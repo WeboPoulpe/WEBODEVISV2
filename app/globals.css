@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-w: 240px;
+  --sidebar-w-collapsed: 64px;
+  --header-h: 60px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: #f9fafb;
+  color: #111827;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Utility class for the luxury menu serif font */
+.font-menu {
+  font-family: var(--font-playfair), Georgia, 'Times New Roman', serif;
+}
+
+/* Dot leader line used in menu rows */
+.dot-leader {
+  flex: 1;
+  border-bottom: 1px dotted #d1d5db;
+  position: relative;
+  top: -3px;
+  margin: 0 6px;
+  min-width: 16px;
+}
+
+/* ── Sheet / panel slide-in animation ──────────────────────────────────────── */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Rich-text description renderer ──────────────────────────────────────── */
+/* Applied to any element using dangerouslySetInnerHTML for prestation descriptions */
+.description-html strong, .description-html b { font-weight: 700; }
+.description-html em, .description-html i    { font-style: italic; }
+.description-html ul { list-style: disc inside; margin: 0.2em 0; padding: 0; }
+.description-html ol { list-style: decimal inside; margin: 0.2em 0; padding: 0; }
+.description-html li { margin-bottom: 0.1em; }
+.description-html p  { margin: 0.15em 0; }
+.description-html p:empty { display: none; }
+/* Collapse spurious trailing <br> that browsers sometimes inject */
+.description-html br:last-child { display: none; }
+
+/* ── Page break helper (also works outside @media print via CSS break-before) */
+.page-break {
+  break-before: page;
+  display: block;
+  height: 0;
+  visibility: hidden; /* invisible on screen, effective only in print */
+}
+
+/* Avoid page breaks inside a block */
+.print-block {
+  break-inside: avoid;
+}
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  /* 1. Format A4, marges retirées (padding géré par QuoteDocument) */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  /* 2. Force les couleurs fond (header violet, badges, etc.) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 3. Cache sidebar, navigation, boutons et éléments .no-print */
+  nav,
+  aside,
+  header,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /*
+   * 4. "Document Only" technique ───────────────────────────────────────────
+   *    Step 1 : masque tout le DOM (visibility conserve le flux multi-pages
+   *             mieux que display:none)
+   *    Step 2 : révèle uniquement .quote-document et ses descendants
+   *    Step 3 : positionne le document en haut à gauche (pleine largeur A4)
+   *
+   *    IMPORTANT — reset des décalages de l'AppShell :
+   *    • .app-main-area a un margin-left inline (largeur sidebar ~240px)
+   *    • <main> a un padding-top inline (hauteur header ~60px)
+   *    Ces décalages doivent être annulés pour que position:absolute parte
+   *    du coin (0,0) de la page et non du coin de la zone de contenu.
+   */
+
+  /* Annule les styles inline de l'AppShell */
+  .app-main-area {
+    margin-left: 0 !important;
+  }
+  main {
+    padding-top: 0 !important;
+    overflow: visible !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .quote-document,
+  .quote-document * {
+    visibility: visible !important;
+  }
+
+  .quote-document {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 210mm !important;      /* explicite A4 — évite la dépendance au viewport */
+    min-height: 297mm !important; /* garantit une page complète même si le contenu est court */
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    margin: 0 !important;
+  }
+
+  /* 5. Classe utilitaire .print-container (pleine largeur A4, sans marges) */
+  .print-container {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Thin scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
