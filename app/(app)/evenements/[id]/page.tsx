@@ -42,6 +42,7 @@ interface Quote {
   status: string;
   services: ServiceLine[] | null;
   checklist: ChecklistItem[] | null;
+  event_materials: MaterialItem[] | null;
 }
 
 interface Ingredient {
@@ -96,6 +97,25 @@ interface ServiceMaterial {
   qty_per_unit: number;
   multiply_by: 'guest' | 'service_qty';
   unit: string | null;
+}
+
+interface MaterialItem {
+  id: string;
+  name: string;
+  qty: number;
+  unit: string;
+}
+
+interface RentalItem {
+  id: string;
+  quote_id: string;
+  material_name: string;
+  qty: number;
+  unit: string | null;
+  supplier_id: string | null;
+  price_per_unit: number;
+  notes: string | null;
+  supplier: Supplier | null;
 }
 
 // ── Category helpers ──────────────────────────────────────────────────────────
@@ -249,10 +269,27 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
 }
 
 // ── Matériel tab ──────────────────────────────────────────────────────────────
-function MaterielTab({ quote }: { quote: Quote }) {
+function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: MaterialItem[]) => void }) {
   const { user } = useAuth();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [templates, setTemplates] = useState<ServiceMaterial[]>([]);
+  const [customItems, setCustomItems] = useState<MaterialItem[]>(quote.event_materials ?? []);
+  const [newName, setNewName] = useState('');
+  const [newQty, setNewQty]   = useState('1');
+  const [newUnit, setNewUnit] = useState('');
+  const [saving, setSaving]   = useState(false);
+
+  // ── Rental items state ─────────────────────────────────────────────────────
+  const [rentalItems, setRentalItems] = useState<RentalItem[]>([]);
+  const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
+  const [showRentalForm, setShowRentalForm] = useState(false);
+  const [rName, setRName]       = useState('');
+  const [rQty, setRQty]         = useState('1');
+  const [rUnit, setRUnit]       = useState('');
+  const [rSupplierId, setRSupplierId] = useState('');
+  const [rPrice, setRPrice]     = useState('0');
+  const [rNotes, setRNotes]     = useState('');
+  const [savingRental, setSavingRental] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -262,6 +299,121 @@ function MaterielTab({ quote }: { quote: Quote }) {
       .eq('user_id', user.id)
       .then(({ data }) => setTemplates((data ?? []) as ServiceMaterial[]));
   }, [user]);
+
+  const saveCustom = useCallback(async (items: MaterialItem[]) => {
+    setSaving(true);
+    await createClient().from('quotes').update({ event_materials: items }).eq('id', quote.id);
+    setSaving(false);
+    onUpdate(items);
+  }, [quote.id, onUpdate]);
+
+  // Load rental items + suppliers
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from('rental_items')
+      .select('*, supplier:suppliers(id, name)')
+      .eq('quote_id', quote.id)
+      .then(({ data }) => setRentalItems((data ?? []) as RentalItem[]));
+    supabase.from('suppliers').select('id, name').order('name')
+      .then(({ data }) => setSuppliers(data ?? []));
+  }, [quote.id]);
+
+  const addRental = async () => {
+    const name = rName.trim();
+    if (!name) return;
+    setSavingRental(true);
+    const { data: newItem } = await createClient()
+      .from('rental_items')
+      .insert({
+        quote_id: quote.id,
+        material_name: name,
+        qty: parseFloat(rQty) || 1,
+        unit: rUnit.trim() || null,
+        supplier_id: rSupplierId || null,
+        price_per_unit: parseFloat(rPrice) || 0,
+        notes: rNotes.trim() || null,
+      })
+      .select('*, supplier:suppliers(id, name)')
+      .single();
+    if (newItem) setRentalItems((p) => [...p, newItem as RentalItem]);
+    setRName(''); setRQty('1'); setRUnit(''); setRSupplierId(''); setRPrice('0'); setRNotes('');
+    setShowRentalForm(false);
+    setSavingRental(false);
+  };
+
+  const removeRental = async (id: string) => {
+    await createClient().from('rental_items').delete().eq('id', id);
+    setRentalItems((p) => p.filter((r) => r.id !== id));
+  };
+
+  const printBonCommande = () => {
+    if (rentalItems.length === 0) return;
+    const grouped: Record<string, RentalItem[]> = {};
+    for (const r of rentalItems) {
+      const key = r.supplier?.name ?? 'Sans fournisseur';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(r);
+    }
+    const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
+    const today = new Date().toLocaleDateString('fr-FR');
+    const rows = Object.entries(grouped).map(([sup, items]) => {
+      const total = items.reduce((s, i) => s + i.qty * i.price_per_unit, 0);
+      return `
+        <h3 style="color:#9c27b0;margin:18px 0 6px;font-size:14px;border-bottom:1px solid #e9d5ff;padding-bottom:4px;">${sup}</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f3e5f5;">
+            <th style="text-align:left;padding:6px 8px;">Article</th>
+            <th style="text-align:center;padding:6px 8px;width:60px;">Qté</th>
+            <th style="text-align:right;padding:6px 8px;width:80px;">PU</th>
+            <th style="text-align:right;padding:6px 8px;width:90px;">Total</th>
+          </tr></thead>
+          <tbody>${items.map((i) => `
+            <tr style="border-bottom:1px solid #f3e5f5;">
+              <td style="padding:6px 8px;">${i.material_name}${i.notes ? `<br><span style="color:#aaa;font-size:11px;font-style:italic;">${i.notes}</span>` : ''}</td>
+              <td style="text-align:center;padding:6px 8px;">${i.qty}${i.unit ? ` ${i.unit}` : ''}</td>
+              <td style="text-align:right;padding:6px 8px;">${money(i.price_per_unit)}</td>
+              <td style="text-align:right;padding:6px 8px;font-weight:bold;">${money(i.qty * i.price_per_unit)}</td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr>
+            <td colspan="3" style="text-align:right;padding:6px 8px;font-weight:bold;font-size:12px;">Total ${sup}</td>
+            <td style="text-align:right;padding:6px 8px;font-weight:bold;color:#9c27b0;">${money(total)}</td>
+          </tr></tfoot>
+        </table>`;
+    }).join('');
+    const grandTotal = rentalItems.reduce((s, r) => s + r.qty * r.price_per_unit, 0);
+    const win = window.open('', '_blank', 'width=800,height=600');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bon de Commande Location</title>
+      <style>@page{size:A4;margin:20mm}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;}</style></head>
+      <body><h1 style="color:#9c27b0;font-size:18px;margin:0 0 4px;">Bon de Commande — Location de Matériel</h1>
+      <p style="color:#888;font-size:11px;margin:0 0 20px;">Événement : ${quote.event_type ?? ''} — ${today}</p>
+      ${rows}
+      <p style="margin-top:20px;text-align:right;font-size:14px;font-weight:bold;color:#9c27b0;">
+        Total général : ${money(grandTotal)}</p>
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 400);
+  };
+
+  const addCustom = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const next = [...customItems, { id: crypto.randomUUID(), name, qty: parseFloat(newQty) || 1, unit: newUnit.trim() }];
+    setCustomItems(next);
+    setNewName('');
+    setNewQty('1');
+    setNewUnit('');
+    saveCustom(next);
+  };
+
+  const removeCustom = (id: string) => {
+    const next = customItems.filter((i) => i.id !== id);
+    setCustomItems(next);
+    saveCustom(next);
+  };
 
   const services = (quote.services ?? []).filter((s) => !s.isPageBreak);
   const materiel  = services.filter((s) => isMateriel(s.category));
@@ -324,20 +476,48 @@ function MaterielTab({ quote }: { quote: Quote }) {
     </div>
   );
 
-  const isEmpty = materiel.length === 0 && personnel.length === 0 && computed.length === 0;
+  const isEmpty = materiel.length === 0 && personnel.length === 0 && computed.length === 0 && customItems.length === 0;
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-gray-400">Cochez les éléments disponibles. Ces données ne sont pas sauvegardées.</p>
+      <p className="text-xs text-gray-400">Cochez les éléments disponibles. Les matériels ajoutés manuellement sont sauvegardés.</p>
 
       {isEmpty && (
         <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
           <Package className="h-8 w-8 text-gray-300 mx-auto mb-2" />
           <p className="text-sm text-gray-400">Aucun matériel détecté.</p>
           <p className="text-xs text-gray-400 mt-1">
-            Catégorisez vos prestations avec &quot;matériel&quot; ou configurez les templates dans{' '}
+            Ajoutez du matériel ci-dessous ou configurez les templates dans{' '}
             <Link href="/prestations" className="text-[#9c27b0] hover:underline">Prestations</Link>.
           </p>
+        </div>
+      )}
+
+      {/* Custom materials (saved to DB) */}
+      {customItems.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Matériel ajouté manuellement</p>
+          <div className="space-y-1.5">
+            {customItems.map((item) => (
+              <div key={item.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+                <input
+                  type="checkbox"
+                  checked={checked.has(item.id)}
+                  onChange={() => toggle(item.id)}
+                  className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                />
+                <p className={['flex-1 text-sm font-medium', checked.has(item.id) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
+                  {item.name}
+                </p>
+                <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
+                  {item.qty} {item.unit}
+                </span>
+                <button onClick={() => removeCustom(item.id)} className="p-1 text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -368,69 +548,264 @@ function MaterielTab({ quote }: { quote: Quote }) {
 
       {materiel.length > 0  && <Section title="Matériel & Vaisselle" items={materiel}  />}
       {personnel.length > 0 && <Section title="Personnel & Service" items={personnel} />}
+
+      {/* Add custom material */}
+      <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
+        <p className="text-xs font-semibold text-gray-600">Ajouter du matériel</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addCustom()}
+            placeholder="Nom du matériel…"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+          />
+          <input
+            type="number"
+            value={newQty}
+            onChange={(e) => setNewQty(e.target.value)}
+            min="0"
+            step="1"
+            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+          />
+          <input
+            type="text"
+            value={newUnit}
+            onChange={(e) => setNewUnit(e.target.value)}
+            placeholder="unité"
+            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+          />
+          <button
+            onClick={addCustom}
+            disabled={!newName.trim() || saving}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Location de matériel ─────────────────────────────────────────────── */}
+      <div className="border border-[#9c27b0]/20 rounded-xl p-4 space-y-4 bg-purple-50/40">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-[#9c27b0] uppercase tracking-widest">Location de matériel</p>
+          <div className="flex items-center gap-2">
+            {rentalItems.length > 0 && (
+              <button
+                onClick={printBonCommande}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-100 transition-colors"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Bon de commande PDF
+              </button>
+            )}
+            <button
+              onClick={() => setShowRentalForm((v) => !v)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#9c27b0] rounded-lg hover:bg-[#7b1fa2] transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter
+            </button>
+          </div>
+        </div>
+
+        {/* Rental items grouped by supplier */}
+        {rentalItems.length > 0 && (() => {
+          const grouped: Record<string, RentalItem[]> = {};
+          for (const r of rentalItems) {
+            const key = r.supplier?.name ?? 'Sans fournisseur';
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(r);
+          }
+          return Object.entries(grouped).map(([sup, items]) => {
+            const total = items.reduce((s, i) => s + i.qty * i.price_per_unit, 0);
+            return (
+              <div key={sup} className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-semibold text-gray-500">{sup}</p>
+                  <span className="text-xs font-bold text-[#9c27b0]">
+                    {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(total)}
+                  </span>
+                </div>
+                {items.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 bg-white border border-purple-100 rounded-xl px-3 py-2.5 shadow-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{r.material_name}</p>
+                      {r.notes && <p className="text-xs text-gray-400 italic">{r.notes}</p>}
+                    </div>
+                    <span className="text-xs text-gray-500 flex-shrink-0">{r.qty}{r.unit ? ` ${r.unit}` : ''}</span>
+                    <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
+                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
+                    </span>
+                    <button onClick={() => removeRental(r.id)} className="p-1 text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          });
+        })()}
+
+        {rentalItems.length === 0 && !showRentalForm && (
+          <p className="text-xs text-gray-400 italic text-center py-2">Aucun matériel à louer — cliquez sur Ajouter</p>
+        )}
+
+        {/* Add rental form */}
+        {showRentalForm && (
+          <div className="bg-white border border-[#9c27b0]/20 rounded-xl p-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={rName}
+                onChange={(e) => setRName(e.target.value)}
+                placeholder="Nom du matériel *"
+                className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              />
+              <input
+                type="number" min="0" step="1"
+                value={rQty}
+                onChange={(e) => setRQty(e.target.value)}
+                placeholder="Quantité"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              />
+              <input
+                value={rUnit}
+                onChange={(e) => setRUnit(e.target.value)}
+                placeholder="Unité"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              />
+              <select
+                value={rSupplierId}
+                onChange={(e) => setRSupplierId(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              >
+                <option value="">Fournisseur (optionnel)</option>
+                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <input
+                type="number" min="0" step="0.01"
+                value={rPrice}
+                onChange={(e) => setRPrice(e.target.value)}
+                placeholder="Prix unitaire HT"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              />
+              <input
+                value={rNotes}
+                onChange={(e) => setRNotes(e.target.value)}
+                placeholder="Notes (optionnel)"
+                className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowRentalForm(false)} className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                Annuler
+              </button>
+              <button
+                onClick={addRental}
+                disabled={!rName.trim() || savingRental}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-[#9c27b0] text-white text-xs font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+              >
+                {savingRental ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── Liste de courses tab ───────────────────────────────────────────────────────
-function CoursesTab({ quote }: { quote: Quote }) {
-  const [checked, setChecked] = useState<Set<string>>(new Set());
-  const services = (quote.services ?? []).filter((s) => !s.isPageBreak);
-  const gastro = services.filter((s) => isGastro(s.category));
+function CoursesTab({ quoteId }: { quoteId: string }) {
+  const [items, setItems] = useState<EventIngredient[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const groups = new Map<string, ServiceLine[]>();
-  for (const s of gastro) {
-    const key = s.category?.trim() || 'Divers';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(s);
-  }
+  useEffect(() => {
+    createClient()
+      .from('event_ingredients')
+      .select('*, ingredient:ingredients(*), supplier:suppliers(id, name)')
+      .eq('quote_id', quoteId)
+      .order('created_at')
+      .then(({ data }) => {
+        setItems((data ?? []) as EventIngredient[]);
+        setLoading(false);
+      });
+  }, [quoteId]);
 
-  if (gastro.length === 0) {
+  const toggle = async (id: string, checked: boolean) => {
+    await createClient().from('event_ingredients').update({ checked }).eq('id', id);
+    setItems((p) => p.map((i) => i.id === id ? { ...i, checked } : i));
+  };
+
+  const grouped = useMemo(() =>
+    items.reduce<Record<string, EventIngredient[]>>((acc, item) => {
+      const key = item.supplier?.name ?? 'Sans fournisseur';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {}),
+  [items]);
+
+  const supplierKeys = useMemo(() =>
+    Object.keys(grouped).sort((a, b) => {
+      if (a === 'Sans fournisseur') return 1;
+      if (b === 'Sans fournisseur') return -1;
+      return a.localeCompare(b, 'fr');
+    }),
+  [grouped]);
+
+  const done = items.filter((i) => i.checked).length;
+  const pct  = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-[#9c27b0]" /></div>;
+
+  if (items.length === 0) {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
         <ShoppingCart className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">Aucune prestation culinaire trouvée.</p>
+        <p className="text-sm text-gray-400">Aucun article dans la liste de courses.</p>
+        <p className="text-xs text-gray-400 mt-1">
+          Ajoutez des ingrédients depuis l&apos;onglet <span className="text-[#9c27b0] font-medium">Prépa & Achats</span>.
+        </p>
       </div>
     );
   }
 
-  const toggle = (id: string) => {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">Cochez les ingrédients ou fournitures déjà préparés.</p>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors print:hidden"
-        >
-          <Printer className="h-3.5 w-3.5" />
-          Imprimer
-        </button>
+    <div className="space-y-5">
+      {/* Progress */}
+      <div>
+        <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+          <span>{done}/{items.length} article{items.length > 1 ? 's' : ''} coché{done > 1 ? 's' : ''}</span>
+          <span className="font-medium text-[#9c27b0]">{pct}%</span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-[#9c27b0] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+        </div>
       </div>
 
-      {Array.from(groups.entries()).map(([cat, items]) => (
-        <div key={cat} className="space-y-1.5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{cat}</p>
-          {items.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+      {/* Items grouped by supplier */}
+      {supplierKeys.map((supplierName) => (
+        <div key={supplierName} className="space-y-1.5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{supplierName}</p>
+          {grouped[supplierName].map((item) => (
+            <div key={item.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
               <input
                 type="checkbox"
-                checked={checked.has(s.id)}
-                onChange={() => toggle(s.id)}
+                checked={item.checked}
+                onChange={(e) => toggle(item.id, e.target.checked)}
                 className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
               />
-              <span className={['flex-1 text-sm font-medium', checked.has(s.id) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
-                {s.name}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className={['text-sm font-medium leading-snug', item.checked ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
+                  {item.ingredient.name}
+                </p>
+                {item.notes && <p className="text-xs text-gray-400 italic truncate">{item.notes}</p>}
+              </div>
               <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
-                ×{s.quantity}
+                {item.quantity} {item.unit ?? item.ingredient.unit ?? ''}
               </span>
             </div>
           ))}
@@ -1106,7 +1481,7 @@ export default function EvenementPage() {
     const supabase = createClient();
     supabase
       .from('quotes')
-      .select('id, client_name, event_type, event_date, event_location, guest_count, total_amount, status, services, checklist')
+      .select('id, client_name, event_type, event_date, event_location, guest_count, total_amount, status, services, checklist, event_materials')
       .eq('id', id)
       .single()
       .then(({ data }) => {
@@ -1190,8 +1565,8 @@ export default function EvenementPage() {
             onUpdate={(items) => setQuote((q) => q ? { ...q, checklist: items } : q)}
           />
         )}
-        {tab === 'materiel'  && <MaterielTab quote={quote} />}
-        {tab === 'courses'   && <CoursesTab  quote={quote} />}
+        {tab === 'materiel'  && <MaterielTab quote={quote} onUpdate={(mats) => setQuote((q) => q ? { ...q, event_materials: mats } : q)} />}
+        {tab === 'courses'   && <CoursesTab  quoteId={id!} />}
         {tab === 'achats'    && <AchatsTab   quoteId={id!} />}
         {tab === 'staffing'  && <StaffingTab quoteId={id!} quote={quote} />}
       </div>

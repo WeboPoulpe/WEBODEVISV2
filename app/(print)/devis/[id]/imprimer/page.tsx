@@ -28,6 +28,54 @@ export default async function ImprimerPage({ params }: Props) {
 
   if (!quote) notFound();
 
+  // ── V2: if WeboWord content_html exists, render it directly ─────────────────
+  if (quote.content_html) {
+    const selectedFont = (quote.selected_font as string | null) ?? 'Georgia';
+    const googleFonts = ['Playfair Display', 'Montserrat', 'Roboto', 'Open Sans'];
+    const isGoogleFont = googleFonts.includes(selectedFont);
+
+    return (
+      <>
+        <AutoPrint />
+        {isGoogleFont && (
+          // eslint-disable-next-line @next/next/no-page-custom-font
+          <link
+            rel="stylesheet"
+            href={`https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@400;600;700&display=swap`}
+          />
+        )}
+        <style>{`
+          @page { size: A4; margin: 0; }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body { margin: 0; padding: 0; font-family: '${selectedFont}', Georgia, serif; }
+          .screen-sep {
+            page-break-after: always !important;
+            break-after: page !important;
+            border: none !important;
+            background: transparent !important;
+            color: transparent !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 0 !important;
+            overflow: hidden !important;
+            font-size: 0 !important;
+            line-height: 0 !important;
+          }
+        `}</style>
+        <div
+          style={{ padding: '20mm', fontFamily: `'${selectedFont}', Georgia, serif` }}
+          dangerouslySetInnerHTML={{ __html: quote.content_html as string }}
+        />
+      </>
+    );
+  }
+
+  // ── V1 fallback: render via QuoteDocument React components ──────────────────
+
   // Fetch company profile
   const { data: profile } = user
     ? await supabase

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
-  CalendarDays, Users, Eye, Pencil, Search, Filter, Printer,
+  CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, ArrowRight, TrendingUp, CalendarRange,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -22,6 +22,8 @@ interface Quote {
   status: string;
   total_amount: number | null;
   created_at: string;
+  user_id: string | null;       // null on true V1 devis (old system)
+  owner_user_id: string | null;
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
@@ -48,6 +50,18 @@ function getEventIcon(eventType: string): React.ElementType {
   return EVENT_ICONS[eventType.toLowerCase().trim()] ?? CalendarDays;
 }
 
+// ── V1 badge ──────────────────────────────────────────────────────────────────
+function V1Badge() {
+  return (
+    <span
+      title="Devis créé dans l'ancienne version (V1). Pour une utilisation optimale, effectuez vos modifications dans l'ancien système."
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 cursor-help flex-shrink-0"
+    >
+      V1
+    </span>
+  );
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
@@ -60,9 +74,9 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange,
+  quote, onClose, onStatusChange, onDelete,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
   const [notes, setNotes] = useState('');
@@ -142,6 +156,14 @@ function DevisSheet({
               <Pencil className="h-4 w-4" />Éditer
             </Link>
           </div>
+          {status === 'draft' && (
+            <button
+              onClick={() => { onDelete(quote.id); onClose(); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors mt-1"
+            >
+              <Trash2 className="h-4 w-4" />Supprimer ce brouillon
+            </button>
+          )}
         </div>
       )}
 
@@ -168,7 +190,7 @@ function DevisSheet({
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function QuoteCard({ quote, onOpenSheet }: { quote: Quote; onOpenSheet: () => void }) {
+function QuoteCard({ quote, onOpenSheet, onDelete }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void }) {
   const Icon = getEventIcon(quote.event_type || '');
   return (
     <div className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200">
@@ -182,7 +204,10 @@ function QuoteCard({ quote, onOpenSheet }: { quote: Quote; onOpenSheet: () => vo
             <p className="text-sm text-gray-500 capitalize truncate">{quote.event_type || 'Événement'}</p>
           </div>
         </div>
-        <StatusBadge status={quote.status} />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {!quote.user_id && <V1Badge />}
+          <StatusBadge status={quote.status} />
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm text-gray-500">
         {quote.event_date && <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-gray-400" />{formatDate(quote.event_date)}</span>}
@@ -193,6 +218,12 @@ function QuoteCard({ quote, onOpenSheet }: { quote: Quote; onOpenSheet: () => vo
           <p className="font-bold text-gray-900 text-base">{formatCurrency(quote.total_amount)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
         ) : <p className="text-sm text-gray-400 italic">—</p>}
         <div className="flex items-center gap-1">
+          {quote.status === 'draft' && (
+            <button onClick={() => onDelete(quote.id)} title="Supprimer le brouillon"
+              className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button onClick={onOpenSheet} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             <Eye className="h-3.5 w-3.5" />Aperçu
           </button>
@@ -200,9 +231,15 @@ function QuoteCard({ quote, onOpenSheet }: { quote: Quote; onOpenSheet: () => vo
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             <Printer className="h-3.5 w-3.5" />PDF
           </Link>
-          <Link href={`/devis/${quote.id}/modifier`}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0]/5 transition-colors">
-            <Pencil className="h-3.5 w-3.5" />Éditer
+          <Link href={`/devis/${quote.id}/modifier?mode=wizard`}
+            title="Modifier les informations (client, prestations…)"
+            className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Pencil className="h-3.5 w-3.5" />
+          </Link>
+          <Link href={`/devis/${quote.id}/modifier?mode=weboword`}
+            title="Ouvrir dans WeboWord (éditeur visuel)"
+            className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0]/5 transition-colors">
+            <LayoutTemplate className="h-3.5 w-3.5" />
           </Link>
         </div>
       </div>
@@ -211,7 +248,7 @@ function QuoteCard({ quote, onOpenSheet }: { quote: Quote; onOpenSheet: () => vo
 }
 
 // ── Table view ────────────────────────────────────────────────────────────────
-function TableView({ quotes, onOpenSheet }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void }) {
+function TableView({ quotes, onOpenSheet, onDelete }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void; onDelete: (id: string) => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
@@ -231,13 +268,22 @@ function TableView({ quotes, onOpenSheet }: { quotes: Quote[]; onOpenSheet: (q: 
               <td className="px-4 py-3 font-medium text-gray-900">{q.client_name || '—'}</td>
               <td className="px-4 py-3 text-gray-600 capitalize">{q.event_type || '—'}</td>
               <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{q.event_date ? formatDate(q.event_date) : '—'}</td>
-              <td className="px-4 py-3"><StatusBadge status={q.status} /></td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-1.5">
+                  {!q.user_id && <V1Badge />}
+                  <StatusBadge status={q.status} />
+                </div>
+              </td>
               <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{q.total_amount ? formatCurrency(q.total_amount) : '—'}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 justify-end">
+                  {q.status === 'draft' && (
+                    <button onClick={() => onDelete(q.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                  )}
                   <button onClick={() => onOpenSheet(q)} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button>
-                  <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><Printer className="h-3.5 w-3.5" /></Link>
-                  <Link href={`/devis/${q.id}/modifier`} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Pencil className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="PDF"><Printer className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/devis/${q.id}/modifier?mode=wizard`} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors" title="Modifier les informations"><Pencil className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/devis/${q.id}/modifier?mode=weboword`} className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors" title="Ouvrir dans WeboWord"><LayoutTemplate className="h-3.5 w-3.5" /></Link>
                 </div>
               </td>
             </tr>
@@ -373,7 +419,7 @@ export default function DevisPage() {
     if (!user) return;
     createClient()
       .from('quotes')
-      .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at')
+      .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id')
       .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
       .then(({ data }) => { setQuotes(data ?? []); setLoading(false); });
@@ -382,6 +428,13 @@ export default function DevisPage() {
   const handleStatusChange = useCallback((id: string, status: string) => {
     setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, status } : q));
     setSheetQuote((prev) => prev?.id === id ? { ...prev, status } : prev);
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => {
+    if (!confirm('Supprimer ce brouillon ? Cette action est irréversible.')) return;
+    await createClient().from('quotes').delete().eq('id', id);
+    setQuotes((prev) => prev.filter((q) => q.id !== id));
+    setSheetQuote((prev) => prev?.id === id ? null : prev);
   }, []);
 
   const filtered = quotes.filter((q) => {
@@ -462,16 +515,16 @@ export default function DevisPage() {
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} />)}
+          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} />)}
         </div>
       ) : view === 'table' ? (
-        <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} />
+        <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} />
       ) : (
         <PipelineView quotes={filtered} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} />
       )}
 
       {sheetQuote && (
-        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} />
+        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} />
       )}
     </div>
   );

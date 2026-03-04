@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Save, Loader2, Plus, Trash2, Search, X, Eye,
-  User, CalendarDays, ChefHat, Settings2, Scissors, PencilLine, Check,
+  User, CalendarDays, ChefHat, Settings2, Scissors, PencilLine, Check, LayoutTemplate,
+  AlertTriangle, ClipboardCopy,
 } from 'lucide-react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import QuoteDocument from './QuoteDocument';
-import QuoteDocumentMariage from './QuoteDocumentMariage';
-import QuoteDocumentBusiness from './QuoteDocumentBusiness';
+import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ServiceLine {
@@ -61,6 +61,8 @@ interface Props {
   initialEvent: EventInfo;
   initialServices: ServiceLine[];
   initialOptions: Options;
+  /** True when the quote already has a saved WeboWord (content_html) */
+  hasContentHtml?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -245,43 +247,55 @@ function Section({ icon: Icon, title, children }: { icon: React.ElementType; tit
   );
 }
 
-// ── Live preview panel ─────────────────────────────────────────────────────────
-function LiveDoc({
-  template, client, event, services, options, profile,
-}: {
-  template: QuoteTemplate;
-  client: ClientInfo;
-  event: EventInfo;
-  services: ServiceLine[];
-  options: Options;
-  profile: { company_name?: string | null; company_address?: string | null; company_phone?: string | null } | null;
-}) {
+// ── Live preview (generateQuoteHtml) ──────────────────────────────────────────
+function useLiveHtml(
+  template: QuoteTemplate,
+  client: ClientInfo,
+  event: EventInfo,
+  services: ServiceLine[],
+  options: Options,
+  profile: { company_name?: string | null } | null,
+) {
   const clientName = client.type === 'particulier'
     ? `${client.firstName} ${client.lastName}`.trim()
     : client.companyName;
 
-  const docProps = {
-    companyName:    profile?.company_name    ?? 'Votre entreprise',
-    companyAddress: profile?.company_address,
-    companyPhone:   profile?.company_phone,
-    clientName,
-    eventType:    event.eventType,
-    eventDate:    event.eventDate || null,
-    guestCount:   event.guestCount,
-    services,
-    options: { vatRate: options.vatRate, hidePrice: options.hidePrice, remarks: options.remarks },
-    images: options.images,
-  };
-
-  if (template === 'mariage')  return <QuoteDocumentMariage  {...docProps} />;
-  if (template === 'business') return <QuoteDocumentBusiness {...docProps} />;
-  return <QuoteDocument {...docProps} />;
+  return useMemo(
+    () => generateQuoteHtml(
+      {
+        companyName:   profile?.company_name ?? 'Votre entreprise',
+        clientName:    clientName || 'Client',
+        clientEmail:   client.email   || null,
+        clientPhone:   client.phone   || null,
+        clientAddress: client.address || null,
+        eventType:     event.eventType     || null,
+        eventDate:     event.eventDate     || null,
+        eventLocation: event.eventLocation || null,
+        guestCount:    event.guestCount    || null,
+        services: services
+          .filter((s) => !s.isPageBreak)
+          .map((s) => ({
+            name:         s.name,
+            description:  s.description,
+            quantity:     s.quantity,
+            unitPrice:    s.unitPrice,
+          })),
+        vatRate:   options.vatRate,
+        remarks:   options.remarks   || null,
+        hidePrice: options.hidePrice,
+      },
+      { template },
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [template, client, event, services, options, profile?.company_name],
+  );
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function QuoteInlineEditor({
   quoteId, initialStatus, initialTemplate,
   initialClient, initialEvent, initialServices, initialOptions,
+  hasContentHtml = false,
 }: Props) {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -296,6 +310,8 @@ export default function QuoteInlineEditor({
   const [saved,   setSaved]   = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [webowordModal, setWebowordModal] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // ── Services helpers ─────────────────────────────────────────────────────────
   const addService = () => setServices((prev) => [
@@ -355,6 +371,59 @@ export default function QuoteInlineEditor({
     setTimeout(() => setSaved(false), 3000);
   };
 
+  // ── Régénérer WeboWord (save + clear content_html, then open WeboWord) ───────
+  const handleRegenerateWeboWord = async () => {
+    if (!user) return;
+    setSaving(true); setError(null);
+    const ht2   = totalHT(services);
+    const ttc2  = ht2 + ht2 * (options.vatRate / 100);
+    const payload = {
+      client_first_name:   client.firstName,
+      client_last_name:    client.lastName,
+      client_name:         client.type === 'particulier'
+        ? `${client.firstName} ${client.lastName}`.trim()
+        : client.companyName,
+      client_email:        client.email,
+      client_phone:        client.phone,
+      client_address:      client.address,
+      client_type:         client.type,
+      company_name:        client.companyName || null,
+      contact_person_name: client.contactName || null,
+      event_type:          event.eventType,
+      event_date:          event.eventDate || null,
+      event_location:      event.eventLocation || null,
+      guest_count:         event.guestCount,
+      services,
+      total_amount:        ttc2,
+      vat_rate:            options.vatRate,
+      hide_price:          options.hidePrice,
+      remarks:             options.remarks || null,
+      images:              options.images,
+      template,
+      user_id:             user.id,
+      content_html:        null, // clear → WeboWord will regenerate
+    };
+    const { error: err } = await createClient().from('quotes').update(payload).eq('id', quoteId);
+    setSaving(false);
+    if (err) { setError(err.message); return; }
+    router.push(`/devis/${quoteId}/modifier?mode=weboword`);
+  };
+
+  // ── Copy service to clipboard ─────────────────────────────────────────────
+  const copyService = (s: ServiceLine) => {
+    const text = [
+      s.name,
+      s.description ? s.description : null,
+      `Qté : ${s.quantity}  ·  PU : ${formatCurrency(s.unitPrice)}  ·  Total : ${formatCurrency(s.quantity * s.unitPrice)}`,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(s.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    });
+  };
+
+  const liveHtml = useLiveHtml(template, client, event, services, options, profile);
+
   return (
     <div className="flex h-full overflow-hidden">
 
@@ -373,6 +442,14 @@ export default function QuoteInlineEditor({
               >
                 <Eye className="h-4 w-4" />
                 Aperçu
+              </button>
+              {/* WeboWord button */}
+              <button
+                onClick={() => hasContentHtml ? setWebowordModal(true) : router.push(`/devis/${quoteId}/modifier?mode=weboword`)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-xl hover:bg-[#f3e5f5] transition-colors"
+              >
+                <LayoutTemplate className="h-4 w-4" />
+                WeboWord
               </button>
               <button
                 onClick={handleSave}
@@ -590,12 +667,106 @@ export default function QuoteInlineEditor({
         <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           <Eye className="h-4 w-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-700 flex-1">Aperçu en direct</span>
+          <span className="text-sm font-medium text-gray-700 flex-1">Aperçu en direct · WeboWord</span>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <LiveDoc template={template} client={client} event={event} services={services} options={options} profile={profile} />
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
+          <div
+            style={{ width: '794px', zoom: 0.45, transformOrigin: 'top left' }}
+            dangerouslySetInnerHTML={{ __html: liveHtml }}
+          />
         </div>
       </div>
+
+      {/* ── WeboWord sync modal ── */}
+      {webowordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+
+            {/* Header */}
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Ouvrir WeboWord</h3>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Ce devis contient des <strong>modifications WeboWord personnalisées</strong>.
+                Les nouvelles prestations ajoutées ici ne seront pas intégrées automatiquement.
+              </p>
+            </div>
+
+            {/* Services clipboard */}
+            {services.filter((s) => !s.isPageBreak).length > 0 && (
+              <div className="p-5 pb-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Prestations à copier dans WeboWord
+                </p>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {services.filter((s) => !s.isPageBreak).map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => copyService(s)}
+                      className={cn(
+                        'w-full text-left px-3 py-2 border rounded-xl transition-all group',
+                        copiedId === s.id
+                          ? 'border-emerald-300 bg-emerald-50'
+                          : 'border-gray-200 hover:border-[#9c27b0]/40 hover:bg-[#f3e5f5]/30',
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{s.name || '(sans nom)'}</p>
+                          {s.description && (
+                            <p className="text-xs text-gray-500 truncate">{s.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-gray-400 tabular-nums">
+                            {s.quantity} × {formatCurrency(s.unitPrice)}
+                          </span>
+                          {copiedId === s.id
+                            ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            : <ClipboardCopy className="h-3.5 w-3.5 text-gray-300 group-hover:text-[#9c27b0] transition-colors" />
+                          }
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">
+                  Cliquez sur une ligne pour la copier dans le presse-papiers, puis collez-la dans WeboWord.
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="p-5 flex flex-col gap-2">
+              <Link
+                href={`/devis/${quoteId}/modifier?mode=weboword`}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+              >
+                <LayoutTemplate className="h-4 w-4" />
+                Ouvrir WeboWord (garder mes éditions)
+              </Link>
+              <button
+                onClick={handleRegenerateWeboWord}
+                disabled={saving}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50 disabled:opacity-60 transition-colors"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Régénérer WeboWord (perdre mes éditions)
+              </button>
+              <button
+                onClick={() => setWebowordModal(false)}
+                className="text-sm text-gray-400 hover:text-gray-600 text-center py-1 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Mobile preview modal ── */}
       {previewOpen && (
@@ -611,8 +782,11 @@ export default function QuoteInlineEditor({
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <LiveDoc template={template} client={client} event={event} services={services} options={options} profile={profile} />
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
+              <div
+                style={{ width: '794px', zoom: 0.42, transformOrigin: 'top left' }}
+                dangerouslySetInnerHTML={{ __html: liveHtml }}
+              />
             </div>
           </div>
         </div>

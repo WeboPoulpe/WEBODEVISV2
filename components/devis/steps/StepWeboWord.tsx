@@ -31,28 +31,40 @@ export default function StepWeboWord({ onBack }: Props) {
       : state.clientInfo.companyName;
 
   const [initialHtml, setInitialHtml] = useState<string | null>(null);
+  const [savedFont,   setSavedFont]   = useState<string | undefined>(undefined);
   const [loading, setLoading]         = useState(true);
+
+  const buildHtml = () =>
+    generateQuoteHtml(
+      {
+        companyName,
+        clientName: clientName || 'Client',
+        clientEmail:   state.clientInfo.email,
+        clientPhone:   state.clientInfo.phone,
+        clientAddress: state.clientInfo.address,
+        eventType:     state.eventInfo.eventType,
+        eventDate:     state.eventInfo.eventDate,
+        eventLocation: state.eventInfo.eventLocation,
+        guestCount:    state.eventInfo.guestCount,
+        services: state.services
+          .filter((s) => !s.isPageBreak)
+          .map((s) => ({
+            name:         s.name,
+            description:  s.description,
+            quantity:     s.quantity,
+            unitPrice:    s.unitPrice,
+            hideDescOnPdf: s.hideDescOnPdf,
+          })),
+        vatRate:   state.options.vatRate,
+        remarks:   state.options.remarks,
+        hidePrice: state.options.hidePrice,
+      },
+      { template: state.template },
+    );
 
   useEffect(() => {
     if (!quoteId) {
-      // Fallback: no quoteId (shouldn't happen), generate from state
-      setInitialHtml(
-        generateQuoteHtml({
-          companyName,
-          clientName: clientName || 'Client',
-          clientEmail:   state.clientInfo.email,
-          clientPhone:   state.clientInfo.phone,
-          clientAddress: state.clientInfo.address,
-          eventType:     state.eventInfo.eventType,
-          eventDate:     state.eventInfo.eventDate,
-          eventLocation: state.eventInfo.eventLocation,
-          guestCount:    state.eventInfo.guestCount,
-          services:      state.services.filter((s) => !s.isPageBreak),
-          vatRate:       state.options.vatRate,
-          remarks:       state.options.remarks,
-          hidePrice:     state.options.hidePrice,
-        }),
-      );
+      setInitialHtml(buildHtml());
       setLoading(false);
       return;
     }
@@ -61,31 +73,12 @@ export default function StepWeboWord({ onBack }: Props) {
     const supabase = createClient();
     supabase
       .from('quotes')
-      .select('content_html')
+      .select('content_html, selected_font')
       .eq('id', quoteId)
       .single()
       .then(({ data }) => {
-        if (data?.content_html) {
-          setInitialHtml(data.content_html);
-        } else {
-          setInitialHtml(
-            generateQuoteHtml({
-              companyName,
-              clientName: clientName || 'Client',
-              clientEmail:   state.clientInfo.email,
-              clientPhone:   state.clientInfo.phone,
-              clientAddress: state.clientInfo.address,
-              eventType:     state.eventInfo.eventType,
-              eventDate:     state.eventInfo.eventDate,
-              eventLocation: state.eventInfo.eventLocation,
-              guestCount:    state.eventInfo.guestCount,
-              services:      state.services.filter((s) => !s.isPageBreak),
-              vatRate:       state.options.vatRate,
-              remarks:       state.options.remarks,
-              hidePrice:     state.options.hidePrice,
-            }),
-          );
-        }
+        setInitialHtml(data?.content_html ?? buildHtml());
+        if (data?.selected_font) setSavedFont(data.selected_font);
         setLoading(false);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,6 +106,7 @@ export default function StepWeboWord({ onBack }: Props) {
       initialHtml={initialHtml}
       clientName={clientName || undefined}
       onBack={onBack}
+      selectedFont={savedFont}
     />
   );
 }

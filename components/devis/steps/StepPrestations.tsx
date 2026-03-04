@@ -119,7 +119,7 @@ function ServiceRow({
   onRemove,
 }: {
   service: ServiceLine;
-  onUpdate: (field: string, value: string | number) => void;
+  onUpdate: (field: string, value: string | number | boolean) => void;
   onRemove: () => void;
 }) {
   // Hooks must be called unconditionally (before any early return)
@@ -233,7 +233,7 @@ function ServiceRow({
 
         {/* Description row — always visible for custom, toggle for catalog */}
         {showDesc && (
-          <div className="px-3 pb-2 -mt-1">
+          <div className="px-3 pb-2 -mt-1 space-y-1.5">
             <textarea
               rows={1}
               value={service.description ?? ''}
@@ -248,6 +248,15 @@ function ServiceRow({
                 el.style.height = el.scrollHeight + 'px';
               }}
             />
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.hideDescOnPdf}
+                onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
+                className="h-3 w-3 rounded accent-[#9c27b0]"
+              />
+              <span className="text-[10px] text-gray-400">Masquer sur le PDF (visible sur Carte Gastronomique)</span>
+            </label>
           </div>
         )}
       </div>
@@ -270,13 +279,24 @@ function ServiceRow({
             onSelect={handleSelect}
           />
         )}
-        <textarea
-          rows={2}
-          value={service.description ?? ''}
-          onChange={(e) => onUpdate('description', e.target.value)}
-          placeholder={service.isCustom ? 'Description longue…' : 'Description gastronomique (optionnel)…'}
-          className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
-        />
+        <div className="space-y-1">
+          <textarea
+            rows={2}
+            value={service.description ?? ''}
+            onChange={(e) => onUpdate('description', e.target.value)}
+            placeholder={service.isCustom ? 'Description longue…' : 'Description gastronomique (optionnel)…'}
+            className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
+          />
+          <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+            <input
+              type="checkbox"
+              checked={!!service.hideDescOnPdf}
+              onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
+              className="h-3 w-3 rounded accent-[#9c27b0]"
+            />
+            <span className="text-[10px] text-gray-400">Masquer sur PDF</span>
+          </label>
+        </div>
         <div className="flex items-end gap-2">
           {[
             { key: 'quantity', label: 'Qté', type: 'number', val: service.quantity, center: true },
@@ -333,7 +353,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
 
   const removeService = (id: string) => dispatch({ type: 'REMOVE_SERVICE', payload: id });
 
-  const updateService = (id: string, field: string, value: string | number) =>
+  const updateService = (id: string, field: string, value: string | number | boolean) =>
     dispatch({ type: 'UPDATE_SERVICE', payload: { id, updates: { [field]: value } } });
 
   // Exclude page-break markers from financial calculations

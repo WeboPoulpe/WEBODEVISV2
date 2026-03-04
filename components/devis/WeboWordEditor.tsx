@@ -19,7 +19,26 @@ interface Props {
   clientName?: string;
   /** Called (wizard mode) when user clicks ← back */
   onBack?: () => void;
+  /** Pre-selected font (from saved quote) */
+  selectedFont?: string;
 }
+
+// ── Gastronomic menu width options ────────────────────────────────────────────
+const MENU_WIDTHS = [
+  { label: 'Étroit',  value: '280px' },
+  { label: 'Normal',  value: '400px' },
+  { label: 'Large',   value: '560px' },
+  { label: 'Plein',   value: '100%'  },
+];
+
+// ── Available fonts ────────────────────────────────────────────────────────────
+const FONTS = [
+  { label: 'Georgia (défaut)', value: 'Georgia', google: false },
+  { label: 'Playfair Display', value: 'Playfair Display', google: true },
+  { label: 'Montserrat', value: 'Montserrat', google: true },
+  { label: 'Roboto', value: 'Roboto', google: true },
+  { label: 'Open Sans', value: 'Open Sans', google: true },
+];
 
 // ── Colour presets for the text-colour picker ─────────────────────────────────
 const COLORS = [
@@ -73,24 +92,58 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack }: Props) {
+export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont }: Props) {
   const router = useRouter();
   const editorRef  = useRef<HTMLDivElement>(null);
   const colorInput = useRef<HTMLInputElement>(null);
   const initDone   = useRef(false);
 
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
-  const [toast,    setToast]    = useState<string | null>(null);
-  const [showDesc, setShowDesc] = useState(true);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [toast,     setToast]     = useState<string | null>(null);
+  const [showDesc,  setShowDesc]  = useState(true);
+  const [font,      setFont]      = useState(initFont ?? 'Georgia');
+  const [showFontMenu, setShowFontMenu] = useState(false);
+  const [menuWidth, setMenuWidth] = useState('400px');
 
-  // Inject initial HTML once (never again — React must not touch innerHTML)
+  // ── Load Google Font when font changes ────────────────────────────────────
+  useEffect(() => {
+    const f = FONTS.find((x) => x.value === font);
+    if (!f?.google) return;
+    const id = `gfont-${font.replace(/\s+/g, '-')}`;
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id   = id;
+      link.rel  = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap`;
+      document.head.appendChild(link);
+    }
+  }, [font]);
+
+  // ── Close font menu on outside click ─────────────────────────────────────
+  useEffect(() => {
+    if (!showFontMenu) return;
+    const handler = () => setShowFontMenu(false);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFontMenu]);
+
+  // Inject initial HTML once + detect existing gastro-menu width
   useEffect(() => {
     if (!initDone.current && editorRef.current) {
       editorRef.current.innerHTML = initialHtml;
       initDone.current = true;
+      const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
+      if (menu?.style.maxWidth) setMenuWidth(menu.style.maxWidth);
     }
   }, [initialHtml]);
+
+  // Apply menuWidth to .gastro-menu div (bake before save/print)
+  const applyMenuWidth = (width: string) => {
+    setMenuWidth(width);
+    const menu = editorRef.current?.querySelector('.gastro-menu') as HTMLElement | null;
+    if (menu) menu.style.maxWidth = width;
+  };
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
@@ -107,7 +160,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setSaving(true); setError(null);
     const { error: err } = await createClient()
       .from('quotes')
-      .update({ content_html: html })
+      .update({ content_html: html, selected_font: font })
       .eq('id', quoteId);
     setSaving(false);
     if (err) { setError(err.message); return; }
@@ -119,21 +172,31 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const content = editorRef.current?.innerHTML ?? '';
     const win = window.open('', '_blank', 'width=900,height=700');
     if (!win) return;
+    const fontEntry = FONTS.find((x) => x.value === font);
+    const fontImport = fontEntry?.google
+      ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
+      : '';
     win.document.write(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <title>Devis</title>
+  ${fontImport}
   <style>
     @page { size: A4; margin: 0; }
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; font-family: Georgia, serif; }
-    /* Séparateur : masqué visuellement mais le page-break inline reste actif */
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; }
     .screen-sep {
+      page-break-after: always !important;
+      break-after: page !important;
       border: none !important;
       background: transparent !important;
       color: transparent !important;
-      margin: 0 -20mm !important;
+      margin: 0 !important;
       padding: 0 !important;
       height: 0 !important;
       overflow: hidden !important;
@@ -155,10 +218,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   return (
     <div className="flex flex-col h-full bg-slate-100">
 
-      {/* CSS toggle for descriptions (targets elements inside contentEditable) */}
-      {!showDesc && (
-        <style>{`.svc-desc { display: none !important; }`}</style>
-      )}
+      {/* CSS: font override + description toggle + gastro menu width */}
+      <style>{`
+        #weboword-sheet, #weboword-sheet * { font-family: '${font}', Georgia, serif !important; }
+        ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
+        .gastro-menu { max-width: ${menuWidth} !important; margin: 0 auto !important; }
+      `}</style>
 
       {/* ── Toast ────────────────────────────────────────────────────────────── */}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
@@ -198,6 +263,16 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             {error && (
               <span className="text-xs text-red-600 max-w-[200px] truncate">{error}</span>
             )}
+
+            {/* Modifier les informations → back to wizard */}
+            <Link
+              href={`/devis/${quoteId}/modifier?mode=wizard`}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Modifier les informations du devis (client, prestations, options)"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Modifier les infos</span>
+            </Link>
 
             {/* Bell icon → notifications */}
             <Link
@@ -350,6 +425,60 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               ? <><Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Descriptions</span></>
               : <><EyeOff className="h-3.5 w-3.5" /><span className="hidden sm:inline">Descriptions masquées</span></>}
           </button>
+
+          <Sep />
+
+          {/* Font selector */}
+          <div className="relative">
+            <button
+              onMouseDown={(e) => { e.preventDefault(); setShowFontMenu((v) => !v); }}
+              title="Changer la police"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
+              style={{ fontFamily: font }}
+            >
+              <span className="max-w-[90px] truncate">{font}</span>
+              <span className="text-gray-400">▾</span>
+            </button>
+            {showFontMenu && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl min-w-[170px] py-1">
+                {FONTS.map((f) => (
+                  <button
+                    key={f.value}
+                    onMouseDown={(e) => { e.preventDefault(); setFont(f.value); setShowFontMenu(false); }}
+                    className={cn(
+                      'w-full text-left px-3 py-1.5 text-sm hover:bg-[#9c27b0]/5 transition-colors',
+                      font === f.value && 'text-[#9c27b0] font-semibold',
+                    )}
+                    style={{ fontFamily: f.value }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Sep />
+
+          {/* Gastro menu width */}
+          <div className="flex items-center gap-1" title="Largeur de la carte gastronomique">
+            <span className="text-[10px] text-gray-400 mr-0.5 hidden sm:inline">Carte :</span>
+            {MENU_WIDTHS.map((w) => (
+              <button
+                key={w.value}
+                onMouseDown={(e) => { e.preventDefault(); applyMenuWidth(w.value); }}
+                title={`Largeur carte gastronomique : ${w.label}`}
+                className={cn(
+                  'px-2 py-1 text-xs rounded-lg transition-colors border',
+                  menuWidth === w.value
+                    ? 'bg-[#9c27b0] text-white border-[#9c27b0]'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-100',
+                )}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

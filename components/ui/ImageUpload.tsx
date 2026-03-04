@@ -10,11 +10,15 @@ interface Props {
   userId: string;
   /** Max number of images (default 5) */
   max?: number;
+  /** Supabase storage bucket name (default 'uploads') */
+  bucket?: string;
 }
 
-export default function ImageUpload({ images, onChange, userId, max = 5 }: Props) {
+export default function ImageUpload({ images, onChange, userId, max = 5, bucket = 'uploads' }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -22,19 +26,22 @@ export default function ImageUpload({ images, onChange, userId, max = 5 }: Props
     if (remaining <= 0) return;
 
     setUploading(true);
+    setUploadError(null);
     const supabase = createClient();
     const newUrls: string[] = [];
 
     for (const file of Array.from(files).slice(0, remaining)) {
-      const path = `devis/${userId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-      const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: true });
-      if (!error) {
-        const { data } = supabase.storage.from('storage').getPublicUrl(path);
+      const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+      if (error) {
+        setUploadError(`Erreur upload : ${error.message}. Vérifiez que le bucket "${bucket}" existe dans Supabase Storage avec accès public.`);
+      } else {
+        const { data } = supabase.storage.from(bucket).getPublicUrl(path);
         newUrls.push(`${data.publicUrl}?t=${Date.now()}`);
       }
     }
 
-    onChange([...images, ...newUrls]);
+    if (newUrls.length > 0) onChange([...images, ...newUrls]);
     setUploading(false);
     if (inputRef.current) inputRef.current.value = '';
   };
@@ -43,6 +50,9 @@ export default function ImageUpload({ images, onChange, userId, max = 5 }: Props
 
   return (
     <div className="space-y-3">
+      {uploadError && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{uploadError}</p>
+      )}
       {/* Thumbnails */}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">

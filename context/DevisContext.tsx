@@ -14,6 +14,8 @@ export interface ServiceLine {
   isCustom?: boolean;
   /** true = séparateur de saut de page (non imprimé comme prestation) */
   isPageBreak?: boolean;
+  /** true = description masquée sur le PDF page 1 (visible sur Carte Gastronomique) */
+  hideDescOnPdf?: boolean;
 }
 
 export type QuoteTemplate = 'standard' | 'mariage' | 'business';

@@ -133,7 +133,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-30 flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden"
+      className="fixed inset-y-0 left-0 z-30 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden"
       style={{
         width: collapsed ? 64 : 240,
         background: 'linear-gradient(175deg, #1a0733 0%, #2a1554 55%, #1e0e42 100%)',

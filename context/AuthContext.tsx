@@ -22,6 +22,8 @@ export interface Profile {
   subscription_type: string | null;
   parent_user_id: string | null;
   can_view_all_company_data: boolean;
+  has_completed_onboarding: boolean | null;
+  default_vat_rate: number | null;
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -85,6 +88,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   };
 
+  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (!error && data.user) {
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        email,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        role: 'user',
+        is_active: true,
+        has_completed_onboarding: false,
+      });
+    }
+    return { error: error?.message ?? null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -95,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, loading, signIn, signOut, refreshProfile }}
+      value={{ user, session, profile, loading, signIn, signUp, signOut, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Event {
@@ -119,19 +120,22 @@ function EventCard({ event }: { event: Event }) {
 export default function EvenementsPage() {
   const [events, setEvents]   = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
     const supabase = createClient();
     supabase
       .from('quotes')
       .select('id, client_name, event_type, event_date, guest_count, total_amount, status')
+      .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
       .not('event_date', 'is', null)
       .order('event_date', { ascending: false })
       .then(({ data }) => {
         setEvents((data ?? []) as Event[]);
         setLoading(false);
       });
-  }, []);
+  }, [user]);
 
   // Split: upcoming (today + future) vs past
   const today    = new Date(); today.setHours(0, 0, 0, 0);
