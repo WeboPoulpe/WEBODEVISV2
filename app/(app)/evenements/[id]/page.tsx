@@ -149,7 +149,7 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'materiel',  label: 'Matériel',         icon: <Package className="h-4 w-4" />        },
   { key: 'courses',   label: 'Courses',          icon: <ShoppingCart className="h-4 w-4" />   },
   { key: 'achats',    label: 'Prépa & Achats',   icon: <UtensilsCrossed className="h-4 w-4" /> },
-  { key: 'staffing',  label: 'Staffing',         icon: <Users2 className="h-4 w-4" />         },
+  { key: 'staffing',  label: 'Extras',           icon: <Users2 className="h-4 w-4" />         },
 ];
 
 // ── Checklist tab ─────────────────────────────────────────────────────────────
@@ -386,7 +386,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
     const win = window.open('', '_blank', 'width=800,height=600');
     if (!win) return;
     win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bon de Commande Location</title>
-      <style>@page{size:A4;margin:20mm}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;}</style></head>
+      <style>@page{size:A4;margin:20mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;}</style></head>
       <body><h1 style="color:#9c27b0;font-size:18px;margin:0 0 4px;">Bon de Commande — Location de Matériel</h1>
       <p style="color:#888;font-size:11px;margin:0 0 20px;">Événement : ${quote.event_type ?? ''} — ${today}</p>
       ${rows}
@@ -718,20 +718,89 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 }
 
 // ── Liste de courses tab ───────────────────────────────────────────────────────
-function CoursesTab({ quoteId }: { quoteId: string }) {
+function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
   const [items, setItems] = useState<EventIngredient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    createClient()
+  const loadItems = useCallback(async () => {
+    const { data } = await createClient()
       .from('event_ingredients')
       .select('*, ingredient:ingredients(*), supplier:suppliers(id, name)')
       .eq('quote_id', quoteId)
-      .order('created_at')
-      .then(({ data }) => {
-        setItems((data ?? []) as EventIngredient[]);
-        setLoading(false);
-      });
+      .order('created_at');
+    return (data ?? []) as EventIngredient[];
+  }, [quoteId]);
+
+  // Auto-generate courses from service_ingredients × guest_count
+  const autoGenerate = useCallback(async (force = false) => {
+    if (!force && !confirm('Recalculer la liste de courses depuis les prestations ? Les articles existants seront supprimés.')) return;
+    setGenerating(true);
+    const supabase = createClient();
+
+    // 1. Get matching prestations by service names (substring match)
+    const services = (quote.services ?? []).filter((s) => !s.isPageBreak);
+    if (services.length === 0) { setGenerating(false); return; }
+
+    const { data: prestations } = await supabase
+      .from('prestations')
+      .select('id, name');
+    if (!prestations || prestations.length === 0) { setGenerating(false); return; }
+
+    // Match prestations to quote services by name substring
+    const matchedIds: string[] = [];
+    for (const svc of services) {
+      for (const p of prestations) {
+        if (p.name.toLowerCase().includes(svc.name.toLowerCase()) ||
+            svc.name.toLowerCase().includes(p.name.toLowerCase())) {
+          if (!matchedIds.includes(p.id)) matchedIds.push(p.id);
+        }
+      }
+    }
+    if (matchedIds.length === 0) { setGenerating(false); return; }
+
+    // 2. Fetch service_ingredients for matched prestations
+    const { data: svcIngredients } = await supabase
+      .from('service_ingredients')
+      .select('ingredient_id, qty_per_person, unit')
+      .in('prestation_id', matchedIds);
+    if (!svcIngredients || svcIngredients.length === 0) { setGenerating(false); return; }
+
+    // 3. Aggregate by ingredient_id (sum qty × guest_count)
+    const guestCount = quote.guest_count ?? 1;
+    const agg: Record<string, { qty: number; unit: string | null }> = {};
+    for (const si of svcIngredients) {
+      if (!agg[si.ingredient_id]) agg[si.ingredient_id] = { qty: 0, unit: si.unit };
+      agg[si.ingredient_id].qty += si.qty_per_person * guestCount;
+    }
+
+    // 4. Delete existing + insert new
+    await supabase.from('event_ingredients').delete().eq('quote_id', quoteId);
+    const toInsert = Object.entries(agg).map(([ingredient_id, { qty, unit }]) => ({
+      quote_id: quoteId,
+      ingredient_id,
+      quantity: Math.round(qty * 100) / 100,
+      unit,
+      checked: false,
+    }));
+    await supabase.from('event_ingredients').insert(toInsert);
+
+    // 5. Reload
+    const fresh = await loadItems();
+    setItems(fresh);
+    setGenerating(false);
+  }, [quote, quoteId, loadItems]);
+
+  useEffect(() => {
+    loadItems().then((data) => {
+      setItems(data);
+      setLoading(false);
+      // Auto-generate only if list is empty AND quote has services with potential links
+      if (data.length === 0 && (quote.services ?? []).filter((s) => !s.isPageBreak).length > 0) {
+        autoGenerate(true);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
   const toggle = async (id: string, checked: boolean) => {
@@ -759,58 +828,76 @@ function CoursesTab({ quoteId }: { quoteId: string }) {
   const done = items.filter((i) => i.checked).length;
   const pct  = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
 
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-[#9c27b0]" /></div>;
-
-  if (items.length === 0) {
-    return (
-      <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-        <ShoppingCart className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">Aucun article dans la liste de courses.</p>
-        <p className="text-xs text-gray-400 mt-1">
-          Ajoutez des ingrédients depuis l&apos;onglet <span className="text-[#9c27b0] font-medium">Prépa & Achats</span>.
-        </p>
-      </div>
-    );
-  }
+  if (loading || generating) return (
+    <div className="flex flex-col items-center justify-center py-8 gap-2">
+      <Loader2 className="h-5 w-5 animate-spin text-[#9c27b0]" />
+      {generating && <p className="text-xs text-gray-400">Calcul depuis les prestations…</p>}
+    </div>
+  );
 
   return (
     <div className="space-y-5">
-      {/* Progress */}
-      <div>
-        <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-          <span>{done}/{items.length} article{items.length > 1 ? 's' : ''} coché{done > 1 ? 's' : ''}</span>
-          <span className="font-medium text-[#9c27b0]">{pct}%</span>
-        </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-2 bg-[#9c27b0] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
-        </div>
+      {/* Actions */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">{items.length} article{items.length !== 1 ? 's' : ''}</p>
+        <button
+          onClick={() => autoGenerate(false)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          Recalculer depuis les prestations
+        </button>
       </div>
 
-      {/* Items grouped by supplier */}
-      {supplierKeys.map((supplierName) => (
-        <div key={supplierName} className="space-y-1.5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{supplierName}</p>
-          {grouped[supplierName].map((item) => (
-            <div key={item.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={(e) => toggle(item.id, e.target.checked)}
-                className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <p className={['text-sm font-medium leading-snug', item.checked ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
-                  {item.ingredient.name}
-                </p>
-                {item.notes && <p className="text-xs text-gray-400 italic truncate">{item.notes}</p>}
-              </div>
-              <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
-                {item.quantity} {item.unit ?? item.ingredient.unit ?? ''}
-              </span>
+      {items.length === 0 ? (
+        <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          <ShoppingCart className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-400">Aucun article dans la liste de courses.</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Ajoutez des ingrédients depuis l&apos;onglet <span className="text-[#9c27b0] font-medium">Prépa & Achats</span>
+            {' '}ou liez des ingrédients à vos prestations.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Progress */}
+          <div>
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+              <span>{done}/{items.length} article{items.length > 1 ? 's' : ''} coché{done > 1 ? 's' : ''}</span>
+              <span className="font-medium text-[#9c27b0]">{pct}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-[#9c27b0] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+
+          {/* Items grouped by supplier */}
+          {supplierKeys.map((supplierName) => (
+            <div key={supplierName} className="space-y-1.5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{supplierName}</p>
+              {grouped[supplierName].map((item) => (
+                <div key={item.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={(e) => toggle(item.id, e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className={['text-sm font-medium leading-snug', item.checked ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
+                      {item.ingredient.name}
+                    </p>
+                    {item.notes && <p className="text-xs text-gray-400 italic truncate">{item.notes}</p>}
+                  </div>
+                  <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
+                    {item.quantity} {item.unit ?? item.ingredient.unit ?? ''}
+                  </span>
+                </div>
+              ))}
             </div>
           ))}
-        </div>
-      ))}
+        </>
+      )}
     </div>
   );
 }
@@ -912,6 +999,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
 
   return (
     <div className="space-y-4">
+      <style>{`@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}`}</style>
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-400">{items.length} ingrédient{items.length !== 1 ? 's' : ''} ajouté{items.length !== 1 ? 's' : ''}</p>
         <div className="flex gap-2">
@@ -1204,6 +1292,11 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
     setAssignments((p) => p.filter((a) => a.id !== id));
   };
 
+  const toggleCourses = async (id: string, val: boolean) => {
+    await createClient().from('event_extras').update({ assign_courses: val }).eq('id', id);
+    setAssignments((p) => p.map((a) => a.id === id ? { ...a, assign_courses: val } : a));
+  };
+
   const addAssignment = async () => {
     if (!selExtra) return;
     setAddSaving(true);
@@ -1240,7 +1333,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
       arrivalTime:  a.arrival_time,
       missionNotes: a.mission_notes,
     }));
-    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiches Mission</title><style>@page{size:A4;margin:0;}body{margin:0;padding:0;font-family:Georgia,serif;}#wrapper{padding:20mm;}</style></head><body><div id="wrapper">${generateStaffHtml(missions)}</div></body></html>`;
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiches Mission</title><style>@page{size:A4;margin:0;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{margin:0;padding:0;font-family:Georgia,serif;}#wrapper{padding:20mm;}</style></head><body><div id="wrapper">${generateStaffHtml(missions)}</div></body></html>`;
     const win = window.open('', '_blank', 'width=900,height=700');
     if (!win) return;
     win.document.write(html);
@@ -1334,6 +1427,17 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                     {a.arrival_time && (
                       <p className="text-[10px] text-gray-500">⏰ Arrivée : <span className="font-semibold">{a.arrival_time}</span></p>
                     )}
+
+                    {/* Assign courses toggle */}
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={a.assign_courses}
+                        onChange={(e) => toggleCourses(a.id, e.target.checked)}
+                        className="h-3 w-3 rounded accent-[#9c27b0]"
+                      />
+                      <span className="text-[10px] text-gray-500">Mission courses</span>
+                    </label>
 
                     {/* Notes inline */}
                     {editingNotes === a.id ? (
@@ -1566,7 +1670,7 @@ export default function EvenementPage() {
           />
         )}
         {tab === 'materiel'  && <MaterielTab quote={quote} onUpdate={(mats) => setQuote((q) => q ? { ...q, event_materials: mats } : q)} />}
-        {tab === 'courses'   && <CoursesTab  quoteId={id!} />}
+        {tab === 'courses'   && <CoursesTab  quoteId={id!} quote={quote} />}
         {tab === 'achats'    && <AchatsTab   quoteId={id!} />}
         {tab === 'staffing'  && <StaffingTab quoteId={id!} quote={quote} />}
       </div>

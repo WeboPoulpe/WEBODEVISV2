@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Plus, Wine, UtensilsCrossed, Coffee, Wrench, Users, Package,
-  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle,
+  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -18,6 +18,20 @@ interface Prestation {
   category: string | null;
   sub_category: string | null;
   description: string | null;
+}
+
+interface IngredientLink {
+  id: string;
+  ingredient_id: string;
+  qty_per_person: number;
+  unit: string | null;
+  ingredient: { id: string; name: string; unit: string | null };
+}
+
+interface IngredientOption {
+  id: string;
+  name: string;
+  unit: string | null;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -223,6 +237,143 @@ function DevisLinePreview({ name, price, description }: {
   );
 }
 
+// ── Ingredients section (inside modal, editing only) ─────────────────────────
+function IngredientsSection({ prestationId, userId }: { prestationId: string; userId: string }) {
+  const [links, setLinks] = useState<IngredientLink[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState('');
+  const [options, setOptions] = useState<IngredientOption[]>([]);
+  const [selected, setSelected] = useState<IngredientOption | null>(null);
+  const [qty, setQty] = useState('1');
+  const [saving, setSaving] = useState(false);
+
+  const loadLinks = useCallback(async () => {
+    const { data } = await createClient()
+      .from('service_ingredients')
+      .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
+      .eq('prestation_id', prestationId);
+    setLinks((data ?? []) as unknown as IngredientLink[]);
+    setLoadingLinks(false);
+  }, [prestationId]);
+
+  useEffect(() => { loadLinks(); }, [loadLinks]);
+
+  useEffect(() => {
+    if (!showAdd || search.trim().length < 2) { setOptions([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await createClient()
+        .from('ingredients')
+        .select('id, name, unit')
+        .eq('user_id', userId)
+        .ilike('name', `%${search}%`)
+        .limit(10);
+      setOptions((data ?? []) as IngredientOption[]);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [search, showAdd, userId]);
+
+  const addLink = async () => {
+    if (!selected) return;
+    setSaving(true);
+    const { data } = await createClient()
+      .from('service_ingredients')
+      .insert({ prestation_id: prestationId, ingredient_id: selected.id, qty_per_person: parseFloat(qty) || 1, unit: selected.unit || null, user_id: userId })
+      .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
+      .single();
+    if (data) setLinks((p) => [...p, data as unknown as IngredientLink]);
+    setSelected(null); setSearch(''); setQty('1'); setShowAdd(false);
+    setSaving(false);
+  };
+
+  const removeLink = async (id: string) => {
+    await createClient().from('service_ingredients').delete().eq('id', id);
+    setLinks((p) => p.filter((l) => l.id !== id));
+  };
+
+  return (
+    <div className="border border-gray-100 rounded-xl p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Carrot className="h-3.5 w-3.5 text-[#9c27b0]" />
+          <p className="text-xs font-semibold text-gray-700">Ingrédients (par personne)</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAdd((v) => !v)}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-50 transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          Ajouter
+        </button>
+      </div>
+
+      {loadingLinks ? (
+        <div className="flex justify-center py-2"><Loader2 className="h-3.5 w-3.5 animate-spin text-gray-300" /></div>
+      ) : links.length === 0 && !showAdd ? (
+        <p className="text-[10px] text-gray-400 italic text-center py-1">Aucun ingrédient lié</p>
+      ) : (
+        <div className="space-y-1">
+          {links.map((l) => (
+            <div key={l.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
+              <span className="flex-1 text-gray-700 font-medium truncate">{l.ingredient.name}</span>
+              <span className="text-[#9c27b0] font-bold tabular-nums">{l.qty_per_person} {l.unit ?? l.ingredient.unit ?? ''}/pers.</span>
+              <button type="button" onClick={() => removeLink(l.id)} className="p-0.5 text-gray-300 hover:text-red-500 transition-colors">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="space-y-2 border-t border-gray-100 pt-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              type="text"
+              value={selected ? selected.name : search}
+              onChange={(e) => { setSelected(null); setSearch(e.target.value); }}
+              placeholder="Rechercher un ingrédient…"
+              className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+            />
+          </div>
+          {!selected && options.length > 0 && (
+            <div className="border border-gray-100 rounded-lg overflow-hidden max-h-32 overflow-y-auto">
+              {options.map((o) => (
+                <button
+                  key={o.id} type="button"
+                  onClick={() => { setSelected(o); setSearch(o.name); setOptions([]); }}
+                  className="w-full text-left px-2 py-1.5 text-xs hover:bg-purple-50 transition-colors border-b border-gray-50 last:border-0"
+                >
+                  {o.name} {o.unit ? <span className="text-gray-400">({o.unit})</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
+          {selected && (
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-gray-500 flex-shrink-0">Qté/pers.</label>
+              <input
+                type="number" min="0" step="0.1" value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                className="w-20 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
+              />
+              <button
+                type="button" onClick={addLink} disabled={saving}
+                className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold bg-[#9c27b0] text-white rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+              >
+                {saving ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Check className="h-2.5 w-2.5" />}
+                Lier
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Add/Edit modal ────────────────────────────────────────────────────────────
 interface ModalProps {
   initial?: Prestation | null;
@@ -374,6 +525,11 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                 placeholder="Détails, inclusions, allergènes…"
               />
             </div>
+
+            {/* Ingredients — only when editing an existing prestation */}
+            {initial && user && (
+              <IngredientsSection prestationId={initial.id} userId={user.id} />
+            )}
 
             {/* Sync to drafts — only when editing and matching drafts exist */}
             {initial && draftCount > 0 && (
