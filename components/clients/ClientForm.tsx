@@ -59,7 +59,7 @@ export default function ClientForm() {
 
     const { error: err } = await supabase.from('customers').insert([
       {
-        user_id: user.id,
+        owner_user_id: user.id,
         customer_type: form.type,
         first_name: form.firstName || null,
         last_name: form.lastName || null,
