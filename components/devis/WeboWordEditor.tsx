@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
-  LayoutTemplate, Bell, Eye, EyeOff,
+  LayoutTemplate, Bell, Eye, EyeOff, Download,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,8 @@ interface Props {
   onBack?: () => void;
   /** Pre-selected font (from saved quote) */
   selectedFont?: string;
+  /** Pre-selected font size in px (from saved quote) */
+  selectedFontSize?: number;
 }
 
 // ── Gastronomic menu width options ────────────────────────────────────────────
@@ -92,7 +94,9 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont }: Props) {
+const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18];
+
+export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize }: Props) {
   const router = useRouter();
   const editorRef  = useRef<HTMLDivElement>(null);
   const colorInput = useRef<HTMLInputElement>(null);
@@ -103,6 +107,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [toast,     setToast]     = useState<string | null>(null);
   const [showDesc,  setShowDesc]  = useState(true);
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
+  const [fontSize,  setFontSize]  = useState(initSize ?? 12);
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [menuWidth, setMenuWidth] = useState('400px');
 
@@ -138,6 +143,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
   }, [initialHtml]);
 
+  // Apply fontSize directly to DOM so contentEditable sees it immediately
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.style.fontSize = `${fontSize}px`;
+    }
+  }, [fontSize]);
+
   // Apply menuWidth to .gastro-menu div (bake before save/print)
   const applyMenuWidth = (width: string) => {
     setMenuWidth(width);
@@ -160,23 +172,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setSaving(true); setError(null);
     const { error: err } = await createClient()
       .from('quotes')
-      .update({ content_html: html, selected_font: font })
+      .update({ content_html: html, selected_font: font, selected_font_size: fontSize })
       .eq('id', quoteId);
     setSaving(false);
     if (err) { setError(err.message); return; }
     setToast('Devis enregistré avec succès');
   };
 
-  // ── Print (WYSIWYG) ───────────────────────────────────────────────────────────
-  const handlePrint = () => {
+  // ── Build print HTML (shared by print + PDF) ──────────────────────────────────
+  const buildPrintHtml = () => {
     const content = editorRef.current?.innerHTML ?? '';
-    const win = window.open('', '_blank', 'width=900,height=700');
-    if (!win) return;
     const fontEntry = FONTS.find((x) => x.value === font);
     const fontImport = fontEntry?.google
       ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
       : '';
-    win.document.write(`<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -184,12 +194,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   ${fontImport}
   <style>
     @page { size: A4; margin: 0; }
+    html, body { color-scheme: light; }
     * {
       box-sizing: border-box;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; }
+    body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; background: #fff; }
     .screen-sep {
       page-break-after: always !important;
       break-after: page !important;
@@ -209,18 +220,51 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 <body>
   <div style="padding:20mm;">${content}</div>
 </body>
-</html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+</html>`;
+  };
+
+  // ── Print (WYSIWYG) ───────────────────────────────────────────────────────────
+  const handlePrint = () => {
+    const html = buildPrintHtml();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) { URL.revokeObjectURL(url); return; }
+    win.onload = () => { setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 600); };
+  };
+
+  // ── Save PDF (direct download via html2pdf.js) ───────────────────────────────
+  const handleSavePdf = async () => {
+    const content = editorRef.current?.innerHTML ?? '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const html2pdf = (await import('html2pdf.js' as any)).default;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = content;
+    wrapper.style.fontFamily = `'${font}', Georgia, serif`;
+    wrapper.style.fontSize   = `${fontSize}px`;
+    wrapper.style.padding    = '20mm';
+    wrapper.style.background = '#fff';
+    wrapper.style.colorScheme = 'light';
+    html2pdf()
+      .set({
+        margin: 0,
+        filename: `devis-${quoteId}.pdf`,
+        image:    { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all'], before: '.screen-sep' },
+      })
+      .from(wrapper)
+      .save();
   };
 
   return (
     <div className="flex flex-col h-full bg-slate-100">
 
-      {/* CSS: font override + description toggle + gastro menu width */}
+      {/* CSS: font override + font size + description toggle + gastro menu width */}
       <style>{`
         #weboword-sheet, #weboword-sheet * { font-family: '${font}', Georgia, serif !important; }
+        #weboword-sheet { font-size: ${fontSize}px !important; }
         ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
         .gastro-menu { max-width: ${menuWidth} !important; margin: 0 auto !important; }
       `}</style>
@@ -286,9 +330,18 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Ouvrir le PDF dans une fenêtre d'impression"
             >
               <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Générer PDF</span>
+              <span className="hidden sm:inline">Imprimer</span>
+            </button>
+            <button
+              onClick={handleSavePdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9c27b0] border border-[#9c27b0]/40 rounded-lg hover:bg-purple-50 transition-colors"
+              title="Télécharger directement en PDF"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Enregistrer PDF</span>
             </button>
             <button
               onClick={handleSave}
@@ -456,6 +509,23 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 ))}
               </div>
             )}
+          </div>
+
+          <Sep />
+
+          {/* Font size selector */}
+          <div className="flex items-center gap-0.5" title="Taille de police">
+            <span className="text-[10px] text-gray-400 mr-0.5 hidden sm:inline">Taille :</span>
+            <select
+              value={fontSize}
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 cursor-pointer"
+            >
+              {FONT_SIZES.map((s) => (
+                <option key={s} value={s}>{s}px</option>
+              ))}
+            </select>
           </div>
 
           <Sep />

@@ -119,6 +119,7 @@ export default async function ModifierPage({
         initialHtml={initialHtml}
         clientName={clientName || undefined}
         selectedFont={(quote.selected_font as string | null) ?? undefined}
+        selectedFontSize={(quote.selected_font_size as number | null) ?? 12}
       />
     );
   }

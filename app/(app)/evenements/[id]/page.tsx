@@ -269,6 +269,8 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
 }
 
 // ── Matériel tab ──────────────────────────────────────────────────────────────
+interface CatalogPrestation { id: string; name: string; category: string | null; unit: string | null; }
+
 function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: MaterialItem[]) => void }) {
   const { user } = useAuth();
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -278,6 +280,9 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
   const [newQty, setNewQty]   = useState('1');
   const [newUnit, setNewUnit] = useState('');
   const [saving, setSaving]   = useState(false);
+  const [showCatalog, setShowCatalog]   = useState(false);
+  const [catalog, setCatalog]           = useState<CatalogPrestation[]>([]);
+  const [catalogSearch, setCatalogSearch] = useState('');
 
   // ── Rental items state ─────────────────────────────────────────────────────
   const [rentalItems, setRentalItems] = useState<RentalItem[]>([]);
@@ -293,11 +298,11 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
   useEffect(() => {
     if (!user) return;
-    createClient()
-      .from('service_materials')
-      .select('*')
-      .eq('user_id', user.id)
+    const supabase = createClient();
+    supabase.from('service_materials').select('*').eq('user_id', user.id)
       .then(({ data }) => setTemplates((data ?? []) as ServiceMaterial[]));
+    supabase.from('prestations').select('id, name, category, unit').eq('user_id', user.id).order('name')
+      .then(({ data }) => setCatalog((data ?? []) as CatalogPrestation[]));
   }, [user]);
 
   const saveCustom = useCallback(async (items: MaterialItem[]) => {
@@ -383,19 +388,19 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
         </table>`;
     }).join('');
     const grandTotal = rentalItems.reduce((s, r) => s + r.qty * r.price_per_unit, 0);
-    const win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bon de Commande Location</title>
-      <style>@page{size:A4;margin:20mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;}</style></head>
+    const htmlStr = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Bon de Commande Location</title>
+      <style>@page{size:A4;margin:20mm}html,body{color-scheme:light}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;background:#fff;}</style></head>
       <body><h1 style="color:#9c27b0;font-size:18px;margin:0 0 4px;">Bon de Commande — Location de Matériel</h1>
       <p style="color:#888;font-size:11px;margin:0 0 20px;">Événement : ${quote.event_type ?? ''} — ${today}</p>
       ${rows}
       <p style="margin-top:20px;text-align:right;font-size:14px;font-weight:bold;color:#9c27b0;">
         Total général : ${money(grandTotal)}</p>
-      </body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+      </body></html>`;
+    const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) { URL.revokeObjectURL(url); return; }
+    win.onload = () => { setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 600); };
   };
 
   const addCustom = () => {
@@ -476,7 +481,15 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
     </div>
   );
 
-  const isEmpty = materiel.length === 0 && personnel.length === 0 && computed.length === 0 && customItems.length === 0;
+  const isEmpty = materiel.length === 0 && computed.length === 0 && customItems.length === 0;
+  const filteredCatalog = catalog.filter((p) =>
+    !catalogSearch || p.name.toLowerCase().includes(catalogSearch.toLowerCase())
+  );
+  const addFromCatalog = (p: CatalogPrestation) => {
+    const next = [...customItems, { id: crypto.randomUUID(), name: p.name, qty: 1, unit: p.unit ?? '' }];
+    setCustomItems(next);
+    saveCustom(next);
+  };
 
   return (
     <div className="space-y-6">
@@ -551,7 +564,51 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
       {/* Add custom material */}
       <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
-        <p className="text-xs font-semibold text-gray-600">Ajouter du matériel</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-600">Ajouter du matériel</p>
+          {catalog.length > 0 && (
+            <button
+              onClick={() => setShowCatalog((v) => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-50 transition-colors"
+            >
+              <Search className="h-3.5 w-3.5" />
+              Catalogue ({catalog.length})
+            </button>
+          )}
+        </div>
+
+        {/* Catalog picker */}
+        {showCatalog && (
+          <div className="border border-[#9c27b0]/20 rounded-xl bg-white overflow-hidden">
+            <div className="p-2 border-b border-gray-100">
+              <input
+                type="text"
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                placeholder="Rechercher une prestation…"
+                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
+              {filteredCatalog.length === 0 ? (
+                <p className="px-3 py-3 text-xs text-gray-400 text-center">Aucun résultat</p>
+              ) : filteredCatalog.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => { addFromCatalog(p); setCatalogSearch(''); setShowCatalog(false); }}
+                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-purple-50 transition-colors text-left"
+                >
+                  <span className="text-sm text-gray-800">{p.name}</span>
+                  <span className="flex items-center gap-1 text-xs text-[#9c27b0]">
+                    <Plus className="h-3 w-3" />Ajouter
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <input
             type="text"
@@ -1333,13 +1390,12 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
       arrivalTime:  a.arrival_time,
       missionNotes: a.mission_notes,
     }));
-    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiches Mission</title><style>@page{size:A4;margin:0;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{margin:0;padding:0;font-family:Georgia,serif;}#wrapper{padding:20mm;}</style></head><body><div id="wrapper">${generateStaffHtml(missions)}</div></body></html>`;
-    const win = window.open('', '_blank', 'width=900,height=700');
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiches Mission</title><style>@page{size:A4;margin:0;}html,body{color-scheme:light}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{margin:0;padding:0;font-family:Georgia,serif;background:#fff;}#wrapper{padding:20mm;}</style></head><body><div id="wrapper">${generateStaffHtml(missions)}</div></body></html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) { URL.revokeObjectURL(url); return; }
+    win.onload = () => { setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 600); };
   };
 
   const alreadyAssigned = new Set(assignments.map((a) => a.extra_id));
