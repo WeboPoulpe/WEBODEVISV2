@@ -210,19 +210,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       print-color-adjust: exact !important;
     }
     body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; background: #fff; }
-    .screen-sep {
-      page-break-after: always !important;
-      break-after: page !important;
-      border: none !important;
-      background: transparent !important;
-      color: transparent !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      height: 0 !important;
-      overflow: hidden !important;
-      font-size: 0 !important;
-      line-height: 0 !important;
-    }
+    .screen-sep { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    .gastro-page { page-break-before: always !important; break-before: page !important; }
+    .gastro-header { page-break-inside: avoid !important; break-inside: avoid !important; }
+    tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
+    thead { display: table-header-group; }
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
 </head>
@@ -274,30 +266,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     /* Page wrapper — compact padding */
     .pdf-wrap { padding: 6mm 10mm; }
 
-    /* Hide screen separator, force page break before page 2 */
-    .screen-sep {
-      display: block !important;
-      visibility: hidden !important;
-      height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      border: none !important;
-      font-size: 0 !important;
-      line-height: 0 !important;
-      page-break-after: always !important;
-      break-after: page !important;
-    }
+    /* Hide screen separator */
+    .screen-sep { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
 
-    /* Prevent bad cuts — keep these elements together */
-    tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
-    table { page-break-inside: auto; }
+    /* Page 2 (carte gastronomique) starts on a new page */
+    .gastro-page { page-break-before: always !important; break-before: page !important; }
+
+    /* Keep the gastro header together — never cut */
+    .gastro-header { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+    /* Prevent bad cuts — keep table rows and menu items together */
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    h3 { page-break-inside: avoid; break-inside: avoid; }
+    .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
     thead { display: table-header-group; }
-
-    /* If table overflows the page, keep rows together and let it flow to next page */
     tbody tr { page-break-inside: avoid; break-inside: avoid; }
-
-    /* Signatures block — keep together */
-    div[style*="BON POUR ACCORD"], div:has(> p[style*="BON POUR"]) { page-break-inside: avoid; break-inside: avoid; }
 
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
