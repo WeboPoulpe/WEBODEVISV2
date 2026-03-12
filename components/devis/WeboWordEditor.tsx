@@ -211,7 +211,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
     body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; background: #fff; }
     body * { min-height: 0 !important; }
-    .screen-sep { display: none !important; }
+    .screen-sep { visibility: hidden !important; height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; font-size: 0 !important; line-height: 0 !important; page-break-after: always !important; break-after: page !important; }
+    .gastro-page { page-break-before: always !important; break-before: page !important; }
     tr { page-break-inside: avoid; }
     thead { display: table-header-group; }
     p, li { orphans: 2; widows: 2; }
@@ -278,10 +279,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     /* Kill min-height from old saved HTML (was 257mm, forces blank space) */
     .pdf-wrap * { min-height: 0 !important; }
 
-    /* Hide screen separator — everything flows continuously */
-    .screen-sep { display: none !important; }
+    /* Hide separator text but force page break */
+    .screen-sep { visibility: hidden !important; height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; font-size: 0 !important; line-height: 0 !important; page-break-after: always !important; break-after: page !important; }
 
-    /* Only protect small elements from cutting — let everything else flow */
+    /* Gastro page also forces new page (for new HTML without .screen-sep) */
+    .gastro-page { page-break-before: always !important; break-before: page !important; }
+
     tr { page-break-inside: avoid; }
     thead { display: table-header-group; }
     p, li { orphans: 2; widows: 2; }
