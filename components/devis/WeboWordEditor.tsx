@@ -220,6 +220,15 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 </head>
 <body>
   <div style="padding:20mm;">${content}</div>
+  <script>
+    var els = document.querySelectorAll('[style]');
+    var sep = false;
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].style.minHeight) els[i].style.minHeight = '0';
+      if (els[i].classList.contains('screen-sep')) { els[i].style.display = 'none'; sep = true; }
+      if (sep && els[i].style.marginTop && parseFloat(els[i].style.marginTop) < 0) els[i].style.marginTop = '24px';
+    }
+  </script>
 </body>
 </html>`;
   };
@@ -283,8 +292,25 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 <body>
   <div class="pdf-wrap">${content}</div>
   <script>
-    // Auto-print when opened (for Save as PDF)
-    window.onload = function() { setTimeout(function() { window.print(); }, 400); };
+    window.onload = function() {
+      var els = document.querySelectorAll('[style]');
+      var screenSepSeen = false;
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        // Kill min-height (old HTML: min-height:257mm)
+        if (el.style.minHeight) el.style.minHeight = '0';
+        // Track when we pass the screen separator
+        if (el.classList.contains('screen-sep')) {
+          el.style.display = 'none';
+          screenSepSeen = true;
+        }
+        // After the separator, fix negative top margins (gastro header overlap)
+        if (screenSepSeen && el.style.marginTop && parseFloat(el.style.marginTop) < 0) {
+          el.style.marginTop = '24px';
+        }
+      }
+      setTimeout(function() { window.print(); }, 500);
+    };
   </script>
 </body>
 </html>`;
