@@ -281,11 +281,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     });
 
     // Append to body so html2canvas can measure & render it
-    el.style.position = 'absolute';
+    // NOTE: do NOT use opacity:0 — html2canvas won't capture invisible elements
+    el.style.position = 'fixed';
     el.style.left     = '0';
     el.style.top      = '0';
     el.style.zIndex   = '-9999';
-    el.style.opacity  = '0';
+    el.style.overflow = 'hidden';
     document.body.appendChild(el);
 
     try {
