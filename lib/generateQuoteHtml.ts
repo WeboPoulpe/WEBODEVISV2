@@ -120,7 +120,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
 
   return `${googleFontImport}
 <!-- ═══════════════════════ PAGE 1 — DEVIS FINANCIER ═══════════════════════ -->
-<div style="font-family:${fontFamily};color:#1a1a1a;line-height:1.65;min-height:257mm;">
+<div style="font-family:${fontFamily};color:#1a1a1a;line-height:1.65;">
 
   <!-- ── Header pleine largeur (marges négatives pour échapper au padding de la feuille A4) ── -->
   <div style="${headerGradient}margin:-20mm -20mm 0;padding:13mm 20mm 11mm;">
@@ -229,7 +229,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
 </div>
 
 <!-- ═══════════════════════ PAGE 2 — CARTE GASTRONOMIQUE ═══════════════════════ -->
-<div style="font-family:${fontFamily};color:#1a1a1a;line-height:1.7;min-height:257mm;">
+<div style="font-family:${fontFamily};color:#1a1a1a;line-height:1.7;">
 
   <!-- ── Header Carte (pleine largeur) ── -->
   <div style="${headerGradient}margin:-20mm -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">

@@ -253,26 +253,56 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const dateStr  = new Date().toISOString().slice(0, 10);
     const filename = `Devis-${safeName}-${dateStr}.pdf`;
 
-    // Clone the editor content into a wrapper with matching padding
+    // Build a temporary wrapper element
     const el = document.createElement('div');
     el.style.fontFamily  = `'${font}', Georgia, serif`;
     el.style.fontSize    = `${fontSize}px`;
     el.style.padding     = '20mm';
     el.style.background  = '#fff';
     el.style.colorScheme = 'light';
+    el.style.width       = '210mm';
     el.innerHTML         = content;
 
-    html2pdf()
-      .set({
-        margin:   0,
-        filename,
-        image:    { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'], before: '.screen-sep' },
-      })
-      .from(el)
-      .save();
+    // Clean up the cloned DOM for proper PDF rendering:
+    // 1. Remove min-height on page containers (prevents forced blank space)
+    el.querySelectorAll<HTMLElement>('[style]').forEach((node) => {
+      if (node.style.minHeight) node.style.minHeight = '';
+    });
+    // 2. Hide the screen separator (it's only for on-screen display)
+    el.querySelectorAll<HTMLElement>('.screen-sep').forEach((sep) => {
+      sep.style.display    = 'none';
+      sep.style.height     = '0';
+      sep.style.margin     = '0';
+      sep.style.padding    = '0';
+      sep.style.border     = 'none';
+      sep.style.overflow   = 'hidden';
+      sep.style.fontSize   = '0';
+      sep.style.lineHeight = '0';
+    });
+
+    // Append to body so html2canvas can measure & render it
+    el.style.position = 'absolute';
+    el.style.left     = '0';
+    el.style.top      = '0';
+    el.style.zIndex   = '-9999';
+    el.style.opacity  = '0';
+    document.body.appendChild(el);
+
+    try {
+      await html2pdf()
+        .set({
+          margin:   0,
+          filename,
+          image:    { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css'], avoid: ['tr', 'h3', 'div[style*="border-bottom"]'] },
+        })
+        .from(el)
+        .save();
+    } finally {
+      document.body.removeChild(el);
+    }
   };
 
   return (
