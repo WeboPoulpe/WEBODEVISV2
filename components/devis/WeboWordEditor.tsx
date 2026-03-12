@@ -280,30 +280,19 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       sep.style.lineHeight = '0';
     });
 
-    // Append to body so html2canvas can measure & render it
-    // NOTE: do NOT use opacity:0 — html2canvas won't capture invisible elements
-    el.style.position = 'fixed';
-    el.style.left     = '0';
-    el.style.top      = '0';
-    el.style.zIndex   = '-9999';
-    el.style.overflow = 'hidden';
-    document.body.appendChild(el);
-
-    try {
-      await html2pdf()
-        .set({
-          margin:   0,
-          filename,
-          image:    { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-          jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css'], avoid: ['tr', 'h3', 'div[style*="border-bottom"]'] },
-        })
-        .from(el)
-        .save();
-    } finally {
-      document.body.removeChild(el);
-    }
+    // html2pdf internally appends the element to the DOM, renders via html2canvas,
+    // then removes it — no need to attach manually.
+    await html2pdf()
+      .set({
+        margin:   0,
+        filename,
+        image:    { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css'], avoid: ['tr', 'h3'] },
+      })
+      .from(el)
+      .save();
   };
 
   return (
