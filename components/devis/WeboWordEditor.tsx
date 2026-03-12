@@ -170,10 +170,19 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const handleSave = async () => {
     const html = editorRef.current?.innerHTML ?? '';
     setSaving(true); setError(null);
-    const { error: err } = await createClient()
+    const supabase = createClient();
+    // Try saving with font size; if column doesn't exist yet, retry without it
+    let { error: err } = await supabase
       .from('quotes')
       .update({ content_html: html, selected_font: font, selected_font_size: fontSize })
       .eq('id', quoteId);
+    if (err?.message?.includes('selected_font_size') || err?.code === '42703') {
+      const res = await supabase
+        .from('quotes')
+        .update({ content_html: html, selected_font: font })
+        .eq('id', quoteId);
+      err = res.error;
+    }
     setSaving(false);
     if (err) { setError(err.message); return; }
     setToast('Devis enregistré avec succès');
