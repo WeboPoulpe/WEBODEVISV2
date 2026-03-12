@@ -210,9 +210,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       print-color-adjust: exact !important;
     }
     body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; background: #fff; }
-    .screen-sep { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
-    .gastro-page { page-break-before: always !important; break-before: page !important; }
-    .gastro-header { page-break-inside: avoid !important; break-inside: avoid !important; }
+    .screen-sep { display: none !important; }
+    .gastro-header { page-break-inside: avoid; break-inside: avoid; }
     tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
     thead { display: table-header-group; }
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
@@ -266,21 +265,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     /* Page wrapper — compact padding */
     .pdf-wrap { padding: 6mm 10mm; }
 
-    /* Hide screen separator */
-    .screen-sep { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+    /* Hide screen separator — everything flows continuously */
+    .screen-sep { display: none !important; }
 
-    /* Page 2 (carte gastronomique) starts on a new page */
-    .gastro-page { page-break-before: always !important; break-before: page !important; }
-
-    /* Keep the gastro header together — never cut */
-    .gastro-header { page-break-inside: avoid !important; break-inside: avoid !important; }
-
-    /* Prevent bad cuts — keep table rows and menu items together */
-    tr { page-break-inside: avoid; break-inside: avoid; }
-    h3 { page-break-inside: avoid; break-inside: avoid; }
-    .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
+    /* Prevent bad cuts */
+    .gastro-header { page-break-inside: avoid; break-inside: avoid; }
+    tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
     thead { display: table-header-group; }
-    tbody tr { page-break-inside: avoid; break-inside: avoid; }
 
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
