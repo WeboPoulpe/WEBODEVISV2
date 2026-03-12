@@ -197,30 +197,6 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   </div>
   ` : ''}
 
-  ${d.remarks ? `
-  <!-- ── Remarques ── -->
-  <div style="margin-bottom:16px;">
-    <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">REMARQUES</p>
-    <p style="font-size:12px;color:#555;white-space:pre-line;margin:0;">${d.remarks}</p>
-  </div>
-  ` : ''}
-
-  <!-- ── Signatures ── -->
-  <div style="display:flex;gap:14px;margin-top:16px;">
-    <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-      <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">BON POUR ACCORD — Client</p>
-      <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">Date et signature :</p>
-    </div>
-    <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-      <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">PRESTATAIRE</p>
-      <p style="font-size:12px;font-weight:600;margin:0;">${d.companyName}</p>
-    </div>
-  </div>
-
-  <!-- ── Conditions ── -->
-  <div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
-    <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">Ce devis est valable 30 jours. Toute commande implique l'acceptation de nos conditions générales de vente.</p>
-  </div>
 </div>
 
 <!-- ─── SÉPARATEUR : visible écran · page-break à l'impression ─── -->
@@ -228,7 +204,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   ✂&nbsp;&nbsp;SAUT DE PAGE — Carte Gastronomique ci-dessous
 </div>
 
-<!-- ═══════════════════════ PAGE 2 — CARTE GASTRONOMIQUE ═══════════════════════ -->
+<!-- ═══════════════════════ CARTE GASTRONOMIQUE ═══════════════════════ -->
 <div class="gastro-page" style="font-family:${fontFamily};color:#1a1a1a;line-height:1.7;">
 
   <!-- ── Header Carte (pleine largeur) ── -->
@@ -250,6 +226,29 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <div style="margin-top:28px;text-align:center;padding-top:14px;border-top:1px solid #f3e5f5;">
     <p style="font-size:11px;color:#ccc;font-style:italic;margin:0;">${d.companyName} — Traiteur &amp; Chef à domicile</p>
   </div>
+</div>
+
+<!-- ═══════════════════════ REMARQUES + SIGNATURES + CONDITIONS ═══════════════════════ -->
+${d.remarks ? `
+<div style="margin:20px 0 16px;">
+  <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">REMARQUES</p>
+  <p style="font-size:12px;color:#555;white-space:pre-line;margin:0;">${d.remarks}</p>
+</div>
+` : ''}
+
+<div style="display:flex;gap:14px;margin-top:16px;">
+  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
+    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">BON POUR ACCORD — Client</p>
+    <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">Date et signature :</p>
+  </div>
+  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
+    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">PRESTATAIRE</p>
+    <p style="font-size:12px;font-weight:600;margin:0;">${d.companyName}</p>
+  </div>
+</div>
+
+<div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
+  <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">Ce devis est valable 30 jours. Toute commande implique l'acceptation de nos conditions générales de vente.</p>
 </div>
 `.trim();
 }
