@@ -213,8 +213,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     body * { min-height: 0 !important; }
     .screen-sep { display: none !important; }
     .gastro-header { page-break-inside: avoid; break-inside: avoid; }
-    tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
     thead { display: table-header-group; }
+    h1, h2, h3, h4, h5, h6, strong, b { page-break-after: avoid; break-after: avoid; }
+    p { page-break-inside: avoid; break-inside: avoid; orphans: 3; widows: 3; }
+    div[style*="display:flex"] { page-break-inside: avoid; break-inside: avoid; }
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
 </head>
@@ -281,10 +285,20 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     /* Hide screen separator — everything flows continuously */
     .screen-sep { display: none !important; }
 
-    /* Prevent bad cuts */
+    /* Prevent bad cuts — keep elements together */
     .gastro-header { page-break-inside: avoid; break-inside: avoid; }
-    tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
     thead { display: table-header-group; }
+    .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
+
+    /* Headings stay with their content — never orphaned at bottom of page */
+    h1, h2, h3, h4, h5, h6, strong, b { page-break-after: avoid; break-after: avoid; }
+
+    /* Paragraphs: avoid cutting, keep at least 3 lines together */
+    p { page-break-inside: avoid; break-inside: avoid; orphans: 3; widows: 3; }
+
+    /* Flex rows (client/event boxes, signature boxes) stay together */
+    div[style*="display:flex"] { page-break-inside: avoid; break-inside: avoid; }
 
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
