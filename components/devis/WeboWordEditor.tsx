@@ -210,6 +210,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       print-color-adjust: exact !important;
     }
     body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; background: #fff; }
+    body * { min-height: 0 !important; }
     .screen-sep { display: none !important; }
     .gastro-header { page-break-inside: avoid; break-inside: avoid; }
     tr, h3, .gastro-menu > div { page-break-inside: avoid; break-inside: avoid; }
@@ -264,6 +265,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
     /* Page wrapper — compact padding */
     .pdf-wrap { padding: 6mm 10mm; }
+
+    /* Kill min-height from old saved HTML (was 257mm, forces blank space) */
+    .pdf-wrap * { min-height: 0 !important; }
 
     /* Hide screen separator — everything flows continuously */
     .screen-sep { display: none !important; }
