@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FileText, Users, CalendarDays, CalendarRange,
   Package, Settings, Carrot, LayoutTemplate,
-  LogOut, ChevronLeft, ChevronRight, UserCheck, Users2, ShoppingBasket,
+  LogOut, ChevronLeft, ChevronRight, UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -45,7 +45,10 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/extras',      icon: Users2,        label: 'Extras',      exact: false },
       { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
       { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
-      { href: '/courses-globales', icon: ShoppingBasket, label: 'Courses globales', exact: false },
+      { href: '/fournisseurs',       icon: Truck,          label: 'Fournisseurs',      exact: false },
+      { href: '/location-templates', icon: Wrench,         label: 'Templates location', exact: false },
+      { href: '/location-globale',   icon: Boxes,          label: 'Location globale',  exact: false },
+      { href: '/courses-globales',   icon: ShoppingBasket, label: 'Courses globales',  exact: false },
     ],
   },
   {

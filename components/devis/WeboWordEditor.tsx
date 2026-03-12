@@ -238,24 +238,56 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const content = editorRef.current?.innerHTML ?? '';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const html2pdf = (await import('html2pdf.js' as any)).default;
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = content;
-    wrapper.style.fontFamily = `'${font}', Georgia, serif`;
-    wrapper.style.fontSize   = `${fontSize}px`;
-    wrapper.style.padding    = '20mm';
-    wrapper.style.background = '#fff';
-    wrapper.style.colorScheme = 'light';
-    html2pdf()
+
+    // Build a clean filename: Devis-ClientName-Date.pdf
+    const safeName = (clientName ?? 'client').replace(/[^a-zA-ZÀ-ÿ0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 40);
+    const dateStr  = new Date().toISOString().slice(0, 10);
+    const filename = `Devis-${safeName}-${dateStr}.pdf`;
+
+    // Create a wrapper that matches the template's expected padding (20mm)
+    // so that negative-margin headers (margin:-20mm) render full-width correctly.
+    const el = document.createElement('div');
+    el.style.fontFamily  = `'${font}', Georgia, serif`;
+    el.style.fontSize    = `${fontSize}px`;
+    el.style.background  = '#fff';
+    el.style.colorScheme = 'light';
+    el.style.padding     = '20mm';
+    el.style.width       = '210mm'; // A4 width
+    el.innerHTML         = content;
+
+    // Fix: hide screen-only separator text, keep it as page-break trigger
+    el.querySelectorAll('.screen-sep').forEach((sep) => {
+      const s = sep as HTMLElement;
+      s.style.height     = '0';
+      s.style.overflow   = 'hidden';
+      s.style.fontSize   = '0';
+      s.style.lineHeight = '0';
+      s.style.margin     = '0';
+      s.style.padding    = '0';
+      s.style.border     = 'none';
+      s.style.background = 'transparent';
+      s.style.color      = 'transparent';
+    });
+
+    // Temporarily append to body (required by html2canvas to measure layout)
+    el.style.position = 'absolute';
+    el.style.left     = '-9999px';
+    el.style.top      = '0';
+    document.body.appendChild(el);
+
+    await html2pdf()
       .set({
-        margin: 0,
-        filename: `devis-${quoteId}.pdf`,
+        margin:   0,
+        filename,
         image:    { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
         jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all'], before: '.screen-sep' },
+        pagebreak: { mode: ['css', 'legacy'], before: '.screen-sep' },
       })
-      .from(wrapper)
+      .from(el)
       .save();
+
+    document.body.removeChild(el);
   };
 
   return (

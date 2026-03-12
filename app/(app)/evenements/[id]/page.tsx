@@ -7,7 +7,7 @@ import {
   ArrowLeft, CheckSquare, Package, ShoppingCart,
   Plus, Trash2, Printer, Loader2, ChevronUp, ChevronDown,
   UtensilsCrossed, Search, X, Smartphone, Users2,
-  ChevronLeft, ChevronRight, Pencil, Check, ExternalLink,
+  ChevronLeft, ChevronRight, Pencil, Check, ExternalLink, Wand2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -116,6 +116,17 @@ interface RentalItem {
   price_per_unit: number;
   notes: string | null;
   supplier: Supplier | null;
+  source?: string | null;
+  ordered?: boolean;
+}
+
+interface RentalTemplate {
+  id: string;
+  material_name: string;
+  qty_per_guest: number;
+  unit: string | null;
+  default_supplier_id: string | null;
+  default_price_per_unit: number;
 }
 
 // ── Category helpers ──────────────────────────────────────────────────────────
@@ -269,7 +280,7 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
 }
 
 // ── Matériel tab ──────────────────────────────────────────────────────────────
-interface CatalogPrestation { id: string; name: string; category: string | null; unit: string | null; }
+interface CatalogPrestation { id: string; name: string; category: string | null; sub_category: string | null; }
 
 function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: MaterialItem[]) => void }) {
   const { user } = useAuth();
@@ -287,7 +298,9 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
   // ── Rental items state ─────────────────────────────────────────────────────
   const [rentalItems, setRentalItems] = useState<RentalItem[]>([]);
   const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
+  const [rentalTemplates, setRentalTemplates] = useState<RentalTemplate[]>([]);
   const [showRentalForm, setShowRentalForm] = useState(false);
+  const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
   const [rName, setRName]       = useState('');
   const [rQty, setRQty]         = useState('1');
   const [rUnit, setRUnit]       = useState('');
@@ -295,14 +308,17 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
   const [rPrice, setRPrice]     = useState('0');
   const [rNotes, setRNotes]     = useState('');
   const [savingRental, setSavingRental] = useState(false);
+  const [generatingRentals, setGeneratingRentals] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
     supabase.from('service_materials').select('*').eq('user_id', user.id)
       .then(({ data }) => setTemplates((data ?? []) as ServiceMaterial[]));
-    supabase.from('prestations').select('id, name, category, unit').eq('user_id', user.id).order('name')
+    supabase.from('prestations').select('id, name, category, sub_category').eq('user_id', user.id).order('name')
       .then(({ data }) => setCatalog((data ?? []) as CatalogPrestation[]));
+    supabase.from('rental_templates').select('*').eq('user_id', user.id).order('sort_order')
+      .then(({ data }) => setRentalTemplates((data ?? []) as RentalTemplate[]));
   }, [user]);
 
   const saveCustom = useCallback(async (items: MaterialItem[]) => {
@@ -324,32 +340,94 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
       .then(({ data }) => setSuppliers(data ?? []));
   }, [quote.id]);
 
-  const addRental = async () => {
+  const resetRentalForm = () => {
+    setRName(''); setRQty('1'); setRUnit(''); setRSupplierId(''); setRPrice('0'); setRNotes('');
+    setShowRentalForm(false);
+    setEditingRentalId(null);
+  };
+
+  const startEditRental = (r: RentalItem) => {
+    setEditingRentalId(r.id);
+    setRName(r.material_name);
+    setRQty(String(r.qty));
+    setRUnit(r.unit ?? '');
+    setRSupplierId(r.supplier_id ?? '');
+    setRPrice(String(r.price_per_unit));
+    setRNotes(r.notes ?? '');
+    setShowRentalForm(true);
+  };
+
+  const saveRental = async () => {
     const name = rName.trim();
     if (!name) return;
     setSavingRental(true);
-    const { data: newItem } = await createClient()
-      .from('rental_items')
-      .insert({
-        quote_id: quote.id,
-        material_name: name,
-        qty: parseFloat(rQty) || 1,
-        unit: rUnit.trim() || null,
-        supplier_id: rSupplierId || null,
-        price_per_unit: parseFloat(rPrice) || 0,
-        notes: rNotes.trim() || null,
-      })
-      .select('*, supplier:suppliers(id, name)')
-      .single();
-    if (newItem) setRentalItems((p) => [...p, newItem as RentalItem]);
-    setRName(''); setRQty('1'); setRUnit(''); setRSupplierId(''); setRPrice('0'); setRNotes('');
-    setShowRentalForm(false);
+    const payload = {
+      material_name: name,
+      qty: parseFloat(rQty) || 1,
+      unit: rUnit.trim() || null,
+      supplier_id: rSupplierId || null,
+      price_per_unit: parseFloat(rPrice) || 0,
+      notes: rNotes.trim() || null,
+    };
+    if (editingRentalId) {
+      const { data: updated } = await createClient()
+        .from('rental_items')
+        .update(payload)
+        .eq('id', editingRentalId)
+        .select('*, supplier:suppliers(id, name)')
+        .single();
+      if (updated) setRentalItems((p) => p.map((r) => r.id === editingRentalId ? updated as RentalItem : r));
+    } else {
+      const { data: newItem } = await createClient()
+        .from('rental_items')
+        .insert({ ...payload, quote_id: quote.id, source: 'manual' })
+        .select('*, supplier:suppliers(id, name)')
+        .single();
+      if (newItem) setRentalItems((p) => [...p, newItem as RentalItem]);
+    }
+    resetRentalForm();
     setSavingRental(false);
   };
 
   const removeRental = async (id: string) => {
     await createClient().from('rental_items').delete().eq('id', id);
     setRentalItems((p) => p.filter((r) => r.id !== id));
+  };
+
+  const toggleOrdered = async (id: string, ordered: boolean) => {
+    await createClient().from('rental_items').update({ ordered }).eq('id', id);
+    setRentalItems((p) => p.map((r) => r.id === id ? { ...r, ordered } : r));
+  };
+
+  const generateFromTemplates = async () => {
+    if (rentalTemplates.length === 0) return;
+    const guestCount = quote.guest_count ?? 1;
+    if (!confirm(`Générer la vaisselle pour ${guestCount} convive${guestCount > 1 ? 's' : ''} depuis vos ${rentalTemplates.length} template${rentalTemplates.length > 1 ? 's' : ''} ?\nLes articles auto-générés précédents seront remplacés.`)) return;
+    setGeneratingRentals(true);
+    const supabase = createClient();
+    // Delete previously auto-generated items
+    const autoIds = rentalItems.filter((r) => r.source === 'template').map((r) => r.id);
+    if (autoIds.length > 0) {
+      await supabase.from('rental_items').delete().in('id', autoIds);
+    }
+    // Insert from templates
+    const toInsert = rentalTemplates.map((t) => ({
+      quote_id: quote.id,
+      material_name: t.material_name,
+      qty: Math.ceil(t.qty_per_guest * guestCount),
+      unit: t.unit,
+      supplier_id: t.default_supplier_id,
+      price_per_unit: t.default_price_per_unit,
+      source: 'template',
+    }));
+    await supabase.from('rental_items').insert(toInsert);
+    // Reload all
+    const { data } = await supabase
+      .from('rental_items')
+      .select('*, supplier:suppliers(id, name)')
+      .eq('quote_id', quote.id);
+    setRentalItems((data ?? []) as RentalItem[]);
+    setGeneratingRentals(false);
   };
 
   const printBonCommande = () => {
@@ -486,7 +564,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
     !catalogSearch || p.name.toLowerCase().includes(catalogSearch.toLowerCase())
   );
   const addFromCatalog = (p: CatalogPrestation) => {
-    const next = [...customItems, { id: crypto.randomUUID(), name: p.name, qty: 1, unit: p.unit ?? '' }];
+    const next = [...customItems, { id: crypto.randomUUID(), name: p.name, qty: 1, unit: '' }];
     setCustomItems(next);
     saveCustom(next);
   };
@@ -645,9 +723,19 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
       {/* ── Location de matériel ─────────────────────────────────────────────── */}
       <div className="border border-[#9c27b0]/20 rounded-xl p-4 space-y-4 bg-purple-50/40">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs font-semibold text-[#9c27b0] uppercase tracking-widest">Location de matériel</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {rentalTemplates.length > 0 && (
+              <button
+                onClick={generateFromTemplates}
+                disabled={generatingRentals}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-100 transition-colors"
+              >
+                {generatingRentals ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                Générer vaisselle ({quote.guest_count ?? 1} conv.)
+              </button>
+            )}
             {rentalItems.length > 0 && (
               <button
                 onClick={printBonCommande}
@@ -658,7 +746,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               </button>
             )}
             <button
-              onClick={() => setShowRentalForm((v) => !v)}
+              onClick={() => { resetRentalForm(); setShowRentalForm(true); }}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#9c27b0] rounded-lg hover:bg-[#7b1fa2] transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -675,43 +763,100 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(r);
           }
-          return Object.entries(grouped).map(([sup, items]) => {
-            const total = items.reduce((s, i) => s + i.qty * i.price_per_unit, 0);
-            return (
-              <div key={sup} className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs font-semibold text-gray-500">{sup}</p>
-                  <span className="text-xs font-bold text-[#9c27b0]">
-                    {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(total)}
-                  </span>
-                </div>
-                {items.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 bg-white border border-purple-100 rounded-xl px-3 py-2.5 shadow-sm">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800">{r.material_name}</p>
-                      {r.notes && <p className="text-xs text-gray-400 italic">{r.notes}</p>}
+          const grandTotal = rentalItems.reduce((s, r) => s + r.qty * r.price_per_unit, 0);
+          return (
+            <>
+              {Object.entries(grouped).map(([sup, items]) => {
+                const total = items.reduce((s, i) => s + i.qty * i.price_per_unit, 0);
+                return (
+                  <div key={sup} className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-semibold text-gray-500">{sup}</p>
+                      <span className="text-xs font-bold text-[#9c27b0]">
+                        {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(total)}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-500 flex-shrink-0">{r.qty}{r.unit ? ` ${r.unit}` : ''}</span>
-                    <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
-                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
-                    </span>
-                    <button onClick={() => removeRental(r.id)} className="p-1 text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {items.map((r) => (
+                      <div
+                        key={r.id}
+                        className={[
+                          'flex items-center gap-3 rounded-xl px-3 py-2.5 shadow-sm transition-colors group',
+                          r.ordered
+                            ? 'bg-emerald-50 border border-emerald-200'
+                            : 'bg-white border border-purple-100 hover:border-[#9c27b0]/40',
+                        ].join(' ')}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!r.ordered}
+                          onChange={(e) => { e.stopPropagation(); toggleOrdered(r.id, e.target.checked); }}
+                          title={r.ordered ? 'Commandé' : 'Marquer comme commandé'}
+                          className="h-4 w-4 rounded accent-emerald-600 cursor-pointer flex-shrink-0"
+                        />
+                        <div
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => startEditRental(r)}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <p className={['text-sm font-medium', r.ordered ? 'text-emerald-700' : 'text-gray-800'].join(' ')}>
+                              {r.material_name}
+                            </p>
+                            {r.source === 'template' && (
+                              <span className="text-[9px] bg-purple-100 text-[#9c27b0] px-1.5 py-0.5 rounded-full font-medium">auto</span>
+                            )}
+                            {r.ordered && (
+                              <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">commandé</span>
+                            )}
+                          </div>
+                          {r.notes && <p className="text-xs text-gray-400 italic">{r.notes}</p>}
+                        </div>
+                        <span className="text-xs text-gray-500 flex-shrink-0">{r.qty}{r.unit ? ` ${r.unit}` : ''}</span>
+                        <span className={[
+                          'text-sm font-bold tabular-nums flex-shrink-0 px-2 py-0.5 rounded-lg',
+                          r.ordered ? 'text-emerald-700 bg-emerald-100' : 'text-[#9c27b0] bg-purple-50',
+                        ].join(' ')}>
+                          {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
+                        </span>
+                        <Pencil
+                          onClick={() => startEditRental(r)}
+                          className="h-3 w-3 text-gray-300 group-hover:text-[#9c27b0] transition-colors flex-shrink-0 cursor-pointer"
+                        />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeRental(r.id); }}
+                          className="p-1 text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                );
+              })}
+              {/* Grand total */}
+              <div className="flex justify-end pt-2 border-t border-purple-200/50">
+                <span className="text-sm font-bold text-[#9c27b0]">
+                  Total : {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(grandTotal)}
+                </span>
               </div>
-            );
-          });
+            </>
+          );
         })()}
 
         {rentalItems.length === 0 && !showRentalForm && (
-          <p className="text-xs text-gray-400 italic text-center py-2">Aucun matériel à louer — cliquez sur Ajouter</p>
+          <div className="text-center py-4">
+            <p className="text-xs text-gray-400 italic">Aucun matériel à louer</p>
+            {rentalTemplates.length === 0 && (
+              <p className="text-[10px] text-gray-400 mt-1">
+                Configurez vos templates de vaisselle dans <Link href="/location-templates" className="text-[#9c27b0] hover:underline">Templates location</Link> pour auto-générer.
+              </p>
+            )}
+          </div>
         )}
 
-        {/* Add rental form */}
+        {/* Add / Edit rental form */}
         {showRentalForm && (
           <div className="bg-white border border-[#9c27b0]/20 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-600">{editingRentalId ? 'Modifier' : 'Ajouter'} un article</p>
             <div className="grid grid-cols-2 gap-2">
               <input
                 value={rName}
@@ -755,16 +900,16 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               />
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowRentalForm(false)} className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <button onClick={resetRentalForm} className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 Annuler
               </button>
               <button
-                onClick={addRental}
+                onClick={saveRental}
                 disabled={!rName.trim() || savingRental}
                 className="flex items-center gap-1.5 px-4 py-1.5 bg-[#9c27b0] text-white text-xs font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
               >
                 {savingRental ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Enregistrer
+                {editingRentalId ? 'Modifier' : 'Enregistrer'}
               </button>
             </div>
           </div>
