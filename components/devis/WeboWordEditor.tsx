@@ -254,37 +254,59 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const dateStr  = new Date().toISOString().slice(0, 10);
     const filename = `Devis-${safeName}-${dateStr}.pdf`;
 
-    // Create a visible off-screen container (html2canvas NEEDS visible + in DOM)
+    // Create a visible container in the DOM (html2canvas needs it rendered)
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'position:absolute;left:0;top:0;z-index:-1;width:794px;background:#fff;';
     document.body.appendChild(wrapper);
 
-    // Inner content div with padding (mimics the A4 sheet)
+    // Content div — NO padding here, we let html2pdf margin handle page margins
     const el = document.createElement('div');
-    el.style.cssText = `font-family:'${font}',Georgia,serif;font-size:${fontSize}px;padding:75px;background:#fff;color:#1a1a1a;`;
+    el.style.cssText = `font-family:'${font}',Georgia,serif;font-size:${fontSize}px;background:#fff;color:#1a1a1a;line-height:1.5;`;
     el.innerHTML = content;
     wrapper.appendChild(el);
 
-    // Clean up: remove min-height (causes blank space) and hide screen separator
+    // ── Clean up the cloned DOM for PDF ──────────────────────────────────────
+    // 1. Remove min-height everywhere (forces blank space)
     el.querySelectorAll<HTMLElement>('[style]').forEach((node) => {
       if (node.style.minHeight) node.style.minHeight = '';
     });
-    el.querySelectorAll<HTMLElement>('.screen-sep').forEach((sep) => {
-      sep.style.cssText = 'display:none;height:0;margin:0;padding:0;overflow:hidden;';
+
+    // 2. Remove the screen separator completely
+    el.querySelectorAll('.screen-sep').forEach((sep) => sep.remove());
+
+    // 3. Fix negative margins on headers — replace with 0 since html2pdf handles margins
+    //    Headers use margin:-20mm to escape parent padding, but we have no padding now
+    el.querySelectorAll<HTMLElement>('[style]').forEach((node) => {
+      const m = node.style.margin;
+      if (m && m.includes('-')) {
+        // Convert negative margins to 0 for left/right, keep top/bottom
+        node.style.marginLeft = '0';
+        node.style.marginRight = '0';
+        if (node.style.marginTop && parseFloat(node.style.marginTop) < 0) {
+          node.style.marginTop = '0';
+        }
+      }
+      // Also fix padding that assumed negative margin context
+      const p = node.style.padding;
+      if (p && p.includes('20mm')) {
+        node.style.paddingLeft = '20px';
+        node.style.paddingRight = '20px';
+      }
     });
 
-    // Wait a tick for fonts/images to load, then generate
+    // Wait for fonts/images
     await new Promise((r) => setTimeout(r, 300));
 
     try {
       await html2pdf()
         .set({
-          margin:   0,
+          // 10mm margin on all sides — compact but with breathing room
+          margin:   [10, 10, 10, 10],
           filename,
           image:    { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 },
           jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'h3'] },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'h3', 'div', 'table'] },
         })
         .from(wrapper)
         .save();
