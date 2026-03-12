@@ -232,7 +232,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
 <div class="gastro-page" style="font-family:${fontFamily};color:#1a1a1a;line-height:1.7;">
 
   <!-- ── Header Carte (pleine largeur) ── -->
-  <div class="gastro-header" style="${headerGradient}margin:-20mm -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">
+  <div class="gastro-header" style="${headerGradient}margin:24px -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">
     <p style="font-size:9px;font-weight:bold;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:3px;margin:0 0 5px;">
       ${d.eventType || 'Réception'}${d.eventDate ? ` — ${dateFr(d.eventDate)}` : ''}
     </p>
