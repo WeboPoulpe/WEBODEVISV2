@@ -245,54 +245,52 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   // ── Save PDF (direct download via html2pdf.js) ───────────────────────────────
   const handleSavePdf = async () => {
     const content = editorRef.current?.innerHTML ?? '';
+    if (!content) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const html2pdf = (await import('html2pdf.js' as any)).default;
 
-    // Build a clean filename: Devis-ClientName-Date.pdf
+    // Build a clean filename
     const safeName = (clientName ?? 'client').replace(/[^a-zA-ZÀ-ÿ0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 40);
     const dateStr  = new Date().toISOString().slice(0, 10);
     const filename = `Devis-${safeName}-${dateStr}.pdf`;
 
-    // Build a temporary wrapper element
-    const el = document.createElement('div');
-    el.style.fontFamily  = `'${font}', Georgia, serif`;
-    el.style.fontSize    = `${fontSize}px`;
-    el.style.padding     = '20mm';
-    el.style.background  = '#fff';
-    el.style.colorScheme = 'light';
-    el.style.width       = '210mm';
-    el.innerHTML         = content;
+    // Create a visible off-screen container (html2canvas NEEDS visible + in DOM)
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:absolute;left:0;top:0;z-index:-1;width:794px;background:#fff;';
+    document.body.appendChild(wrapper);
 
-    // Clean up the cloned DOM for proper PDF rendering:
-    // 1. Remove min-height on page containers (prevents forced blank space)
+    // Inner content div with padding (mimics the A4 sheet)
+    const el = document.createElement('div');
+    el.style.cssText = `font-family:'${font}',Georgia,serif;font-size:${fontSize}px;padding:75px;background:#fff;color:#1a1a1a;`;
+    el.innerHTML = content;
+    wrapper.appendChild(el);
+
+    // Clean up: remove min-height (causes blank space) and hide screen separator
     el.querySelectorAll<HTMLElement>('[style]').forEach((node) => {
       if (node.style.minHeight) node.style.minHeight = '';
     });
-    // 2. Hide the screen separator (it's only for on-screen display)
     el.querySelectorAll<HTMLElement>('.screen-sep').forEach((sep) => {
-      sep.style.display    = 'none';
-      sep.style.height     = '0';
-      sep.style.margin     = '0';
-      sep.style.padding    = '0';
-      sep.style.border     = 'none';
-      sep.style.overflow   = 'hidden';
-      sep.style.fontSize   = '0';
-      sep.style.lineHeight = '0';
+      sep.style.cssText = 'display:none;height:0;margin:0;padding:0;overflow:hidden;';
     });
 
-    // html2pdf internally appends the element to the DOM, renders via html2canvas,
-    // then removes it — no need to attach manually.
-    await html2pdf()
-      .set({
-        margin:   0,
-        filename,
-        image:    { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css'], avoid: ['tr', 'h3'] },
-      })
-      .from(el)
-      .save();
+    // Wait a tick for fonts/images to load, then generate
+    await new Promise((r) => setTimeout(r, 300));
+
+    try {
+      await html2pdf()
+        .set({
+          margin:   0,
+          filename,
+          image:    { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 },
+          jsPDF:    { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'h3'] },
+        })
+        .from(wrapper)
+        .save();
+    } finally {
+      document.body.removeChild(wrapper);
+    }
   };
 
   return (
