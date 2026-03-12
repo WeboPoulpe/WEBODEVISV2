@@ -94,14 +94,11 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     ? `<style>@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(opts.font)}:wght@400;600;700&display=swap');</style>`
     : '';
 
-  // ── Table rows Page 1 ──────────────────────────────────────────────────────
+  // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
   const tableRows = d.services.map((s) => `
     <tr>
       <td style="padding:9px 12px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
         <strong style="font-size:12px;color:#1a1a1a;">${s.name || '—'}</strong>
-        ${s.description && !s.hideDescOnPdf
-          ? `<p class="svc-desc" style="font-size:11px;color:#9e9e9e;font-style:italic;margin:3px 0 0;line-height:1.4;">${s.description}</p>`
-          : ''}
       </td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;">${s.quantity}</td>
       ${!d.hidePrice ? `
