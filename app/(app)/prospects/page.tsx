@@ -735,6 +735,8 @@ export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProspectStatus | 'all'>('all');
+  const [eventFilter, setEventFilter] = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Prospect | null>(null);
   const [showTokenManager, setShowTokenManager] = useState(false);
@@ -785,14 +787,30 @@ export default function ProspectsPage() {
     if (selected?.id === id) setSelected(null);
   };
 
+  // Extract unique years from event_date for year filter options
+  const availableYears = Array.from(
+    new Set(
+      prospects
+        .map((p) => p.event_date ? new Date(p.event_date).getFullYear().toString() : null)
+        .filter(Boolean) as string[]
+    )
+  ).sort();
+
+  // Extract unique event types for filter options
+  const availableEventTypes = Array.from(
+    new Set(prospects.map((p) => p.event_type).filter(Boolean) as string[])
+  ).sort();
+
   const filtered = prospects.filter((p) => {
     const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+    const matchEvent = eventFilter === 'all' || p.event_type === eventFilter;
+    const matchYear = yearFilter === 'all' || (p.event_date && new Date(p.event_date).getFullYear().toString() === yearFilter);
     const matchSearch =
       !search ||
       `${p.first_name} ${p.last_name} ${p.email} ${p.event_type ?? ''}`
         .toLowerCase()
         .includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+    return matchStatus && matchSearch && matchEvent && matchYear;
   });
 
   const newCount = prospects.filter((p) => p.status === 'nouveau').length;
@@ -831,6 +849,39 @@ export default function ProspectsPage() {
             placeholder="Rechercher par nom, email, événement…"
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
           />
+        </div>
+
+        {/* Event type + Year filters */}
+        <div className="flex gap-2 mb-3">
+          <select
+            value={eventFilter}
+            onChange={(e) => setEventFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+          >
+            <option value="all">Tous les événements</option>
+            {availableEventTypes.map((t) => (
+              <option key={t} value={t}>{t} ({prospects.filter((p) => p.event_type === t).length})</option>
+            ))}
+          </select>
+          <select
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+          >
+            <option value="all">Toutes les années</option>
+            {availableYears.map((y) => (
+              <option key={y} value={y}>{y} ({prospects.filter((p) => p.event_date && new Date(p.event_date).getFullYear().toString() === y).length})</option>
+            ))}
+          </select>
+          {(eventFilter !== 'all' || yearFilter !== 'all') && (
+            <button
+              onClick={() => { setEventFilter('all'); setYearFilter('all'); }}
+              className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-[#9c27b0] bg-purple-50 border border-[#9c27b0]/20 rounded-xl hover:bg-purple-100 transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Réinitialiser
+            </button>
+          )}
         </div>
 
         {/* Status filter pills */}
@@ -901,11 +952,11 @@ export default function ProspectsPage() {
               </div>
               <p className="text-gray-500 font-medium mb-1">Aucune demande</p>
               <p className="text-sm text-gray-400 mb-4">
-                {search || statusFilter !== 'all'
+                {search || statusFilter !== 'all' || eventFilter !== 'all' || yearFilter !== 'all'
                   ? 'Aucun résultat pour ces filtres.'
                   : 'Partagez votre formulaire pour recevoir des demandes.'}
               </p>
-              {!search && statusFilter === 'all' && (
+              {!search && statusFilter === 'all' && eventFilter === 'all' && yearFilter === 'all' && (
                 <button
                   onClick={() => setShowTokenManager(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
