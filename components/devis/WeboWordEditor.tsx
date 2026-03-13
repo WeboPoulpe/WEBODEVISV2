@@ -95,6 +95,14 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18];
+const LINE_HEIGHTS = [
+  { label: '1.0', value: '1' },
+  { label: '1.2', value: '1.2' },
+  { label: '1.4', value: '1.4' },
+  { label: '1.6', value: '1.6' },
+  { label: '1.8', value: '1.8' },
+  { label: '2.0', value: '2' },
+];
 
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize }: Props) {
   const router = useRouter();
@@ -108,6 +116,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [showDesc,  setShowDesc]  = useState(true);
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
+  const [lineHeight, setLineHeight] = useState('1.4');
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [menuWidth, setMenuWidth] = useState('400px');
 
@@ -143,12 +152,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
   }, [initialHtml]);
 
-  // Apply fontSize directly to DOM so contentEditable sees it immediately
+  // Apply fontSize + lineHeight directly to DOM so contentEditable sees it immediately
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.style.fontSize = `${fontSize}px`;
+      editorRef.current.style.lineHeight = lineHeight;
     }
-  }, [fontSize]);
+  }, [fontSize, lineHeight]);
 
   // Apply menuWidth to .gastro-menu div (bake before save/print)
   const applyMenuWidth = (width: string) => {
@@ -209,7 +219,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; background: #fff; }
+    body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; line-height: ${lineHeight}; background: #fff; }
     body * { min-height: 0 !important; }
     .screen-sep { visibility: hidden !important; height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; font-size: 0 !important; line-height: 0 !important; page-break-after: always !important; break-after: page !important; }
     .gastro-page { page-break-before: always !important; break-before: page !important; }
@@ -271,7 +281,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     @page { size: A4; margin: 8mm 12mm; }
     html, body { margin: 0; padding: 0; background: #fff; color-scheme: light; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; color: #1a1a1a; }
+    body { font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; line-height: ${lineHeight}; color: #1a1a1a; }
 
     /* Page wrapper — compact padding */
     .pdf-wrap { padding: 6mm 10mm; }
@@ -331,7 +341,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       {/* CSS: font override + font size + description toggle + gastro menu width */}
       <style>{`
         #weboword-sheet, #weboword-sheet * { font-family: '${font}', Georgia, serif !important; }
-        #weboword-sheet { font-size: ${fontSize}px !important; }
+        #weboword-sheet { font-size: ${fontSize}px !important; line-height: ${lineHeight} !important; }
         ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
         .gastro-menu { max-width: ${menuWidth} !important; margin: 0 auto !important; }
       `}</style>
@@ -591,6 +601,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             >
               {FONT_SIZES.map((s) => (
                 <option key={s} value={s}>{s}px</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Line height selector */}
+          <div className="flex items-center gap-0.5" title="Interligne">
+            <span className="text-[10px] text-gray-400 mr-0.5 hidden sm:inline">Interligne :</span>
+            <select
+              value={lineHeight}
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => setLineHeight(e.target.value)}
+              className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 cursor-pointer"
+            >
+              {LINE_HEIGHTS.map((lh) => (
+                <option key={lh.value} value={lh.value}>{lh.label}</option>
               ))}
             </select>
           </div>
