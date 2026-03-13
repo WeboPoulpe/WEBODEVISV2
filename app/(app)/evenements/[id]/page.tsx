@@ -8,6 +8,7 @@ import {
   Plus, Trash2, Printer, Loader2, ChevronUp, ChevronDown,
   UtensilsCrossed, Search, X, Smartphone, Users2,
   ChevronLeft, ChevronRight, Pencil, Check, ExternalLink, Wand2,
+  MapPin, Users, Calendar, CreditCard, Eye,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -211,42 +212,59 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
   const pct  = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {items.length > 0 && (
-        <div>
-          <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-            <span>{done}/{items.length} tâche{items.length > 1 ? 's' : ''} complétée{done > 1 ? 's' : ''}</span>
-            <span className="font-medium text-[#9c27b0]">{pct}%</span>
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>{done}/{items.length} tâche{items.length > 1 ? 's' : ''}</span>
+            <span className="font-bold text-[#9c27b0]">{pct}%</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-2 bg-[#9c27b0] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-2.5 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #9c27b0, #e040fb)' }}
+            />
           </div>
         </div>
       )}
 
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400 italic text-center py-4">Aucune tâche — ajoutez-en ci-dessous</p>
+        <div className="text-center py-10">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-50 flex items-center justify-center mx-auto mb-3">
+            <CheckSquare className="h-6 w-6 text-[#9c27b0]" />
+          </div>
+          <p className="text-sm font-medium text-gray-500">Aucune tâche</p>
+          <p className="text-xs text-gray-400 mt-1">Ajoutez votre première tâche ci-dessous</p>
+        </div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {items.map((item, idx) => (
-            <div key={item.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5 group">
+            <div
+              key={item.id}
+              className={[
+                'flex items-center gap-3 rounded-xl px-4 py-3 group transition-all duration-200 border',
+                item.done
+                  ? 'bg-emerald-50/50 border-emerald-200/50'
+                  : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+              ].join(' ')}
+            >
               <input
                 type="checkbox"
                 checked={item.done}
                 onChange={() => toggle(item.id)}
-                className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                className="h-4.5 w-4.5 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
               />
-              <span className={['flex-1 text-sm', item.done ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
+              <span className={['flex-1 text-sm font-medium', item.done ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
                 {item.text}
               </span>
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => move(idx, -1)} disabled={idx === 0} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors">
+                <button onClick={() => move(idx, -1)} disabled={idx === 0} className="p-1.5 text-gray-300 hover:text-gray-600 disabled:opacity-20 rounded-lg hover:bg-gray-100 transition-all">
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors">
+                <button onClick={() => move(idx, 1)} disabled={idx === items.length - 1} className="p-1.5 text-gray-300 hover:text-gray-600 disabled:opacity-20 rounded-lg hover:bg-gray-100 transition-all">
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => remove(item.id)} className="p-1 text-red-400 hover:text-red-600 transition-colors">
+                <button onClick={() => remove(item.id)} className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -261,13 +279,13 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
-          placeholder="Nouvelle tâche…"
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+          placeholder="Ajouter une tâche…"
+          className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] focus:bg-white transition-all"
         />
         <button
           onClick={add}
           disabled={!newText.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-200/50 disabled:opacity-40 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           Ajouter
@@ -533,11 +551,20 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
   };
 
   const Section = ({ title, items }: { title: string; items: ServiceLine[] }) => (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{title}</p>
-      <div className="space-y-1.5">
+    <div className="space-y-3">
+      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+        <span className="h-px flex-1 bg-gray-200" />
+        {title}
+        <span className="h-px flex-1 bg-gray-200" />
+      </h3>
+      <div className="space-y-2">
         {items.map((s) => (
-          <div key={s.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+          <div key={s.id} className={[
+            'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 border',
+            checked.has(s.id)
+              ? 'bg-emerald-50/50 border-emerald-200/50'
+              : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+          ].join(' ')}>
             <input
               type="checkbox"
               checked={checked.has(s.id)}
@@ -550,8 +577,8 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               </p>
               {s.description && <p className="text-xs text-gray-400 italic truncate">{s.description}</p>}
             </div>
-            <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
-              ×{s.quantity}
+            <span className="text-xs font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 px-2.5 py-1 rounded-lg border border-purple-100/50">
+              x{s.quantity}
             </span>
           </div>
         ))}
@@ -571,26 +598,36 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-gray-400">Cochez les éléments disponibles. Les matériels ajoutés manuellement sont sauvegardés.</p>
 
       {isEmpty && (
-        <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-          <Package className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400">Aucun matériel détecté.</p>
-          <p className="text-xs text-gray-400 mt-1">
+        <div className="text-center py-12">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-50 flex items-center justify-center mx-auto mb-4">
+            <Package className="h-7 w-7 text-[#9c27b0]" />
+          </div>
+          <p className="text-sm font-medium text-gray-500">Aucun matériel</p>
+          <p className="text-xs text-gray-400 mt-1.5 max-w-xs mx-auto">
             Ajoutez du matériel ci-dessous ou configurez les templates dans{' '}
-            <Link href="/prestations" className="text-[#9c27b0] hover:underline">Prestations</Link>.
+            <Link href="/location-templates" className="text-[#9c27b0] hover:underline font-medium">Configuration</Link>.
           </p>
         </div>
       )}
 
       {/* Custom materials (saved to DB) */}
       {customItems.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Matériel ajouté manuellement</p>
-          <div className="space-y-1.5">
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+            <span className="h-px flex-1 bg-gray-200" />
+            Matériel manuel
+            <span className="h-px flex-1 bg-gray-200" />
+          </h3>
+          <div className="space-y-2">
             {customItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+              <div key={item.id} className={[
+                'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 border',
+                checked.has(item.id)
+                  ? 'bg-emerald-50/50 border-emerald-200/50'
+                  : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+              ].join(' ')}>
                 <input
                   type="checkbox"
                   checked={checked.has(item.id)}
@@ -600,10 +637,10 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 <p className={['flex-1 text-sm font-medium', checked.has(item.id) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
                   {item.name}
                 </p>
-                <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
+                <span className="text-xs font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 px-2.5 py-1 rounded-lg border border-purple-100/50">
                   {item.qty} {item.unit}
                 </span>
-                <button onClick={() => removeCustom(item.id)} className="p-1 text-red-400 hover:text-red-600 transition-colors flex-shrink-0">
+                <button onClick={() => removeCustom(item.id)} className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -614,11 +651,20 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
       {/* Computed materials from templates */}
       {computed.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Matériel calculé automatiquement</p>
-          <div className="space-y-1.5">
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+            <span className="h-px flex-1 bg-gray-200" />
+            Matériel auto-calculé
+            <span className="h-px flex-1 bg-gray-200" />
+          </h3>
+          <div className="space-y-2">
             {computed.map((item) => (
-              <div key={item.key} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-3 py-2.5 shadow-sm">
+              <div key={item.key} className={[
+                'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 border',
+                checked.has(item.key)
+                  ? 'bg-emerald-50/50 border-emerald-200/50'
+                  : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+              ].join(' ')}>
                 <input
                   type="checkbox"
                   checked={checked.has(item.key)}
@@ -628,7 +674,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 <p className={['flex-1 text-sm font-medium', checked.has(item.key) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
                   {item.name}
                 </p>
-                <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
+                <span className="text-xs font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 px-2.5 py-1 rounded-lg border border-purple-100/50">
                   {item.qty} {item.unit ?? ''}
                 </span>
               </div>
@@ -641,13 +687,18 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
       {personnel.length > 0 && <Section title="Personnel & Service" items={personnel} />}
 
       {/* Add custom material */}
-      <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
+      <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-br from-gray-50 to-white p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-gray-600">Ajouter du matériel</p>
+          <h3 className="text-sm font-semibold text-gray-700">Ajouter du matériel</h3>
           {catalog.length > 0 && (
             <button
               onClick={() => setShowCatalog((v) => !v)}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-50 transition-colors"
+              className={[
+                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200',
+                showCatalog
+                  ? 'bg-[#9c27b0] text-white shadow-md shadow-purple-200/50'
+                  : 'text-[#9c27b0] border border-[#9c27b0]/30 hover:bg-purple-50',
+              ].join(' ')}
             >
               <Search className="h-3.5 w-3.5" />
               Catalogue ({catalog.length})
@@ -657,28 +708,34 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
         {/* Catalog picker */}
         {showCatalog && (
-          <div className="border border-[#9c27b0]/20 rounded-xl bg-white overflow-hidden">
-            <div className="p-2 border-b border-gray-100">
-              <input
-                type="text"
-                value={catalogSearch}
-                onChange={(e) => setCatalogSearch(e.target.value)}
-                placeholder="Rechercher une prestation…"
-                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
-                autoFocus
-              />
+          <div className="rounded-xl bg-white border border-purple-200/60 overflow-hidden shadow-sm">
+            <div className="p-3 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  placeholder="Rechercher une prestation…"
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] focus:bg-white transition-all"
+                  autoFocus
+                />
+              </div>
             </div>
-            <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
+            <div className="max-h-52 overflow-y-auto divide-y divide-gray-50">
               {filteredCatalog.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-gray-400 text-center">Aucun résultat</p>
+                <p className="px-4 py-4 text-xs text-gray-400 text-center">Aucun résultat</p>
               ) : filteredCatalog.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => { addFromCatalog(p); setCatalogSearch(''); setShowCatalog(false); }}
-                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-purple-50 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-purple-50/50 transition-colors text-left group"
                 >
-                  <span className="text-sm text-gray-800">{p.name}</span>
-                  <span className="flex items-center gap-1 text-xs text-[#9c27b0]">
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-gray-800">{p.name}</span>
+                    {p.category && <span className="ml-2 text-xs text-gray-400">{p.category}</span>}
+                  </div>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-[#9c27b0] opacity-0 group-hover:opacity-100 transition-opacity">
                     <Plus className="h-3 w-3" />Ajouter
                   </span>
                 </button>
@@ -694,7 +751,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCustom()}
             placeholder="Nom du matériel…"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+            className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] transition-all"
           />
           <input
             type="number"
@@ -702,19 +759,19 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             onChange={(e) => setNewQty(e.target.value)}
             min="0"
             step="1"
-            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+            className="w-20 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] transition-all"
           />
           <input
             type="text"
             value={newUnit}
             onChange={(e) => setNewUnit(e.target.value)}
             placeholder="unité"
-            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+            className="w-20 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] transition-all"
           />
           <button
             onClick={addCustom}
             disabled={!newName.trim() || saving}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+            className="flex items-center justify-center w-11 h-11 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white rounded-xl hover:shadow-lg hover:shadow-purple-200/50 disabled:opacity-40 transition-all duration-200"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           </button>
@@ -722,32 +779,40 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
       </div>
 
       {/* ── Location de matériel ─────────────────────────────────────────────── */}
-      <div className="border border-[#9c27b0]/20 rounded-xl p-4 space-y-4 bg-purple-50/40">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs font-semibold text-[#9c27b0] uppercase tracking-widest">Location de matériel</p>
+      <div className="rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 to-pink-50/30 p-5 space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center shadow-md shadow-purple-200/50">
+              <Package className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">Location de matériel</h3>
+              <Link href="/location-templates" className="text-[10px] text-[#9c27b0] hover:underline">Gérer les templates</Link>
+            </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             {rentalTemplates.length > 0 && (
               <button
                 onClick={generateFromTemplates}
                 disabled={generatingRentals}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-100 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#9c27b0] bg-white border border-purple-200/60 rounded-xl hover:bg-purple-50 hover:shadow-sm transition-all duration-200"
               >
                 {generatingRentals ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                Générer vaisselle ({quote.guest_count ?? 1} conv.)
+                Générer ({quote.guest_count ?? 1} conv.)
               </button>
             )}
             {rentalItems.length > 0 && (
               <button
                 onClick={printBonCommande}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-100 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all duration-200"
               >
                 <Printer className="h-3.5 w-3.5" />
-                Bon de commande PDF
+                PDF
               </button>
             )}
             <button
               onClick={() => { resetRentalForm(); setShowRentalForm(true); }}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#9c27b0] rounded-lg hover:bg-[#7b1fa2] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] rounded-xl hover:shadow-lg hover:shadow-purple-200/50 transition-all duration-200"
             >
               <Plus className="h-3.5 w-3.5" />
               Ajouter
@@ -765,89 +830,98 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
           }
           const grandTotal = rentalItems.reduce((s, r) => s + r.qty * r.price_per_unit, 0);
           return (
-            <>
+            <div className="space-y-4">
               {Object.entries(grouped).map(([sup, items]) => {
                 const total = items.reduce((s, i) => s + i.qty * i.price_per_unit, 0);
                 return (
-                  <div key={sup} className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs font-semibold text-gray-500">{sup}</p>
-                      <span className="text-xs font-bold text-[#9c27b0]">
+                  <div key={sup} className="space-y-2">
+                    <div className="flex justify-between items-center px-1">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{sup}</p>
+                      <span className="text-xs font-bold text-[#9c27b0] bg-white px-2.5 py-1 rounded-lg border border-purple-100/50">
                         {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(total)}
                       </span>
                     </div>
-                    {items.map((r) => (
-                      <div
-                        key={r.id}
-                        className={[
-                          'flex items-center gap-3 rounded-xl px-3 py-2.5 shadow-sm transition-colors group',
-                          r.ordered
-                            ? 'bg-emerald-50 border border-emerald-200'
-                            : 'bg-white border border-purple-100 hover:border-[#9c27b0]/40',
-                        ].join(' ')}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!r.ordered}
-                          onChange={(e) => { e.stopPropagation(); toggleOrdered(r.id, e.target.checked); }}
-                          title={r.ordered ? 'Commandé' : 'Marquer comme commandé'}
-                          className="h-4 w-4 rounded accent-emerald-600 cursor-pointer flex-shrink-0"
-                        />
+                    <div className="space-y-1.5">
+                      {items.map((r) => (
                         <div
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => startEditRental(r)}
+                          key={r.id}
+                          className={[
+                            'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 group border',
+                            r.ordered
+                              ? 'bg-emerald-50/80 border-emerald-200/60'
+                              : 'bg-white/80 border-white hover:border-purple-200/60 hover:shadow-sm',
+                          ].join(' ')}
                         >
-                          <div className="flex items-center gap-1.5">
-                            <p className={['text-sm font-medium', r.ordered ? 'text-emerald-700' : 'text-gray-800'].join(' ')}>
-                              {r.material_name}
-                            </p>
-                            {r.source === 'template' && (
-                              <span className="text-[9px] bg-purple-100 text-[#9c27b0] px-1.5 py-0.5 rounded-full font-medium">auto</span>
-                            )}
-                            {r.ordered && (
-                              <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">commandé</span>
-                            )}
+                          <input
+                            type="checkbox"
+                            checked={!!r.ordered}
+                            onChange={(e) => { e.stopPropagation(); toggleOrdered(r.id, e.target.checked); }}
+                            title={r.ordered ? 'Commandé' : 'Marquer comme commandé'}
+                            className="h-4 w-4 rounded accent-emerald-600 cursor-pointer flex-shrink-0"
+                          />
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() => startEditRental(r)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <p className={['text-sm font-medium', r.ordered ? 'text-emerald-700' : 'text-gray-800'].join(' ')}>
+                                {r.material_name}
+                              </p>
+                              {r.source === 'template' && (
+                                <span className="text-[9px] bg-gradient-to-r from-purple-100 to-pink-50 text-[#9c27b0] px-2 py-0.5 rounded-full font-semibold border border-purple-200/40">auto</span>
+                              )}
+                              {r.ordered && (
+                                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">commandé</span>
+                              )}
+                            </div>
+                            {r.notes && <p className="text-xs text-gray-400 italic mt-0.5">{r.notes}</p>}
                           </div>
-                          {r.notes && <p className="text-xs text-gray-400 italic">{r.notes}</p>}
+                          <span className="text-xs text-gray-500 flex-shrink-0 font-medium">{r.qty}{r.unit ? ` ${r.unit}` : ''}</span>
+                          <span className={[
+                            'text-xs font-bold tabular-nums flex-shrink-0 px-2.5 py-1 rounded-lg',
+                            r.ordered ? 'text-emerald-700 bg-emerald-100/80' : 'text-[#9c27b0] bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100/50',
+                          ].join(' ')}>
+                            {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
+                          </span>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => startEditRental(r)}
+                              className="p-1.5 text-gray-300 hover:text-[#9c27b0] rounded-lg hover:bg-purple-50 transition-all"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); removeRental(r.id); }}
+                              className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-500 flex-shrink-0">{r.qty}{r.unit ? ` ${r.unit}` : ''}</span>
-                        <span className={[
-                          'text-sm font-bold tabular-nums flex-shrink-0 px-2 py-0.5 rounded-lg',
-                          r.ordered ? 'text-emerald-700 bg-emerald-100' : 'text-[#9c27b0] bg-purple-50',
-                        ].join(' ')}>
-                          {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
-                        </span>
-                        <Pencil
-                          onClick={() => startEditRental(r)}
-                          className="h-3 w-3 text-gray-300 group-hover:text-[#9c27b0] transition-colors flex-shrink-0 cursor-pointer"
-                        />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeRental(r.id); }}
-                          className="p-1 text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 );
               })}
               {/* Grand total */}
-              <div className="flex justify-end pt-2 border-t border-purple-200/50">
-                <span className="text-sm font-bold text-[#9c27b0]">
-                  Total : {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(grandTotal)}
-                </span>
+              <div className="flex justify-end pt-3 border-t border-purple-200/40">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] shadow-lg shadow-purple-200/40">
+                  <span className="text-xs text-white/70 font-medium">Total</span>
+                  <span className="text-sm font-bold text-white tabular-nums">
+                    {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(grandTotal)}
+                  </span>
+                </div>
               </div>
-            </>
+            </div>
           );
         })()}
 
         {rentalItems.length === 0 && !showRentalForm && (
-          <div className="text-center py-4">
-            <p className="text-xs text-gray-400 italic">Aucun matériel à louer</p>
+          <div className="text-center py-8">
+            <p className="text-xs text-gray-500 font-medium">Aucun matériel à louer</p>
             {rentalTemplates.length === 0 && (
-              <p className="text-[10px] text-gray-400 mt-1">
-                Configurez vos templates de vaisselle dans <Link href="/location-templates" className="text-[#9c27b0] hover:underline">Templates location</Link> pour auto-générer.
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                Configurez vos templates dans <Link href="/location-templates" className="text-[#9c27b0] hover:underline font-medium">Configuration</Link>
               </p>
             )}
           </div>
@@ -855,32 +929,32 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
         {/* Add / Edit rental form */}
         {showRentalForm && (
-          <div className="bg-white border border-[#9c27b0]/20 rounded-xl p-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-600">{editingRentalId ? 'Modifier' : 'Ajouter'} un article</p>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="bg-white rounded-2xl border border-purple-200/60 p-4 space-y-3 shadow-sm">
+            <h4 className="text-sm font-semibold text-gray-700">{editingRentalId ? 'Modifier' : 'Nouvel'} article</h4>
+            <div className="grid grid-cols-2 gap-2.5">
               <input
                 value={rName}
                 onChange={(e) => setRName(e.target.value)}
                 placeholder="Nom du matériel *"
-                className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="col-span-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
               />
               <input
                 type="number" min="0" step="1"
                 value={rQty}
                 onChange={(e) => setRQty(e.target.value)}
                 placeholder="Quantité"
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
               />
               <input
                 value={rUnit}
                 onChange={(e) => setRUnit(e.target.value)}
                 placeholder="Unité"
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
               />
               <select
                 value={rSupplierId}
                 onChange={(e) => setRSupplierId(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
               >
                 <option value="">Fournisseur (optionnel)</option>
                 {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -890,23 +964,23 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 value={rPrice}
                 onChange={(e) => setRPrice(e.target.value)}
                 placeholder="Prix unitaire HT"
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
               />
               <input
                 value={rNotes}
                 onChange={(e) => setRNotes(e.target.value)}
                 placeholder="Notes (optionnel)"
-                className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="col-span-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
               />
             </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={resetRentalForm} className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={resetRentalForm} className="px-4 py-2 text-xs font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
                 Annuler
               </button>
               <button
                 onClick={saveRental}
                 disabled={!rName.trim() || savingRental}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-[#9c27b0] text-white text-xs font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white text-xs font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-200/50 disabled:opacity-40 transition-all duration-200"
               >
                 {savingRental ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 {editingRentalId ? 'Modifier' : 'Enregistrer'}
@@ -1815,65 +1889,104 @@ export default function EvenementPage() {
     : null;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/30">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-      {/* ── Back + header ─────────────────────────────────────────────────── */}
-      <div>
-        <Link href="/calendrier" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4 transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-          Retour au calendrier
+        {/* ── Back ──────────────────────────────────────────────────────────── */}
+        <Link href="/calendrier" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#9c27b0] transition-colors group">
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          Calendrier
         </Link>
 
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{quote.client_name || 'Événement'}</h1>
-            <p className="text-sm text-gray-500 mt-0.5 capitalize">{quote.event_type}</p>
-            {displayDate && <p className="text-sm text-[#9c27b0] font-medium mt-0.5">{displayDate}</p>}
-            {quote.event_location && <p className="text-xs text-gray-400 mt-0.5">📍 {quote.event_location}</p>}
-            {quote.guest_count && (
-              <p className="text-xs text-gray-400 mt-0.5">{quote.guest_count} couvert{quote.guest_count > 1 ? 's' : ''}</p>
-            )}
-          </div>
-          <div className="text-right flex-shrink-0">
-            {quote.total_amount != null && (
-              <p className="text-lg font-bold text-[#9c27b0]">{formatCurrency(quote.total_amount)}</p>
-            )}
-            <Link href={`/devis/${quote.id}/modifier`} className="text-xs text-gray-400 hover:text-[#9c27b0] hover:underline transition-colors">
-              Voir le devis
-            </Link>
+        {/* ── Hero header card ──────────────────────────────────────────────── */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/80 backdrop-blur-sm shadow-lg shadow-purple-100/40">
+          {/* Decorative gradient bar */}
+          <div className="absolute inset-x-0 top-0 h-1" style={{ background: 'linear-gradient(90deg, #9c27b0, #e040fb, #7b1fa2)' }} />
+
+          <div className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-3">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{quote.client_name || 'Événement'}</h1>
+                  <span className="inline-block mt-1.5 px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-gradient-to-r from-purple-100 to-pink-50 text-[#9c27b0] border border-purple-200/50">
+                    {quote.event_type}
+                  </span>
+                </div>
+
+                {/* Info chips */}
+                <div className="flex flex-wrap gap-2">
+                  {displayDate && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50/80 border border-purple-100/50">
+                      <Calendar className="h-3.5 w-3.5 text-[#9c27b0]" />
+                      <span className="text-xs font-medium text-gray-700 capitalize">{displayDate}</span>
+                    </div>
+                  )}
+                  {quote.event_location && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50/80 border border-blue-100/50">
+                      <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                      <span className="text-xs font-medium text-gray-700">{quote.event_location}</span>
+                    </div>
+                  )}
+                  {quote.guest_count && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-100/50">
+                      <Users className="h-3.5 w-3.5 text-amber-600" />
+                      <span className="text-xs font-medium text-gray-700">{quote.guest_count} couvert{quote.guest_count > 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Price + link */}
+              <div className="text-right flex-shrink-0 space-y-2">
+                {quote.total_amount != null && (
+                  <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] shadow-lg shadow-purple-200/50">
+                    <CreditCard className="h-4 w-4 text-white/70" />
+                    <span className="text-lg font-bold text-white tabular-nums">{formatCurrency(quote.total_amount)}</span>
+                  </div>
+                )}
+                <div>
+                  <Link href={`/devis/${quote.id}/modifier`} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#9c27b0] transition-colors">
+                    <Eye className="h-3 w-3" />
+                    Voir le devis
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-      <div className="flex bg-gray-100 p-1 rounded-xl gap-1 overflow-x-auto">
-        {TABS.map(({ key, label, icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={[
-              'flex-shrink-0 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all',
-              tab === key ? 'bg-white text-[#9c27b0] shadow-sm' : 'text-gray-500 hover:text-gray-700',
-            ].join(' ')}
-          >
-            {icon}
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+        {/* ── Tabs ──────────────────────────────────────────────────────────── */}
+        <div className="flex bg-white/70 backdrop-blur-sm border border-gray-200/60 p-1.5 rounded-2xl gap-1 overflow-x-auto shadow-sm">
+          {TABS.map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={[
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200',
+                tab === key
+                  ? 'bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] text-white shadow-md shadow-purple-200/50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+              ].join(' ')}
+            >
+              {icon}
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
 
-      {/* ── Tab content ───────────────────────────────────────────────────── */}
-      <div>
-        {tab === 'checklist' && (
-          <ChecklistTab
-            quote={quote}
-            onUpdate={(items) => setQuote((q) => q ? { ...q, checklist: items } : q)}
-          />
-        )}
-        {tab === 'materiel'  && <MaterielTab quote={quote} onUpdate={(mats) => setQuote((q) => q ? { ...q, event_materials: mats } : q)} />}
-        {tab === 'courses'   && <CoursesTab  quoteId={id!} quote={quote} />}
-        {tab === 'achats'    && <AchatsTab   quoteId={id!} />}
-        {tab === 'staffing'  && <StaffingTab quoteId={id!} quote={quote} />}
+        {/* ── Tab content ───────────────────────────────────────────────────── */}
+        <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl p-5 sm:p-6 shadow-sm">
+          {tab === 'checklist' && (
+            <ChecklistTab
+              quote={quote}
+              onUpdate={(items) => setQuote((q) => q ? { ...q, checklist: items } : q)}
+            />
+          )}
+          {tab === 'materiel'  && <MaterielTab quote={quote} onUpdate={(mats) => setQuote((q) => q ? { ...q, event_materials: mats } : q)} />}
+          {tab === 'courses'   && <CoursesTab  quoteId={id!} quote={quote} />}
+          {tab === 'achats'    && <AchatsTab   quoteId={id!} />}
+          {tab === 'staffing'  && <StaffingTab quoteId={id!} quote={quote} />}
+        </div>
       </div>
     </div>
   );

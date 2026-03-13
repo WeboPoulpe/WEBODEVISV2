@@ -46,7 +46,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
       { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
       { href: '/fournisseurs',       icon: Truck,          label: 'Fournisseurs',      exact: false },
-      { href: '/location-templates', icon: Wrench,         label: 'Templates location', exact: false },
       { href: '/location-globale',   icon: Boxes,          label: 'Location globale',  exact: false },
       { href: '/courses-globales',   icon: ShoppingBasket, label: 'Courses globales',  exact: false },
     ],
@@ -56,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/parametres', icon: Settings,        label: 'Paramètres',     exact: false },
       { href: '/modeles',    icon: LayoutTemplate,  label: 'Modèles de devis', exact: false },
+      { href: '/location-templates', icon: Wrench,  label: 'Templates location', exact: false },
     ],
   },
 ];
