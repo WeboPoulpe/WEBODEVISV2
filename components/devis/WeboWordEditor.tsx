@@ -651,6 +651,15 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full print:min-h-0"
         >
           <style>{`
+            #weboword-sheet,
+            #weboword-sheet p,
+            #weboword-sheet li,
+            #weboword-sheet div,
+            #weboword-sheet span,
+            #weboword-sheet td,
+            #weboword-sheet th {
+              line-height: ${lineHeight} !important;
+            }
             @media print {
               .no-print { display: none !important; }
               #weboword-sheet {
@@ -678,7 +687,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             contentEditable
             suppressContentEditableWarning
             spellCheck
-            style={{ padding: '20mm' }}
+            style={{ padding: '20mm', fontSize: `${fontSize}px`, lineHeight: lineHeight }}
             className="outline-none min-h-[297mm] prose prose-sm max-w-none focus:ring-2 focus:ring-[#9c27b0]/20 rounded-lg"
             data-placeholder="Cliquez ici pour commencer à modifier votre devis…"
           />
