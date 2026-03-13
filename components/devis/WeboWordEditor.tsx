@@ -45,7 +45,7 @@ const FONTS = [
 // ── Colour presets for the text-colour picker ─────────────────────────────────
 const COLORS = [
   '#1a1a1a', '#9c27b0', '#7b1fa2', '#1565c0', '#2e7d32',
-  '#c62828', '#e65100', '#f9a825', '#ffffff',
+  '#c62828', '#FF2400', '#e65100', '#f9a825', '#ffffff',
 ];
 
 // ── Small toolbar button ───────────────────────────────────────────────────────
