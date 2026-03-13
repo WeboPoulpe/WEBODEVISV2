@@ -209,47 +209,46 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate }: { quote: Quote
             <p className="text-sm text-gray-500 capitalize truncate">{quote.event_type || 'Événement'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {!quote.user_id && <V1Badge />}
-          <StatusBadge status={quote.status} />
-        </div>
+        {!quote.user_id && <div className="flex-shrink-0"><V1Badge /></div>}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm text-gray-500">
         {quote.event_date && <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-gray-400" />{formatDate(quote.event_date)}</span>}
         {quote.guest_count && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-gray-400" />{quote.guest_count} couvert{quote.guest_count > 1 ? 's' : ''}</span>}
       </div>
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        {quote.total_amount ? (
-          <p className="font-bold text-gray-900 text-base">{formatCurrency(quote.total_amount)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
-        ) : <p className="text-sm text-gray-400 italic">—</p>}
+      <div className="pt-3 border-t border-gray-100 space-y-2.5">
+        <div className="flex items-center justify-between">
+          {quote.total_amount ? (
+            <p className="font-bold text-gray-900 text-base">{formatCurrency(quote.total_amount)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
+          ) : <p className="text-sm text-gray-400 italic">—</p>}
+          <StatusBadge status={quote.status} />
+        </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => onDuplicate(quote.id)} title="Dupliquer les prestations"
-            className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+          <button onClick={onOpenSheet} title="Aperçu"
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Eye className="h-3.5 w-3.5" />Aperçu
+          </button>
+          <Link href={`/devis/${quote.id}/imprimer`} target="_blank" title="PDF"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <Printer className="h-3.5 w-3.5" />
+          </Link>
+          <button onClick={() => onDuplicate(quote.id)} title="Dupliquer"
+            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
             <Copy className="h-3.5 w-3.5" />
           </button>
+          <Link href={`/devis/${quote.id}/modifier?mode=wizard`} title="Modifier"
+            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+            <Pencil className="h-3.5 w-3.5" />
+          </Link>
+          <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
+            className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+            <LayoutTemplate className="h-3.5 w-3.5" />
+          </Link>
           {quote.status === 'draft' && (
-            <button onClick={() => onDelete(quote.id)} title="Supprimer le brouillon"
+            <button onClick={() => onDelete(quote.id)} title="Supprimer"
               className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-          <button onClick={onOpenSheet} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Eye className="h-3.5 w-3.5" />Aperçu
-          </button>
-          <Link href={`/devis/${quote.id}/imprimer`} target="_blank"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Printer className="h-3.5 w-3.5" />PDF
-          </Link>
-          <Link href={`/devis/${quote.id}/modifier?mode=wizard`}
-            title="Modifier les informations (client, prestations…)"
-            className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Pencil className="h-3.5 w-3.5" />
-          </Link>
-          <Link href={`/devis/${quote.id}/modifier?mode=weboword`}
-            title="Ouvrir dans WeboWord (éditeur visuel)"
-            className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0]/5 transition-colors">
-            <LayoutTemplate className="h-3.5 w-3.5" />
-          </Link>
         </div>
       </div>
     </div>
