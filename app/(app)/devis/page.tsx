@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
-  LayoutGrid, List, Columns3, StickyNote, Save, Loader2, ArrowRight, TrendingUp, CalendarRange,
+  LayoutGrid, List, Columns3, StickyNote, Save, Loader2, ArrowRight, TrendingUp, CalendarRange, Copy,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -74,9 +75,9 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange, onDelete,
+  quote, onClose, onStatusChange, onDelete, onDuplicate,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
   const [notes, setNotes] = useState('');
@@ -151,6 +152,10 @@ function DevisSheet({
               className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
               <Printer className="h-4 w-4" />PDF
             </Link>
+            <button onClick={() => { onDuplicate(quote.id); onClose(); }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-[#9c27b0]/30 rounded-xl text-sm font-medium text-[#9c27b0] hover:bg-[#f3e5f5] transition-colors">
+              <Copy className="h-4 w-4" />Dupliquer
+            </button>
             <Link href={`/devis/${quote.id}/modifier`}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#9c27b0] text-white rounded-xl text-sm font-medium hover:bg-[#7b1fa2] transition-colors">
               <Pencil className="h-4 w-4" />Éditer
@@ -190,7 +195,7 @@ function DevisSheet({
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function QuoteCard({ quote, onOpenSheet, onDelete }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void }) {
+function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void }) {
   const Icon = getEventIcon(quote.event_type || '');
   return (
     <div className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200">
@@ -218,6 +223,10 @@ function QuoteCard({ quote, onOpenSheet, onDelete }: { quote: Quote; onOpenSheet
           <p className="font-bold text-gray-900 text-base">{formatCurrency(quote.total_amount)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
         ) : <p className="text-sm text-gray-400 italic">—</p>}
         <div className="flex items-center gap-1">
+          <button onClick={() => onDuplicate(quote.id)} title="Dupliquer les prestations"
+            className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+            <Copy className="h-3.5 w-3.5" />
+          </button>
           {quote.status === 'draft' && (
             <button onClick={() => onDelete(quote.id)} title="Supprimer le brouillon"
               className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -248,7 +257,7 @@ function QuoteCard({ quote, onOpenSheet, onDelete }: { quote: Quote; onOpenSheet
 }
 
 // ── Table view ────────────────────────────────────────────────────────────────
-function TableView({ quotes, onOpenSheet, onDelete }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void; onDelete: (id: string) => void }) {
+function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
@@ -277,6 +286,7 @@ function TableView({ quotes, onOpenSheet, onDelete }: { quotes: Quote[]; onOpenS
               <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{q.total_amount ? formatCurrency(q.total_amount) : '—'}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 justify-end">
+                  <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
                   {q.status === 'draft' && (
                     <button onClick={() => onDelete(q.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                   )}
@@ -408,6 +418,7 @@ function SkeletonCard() {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DevisPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -436,6 +447,44 @@ export default function DevisPage() {
     setQuotes((prev) => prev.filter((q) => q.id !== id));
     setSheetQuote((prev) => prev?.id === id ? null : prev);
   }, []);
+
+  const handleDuplicate = useCallback(async (id: string) => {
+    const { data } = await createClient()
+      .from('quotes')
+      .select('services, event_type, event_date, event_location, guest_count, remarks, vat_rate, hide_price, template, images')
+      .eq('id', id)
+      .single();
+    if (!data) return;
+    // Pre-fill sessionStorage with prestations + event info (no client info)
+    const draft = {
+      currentStep: 1,
+      template: data.template || 'standard',
+      isEditing: false,
+      editingQuoteId: null,
+      editingQuoteStatus: null,
+      savedQuoteId: null,
+      clientInfo: {
+        type: 'particulier', firstName: '', lastName: '', email: '', phone: '',
+        address: '', companyName: '', siret: '', contactName: '', contactEmail: '', contactPhone: '',
+      },
+      eventInfo: {
+        eventType: data.event_type || '',
+        eventDate: data.event_date || '',
+        guestCount: data.guest_count || 1,
+        eventLocation: data.event_location || '',
+      },
+      services: data.services || [],
+      options: {
+        remarks: data.remarks || '',
+        conditions: '',
+        vatRate: data.vat_rate ?? 20,
+        hidePrice: data.hide_price ?? false,
+        images: data.images || [],
+      },
+    };
+    sessionStorage.setItem('webodevis_draft', JSON.stringify(draft));
+    router.push('/devis/nouveau');
+  }, [router]);
 
   const filtered = quotes.filter((q) => {
     const matchSearch = !search || q.client_name?.toLowerCase().includes(search.toLowerCase()) || q.event_type?.toLowerCase().includes(search.toLowerCase());
@@ -515,16 +564,16 @@ export default function DevisPage() {
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} />)}
+          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />)}
         </div>
       ) : view === 'table' ? (
-        <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} />
+        <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
       ) : (
         <PipelineView quotes={filtered} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} />
       )}
 
       {sheetQuote && (
-        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} />
+        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} />
       )}
     </div>
   );
