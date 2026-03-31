@@ -144,18 +144,13 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingCgv(true); setSavedCgv(false);
     const supabase = createClient();
+    // Try saving CGV — if column doesn't exist, show error with SQL fix
     const { error } = await supabase.from('profiles').update({
       cgv: cgvHtml.trim() || null,
-      updated_at: new Date().toISOString(),
     }).eq('id', user.id);
     if (error) {
-      console.error('Erreur sauvegarde CGV:', error);
-      // If column doesn't exist, try adding it via upsert
-      if (error.code === '42703' || error.message?.includes('cgv')) {
-        alert('La colonne "cgv" n\'existe pas encore dans la base. Ajoutez-la dans Supabase :\n\nALTER TABLE profiles ADD COLUMN cgv TEXT;');
-      } else {
-        alert('Erreur lors de la sauvegarde : ' + error.message);
-      }
+      console.error('Erreur sauvegarde CGV:', error.message, error.code, error);
+      alert('Erreur sauvegarde CGV : ' + error.message + '\n\nSi la colonne n\'existe pas, exécutez dans Supabase SQL Editor :\nALTER TABLE profiles ADD COLUMN cgv TEXT;');
       setSavingCgv(false);
       return;
     }
@@ -296,12 +291,14 @@ export default function ParametresPage() {
           </div>
         </div>
         <div className="p-6 space-y-4">
-          <RichTextEditor
-            initialValue={cgvHtml}
-            onChange={setCgvHtml}
-            placeholder="Saisir vos CGV ici… (paiement, annulation, responsabilités…)"
-            minHeight="200px"
-          />
+          {!loadingProfile && (
+            <RichTextEditor
+              initialValue={cgvHtml}
+              onChange={setCgvHtml}
+              placeholder="Saisir vos CGV ici… (paiement, annulation, responsabilités…)"
+              minHeight="200px"
+            />
+          )}
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-400">
               {cgvHtml ? 'Les CGV seront ajoutées en page 2 du PDF.' : 'Aucune CGV renseignée — page 2 absente.'}

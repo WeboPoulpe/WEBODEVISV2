@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ProspectStatus =
   | 'nouveau' | 'devis' | 'flyer' | 'rdv_degust'
-  | 'attente_reponse' | 'acompte' | 'relance' | 'refuse';
+  | 'attente_reponse' | 'acompte' | 'relance' | 'refuse' | 'refuse_client' | 'refuse_traiteur';
 
 interface Prospect {
   id: string;
@@ -54,7 +54,9 @@ const STATUSES: {
   { key: 'acompte',          label: 'Acompte reçu',    bg: 'bg-emerald-50',text: 'text-emerald-700', dot: 'bg-emerald-400'},
   { key: 'relance',          label: 'Relance',         bg: 'bg-pink-50',   text: 'text-pink-700',    dot: 'bg-pink-400'   },
   { key: 'flyer',            label: 'Flyer envoyé',    bg: 'bg-slate-100', text: 'text-slate-600',   dot: 'bg-slate-400'  },
-  { key: 'refuse',           label: 'Refusé',          bg: 'bg-red-50',    text: 'text-red-700',     dot: 'bg-red-400'    },
+  { key: 'refuse',           label: 'Refusé',           bg: 'bg-red-50',    text: 'text-red-700',     dot: 'bg-red-400'    },
+  { key: 'refuse_client',    label: 'Refus client',     bg: 'bg-red-50',    text: 'text-red-600',     dot: 'bg-red-300'    },
+  { key: 'refuse_traiteur',  label: 'Refus traiteur',   bg: 'bg-rose-50',   text: 'text-rose-700',    dot: 'bg-rose-400'   },
 ];
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map((s) => [s.key, s]));
