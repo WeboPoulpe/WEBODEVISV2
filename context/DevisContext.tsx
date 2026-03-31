@@ -16,6 +16,10 @@ export interface ServiceLine {
   isPageBreak?: boolean;
   /** true = description masquée sur le PDF page 1 (visible sur Carte Gastronomique) */
   hideDescOnPdf?: boolean;
+  /** true = prestation incluse / gratuite (affichée mais exclue du total) */
+  isFree?: boolean;
+  /** true = prestation en option (affichée avec badge "Option") */
+  isOption?: boolean;
 }
 
 export type QuoteTemplate = 'standard' | 'mariage' | 'business';
@@ -215,5 +219,5 @@ export function useDevis() {
 
 // ── Selectors ────────────────────────────────────────────────────────────────
 export function totalHT(services: ServiceLine[]) {
-  return services.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+  return services.reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
 }

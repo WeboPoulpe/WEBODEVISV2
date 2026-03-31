@@ -25,6 +25,8 @@ export interface QuoteHtmlData {
     quantity: number;
     unitPrice: number;
     hideDescOnPdf?: boolean;
+    isFree?: boolean;
+    isOption?: boolean;
   }>;
   vatRate: number;
   remarks?: string | null;
@@ -51,7 +53,7 @@ const dateFr = (s?: string | null) => {
 };
 
 export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
-  const ht  = d.services.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+  const ht  = d.services.reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
   const vat = ht * (d.vatRate / 100);
   const ttc = ht + vat;
   const today = new Date().toLocaleDateString('fr-FR');
@@ -95,17 +97,25 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     : '';
 
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
-  const tableRows = d.services.map((s) => `
+  const tableRows = d.services.map((s) => {
+    const badge = s.isFree
+      ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">INCLUS</span>'
+      : s.isOption
+      ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">OPTION</span>'
+      : '';
+    const priceStyle = s.isFree ? 'text-decoration:line-through;color:#9ca3af;' : '';
+    return `
     <tr>
       <td style="padding:9px 12px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
-        <strong style="font-size:12px;color:#1a1a1a;">${s.name || '—'}</strong>
+        <strong style="font-size:12px;color:#1a1a1a;">${s.name || '—'}</strong>${badge}
       </td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;">${s.quantity}</td>
       ${!d.hidePrice ? `
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;">${money(s.unitPrice)}</td>
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;">${money(s.quantity * s.unitPrice)}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? 'Inclus' : money(s.unitPrice)}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? 'Inclus' : money(s.quantity * s.unitPrice)}</td>
       ` : ''}
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   // ── Menu items Page 2 — descriptions always shown regardless of hideDescOnPdf ──
   const menuItems = d.services

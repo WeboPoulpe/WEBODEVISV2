@@ -102,6 +102,8 @@ export default async function ModifierPage({
             quantity:     s.quantity,
             unitPrice:    s.unitPrice,
             hideDescOnPdf: (s as ServiceLine & { hideDescOnPdf?: boolean }).hideDescOnPdf,
+            isFree:       (s as ServiceLine & { isFree?: boolean }).isFree,
+            isOption:     (s as ServiceLine & { isOption?: boolean }).isOption,
           })),
         vatRate:    quote.vat_rate   ?? 20,
         remarks:    quote.remarks    ?? null,

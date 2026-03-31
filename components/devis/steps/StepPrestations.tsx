@@ -233,8 +233,8 @@ function ServiceRow({
             value={service.unitPrice}
             onChange={(e) => onUpdate('unitPrice', parseFloat(e.target.value) || 0)}
           />
-          <span className="text-sm font-semibold text-gray-900 text-right tabular-nums">
-            {formatCurrency(service.quantity * service.unitPrice)}
+          <span className={`text-sm font-semibold text-right tabular-nums ${service.isFree ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+            {service.isFree ? 'Inclus' : formatCurrency(service.quantity * service.unitPrice)}
           </span>
           <div className="flex gap-0.5 justify-end">
             {!service.isCustom && (
@@ -270,15 +270,35 @@ function ServiceRow({
                 el.style.height = el.scrollHeight + 'px';
               }}
             />
-            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
-              <input
-                type="checkbox"
-                checked={!!service.hideDescOnPdf}
-                onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
-                className="h-3 w-3 rounded accent-[#9c27b0]"
-              />
-              <span className="text-[10px] text-gray-400">Masquer sur le PDF (visible sur Carte Gastronomique)</span>
-            </label>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={!!service.hideDescOnPdf}
+                  onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
+                  className="h-3 w-3 rounded accent-[#9c27b0]"
+                />
+                <span className="text-[10px] text-gray-400">Masquer sur le PDF (visible sur Carte Gastronomique)</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={!!service.isFree}
+                  onChange={(e) => { onUpdate('isFree', e.target.checked); if (e.target.checked) onUpdate('isOption', false); }}
+                  className="h-3 w-3 rounded accent-emerald-600"
+                />
+                <span className="text-[10px] text-emerald-600 font-medium">Inclus (gratuit)</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={!!service.isOption}
+                  onChange={(e) => { onUpdate('isOption', e.target.checked); if (e.target.checked) onUpdate('isFree', false); }}
+                  className="h-3 w-3 rounded accent-amber-600"
+                />
+                <span className="text-[10px] text-amber-600 font-medium">En option</span>
+              </label>
+            </div>
           </div>
         )}
       </div>
@@ -309,15 +329,35 @@ function ServiceRow({
             placeholder={service.isCustom ? 'Description longue…' : 'Description gastronomique (optionnel)…'}
             className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
           />
-          <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
-            <input
-              type="checkbox"
-              checked={!!service.hideDescOnPdf}
-              onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
-              className="h-3 w-3 rounded accent-[#9c27b0]"
-            />
-            <span className="text-[10px] text-gray-400">Masquer sur PDF</span>
-          </label>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.hideDescOnPdf}
+                onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
+                className="h-3 w-3 rounded accent-[#9c27b0]"
+              />
+              <span className="text-[10px] text-gray-400">Masquer sur PDF</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.isFree}
+                onChange={(e) => { onUpdate('isFree', e.target.checked); if (e.target.checked) onUpdate('isOption', false); }}
+                className="h-3 w-3 rounded accent-emerald-600"
+              />
+              <span className="text-[10px] text-emerald-600 font-medium">Inclus</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.isOption}
+                onChange={(e) => { onUpdate('isOption', e.target.checked); if (e.target.checked) onUpdate('isFree', false); }}
+                className="h-3 w-3 rounded accent-amber-600"
+              />
+              <span className="text-[10px] text-amber-600 font-medium">Option</span>
+            </label>
+          </div>
         </div>
         <div className="flex items-end gap-2">
           {[
@@ -336,8 +376,8 @@ function ServiceRow({
           ))}
           <div className="flex-1 space-y-1">
             <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Total</label>
-            <p className="text-sm font-bold text-gray-900 py-2 text-right tabular-nums">
-              {formatCurrency(service.quantity * service.unitPrice)}
+            <p className={`text-sm font-bold py-2 text-right tabular-nums ${service.isFree ? 'text-gray-400' : 'text-gray-900'}`}>
+              {service.isFree ? 'Inclus' : formatCurrency(service.quantity * service.unitPrice)}
             </p>
           </div>
           <button onClick={onRemove} className="p-2 mb-0.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
