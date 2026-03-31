@@ -754,7 +754,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
           {/* Auto-structure descriptions */}
           <button
-            onMouseDown={(e) => { e.preventDefault(); openStructureModal(); }}
+            type="button"
+            onClick={openStructureModal}
             title="Structurer automatiquement les descriptions (séparer par tirets, mettre en forme)"
             className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[#9c27b0]/70 hover:bg-[#f3e5f5] hover:text-[#9c27b0] transition-colors"
           >
