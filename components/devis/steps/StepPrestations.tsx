@@ -124,6 +124,9 @@ function ServiceRow({
 }) {
   // Hooks must be called unconditionally (before any early return)
   const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description);
+  const descRef = useCallback((el: HTMLTextAreaElement | null) => {
+    if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+  }, []);
 
   // Strip HTML from description on mount if present
   useEffect(() => {
@@ -253,6 +256,7 @@ function ServiceRow({
         {showDesc && (
           <div className="px-3 pb-2 -mt-1 space-y-1.5">
             <textarea
+              ref={descRef}
               rows={1}
               value={service.description ?? ''}
               onChange={(e) => onUpdate('description', e.target.value)}
