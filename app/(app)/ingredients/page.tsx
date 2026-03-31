@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Carrot, Plus, Pencil, Trash2, Search, Loader2, Check,
-  ChevronDown, ChevronUp, Truck, X, UploadCloud, AlertCircle,
+  ChevronDown, ChevronUp, Truck, X, UploadCloud, AlertCircle, ImagePlus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -493,6 +493,37 @@ export default function IngredientsPage() {
   const [nsPhone, setNsPhone] = useState('');
   const [nsNotes, setNsNotes] = useState('');
   const [nsSaving, setNsSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedProgress, setSeedProgress] = useState({ done: 0, total: 0, found: 0 });
+
+  // ── Seed images from Open Food Facts ───────────────────────────────────────
+  const seedImages = async () => {
+    if (!user) return;
+    const missing = ingredients.filter((i) => !i.image_url && i.user_id === user.id);
+    if (missing.length === 0) { alert('Tous les ingrédients ont déjà une image !'); return; }
+    setSeeding(true);
+    setSeedProgress({ done: 0, total: missing.length, found: 0 });
+    const supabase = createClient();
+    let found = 0;
+
+    for (let idx = 0; idx < missing.length; idx++) {
+      const ing = missing[idx];
+      try {
+        const results = await searchOFF(ing.name);
+        const withImg = results.find((r) => r.image_url);
+        if (withImg?.image_url) {
+          await supabase.from('ingredients').update({ image_url: withImg.image_url }).eq('id', ing.id);
+          setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, image_url: withImg.image_url! } : i));
+          found++;
+        }
+      } catch { /* skip on error */ }
+      setSeedProgress({ done: idx + 1, total: missing.length, found });
+      // Small delay to avoid rate-limiting
+      if (idx < missing.length - 1) await new Promise((r) => setTimeout(r, 400));
+    }
+    setSeeding(false);
+    alert(`Terminé ! ${found} image${found > 1 ? 's' : ''} trouvée${found > 1 ? 's' : ''} sur ${missing.length} ingrédient${missing.length > 1 ? 's' : ''}.`);
+  };
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -645,6 +676,15 @@ export default function IngredientsPage() {
             >
               <UploadCloud className="h-4 w-4" />
               CSV
+            </button>
+            <button
+              onClick={seedImages}
+              disabled={seeding}
+              title="Rechercher automatiquement les images manquantes via Open Food Facts"
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+            >
+              {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              {seeding ? `${seedProgress.done}/${seedProgress.total}` : 'Seed images'}
             </button>
             <button
               onClick={() => setModal({ open: true, item: null })}
