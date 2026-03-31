@@ -117,6 +117,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
   const [lineHeight, setLineHeight] = useState('1.4');
+  const [structureModal, setStructureModal] = useState<{ open: boolean; items: { index: number; name: string; preview: string; selected: boolean }[] }>({ open: false, items: [] });
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [menuWidth, setMenuWidth] = useState('400px');
 
@@ -168,14 +169,41 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   };
 
   // ── Auto-structure descriptions ──────────────────────────────────────────────
-  const autoStructureDescriptions = useCallback(() => {
+  const openStructureModal = useCallback(() => {
     if (!editorRef.current) return;
     const descs = editorRef.current.querySelectorAll('.svc-desc');
-    let changed = 0;
-    descs.forEach((el) => {
+    const items: { index: number; name: string; preview: string; selected: boolean }[] = [];
+    descs.forEach((el, i) => {
       const raw = el.textContent || '';
-      if (!raw.trim() || el.querySelectorAll('p, li').length > 2) return; // already structured
-      // Split by common separators
+      if (!raw.trim()) return;
+      // Find the prestation name (previous sibling or parent's h3/strong)
+      const parent = el.closest('div[style]') || el.parentElement;
+      const nameEl = parent?.querySelector('h3, strong');
+      const name = nameEl?.textContent || `Description ${i + 1}`;
+      const alreadyStructured = el.querySelectorAll('p, li').length > 2;
+      items.push({
+        index: i,
+        name,
+        preview: raw.substring(0, 120) + (raw.length > 120 ? '…' : ''),
+        selected: !alreadyStructured, // pre-check unstructured ones
+      });
+    });
+    if (items.length === 0) {
+      setToast('Aucune description trouvée à structurer');
+      return;
+    }
+    setStructureModal({ open: true, items });
+  }, []);
+
+  const applyStructure = useCallback(() => {
+    if (!editorRef.current) return;
+    const descs = editorRef.current.querySelectorAll('.svc-desc');
+    const selectedIndices = new Set(structureModal.items.filter((it) => it.selected).map((it) => it.index));
+    let changed = 0;
+    descs.forEach((el, i) => {
+      if (!selectedIndices.has(i)) return;
+      const raw = el.textContent || '';
+      if (!raw.trim()) return;
       const lines = raw
         .split(/\s+[-–]\s+/)
         .flatMap((s) => s.split(/\*{2,}/))
@@ -196,12 +224,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       el.innerHTML = html;
       changed++;
     });
-    if (changed === 0) {
-      alert('Aucune description à structurer (déjà formatées ou vides).');
-    } else {
-      alert(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''} !`);
-    }
-  }, []);
+    setStructureModal({ open: false, items: [] });
+    setToast(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''}`);
+  }, [structureModal.items]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
@@ -384,6 +409,69 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
       {/* ── Toast ────────────────────────────────────────────────────────────── */}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+
+      {/* ── Structure modal ─────────────────────────────────────────────────── */}
+      {structureModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setStructureModal({ open: false, items: [] })} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-[#9c27b0]" />
+                <h2 className="text-sm font-semibold text-gray-900">Structurer les descriptions</h2>
+              </div>
+              <button onClick={() => setStructureModal({ open: false, items: [] })} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                <span className="text-lg leading-none">&times;</span>
+              </button>
+            </div>
+            <p className="px-5 pt-3 text-xs text-gray-500">Choisissez les descriptions à reformater automatiquement (séparation par tirets, mise en forme des prix) :</p>
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+              {structureModal.items.map((item, idx) => (
+                <label key={item.index} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.selected ? 'border-[#9c27b0]/30 bg-[#faf5ff]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <input
+                    type="checkbox"
+                    checked={item.selected}
+                    onChange={(e) => {
+                      const updated = [...structureModal.items];
+                      updated[idx] = { ...updated[idx], selected: e.target.checked };
+                      setStructureModal({ ...structureModal, items: updated });
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded accent-[#9c27b0] flex-shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-2 italic">{item.preview}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  const allSelected = structureModal.items.every((it) => it.selected);
+                  setStructureModal({ ...structureModal, items: structureModal.items.map((it) => ({ ...it, selected: !allSelected })) });
+                }}
+                className="text-xs text-[#9c27b0] hover:underline font-medium"
+              >
+                {structureModal.items.every((it) => it.selected) ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setStructureModal({ open: false, items: [] })} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  Annuler
+                </button>
+                <button
+                  onClick={applyStructure}
+                  disabled={!structureModal.items.some((it) => it.selected)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Structurer ({structureModal.items.filter((it) => it.selected).length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm print:hidden">
@@ -594,7 +682,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
           {/* Auto-structure descriptions */}
           <button
-            onMouseDown={(e) => { e.preventDefault(); autoStructureDescriptions(); }}
+            onMouseDown={(e) => { e.preventDefault(); openStructureModal(); }}
             title="Structurer automatiquement les descriptions (séparer par tirets, mettre en forme)"
             className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[#9c27b0]/70 hover:bg-[#f3e5f5] hover:text-[#9c27b0] transition-colors"
           >
