@@ -96,14 +96,19 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingId(true); setSavedId(false);
     const supabase = createClient();
-    await supabase.from('profiles').upsert({
-      id: user.id,
+    const { error } = await supabase.from('profiles').update({
       company_name: profile.company_name.trim() || null,
       company_address: profile.company_address.trim() || null,
       company_phone: profile.company_phone.trim() || null,
       siret: profile.siret.trim() || null,
       updated_at: new Date().toISOString(),
-    });
+    }).eq('id', user.id);
+    if (error) {
+      console.error('Erreur sauvegarde identité:', error);
+      alert('Erreur : ' + error.message);
+      setSavingId(false);
+      return;
+    }
     setSavingId(false); setSavedId(true);
     setTimeout(() => setSavedId(false), 2500);
   };
@@ -139,11 +144,21 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingCgv(true); setSavedCgv(false);
     const supabase = createClient();
-    await supabase.from('profiles').upsert({
-      id: user.id,
+    const { error } = await supabase.from('profiles').update({
       cgv: cgvHtml.trim() || null,
       updated_at: new Date().toISOString(),
-    });
+    }).eq('id', user.id);
+    if (error) {
+      console.error('Erreur sauvegarde CGV:', error);
+      // If column doesn't exist, try adding it via upsert
+      if (error.code === '42703' || error.message?.includes('cgv')) {
+        alert('La colonne "cgv" n\'existe pas encore dans la base. Ajoutez-la dans Supabase :\n\nALTER TABLE profiles ADD COLUMN cgv TEXT;');
+      } else {
+        alert('Erreur lors de la sauvegarde : ' + error.message);
+      }
+      setSavingCgv(false);
+      return;
+    }
     setSavingCgv(false); setSavedCgv(true);
     setTimeout(() => setSavedCgv(false), 2500);
   };
