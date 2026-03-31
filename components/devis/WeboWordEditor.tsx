@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
-  LayoutTemplate, Bell, Eye, EyeOff, Download,
+  LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -166,6 +166,42 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const menu = editorRef.current?.querySelector('.gastro-menu') as HTMLElement | null;
     if (menu) menu.style.maxWidth = width;
   };
+
+  // ── Auto-structure descriptions ──────────────────────────────────────────────
+  const autoStructureDescriptions = useCallback(() => {
+    if (!editorRef.current) return;
+    const descs = editorRef.current.querySelectorAll('.svc-desc');
+    let changed = 0;
+    descs.forEach((el) => {
+      const raw = el.textContent || '';
+      if (!raw.trim() || el.querySelectorAll('p, li').length > 2) return; // already structured
+      // Split by common separators
+      const lines = raw
+        .split(/\s+[-–]\s+/)
+        .flatMap((s) => s.split(/\*{2,}/))
+        .flatMap((s) => s.split(/\n+/))
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (lines.length <= 1) return;
+      const html = lines
+        .map((line) => {
+          const priceMatch = line.match(/(\+?\d+€\/pers\.?)$/);
+          if (priceMatch) {
+            const before = line.slice(0, -priceMatch[0].length).trim();
+            return `<p style="margin:2px 0">${before} <strong>${priceMatch[0]}</strong></p>`;
+          }
+          return `<p style="margin:2px 0">${line}</p>`;
+        })
+        .join('');
+      el.innerHTML = html;
+      changed++;
+    });
+    if (changed === 0) {
+      alert('Aucune description à structurer (déjà formatées ou vides).');
+    } else {
+      alert(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''} !`);
+    }
+  }, []);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
@@ -554,6 +590,16 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             {showDesc
               ? <><Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">Descriptions</span></>
               : <><EyeOff className="h-3.5 w-3.5" /><span className="hidden sm:inline">Descriptions masquées</span></>}
+          </button>
+
+          {/* Auto-structure descriptions */}
+          <button
+            onMouseDown={(e) => { e.preventDefault(); autoStructureDescriptions(); }}
+            title="Structurer automatiquement les descriptions (séparer par tirets, mettre en forme)"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[#9c27b0]/70 hover:bg-[#f3e5f5] hover:text-[#9c27b0] transition-colors"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Structurer</span>
           </button>
 
           <Sep />
