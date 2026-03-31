@@ -459,14 +459,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       {/* ── Structure modal ─────────────────────────────────────────────────── */}
       {structureModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setStructureModal({ open: false, items: [] })} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setStructureModal({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true })} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Wand2 className="h-4 w-4 text-[#9c27b0]" />
                 <h2 className="text-sm font-semibold text-gray-900">Structurer les descriptions</h2>
               </div>
-              <button onClick={() => setStructureModal({ open: false, items: [] })} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <button onClick={() => setStructureModal({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true })} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
                 <span className="text-lg leading-none">&times;</span>
               </button>
             </div>
@@ -550,7 +550,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 {structureModal.items.every((it) => it.selected) ? 'Tout désélectionner' : 'Tout sélectionner'}
               </button>
               <div className="flex gap-2">
-                <button onClick={() => setStructureModal({ open: false, items: [] })} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <button onClick={() => setStructureModal({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true })} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   Annuler
                 </button>
                 <button
