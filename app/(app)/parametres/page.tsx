@@ -75,7 +75,7 @@ export default function ParametresPage() {
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle().then(({ data, error }) => {
+    supabase.from('profiles').select('company_name, company_address, company_phone, siret, logo_url').eq('id', user.id).maybeSingle().then(async ({ data, error }) => {
       if (error) console.error('Erreur chargement profil:', error.message);
       if (data) {
         setProfile({
@@ -84,9 +84,14 @@ export default function ParametresPage() {
           company_phone: data.company_phone ?? '',
           siret: data.siret ?? '',
           logo_url: data.logo_url ?? null,
-          cgv: data.cgv ?? null,
+          cgv: null,
         });
-        setCgvHtml(data.cgv ?? '');
+        // Try loading cgv separately (column may not exist yet)
+        const { data: cgvData } = await supabase.from('profiles').select('cgv').eq('id', user.id).maybeSingle();
+        if (cgvData?.cgv) {
+          setProfile((p) => ({ ...p, cgv: cgvData.cgv }));
+          setCgvHtml(cgvData.cgv);
+        }
       }
       setLoadingProfile(false);
     });
@@ -97,14 +102,14 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingId(true); setSavedId(false);
     const supabase = createClient();
-    const { error } = await supabase.from('profiles').upsert({
-      id: user.id,
-      company_name: profile.company_name.trim() || null,
-      company_address: profile.company_address.trim() || null,
-      company_phone: profile.company_phone.trim() || null,
-      siret: profile.siret.trim() || null,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    const { error } = await supabase.from('profiles')
+      .update({
+        company_name: profile.company_name.trim() || null,
+        company_address: profile.company_address.trim() || null,
+        company_phone: profile.company_phone.trim() || null,
+        siret: profile.siret.trim() || null,
+      })
+      .eq('id', user.id);
     if (error) {
       console.error('Erreur sauvegarde identité:', error);
       alert('Erreur : ' + error.message);
@@ -126,7 +131,7 @@ export default function ParametresPage() {
     if (!error) {
       const { data: urlData } = supabase.storage.from('storage').getPublicUrl(path);
       const url = `${urlData.publicUrl}?t=${Date.now()}`;
-      await supabase.from('profiles').upsert({ id: user.id, logo_url: url, updated_at: new Date().toISOString() });
+      await supabase.from('profiles').update({ logo_url: url }).eq('id', user.id);
       setProfile((p) => ({ ...p, logo_url: url }));
     }
     setUploadingLogo(false);
@@ -137,7 +142,7 @@ export default function ParametresPage() {
     if (!user) return;
     const supabase = createClient();
     await supabase.storage.from('storage').remove([`logos/${user.id}`]);
-    await supabase.from('profiles').upsert({ id: user.id, logo_url: null, updated_at: new Date().toISOString() });
+    await supabase.from('profiles').update({ logo_url: null }).eq('id', user.id);
     setProfile((p) => ({ ...p, logo_url: null }));
   };
 
@@ -146,13 +151,13 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingCgv(true); setSavedCgv(false);
     const supabase = createClient();
-    const { error } = await supabase.from('profiles').upsert({
-      id: user.id,
-      cgv: cgvHtml.trim() || null,
-    }, { onConflict: 'id' });
+    // Try update first (row should exist)
+    const { error } = await supabase.from('profiles')
+      .update({ cgv: cgvHtml.trim() || null })
+      .eq('id', user.id);
     if (error) {
       console.error('Erreur sauvegarde CGV:', error.message, error.code);
-      alert('Erreur sauvegarde CGV : ' + error.message);
+      alert('Erreur sauvegarde CGV : ' + error.message + '\n\nVérifiez que la colonne cgv existe :\nALTER TABLE profiles ADD COLUMN cgv TEXT;');
       setSavingCgv(false);
       return;
     }
