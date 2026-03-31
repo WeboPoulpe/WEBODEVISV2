@@ -99,7 +99,7 @@ function PrestationSearch({
                 <span className="text-xs text-gray-600 font-medium flex-shrink-0">{formatCurrency(p.unit_price)}</span>
               </div>
               {p.description && (
-                <p className="text-xs text-gray-400 italic mt-0.5 line-clamp-1">{p.description}</p>
+                <p className="text-xs text-gray-400 italic mt-0.5 line-clamp-1">{p.description.replace(/<[^>]*>/g, '')}</p>
               )}
               {p.category && (
                 <span className="inline-block text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded mt-1">{p.category}</span>
@@ -125,11 +125,29 @@ function ServiceRow({
   // Hooks must be called unconditionally (before any early return)
   const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description);
 
+  // Strip HTML from description on mount if present
+  useEffect(() => {
+    if (service.description && /<[^>]+>/.test(service.description)) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = service.description;
+      const clean = tmp.textContent || tmp.innerText || '';
+      onUpdate('description', clean);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Strip HTML tags from a string */
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   const handleSelect = (p: Prestation) => {
     onUpdate('name', p.name);
     onUpdate('unitPrice', p.unit_price);
     onUpdate('category', p.category ?? '');
-    onUpdate('description', p.description ?? '');
+    onUpdate('description', p.description ? stripHtml(p.description) : '');
     if (p.description) setShowDesc(true);
   };
 
