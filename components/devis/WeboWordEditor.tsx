@@ -117,7 +117,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
   const [lineHeight, setLineHeight] = useState('1.4');
-  const [structureModal, setStructureModal] = useState<{ open: boolean; items: { index: number; name: string; preview: string; selected: boolean }[] }>({ open: false, items: [] });
+  const [structureModal, setStructureModal] = useState<{
+    open: boolean;
+    items: { index: number; name: string; preview: string; selected: boolean }[];
+    titleColor: string;
+    titleBold: boolean;
+    titleItalic: boolean;
+    descItalic: boolean;
+  }>({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [menuWidth, setMenuWidth] = useState('400px');
 
@@ -192,41 +199,58 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       setToast('Aucune description trouvée à structurer');
       return;
     }
-    setStructureModal({ open: true, items });
+    setStructureModal({ open: true, items, titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
   }, []);
 
   const applyStructure = useCallback(() => {
     if (!editorRef.current) return;
     const descs = editorRef.current.querySelectorAll('.svc-desc');
+    const { titleColor, titleBold, titleItalic, descItalic } = structureModal;
     const selectedIndices = new Set(structureModal.items.filter((it) => it.selected).map((it) => it.index));
     let changed = 0;
     descs.forEach((el, i) => {
       if (!selectedIndices.has(i)) return;
       const raw = el.textContent || '';
       if (!raw.trim()) return;
+
+      // Also style the title (h3) of this prestation
+      const parent = el.closest('div[style]') || el.parentElement;
+      const titleEl = parent?.querySelector('h3') as HTMLElement | null;
+      if (titleEl) {
+        if (titleColor) titleEl.style.color = titleColor;
+        titleEl.style.fontWeight = titleBold ? 'bold' : 'normal';
+        titleEl.style.fontStyle = titleItalic ? 'italic' : 'normal';
+      }
+
       const lines = raw
         .split(/\s+[-–]\s+/)
         .flatMap((s) => s.split(/\*{2,}/))
         .flatMap((s) => s.split(/\n+/))
         .map((s) => s.trim())
         .filter(Boolean);
-      if (lines.length <= 1) return;
+      if (lines.length <= 1) {
+        // Even if only 1 line, apply italic style
+        if (descItalic) (el as HTMLElement).style.fontStyle = 'italic';
+        changed++;
+        return;
+      }
+      const italic = descItalic ? 'font-style:italic;' : '';
       const html = lines
         .map((line) => {
           const priceMatch = line.match(/(\+?\d+€\/pers\.?)$/);
           if (priceMatch) {
             const before = line.slice(0, -priceMatch[0].length).trim();
-            return `<p style="margin:2px 0">${before} <strong>${priceMatch[0]}</strong></p>`;
+            return `<p style="margin:2px 0;${italic}">${before} <strong>${priceMatch[0]}</strong></p>`;
           }
-          return `<p style="margin:2px 0">${line}</p>`;
+          return `<p style="margin:2px 0;${italic}">${line}</p>`;
         })
         .join('');
       el.innerHTML = html;
       changed++;
     });
-    setStructureModal({ open: false, items: [] });
+    setStructureModal({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
     setToast(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''}`);
-  }, [structureModal.items]);
+  }, [structureModal]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
@@ -424,7 +448,55 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 <span className="text-lg leading-none">&times;</span>
               </button>
             </div>
-            <p className="px-5 pt-3 text-xs text-gray-500">Choisissez les descriptions à reformater automatiquement (séparation par tirets, mise en forme des prix) :</p>
+            <p className="px-5 pt-3 text-xs text-gray-500">Choisissez les descriptions à reformater et le style à appliquer :</p>
+
+            {/* Style options */}
+            <div className="mx-5 mt-3 p-3 bg-gray-50 rounded-xl space-y-2.5">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Style des titres</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">Couleur :</span>
+                  <div className="flex gap-1">
+                    {['#9c27b0', '#c8956c', '#1e293b', '#1a1a1a', '#c62828', '#1565c0', '#2e7d32'].map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setStructureModal({ ...structureModal, titleColor: c })}
+                        style={{ background: c }}
+                        className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 ${structureModal.titleColor === c ? 'border-gray-900 scale-110' : 'border-gray-300'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={structureModal.titleBold} onChange={(e) => setStructureModal({ ...structureModal, titleBold: e.target.checked })} className="h-3 w-3 rounded accent-[#9c27b0]" />
+                  <span className="text-xs text-gray-600 font-bold">Gras</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={structureModal.titleItalic} onChange={(e) => setStructureModal({ ...structureModal, titleItalic: e.target.checked })} className="h-3 w-3 rounded accent-[#9c27b0]" />
+                  <span className="text-xs text-gray-600 italic">Italique</span>
+                </label>
+              </div>
+              <div className="border-t border-gray-200 pt-2">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Style des descriptions</p>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={structureModal.descItalic} onChange={(e) => setStructureModal({ ...structureModal, descItalic: e.target.checked })} className="h-3 w-3 rounded accent-[#9c27b0]" />
+                  <span className="text-xs text-gray-600 italic">Descriptions en italique</span>
+                </label>
+              </div>
+              {/* Live preview */}
+              <div className="border-t border-gray-200 pt-2">
+                <p className="text-[10px] text-gray-400 mb-1">Aperçu :</p>
+                <div className="bg-white rounded-lg p-2 border border-gray-200 text-center">
+                  <p style={{ color: structureModal.titleColor, fontWeight: structureModal.titleBold ? 'bold' : 'normal', fontStyle: structureModal.titleItalic ? 'italic' : 'normal', fontSize: '13px' }}>
+                    Nom de la prestation
+                  </p>
+                  <p style={{ fontStyle: structureModal.descItalic ? 'italic' : 'normal', fontSize: '11px', color: '#777' }}>
+                    Description gastronomique du plat
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
               {structureModal.items.map((item, idx) => (
                 <label key={item.index} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.selected ? 'border-[#9c27b0]/30 bg-[#faf5ff]' : 'border-gray-200 hover:bg-gray-50'}`}>
