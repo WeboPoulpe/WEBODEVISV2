@@ -75,7 +75,8 @@ export default function ParametresPage() {
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
-    supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle().then(({ data, error }) => {
+      if (error) console.error('Erreur chargement profil:', error.message);
       if (data) {
         setProfile({
           company_name: data.company_name ?? '',
@@ -96,13 +97,14 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingId(true); setSavedId(false);
     const supabase = createClient();
-    const { error } = await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
       company_name: profile.company_name.trim() || null,
       company_address: profile.company_address.trim() || null,
       company_phone: profile.company_phone.trim() || null,
       siret: profile.siret.trim() || null,
       updated_at: new Date().toISOString(),
-    }).eq('id', user.id);
+    }, { onConflict: 'id' });
     if (error) {
       console.error('Erreur sauvegarde identité:', error);
       alert('Erreur : ' + error.message);
@@ -144,13 +146,13 @@ export default function ParametresPage() {
     if (!user) return;
     setSavingCgv(true); setSavedCgv(false);
     const supabase = createClient();
-    // Try saving CGV — if column doesn't exist, show error with SQL fix
-    const { error } = await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
       cgv: cgvHtml.trim() || null,
-    }).eq('id', user.id);
+    }, { onConflict: 'id' });
     if (error) {
-      console.error('Erreur sauvegarde CGV:', error.message, error.code, error);
-      alert('Erreur sauvegarde CGV : ' + error.message + '\n\nSi la colonne n\'existe pas, exécutez dans Supabase SQL Editor :\nALTER TABLE profiles ADD COLUMN cgv TEXT;');
+      console.error('Erreur sauvegarde CGV:', error.message, error.code);
+      alert('Erreur sauvegarde CGV : ' + error.message);
       setSavingCgv(false);
       return;
     }
