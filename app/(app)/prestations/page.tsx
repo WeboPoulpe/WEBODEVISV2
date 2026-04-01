@@ -18,6 +18,7 @@ interface Prestation {
   category: string | null;
   sub_category: string | null;
   description: string | null;
+  is_option: boolean;
 }
 
 interface IngredientLink {
@@ -387,6 +388,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
   const [price, setPrice] = useState(String(initial?.unit_price ?? ''));
   const [category, setCategory] = useState(initial?.category ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
+  const [isOption, setIsOption] = useState(initial?.is_option ?? false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncDrafts, setSyncDrafts] = useState(false);
@@ -453,6 +455,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
       unit_price: parseFloat(price) || 0,
       category: category.trim() || null,
       description: description.trim() || null,
+      is_option: isOption,
       user_id: user.id,
     };
 
@@ -526,6 +529,20 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               />
             </div>
 
+            <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
+              <input
+                type="checkbox"
+                checked={isOption}
+                onChange={(e) => setIsOption(e.target.checked)}
+                className="w-4 h-4 accent-amber-600 rounded"
+              />
+              <span className="text-sm text-gray-600">
+                Marquer comme{' '}
+                <span className="font-semibold text-amber-600">Option</span>
+                {' '}(pré-cochée dans les devis)
+              </span>
+            </label>
+
             {/* Ingredients — only when editing an existing prestation */}
             {initial && user && (
               <IngredientsSection prestationId={initial.id} userId={user.id} />
@@ -595,7 +612,12 @@ function PrestationCard({
     <div className="group bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#9c27b0]/30 hover:shadow-sm transition-all">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 truncate">{p.name}</p>
+          <p className="font-semibold text-gray-900 truncate">
+            {p.name}
+            {p.is_option && (
+              <span className="ml-2 inline-block text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded align-middle">OPTION</span>
+            )}
+          </p>
           {p.description && (
             <div
               className="text-xs text-gray-500 mt-0.5 line-clamp-2 description-html"
@@ -655,7 +677,7 @@ export default function PrestationsPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from('prestations')
-      .select('id, name, unit_price, category, sub_category, description')
+      .select('id, name, unit_price, category, sub_category, description, is_option')
       .order('category')
       .order('name');
     setItems(data ?? []);

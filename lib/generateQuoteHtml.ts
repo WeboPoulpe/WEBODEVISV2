@@ -96,6 +96,10 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     ? `<style>@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(opts.font)}:wght@400;600;700&display=swap');</style>`
     : '';
 
+  // ── Separate base vs option totals ──────────────────────────────────────────
+  const baseHt = d.services.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
+  const optionHt = d.services.reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
+
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
   const tableRows = d.services.map((s) => {
     const badge = s.isFree
@@ -103,13 +107,16 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       : s.isOption
       ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">OPTION</span>'
       : '';
-    const priceStyle = s.isFree ? 'text-decoration:line-through;color:#9ca3af;' : '';
+    const isOpt = s.isOption;
+    const rowBg = isOpt ? `background-color:#fffbeb;` : '';
+    const nameColor = isOpt ? 'color:#92400e;' : 'color:#1a1a1a;';
+    const priceStyle = s.isFree ? 'text-decoration:line-through;color:#9ca3af;' : isOpt ? 'color:#d97706;' : '';
     return `
-    <tr>
+    <tr style="${rowBg}">
       <td style="padding:9px 12px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
-        <strong style="font-size:12px;color:#1a1a1a;">${s.name || '—'}</strong>${badge}
+        <strong style="font-size:12px;${nameColor}">${s.name || '—'}</strong>${badge}
       </td>
-      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;">${s.quantity}</td>
+      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${isOpt ? 'color:#d97706;' : ''}">${s.quantity}</td>
       ${!d.hidePrice ? `
       <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? 'Inclus' : money(s.unitPrice)}</td>
       <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? 'Inclus' : money(s.quantity * s.unitPrice)}</td>
@@ -120,13 +127,18 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   // ── Menu items Page 2 — descriptions always shown regardless of hideDescOnPdf ──
   const menuItems = d.services
     .filter((s) => s.name)
-    .map((s) => `
+    .map((s) => {
+      const optBadge = s.isOption
+        ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">OPTION</span>'
+        : '';
+      return `
       <div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
-        <h3 style="font-size:15px;font-weight:bold;color:${menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}</h3>
+        <h3 style="font-size:15px;font-weight:bold;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</h3>
         ${s.description
           ? `<p class="svc-desc" style="font-size:12px;color:#777;font-style:italic;margin:0;line-height:1.55;">${s.description}</p>`
           : ''}
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
   return `${googleFontImport}
 <!-- ═══════════════════════ PAGE 1 — DEVIS FINANCIER ═══════════════════════ -->
@@ -193,10 +205,15 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   ${!d.hidePrice ? `
   <!-- ── Totaux ── -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
-    <div style="min-width:195px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
+    <div style="min-width:220px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
-        <span>Sous-total HT</span><span>${money(ht)}</span>
+        <span>Sous-total HT</span><span>${money(baseHt)}</span>
       </div>
+      ${optionHt > 0 ? `
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;">
+        <span>Options HT</span><span>${money(optionHt)}</span>
+      </div>
+      ` : ''}
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
         <span>TVA (${d.vatRate}%)</span><span>${money(vat)}</span>
       </div>

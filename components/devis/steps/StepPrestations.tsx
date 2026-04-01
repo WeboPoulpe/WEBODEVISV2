@@ -12,6 +12,7 @@ interface Prestation {
   unit_price: number;
   category: string | null;
   description: string | null;
+  is_option: boolean;
 }
 
 interface Props {
@@ -51,7 +52,7 @@ function PrestationSearch({
       const supabase = createClient();
       const { data } = await supabase
         .from('prestations')
-        .select('id, name, unit_price, category, description')
+        .select('id, name, unit_price, category, description, is_option')
         .ilike('name', `%${q}%`)
         .limit(8);
       if (data && data.length > 0) { setResults(data); setOpen(true); }
@@ -101,9 +102,14 @@ function PrestationSearch({
               {p.description && (
                 <p className="text-xs text-gray-400 italic mt-0.5 line-clamp-1">{p.description.replace(/<[^>]*>/g, '')}</p>
               )}
-              {p.category && (
-                <span className="inline-block text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded mt-1">{p.category}</span>
-              )}
+              <div className="flex items-center gap-1.5 mt-1">
+                {p.category && (
+                  <span className="inline-block text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded">{p.category}</span>
+                )}
+                {p.is_option && (
+                  <span className="inline-block text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Option</span>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -151,7 +157,8 @@ function ServiceRow({
     onUpdate('unitPrice', p.unit_price);
     onUpdate('category', p.category ?? '');
     onUpdate('description', p.description ? stripHtml(p.description) : '');
-    if (p.description) setShowDesc(true);
+    if (p.is_option) { onUpdate('isOption', true); onUpdate('isFree', false); }
+    if (p.description || p.is_option) setShowDesc(true);
   };
 
   const inputCls = 'text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white';
@@ -421,6 +428,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
   // Exclude page-break markers from financial calculations
   const realServices = services.filter((s) => !s.isPageBreak);
   const ht = totalHT(realServices);
+  const optionHt = realServices.reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
   const vatAmt = ht * (options.vatRate / 100);
   const ttc = ht + vatAmt;
 
@@ -512,8 +520,14 @@ export default function StepPrestations({ onNext, onBack }: Props) {
       )}
 
       {realServices.length > 0 && (
-        <div className="ml-auto w-fit min-w-[200px] space-y-1.5 bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <div className="ml-auto w-fit min-w-[220px] space-y-1.5 bg-gray-50 rounded-xl p-4 border border-gray-100">
           <Row label="Sous-total HT" value={formatCurrency(ht)} />
+          {optionHt > 0 && (
+            <div className="flex justify-between gap-6 text-sm text-amber-600 bg-amber-50 -mx-2 px-2 py-0.5 rounded">
+              <span>dont Options</span>
+              <span className="tabular-nums">{formatCurrency(optionHt)}</span>
+            </div>
+          )}
           <Row label={`TVA (${options.vatRate}%)`} value={formatCurrency(vatAmt)} />
           <div className="border-t border-gray-200 pt-1.5">
             <Row label="Total TTC" value={formatCurrency(ttc)} bold />
