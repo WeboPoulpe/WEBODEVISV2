@@ -322,6 +322,7 @@ function useLiveHtml(
         vatRate:   options.vatRate,
         remarks:   options.remarks   || null,
         hidePrice: options.hidePrice,
+        cgv: profile?.cgv ?? profile?.company_cgv ?? null,
       },
       { template },
     ),

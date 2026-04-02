@@ -19,6 +19,7 @@ export interface Profile {
   company_address: string | null;
   company_website: string | null;
   company_cgv: string | null;
+  cgv: string | null;
   subscription_type: string | null;
   parent_user_id: string | null;
   can_view_all_company_data: boolean;

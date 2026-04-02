@@ -73,7 +73,7 @@ export default async function ModifierPage({
   if (showWeboWord) {
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('company_name')
+      .select('company_name, cgv')
       .eq('id', user.id)
       .single();
 
@@ -108,6 +108,7 @@ export default async function ModifierPage({
         vatRate:    quote.vat_rate   ?? 20,
         remarks:    quote.remarks    ?? null,
         hidePrice:  quote.hide_price ?? false,
+        cgv:        profileData?.cgv ?? null,
       },
       {
         template: (quote.template as 'standard' | 'mariage' | 'business') ?? 'standard',

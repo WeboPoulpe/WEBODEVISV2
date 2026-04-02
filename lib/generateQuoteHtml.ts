@@ -31,6 +31,7 @@ export interface QuoteHtmlData {
   vatRate: number;
   remarks?: string | null;
   hidePrice?: boolean;
+  cgv?: string | null;
 }
 
 export interface QuoteHtmlOptions {
@@ -276,5 +277,17 @@ ${d.remarks ? `
 <div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
   <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">Ce devis est valable 30 jours. Toute commande implique l'acceptation de nos conditions générales de vente.</p>
 </div>
+
+${d.cgv ? `
+<!-- ═══════════════════════ CONDITIONS GÉNÉRALES DE VENTE ═══════════════════════ -->
+<div style="page-break-before:always;break-before:page;margin-top:24px;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+    <div style="flex:1;height:1px;background:#e0e0e0;"></div>
+    <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:2px;margin:0;">Conditions Générales de Vente</p>
+    <div style="flex:1;height:1px;background:#e0e0e0;"></div>
+  </div>
+  <div style="font-size:10px;color:#555;line-height:1.6;">${d.cgv}</div>
+</div>
+` : ''}
 `.trim();
 }
