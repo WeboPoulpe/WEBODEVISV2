@@ -14,6 +14,15 @@ import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+interface QuoteService {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  isFree?: boolean;
+  isOption?: boolean;
+  isPageBreak?: boolean;
+}
+
 interface Quote {
   id: string;
   client_name: string;
@@ -25,6 +34,7 @@ interface Quote {
   created_at: string;
   user_id: string | null;       // null on true V1 devis (old system)
   owner_user_id: string | null;
+  services: QuoteService[] | null;
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
@@ -128,6 +138,30 @@ function DevisSheet({
               })}
             </div>
           </div>
+          {/* Prestations */}
+          {Array.isArray(quote.services) && quote.services.filter((s: QuoteService) => !s.isPageBreak && s.name).length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prestations</p>
+              <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+                {(quote.services as QuoteService[]).filter((s) => !s.isPageBreak && s.name).map((s, i) => (
+                  <div key={i} className={`flex items-center justify-between gap-2 px-3 py-2 ${s.isOption ? 'bg-amber-50/60' : ''}`}>
+                    <div className="min-w-0 flex-1">
+                      <span className={`text-sm ${s.isOption ? 'text-amber-800' : 'text-gray-900'}`}>{s.name}</span>
+                      {s.isOption && <span className="ml-1.5 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">OPTION</span>}
+                      {s.isFree && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">INCLUS</span>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs text-gray-400">x{s.quantity}</span>
+                      <span className={`text-sm font-medium tabular-nums ${s.isFree ? 'text-gray-400 line-through' : s.isOption ? 'text-amber-600' : 'text-gray-900'}`}>
+                        {s.isFree ? 'Inclus' : formatCurrency(s.quantity * s.unitPrice)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {quote.total_amount && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <span className="text-sm text-gray-600">Total TTC</span>
@@ -429,7 +463,7 @@ export default function DevisPage() {
     if (!user) return;
     createClient()
       .from('quotes')
-      .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id')
+      .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services')
       .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
       .then(({ data }) => { setQuotes(data ?? []); setLoading(false); });
