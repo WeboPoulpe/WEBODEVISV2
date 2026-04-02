@@ -75,7 +75,7 @@ export default function StepResume({ onBack }: Props) {
 
       const { error: err } = await supabase
         .from('quotes')
-        .update({ ...quotePayload, status: finalStatus })
+        .update({ ...quotePayload, status: finalStatus, content_html: null })
         .eq('id', state.editingQuoteId);
 
       setSaving(false);
