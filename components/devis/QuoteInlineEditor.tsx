@@ -24,6 +24,9 @@ export interface ServiceLine {
   category?: string;
   isCustom?: boolean;
   isPageBreak?: boolean;
+  hideDescOnPdf?: boolean;
+  isFree?: boolean;
+  isOption?: boolean;
 }
 
 interface ClientInfo {
@@ -69,7 +72,7 @@ interface Props {
 function totalHT(services: ServiceLine[]) {
   return services
     .filter((s) => !s.isPageBreak)
-    .reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+    .reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
 }
 
 const EVENT_TYPES = ['Mariage', 'Anniversaire', 'Cocktail', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
@@ -83,7 +86,7 @@ const TEMPLATES: { key: QuoteTemplate; label: string }[] = [
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors';
 
 // ── Catalog combobox ──────────────────────────────────────────────────────────
-interface CatalogItem { id: string; name: string; unit_price: number; category: string | null; description: string | null; }
+interface CatalogItem { id: string; name: string; unit_price: number; category: string | null; description: string | null; is_option: boolean; }
 
 function PrestationSearch({
   value, onNameChange, onSelect,
@@ -103,7 +106,7 @@ function PrestationSearch({
     if (timer.current) clearTimeout(timer.current);
     if (!q.trim()) { setResults([]); setOpen(false); return; }
     timer.current = setTimeout(async () => {
-      const { data } = await createClient().from('prestations').select('id, name, unit_price, category, description').ilike('name', `%${q}%`).limit(8);
+      const { data } = await createClient().from('prestations').select('id, name, unit_price, category, description, is_option').ilike('name', `%${q}%`).limit(8);
       if (data?.length) { setResults(data); setOpen(true); } else { setResults([]); setOpen(false); }
     }, 300);
   }, []);
@@ -129,7 +132,10 @@ function PrestationSearch({
                 <p className="text-sm text-gray-900 font-medium">{p.name}</p>
                 <span className="text-xs text-gray-500 tabular-nums">{formatCurrency(p.unit_price)}</span>
               </div>
-              {p.category && <span className="text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded">{p.category}</span>}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {p.category && <span className="text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded">{p.category}</span>}
+                {p.is_option && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Option</span>}
+              </div>
             </li>
           ))}
         </ul>
@@ -141,8 +147,8 @@ function PrestationSearch({
 // ── Service row ───────────────────────────────────────────────────────────────
 function ServiceRow({
   service, onUpdate, onRemove,
-}: { service: ServiceLine; onUpdate: (field: string, value: string | number) => void; onRemove: () => void }) {
-  const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description);
+}: { service: ServiceLine; onUpdate: (field: string, value: string | number | boolean) => void; onRemove: () => void }) {
+  const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description || !!service.isOption || !!service.isFree);
   const base = 'text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors';
 
   if (service.isPageBreak) {
@@ -182,7 +188,8 @@ function ServiceRow({
               onUpdate('unitPrice', p.unit_price);
               onUpdate('category', p.category ?? '');
               onUpdate('description', p.description ?? '');
-              if (p.description) setShowDesc(true);
+              if (p.is_option) { onUpdate('isOption', true); onUpdate('isFree', false); }
+              if (p.description || p.is_option) setShowDesc(true);
             }}
           />
         )}
@@ -198,8 +205,8 @@ function ServiceRow({
           value={service.unitPrice}
           onChange={(e) => onUpdate('unitPrice', parseFloat(e.target.value) || 0)}
         />
-        <span className="text-sm font-semibold text-gray-900 text-right tabular-nums">
-          {formatCurrency(service.quantity * service.unitPrice)}
+        <span className={`text-sm font-semibold text-right tabular-nums ${service.isFree ? 'text-gray-400 line-through' : service.isOption ? 'text-amber-600' : 'text-gray-900'}`}>
+          {service.isFree ? 'Inclus' : formatCurrency(service.quantity * service.unitPrice)}
         </span>
         <div className="flex gap-0.5 justify-end">
           {!service.isCustom && (
@@ -217,7 +224,7 @@ function ServiceRow({
         </div>
       </div>
       {showDesc && (
-        <div className="px-3 pb-2 -mt-1">
+        <div className="px-3 pb-2 -mt-1 space-y-1.5">
           <textarea
             rows={1}
             value={service.description ?? ''}
@@ -226,6 +233,35 @@ function ServiceRow({
             className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
             onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
           />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.hideDescOnPdf}
+                onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
+                className="h-3 w-3 rounded accent-[#9c27b0]"
+              />
+              <span className="text-[10px] text-gray-400">Masquer sur le PDF</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.isFree}
+                onChange={(e) => { onUpdate('isFree', e.target.checked); if (e.target.checked) onUpdate('isOption', false); }}
+                className="h-3 w-3 rounded accent-emerald-600"
+              />
+              <span className="text-[10px] text-emerald-600 font-medium">Inclus (gratuit)</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={!!service.isOption}
+                onChange={(e) => { onUpdate('isOption', e.target.checked); if (e.target.checked) onUpdate('isFree', false); }}
+                className="h-3 w-3 rounded accent-amber-600"
+              />
+              <span className="text-[10px] text-amber-600 font-medium">En option</span>
+            </label>
+          </div>
         </div>
       )}
     </div>
@@ -279,6 +315,9 @@ function useLiveHtml(
             description:  s.description,
             quantity:     s.quantity,
             unitPrice:    s.unitPrice,
+            hideDescOnPdf: s.hideDescOnPdf,
+            isFree:       s.isFree,
+            isOption:     s.isOption,
           })),
         vatRate:   options.vatRate,
         remarks:   options.remarks   || null,
@@ -324,11 +363,12 @@ export default function QuoteInlineEditor({
     ...prev, { id: crypto.randomUUID(), name: '', quantity: 0, unitPrice: 0, isPageBreak: true },
   ]);
   const removeService = (id: string) => setServices((prev) => prev.filter((s) => s.id !== id));
-  const updateService = (id: string, field: string, value: string | number) =>
+  const updateService = (id: string, field: string, value: string | number | boolean) =>
     setServices((prev) => prev.map((s) => s.id === id ? { ...s, [field]: value } : s));
 
   // ── Totals ───────────────────────────────────────────────────────────────────
   const ht     = totalHT(services);
+  const optionHt = services.filter((s) => !s.isPageBreak).reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
   const vatAmt = ht * (options.vatRate / 100);
   const ttc    = ht + vatAmt;
 
@@ -362,6 +402,7 @@ export default function QuoteInlineEditor({
       images:              options.images,
       template,
       user_id:             user.id,
+      content_html:        null, // force WeboWord regeneration
     };
 
     const { error: err } = await supabase.from('quotes').update(payload).eq('id', quoteId);
@@ -577,8 +618,13 @@ export default function QuoteInlineEditor({
 
             {/* Totals */}
             {services.filter((s) => !s.isPageBreak).length > 0 && (
-              <div className="mt-4 ml-auto w-fit min-w-[200px] bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-1.5">
+              <div className="mt-4 ml-auto w-fit min-w-[220px] bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-1.5">
                 <div className="flex justify-between gap-6 text-sm text-gray-600"><span>Sous-total HT</span><span className="tabular-nums">{formatCurrency(ht)}</span></div>
+                {optionHt > 0 && (
+                  <div className="flex justify-between gap-6 text-sm text-amber-600 bg-amber-50 -mx-2 px-2 py-0.5 rounded">
+                    <span>dont Options</span><span className="tabular-nums">{formatCurrency(optionHt)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between gap-6 text-sm text-gray-600"><span>TVA ({options.vatRate}%)</span><span className="tabular-nums">{formatCurrency(vatAmt)}</span></div>
                 <div className="border-t border-gray-200 pt-1.5 flex justify-between gap-6 text-sm font-bold text-gray-900"><span>Total TTC</span><span className="tabular-nums">{formatCurrency(ttc)}</span></div>
               </div>
