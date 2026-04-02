@@ -54,6 +54,8 @@ export default function StepWeboWord({ onBack }: Props) {
             quantity:     s.quantity,
             unitPrice:    s.unitPrice,
             hideDescOnPdf: s.hideDescOnPdf,
+            isFree:       s.isFree,
+            isOption:     s.isOption,
           })),
         vatRate:   state.options.vatRate,
         remarks:   state.options.remarks,
