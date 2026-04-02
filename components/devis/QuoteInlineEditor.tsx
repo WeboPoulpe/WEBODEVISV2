@@ -290,7 +290,7 @@ function useLiveHtml(
   event: EventInfo,
   services: ServiceLine[],
   options: Options,
-  profile: { company_name?: string | null } | null,
+  profile: { company_name?: string | null; cgv?: string | null } | null,
 ) {
   const clientName = client.type === 'particulier'
     ? `${client.firstName} ${client.lastName}`.trim()
@@ -322,7 +322,7 @@ function useLiveHtml(
         vatRate:   options.vatRate,
         remarks:   options.remarks   || null,
         hidePrice: options.hidePrice,
-        cgv: profile?.cgv ?? profile?.company_cgv ?? null,
+        cgv: profile?.cgv ?? null,
       },
       { template },
     ),
