@@ -67,6 +67,7 @@ export default async function ImprimerPage({ params }: Props) {
           }
         `}</style>
         <div
+          className="prose prose-sm max-w-none"
           style={{ padding: '20mm', fontFamily: `'${selectedFont}', Georgia, serif` }}
           dangerouslySetInnerHTML={{ __html: quote.content_html as string }}
         />

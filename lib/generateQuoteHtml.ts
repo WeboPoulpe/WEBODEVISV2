@@ -133,9 +133,9 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
         : '';
       return `
       <div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
-        <h3 style="font-size:15px;font-weight:bold;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</h3>
+        <p style="font-size:15px;font-weight:normal;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
         ${s.description
-          ? `<p class="svc-desc" style="font-size:12px;color:#777;font-style:italic;margin:0;line-height:1.55;">${s.description}</p>`
+          ? `<p class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</p>`
           : ''}
       </div>`;
     }).join('');
