@@ -39,6 +39,8 @@ function useQuoteHtml() {
               quantity: s.quantity,
               unitPrice: s.unitPrice,
               hideDescOnPdf: s.hideDescOnPdf,
+              isFree: s.isFree,
+              isOption: s.isOption,
             })),
           vatRate: options.vatRate,
           remarks: options.remarks,

@@ -219,5 +219,5 @@ export function useDevis() {
 
 // ── Selectors ────────────────────────────────────────────────────────────────
 export function totalHT(services: ServiceLine[]) {
-  return services.reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
+  return services.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
 }

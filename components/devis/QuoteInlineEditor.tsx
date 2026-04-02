@@ -72,7 +72,7 @@ interface Props {
 function totalHT(services: ServiceLine[]) {
   return services
     .filter((s) => !s.isPageBreak)
-    .reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
+    .reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
 }
 
 const EVENT_TYPES = ['Mariage', 'Anniversaire', 'Cocktail', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];

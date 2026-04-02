@@ -24,6 +24,7 @@ export default function StepResume({ onBack }: Props) {
 
   const realServices = services.filter((s) => !s.isPageBreak);
   const ht    = totalHT(realServices);
+  const optionHt = realServices.reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
   const vatAmt = ht * (options.vatRate / 100);
   const ttc   = ht + vatAmt;
 
@@ -205,6 +206,12 @@ export default function StepResume({ onBack }: Props) {
               <span>Sous-total HT</span>
               <span>{formatCurrency(ht)}</span>
             </div>
+            {optionHt > 0 && (
+              <div className="flex justify-between text-amber-600 bg-amber-50 -mx-2 px-2 py-0.5 rounded text-sm">
+                <span>Options HT</span>
+                <span className="tabular-nums">{formatCurrency(optionHt)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-gray-600">
               <span>TVA ({options.vatRate}%)</span>
               <span>{formatCurrency(vatAmt)}</span>

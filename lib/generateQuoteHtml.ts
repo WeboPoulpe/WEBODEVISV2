@@ -53,7 +53,7 @@ const dateFr = (s?: string | null) => {
 };
 
 export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
-  const ht  = d.services.reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
+  const ht  = d.services.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
   const vat = ht * (d.vatRate / 100);
   const ttc = ht + vat;
   const today = new Date().toLocaleDateString('fr-FR');
@@ -96,8 +96,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     ? `<style>@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(opts.font)}:wght@400;600;700&display=swap');</style>`
     : '';
 
-  // ── Separate base vs option totals ──────────────────────────────────────────
-  const baseHt = d.services.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
+  // ── Option subtotal (separate from ht which already excludes options) ───────
   const optionHt = d.services.reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
 
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
@@ -207,7 +206,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
     <div style="min-width:220px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
-        <span>Sous-total HT</span><span>${money(baseHt)}</span>
+        <span>Sous-total HT</span><span>${money(ht)}</span>
       </div>
       ${optionHt > 0 ? `
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;">
