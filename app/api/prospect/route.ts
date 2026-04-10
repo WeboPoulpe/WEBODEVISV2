@@ -13,6 +13,14 @@ export function OPTIONS() {
   return NextResponse.json(null, { status: 204, headers: corsHeaders });
 }
 
+// ── Supabase client (anon key) ───────────────────────────────────────────────
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}
+
 // ── POST /api/prospect ───────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -22,8 +30,38 @@ export async function POST(req: NextRequest) {
     const apiToken = req.headers.get('X-API-Token') || body.token;
     if (!apiToken) {
       return NextResponse.json(
-        { error: 'Token manquant. Ajoutez X-API-Token dans le header ou "token" dans le body.' },
+        { error: 'Token manquant.' },
         { status: 401, headers: corsHeaders },
+      );
+    }
+
+    const supabase = getSupabase();
+
+    // ── Verify token exists and is active ──────────────────────────────────
+    const { data: tokenData } = await supabase
+      .from('user_prospect_tokens')
+      .select('id, user_id, is_active')
+      .eq('token', apiToken)
+      .maybeSingle();
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: 'Token invalide ou inexistant' },
+        { status: 403, headers: corsHeaders },
+      );
+    }
+    if (!tokenData.is_active) {
+      return NextResponse.json(
+        { error: 'Token désactivé' },
+        { status: 403, headers: corsHeaders },
+      );
+    }
+
+    // ── Verify-only mode (embed page checks token on load) ─────────────────
+    if (body._verify) {
+      return NextResponse.json(
+        { valid: true },
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -45,34 +83,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Supabase client (anon key — relies on RLS) ─────────────────────────
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-
-    // ── Verify token exists and is active ──────────────────────────────────
-    const { data: tokenData, error: tokenErr } = await supabase
-      .from('user_prospect_tokens')
-      .select('id, is_active')
-      .eq('token', apiToken)
-      .maybeSingle();
-
-    if (tokenErr || !tokenData) {
-      return NextResponse.json(
-        { error: 'Token invalide ou inexistant' },
-        { status: 403, headers: corsHeaders },
-      );
-    }
-    if (!tokenData.is_active) {
-      return NextResponse.json(
-        { error: 'Token désactivé' },
-        { status: 403, headers: corsHeaders },
-      );
-    }
-
     // ── Insert prospect request ────────────────────────────────────────────
-    const { data, error } = await supabase.from('prospect_requests').insert({
+    const { error } = await supabase.from('prospect_requests').insert({
       first_name:      first_name.trim(),
       last_name:       last_name.trim(),
       email:           email.trim().toLowerCase(),
@@ -84,24 +96,20 @@ export async function POST(req: NextRequest) {
       guest_count:     parseInt(body.guest_count) || null,
       message:         body.message?.trim() || null,
       user_token:      apiToken,
+      owner_user_id:   tokenData.user_id,
       status:          'nouveau',
-    }).select('id, created_at').single();
+    });
 
     if (error) {
-      console.error('Erreur insertion prospect:', error);
+      console.error('Erreur insertion prospect:', error.message, error.code);
       return NextResponse.json(
-        { error: 'Erreur lors de la création de la demande' },
+        { error: 'Erreur lors de la création de la demande: ' + error.message },
         { status: 500, headers: corsHeaders },
       );
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: 'Demande de devis enregistrée avec succès',
-        id: data.id,
-        created_at: data.created_at,
-      },
+      { success: true, message: 'Demande de devis enregistrée avec succès' },
       { status: 201, headers: corsHeaders },
     );
   } catch (err) {
