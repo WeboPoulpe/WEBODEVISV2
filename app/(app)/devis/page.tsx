@@ -507,6 +507,10 @@ export default function DevisPage() {
       remarks: tpl.remarks || null,
       vat_rate: tpl.vat_rate ?? 20,
       hide_price: tpl.hide_price ?? false,
+      event_type: '',
+      event_date: new Date().toISOString().slice(0, 10),
+      event_location: '',
+      guest_count: 1,
     };
 
     const res = await supabase.from('quotes').insert(payload).select('id').single();
