@@ -495,74 +495,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
-    // Regenerate page 1 only, keep page 2 (gastro menu) intact
-    if (editorRef.current) {
-      // Get quote metadata for template/vat
-      const { data: quoteMeta } = await supabase.from('quotes')
-        .select('template, vat_rate, hide_price, remarks')
-        .eq('id', quoteId).single();
+    // Reset content_html to force regeneration with new data, then reload
+    await supabase.from('quotes').update({ content_html: null }).eq('id', quoteId);
 
-      const svcForHtml = updatedServices
-        .filter((s: { removed?: boolean; isPageBreak?: boolean }) => !s.removed && !s.isPageBreak)
-        .map((s: { name: string; description?: string; quantity: number; unitPrice: number; hideDescOnPdf?: boolean; isFree?: boolean; isOption?: boolean }) => ({
-          name: s.name, description: s.description || null,
-          quantity: s.quantity, unitPrice: s.unitPrice,
-          hideDescOnPdf: s.hideDescOnPdf, isFree: s.isFree, isOption: s.isOption,
-        }));
-
-      const tmpl = (quoteMeta?.template as 'standard' | 'mariage' | 'business') || 'standard';
-      const fullHtml = generateQuoteHtml({
-        companyName: profile?.company_name ?? 'Votre entreprise',
-        clientName: clientFullName || 'À compléter',
-        clientEmail: adminFields.clientEmail || null,
-        clientPhone: adminFields.clientPhone || null,
-        clientAddress: adminFields.clientAddress || null,
-        eventType: adminFields.eventType || null,
-        eventDate: adminFields.eventDate || null,
-        eventLocation: adminFields.eventLocation || null,
-        guestCount: parseInt(adminFields.guestCount) || null,
-        services: svcForHtml,
-        vatRate: quoteMeta?.vat_rate ?? 20,
-        remarks: quoteMeta?.remarks || null,
-        hidePrice: quoteMeta?.hide_price ?? false,
-      }, { template: tmpl, font });
-
-      // Split current content at screen-sep to preserve page 2
-      const currentHtml = editorRef.current.innerHTML;
-      const sepMarker = 'class="screen-sep"';
-      const sepIdx = currentHtml.indexOf(sepMarker);
-
-      // Split generated HTML at screen-sep to get new page 1
-      const genSepIdx = fullHtml.indexOf(sepMarker);
-
-      if (sepIdx !== -1 && genSepIdx !== -1) {
-        // Find the start of the <div with screen-sep in both
-        const currentSepStart = currentHtml.lastIndexOf('<div', sepIdx);
-        const genSepStart = fullHtml.lastIndexOf('<div', genSepIdx);
-        // New page 1 (from generated) + old page 2 (from current)
-        const newPage1 = fullHtml.substring(0, genSepStart);
-        const oldPage2 = currentHtml.substring(currentSepStart);
-        editorRef.current.innerHTML = newPage1 + oldPage2;
-      } else {
-        // No separator found — replace everything
-        editorRef.current.innerHTML = fullHtml;
-      }
-
-      // Track changes
-      adminServices.forEach((svc) => {
-        if (svc.removed) changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
-        else if (svc.isFree) changes.push({ field: svc.name, from: 'Normal', to: 'Inclus' });
-        else if (svc.isOption) changes.push({ field: svc.name, from: 'Normal', to: 'Option' });
-      });
-    }
-
-    if (changes.length > 0) {
-      setAdminChanges((prev) => [...prev, ...changes]);
-      setToast(`${changes.length} modification${changes.length > 1 ? 's' : ''} appliquée${changes.length > 1 ? 's' : ''}`);
-    } else {
-      setToast('Informations sauvegardées');
-    }
     setAdminModal(false);
+    // Reload page to regenerate WeboWord with updated data
+    window.location.reload();
   }, [adminFields, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
