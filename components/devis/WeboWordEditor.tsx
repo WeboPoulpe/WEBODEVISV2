@@ -425,12 +425,28 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
+    // Save admin fields to database (quotes table)
+    const supabase = createClient();
+    const clientFullName = [adminFields.clientName].filter(Boolean).join(' ');
+    await supabase.from('quotes').update({
+      client_name: clientFullName || null,
+      client_email: adminFields.clientEmail || null,
+      client_phone: adminFields.clientPhone || null,
+      client_address: adminFields.clientAddress || null,
+      event_type: adminFields.eventType || '',
+      event_date: adminFields.eventDate || new Date().toISOString().slice(0, 10),
+      event_location: adminFields.eventLocation || '',
+      guest_count: parseInt(adminFields.guestCount) || 1,
+    }).eq('id', quoteId);
+
     if (changes.length > 0) {
       setAdminChanges((prev) => [...prev, ...changes]);
       setToast(`${changes.length} champ${changes.length > 1 ? 's' : ''} mis à jour`);
+    } else {
+      setToast('Informations sauvegardées');
     }
     setAdminModal(false);
-  }, [adminFields]);
+  }, [adminFields, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
