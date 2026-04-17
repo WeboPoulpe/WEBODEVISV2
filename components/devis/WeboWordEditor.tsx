@@ -7,7 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
-  PenLine, History, X,
+  PenLine, History, X, Search,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -122,6 +122,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [adminFields, setAdminFields] = useState({ clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', eventType: '', eventDate: '', eventLocation: '', guestCount: '' });
   const [adminChanges, setAdminChanges] = useState<{ field: string; from: string; to: string }[]>([]);
   const [showChanges, setShowChanges] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientResults, setClientResults] = useState<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null }[]>([]);
+  const [showClientPicker, setShowClientPicker] = useState(false);
   const [structureModal, setStructureModal] = useState<{
     open: boolean;
     items: { index: number; name: string; preview: string; selected: boolean }[];
@@ -279,44 +282,52 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setToast(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''}`);
   }, [structureModal]);
 
-  // ── Admin fields: extract from DOM ──────────────────────────────────────────
-  const openAdminModal = useCallback(() => {
-    if (!editorRef.current) return;
-    const el = editorRef.current;
-
-    // Find CLIENT block and EVENT block
-    const blocks = Array.from(el.querySelectorAll('div[style*="flex:1"]'));
-    const clientBlock = blocks.find((b) => b.querySelector('p')?.textContent?.trim() === 'CLIENT') as HTMLElement | undefined;
-    const eventBlock = blocks.find((b) => b.querySelector('p')?.textContent?.trim() === 'ÉVÉNEMENT') as HTMLElement | undefined;
-
-    // Client: label(0), name(1), email?(2), phone?(3), address?(4)
-    const clientPs = clientBlock ? Array.from(clientBlock.querySelectorAll('p')) : [];
-    const cName = clientPs[1]?.textContent?.trim() || '';
-    const clientInfoTexts: string[] = [];
-    for (let i = 2; i < clientPs.length; i++) clientInfoTexts.push(clientPs[i]?.textContent?.trim() || '');
-
-    // Event: label(0), type(1), date?(2), guests?(3), location?(4)
-    const eventPs = eventBlock ? Array.from(eventBlock.querySelectorAll('p')) : [];
-    const evType = eventPs[1]?.textContent?.trim() || '';
-    const eventInfoTexts: string[] = [];
-    for (let i = 2; i < eventPs.length; i++) eventInfoTexts.push(eventPs[i]?.textContent?.trim() || '');
-
-    const extractField = (texts: string[], prefix: string) => {
-      const line = texts.find((t) => t.startsWith(prefix));
-      return line ? line.replace(prefix, '').trim() : '';
-    };
-
-    setAdminFields({
-      clientName: cName === 'À compléter' ? '' : cName,
-      clientEmail: clientInfoTexts.find((t) => t.includes('@')) || '',
-      clientPhone: clientInfoTexts.find((t) => /^\d|^0/.test(t)) || '',
-      clientAddress: clientInfoTexts.filter((t) => !t.includes('@') && !/^\d|^0/.test(t.replace(/\s/g, '')))[0] || '',
-      eventType: evType === 'À préciser' ? '' : evType,
-      eventDate: extractField(eventInfoTexts, '📅 ') || extractField(eventInfoTexts, '📅'),
-      guestCount: (extractField(eventInfoTexts, '👥 ') || extractField(eventInfoTexts, '👥')).replace(/\D+/g, ''),
-      eventLocation: extractField(eventInfoTexts, '📍 ') || extractField(eventInfoTexts, '📍'),
-    });
+  // ── Admin fields: load from database ────────────────────────────────────────
+  const openAdminModal = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase.from('quotes')
+      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count')
+      .eq('id', quoteId).single();
+    if (data) {
+      setAdminFields({
+        clientName: data.client_name || '',
+        clientEmail: data.client_email || '',
+        clientPhone: data.client_phone || '',
+        clientAddress: data.client_address || '',
+        eventType: data.event_type || '',
+        eventDate: data.event_date || '',
+        eventLocation: data.event_location || '',
+        guestCount: data.guest_count ? String(data.guest_count) : '',
+      });
+    }
+    setClientSearch('');
+    setClientResults([]);
+    setShowClientPicker(false);
     setAdminModal(true);
+  }, [quoteId]);
+
+  // ── Search clients ────────────────────────────────────────────────────────
+  const searchClients = useCallback(async (q: string) => {
+    setClientSearch(q);
+    if (!q.trim() || q.length < 2) { setClientResults([]); setShowClientPicker(false); return; }
+    const supabase = createClient();
+    const { data } = await supabase.from('customers')
+      .select('id, first_name, last_name, email, phone, company_name')
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,company_name.ilike.%${q}%`)
+      .limit(6);
+    setClientResults(data || []);
+    setShowClientPicker(true);
+  }, []);
+
+  const selectClient = useCallback((c: { first_name: string | null; last_name: string | null; email: string; phone: string | null }) => {
+    setAdminFields((f) => ({
+      ...f,
+      clientName: [c.first_name, c.last_name].filter(Boolean).join(' '),
+      clientEmail: c.email || '',
+      clientPhone: c.phone || '',
+    }));
+    setShowClientPicker(false);
+    setClientSearch('');
   }, []);
 
   // ── Admin fields: apply changes to DOM ────────────────────────────────────
@@ -427,21 +438,54 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
     // Save admin fields to database (quotes table)
     const supabase = createClient();
-    const clientFullName = [adminFields.clientName].filter(Boolean).join(' ');
-    await supabase.from('quotes').update({
-      client_name: clientFullName || null,
+    const clientFullName = adminFields.clientName.trim();
+    // Parse event_date: keep ISO if already ISO, otherwise store as-is
+    const eventDateVal = adminFields.eventDate || new Date().toISOString().slice(0, 10);
+
+    const { error: saveErr } = await supabase.from('quotes').update({
+      client_name: clientFullName || '',
       client_email: adminFields.clientEmail || null,
       client_phone: adminFields.clientPhone || null,
       client_address: adminFields.clientAddress || null,
       event_type: adminFields.eventType || '',
-      event_date: adminFields.eventDate || new Date().toISOString().slice(0, 10),
+      event_date: eventDateVal,
       event_location: adminFields.eventLocation || '',
       guest_count: parseInt(adminFields.guestCount) || 1,
     }).eq('id', quoteId);
 
+    if (saveErr) {
+      console.error('Erreur sauvegarde admin:', saveErr.message);
+      setToast('Erreur: ' + saveErr.message);
+      setAdminModal(false);
+      return;
+    }
+
+    // Upsert client in customers table if name + email provided
+    if (clientFullName && adminFields.clientEmail) {
+      const names = clientFullName.split(' ');
+      const firstName = names[0] || '';
+      const lastName = names.slice(1).join(' ') || '';
+      // Check if customer exists by email
+      const { data: existing } = await supabase.from('customers')
+        .select('id').eq('email', adminFields.clientEmail.toLowerCase()).maybeSingle();
+      if (existing) {
+        await supabase.from('customers').update({
+          first_name: firstName, last_name: lastName,
+          phone: adminFields.clientPhone || null,
+        }).eq('id', existing.id);
+      } else {
+        await supabase.from('customers').insert({
+          first_name: firstName, last_name: lastName,
+          email: adminFields.clientEmail.toLowerCase(),
+          phone: adminFields.clientPhone || null,
+          customer_type: 'particulier',
+        });
+      }
+    }
+
     if (changes.length > 0) {
       setAdminChanges((prev) => [...prev, ...changes]);
-      setToast(`${changes.length} champ${changes.length > 1 ? 's' : ''} mis à jour`);
+      setToast(`${changes.length} champ${changes.length > 1 ? 's' : ''} mis à jour et sauvegardé`);
     } else {
       setToast('Informations sauvegardées');
     }
@@ -1146,7 +1190,42 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               <div>
                 <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Client</p>
                 <div className="space-y-3">
-                  <div>
+                  {/* Client search */}
+                  <div className="relative">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Rechercher un client existant</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                      <input
+                        value={clientSearch}
+                        onChange={(e) => searchClients(e.target.value)}
+                        placeholder="Nom, email ou entreprise…"
+                        className="w-full text-sm border border-dashed border-[#9c27b0]/30 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-[#faf5ff]"
+                      />
+                    </div>
+                    {showClientPicker && clientResults.length > 0 && (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {clientResults.map((c) => (
+                          <button key={c.id} onClick={() => selectClient(c)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#faf5ff] transition-colors text-left border-b border-gray-50 last:border-0">
+                            <div className="w-8 h-8 rounded-full bg-[#f3e5f5] flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-[#9c27b0]">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 truncate">{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.company_name || c.email}</p>
+                              <p className="text-[10px] text-gray-400 truncate">{c.email}{c.phone ? ` · ${c.phone}` : ''}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showClientPicker && clientResults.length === 0 && clientSearch.length >= 2 && (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-3 text-center">
+                        <p className="text-xs text-gray-400">Aucun client trouvé</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Nom complet</label>
                     <input
                       value={adminFields.clientName}
