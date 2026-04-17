@@ -579,27 +579,28 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
       // Recalculate and update totals in DOM
       const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
-      const ht = adminServices.filter((s) => !s.removed && !s.isFree).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
-      const vatRate = 20; // default
+      const active = adminServices.filter((s) => !s.removed && !s.isFree);
+      const htSansOption = active.filter((s) => !s.isOption).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+      const optionHt = active.filter((s) => s.isOption).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+      const ht = htSansOption + optionHt;
+      const vatRate = 20;
       const vat = ht * (vatRate / 100);
       const ttc = ht + vat;
-      // Find totals block (div with "Sous-total HT", "TVA", "Total TTC")
-      const allSpans = Array.from(editorRef.current.querySelectorAll('span'));
-      allSpans.forEach((span) => {
-        const txt = span.textContent?.trim();
-        if (txt === 'Sous-total HT') {
-          const next = span.parentElement?.querySelector('span:last-child');
-          if (next && next !== span) next.textContent = money(ht);
+
+      // Find totals container
+      const totalsContainer = editorRef.current.querySelector('div[style*="min-width:220px"], div[style*="min-width: 220px"]') as HTMLElement | null;
+      if (totalsContainer) {
+        // Rebuild totals content
+        const rowStyle = 'display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;';
+        const optionRowStyle = 'display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;';
+        let html = `<div style="${rowStyle}"><span>Sous-total HT</span><span>${money(htSansOption)}</span></div>`;
+        if (optionHt > 0) {
+          html += `<div style="${optionRowStyle}"><span>dont Options HT</span><span>${money(optionHt)}</span></div>`;
         }
-        if (txt?.startsWith('TVA')) {
-          const next = span.parentElement?.querySelector('span:last-child');
-          if (next && next !== span) next.textContent = money(vat);
-        }
-        if (txt === 'Total TTC') {
-          const next = span.parentElement?.querySelector('span:last-child');
-          if (next && next !== span) next.textContent = money(ttc);
-        }
-      });
+        html += `<div style="${rowStyle}padding-bottom:10px;border-bottom:1px solid #e9d5ff;"><span>TVA (${vatRate}%)</span><span>${money(vat)}</span></div>`;
+        html += `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;color:#9c27b0;margin-top:10px;"><span>Total TTC</span><span>${money(ttc)}</span></div>`;
+        totalsContainer.innerHTML = html;
+      }
     }
 
     if (changes.length > 0) {
