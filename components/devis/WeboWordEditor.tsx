@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
+import { useAuth } from '@/context/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Props {
@@ -107,6 +109,7 @@ const LINE_HEIGHTS = [
 
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize }: Props) {
   const router = useRouter();
+  const { profile } = useAuth();
   const editorRef  = useRef<HTMLDivElement>(null);
   const colorInput = useRef<HTMLInputElement>(null);
   const initDone   = useRef(false);
@@ -514,86 +517,45 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
-    // Update DOM: financial table rows — match by name substring (handles truncation)
+    // Regenerate the full HTML with updated data and re-inject into editor
     if (editorRef.current) {
-      const allRows = Array.from(editorRef.current.querySelectorAll('table tr'));
-      const dataRows = allRows.filter((r) => r.querySelector('td')) as HTMLElement[];
-      const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
+      // Build services for generateQuoteHtml (exclude removed, apply flags)
+      const svcForHtml = updatedServices
+        .filter((s: { removed?: boolean; isPageBreak?: boolean }) => !s.removed && !s.isPageBreak)
+        .map((s: { name: string; description?: string; quantity: number; unitPrice: number; hideDescOnPdf?: boolean; isFree?: boolean; isOption?: boolean }) => ({
+          name: s.name,
+          description: s.description || null,
+          quantity: s.quantity,
+          unitPrice: s.unitPrice,
+          hideDescOnPdf: s.hideDescOnPdf,
+          isFree: s.isFree,
+          isOption: s.isOption,
+        }));
 
+      const newHtml = generateQuoteHtml({
+        companyName: profile?.company_name ?? 'Votre entreprise',
+        clientName: clientFullName || 'À compléter',
+        clientEmail: adminFields.clientEmail || null,
+        clientPhone: adminFields.clientPhone || null,
+        clientAddress: adminFields.clientAddress || null,
+        eventType: adminFields.eventType || null,
+        eventDate: adminFields.eventDate || null,
+        eventLocation: adminFields.eventLocation || null,
+        guestCount: parseInt(adminFields.guestCount) || null,
+        services: svcForHtml,
+        vatRate: 20,
+        remarks: null,
+        hidePrice: false,
+      }, { template: (editorRef.current.querySelector('.gastro-page') ? undefined : 'standard'), font });
+
+      editorRef.current.innerHTML = newHtml;
+
+      // Track changes
       adminServices.forEach((svc) => {
-        // Match by finding a row whose strong text starts with or contains the service name
-        const row = dataRows.find((r) => {
-          const strong = r.querySelector('strong');
-          if (!strong) return false;
-          const txt = strong.textContent?.trim() || '';
-          return txt === svc.name || txt.startsWith(svc.name.slice(0, 20)) || svc.name.startsWith(txt.slice(0, 20));
-        });
-        if (!row) return;
-
-        if (svc.removed) {
-          row.style.display = 'none';
-          changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
-          return;
-        }
-        row.style.display = '';
-
-        // First td: name + badge
-        const firstTd = row.querySelector('td') as HTMLElement | null;
-        if (firstTd) {
-          // Remove ALL existing badge spans (keep strong)
-          Array.from(firstTd.querySelectorAll('span')).forEach((s) => s.remove());
-          if (svc.isFree || svc.isOption) {
-            const badge = document.createElement('span');
-            badge.style.cssText = svc.isFree
-              ? 'display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;'
-              : 'display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;';
-            badge.textContent = svc.isFree ? 'INCLUS' : 'OPTION';
-            firstTd.querySelector('strong')?.after(badge);
-            changes.push({ field: svc.name, from: 'Normal', to: svc.isFree ? 'Inclus' : 'Option' });
-          }
-        }
-
-        const tds = Array.from(row.querySelectorAll('td')) as HTMLElement[];
-        // Update quantity (2nd td)
-        if (tds.length >= 2) tds[1].textContent = String(svc.quantity);
-        // Update price cells (last 2 tds)
-        if (tds.length >= 4) {
-          const puTd = tds[tds.length - 2];
-          const totalTd = tds[tds.length - 1];
-          if (svc.isFree) {
-            puTd.textContent = 'Inclus'; puTd.style.textDecoration = 'line-through'; puTd.style.color = '#9ca3af';
-            totalTd.textContent = 'Inclus'; totalTd.style.textDecoration = 'line-through'; totalTd.style.color = '#9ca3af';
-          } else {
-            puTd.style.textDecoration = ''; puTd.style.color = '';
-            totalTd.style.textDecoration = ''; totalTd.style.color = '';
-            totalTd.textContent = money(svc.quantity * svc.unitPrice);
-          }
-        }
+        if (svc.removed) changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
+        else if (svc.isFree) changes.push({ field: svc.name, from: 'Normal', to: 'Inclus' });
+        else if (svc.isOption) changes.push({ field: svc.name, from: 'Normal', to: 'Option' });
       });
-
-      // Recalculate and update totals in DOM
-      const active = adminServices.filter((s) => !s.removed && !s.isFree);
-      const htSansOption = active.filter((s) => !s.isOption).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
-      const optionHt = active.filter((s) => s.isOption).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
-      const ht = htSansOption + optionHt;
-      const vatRate = 20;
-      const vat = ht * (vatRate / 100);
-      const ttc = ht + vat;
-
-      // Find totals container
-      const totalsContainer = editorRef.current.querySelector('div[style*="min-width:220px"], div[style*="min-width: 220px"]') as HTMLElement | null;
-      if (totalsContainer) {
-        // Rebuild totals content
-        const rowStyle = 'display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;';
-        const optionRowStyle = 'display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;';
-        let html = `<div style="${rowStyle}"><span>Sous-total HT</span><span>${money(htSansOption)}</span></div>`;
-        if (optionHt > 0) {
-          html += `<div style="${optionRowStyle}"><span>dont Options HT</span><span>${money(optionHt)}</span></div>`;
-        }
-        html += `<div style="${rowStyle}padding-bottom:10px;border-bottom:1px solid #e9d5ff;"><span>TVA (${vatRate}%)</span><span>${money(vat)}</span></div>`;
-        html += `<div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;color:#9c27b0;margin-top:10px;"><span>Total TTC</span><span>${money(ttc)}</span></div>`;
-        totalsContainer.innerHTML = html;
-      }
     }
 
     if (changes.length > 0) {
