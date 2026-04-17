@@ -460,7 +460,8 @@ export default function DevisPage() {
   const [view, setView] = useState<ViewMode>('grid');
   const [sheetQuote, setSheetQuote] = useState<Quote | null>(null);
   const [dupModal, setDupModal] = useState<{ open: boolean; quoteId: string | null; saving: boolean; templateName: string }>({ open: false, quoteId: null, saving: false, templateName: '' });
-  const [templates, setTemplates] = useState<{ id: string; name: string; template: string; created_at: string; services: unknown[] }[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [templates, setTemplates] = useState<{ id: string; name: string; template: string; created_at: string; services: any[]; remarks: string | null; vat_rate: number; hide_price: boolean }[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [creatingFromTpl, setCreatingFromTpl] = useState<string | null>(null);
 
@@ -473,7 +474,7 @@ export default function DevisPage() {
         .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false }),
       supabase.from('devis_templates')
-        .select('id, name, template, created_at, services')
+        .select('id, name, template, created_at, services, remarks, vat_rate, hide_price')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
     ]).then(([quotesRes, tplRes]) => {
@@ -490,20 +491,28 @@ export default function DevisPage() {
     const supabase = createClient();
     const { data: tpl } = await supabase.from('devis_templates').select('*').eq('id', tplId).single();
     if (!tpl) { setCreatingFromTpl(null); return; }
-    const basePayload = {
+
+    // Build payload — only include fields we know exist
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload: Record<string, any> = {
       user_id: user.id,
       client_name: '',
       status: 'draft',
       services: tpl.services || [],
       content_html: tpl.content_html || null,
-      selected_font: tpl.selected_font || null,
       template: tpl.template || 'standard',
       remarks: tpl.remarks || null,
       vat_rate: tpl.vat_rate ?? 20,
       hide_price: tpl.hide_price ?? false,
     };
-    let res = await supabase.from('quotes').insert({ ...basePayload, selected_font_size: tpl.selected_font_size || 12 }).select('id').single();
-    if (res.error) res = await supabase.from('quotes').insert(basePayload).select('id').single();
+    if (tpl.selected_font) payload.selected_font = tpl.selected_font;
+
+    let res = await supabase.from('quotes').insert(payload).select('id').single();
+    if (res.error) {
+      // Retry without content_html if that column doesn't exist
+      delete payload.content_html;
+      res = await supabase.from('quotes').insert(payload).select('id').single();
+    }
     setCreatingFromTpl(null);
     if (res.data) router.push(`/devis/${res.data.id}/modifier?mode=weboword`);
   }, [user, router]);
@@ -642,30 +651,58 @@ export default function DevisPage() {
             <span className={`text-xs transition-transform ${showTemplates ? 'rotate-180' : ''}`}>▾</span>
           </button>
           {showTemplates && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-              {templates.map((tpl) => (
-                <div key={tpl.id} className="group bg-gradient-to-br from-[#faf5ff] to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-[#9c27b0]/40 transition-all">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{tpl.name}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">
-                        {Array.isArray(tpl.services) ? tpl.services.length : 0} prestation{Array.isArray(tpl.services) && tpl.services.length > 1 ? 's' : ''}
-                      </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              {templates.map((tpl) => {
+                const svcCount = Array.isArray(tpl.services) ? tpl.services.length : 0;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const svcNames = Array.isArray(tpl.services) ? tpl.services.filter((s: any) => s.name && !s.isPageBreak).slice(0, 3) : [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const totalHt = Array.isArray(tpl.services) ? tpl.services.reduce((sum: number, s: any) => sum + (s.isFree ? 0 : (s.quantity || 0) * (s.unitPrice || 0)), 0) : 0;
+                const templateLabel = tpl.template === 'mariage' ? 'Mariage' : tpl.template === 'business' ? 'Business' : 'Standard';
+                const templateColor = tpl.template === 'mariage' ? 'text-amber-700 bg-amber-50' : tpl.template === 'business' ? 'text-slate-700 bg-slate-100' : 'text-[#9c27b0] bg-[#f3e5f5]';
+                return (
+                  <div key={tpl.id} className="group bg-gradient-to-br from-[#faf5ff] to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-[#9c27b0]/40 transition-all">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-900 truncate">{tpl.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${templateColor}`}>{templateLabel}</span>
+                          <span className="text-[10px] text-gray-400">{svcCount} prestation{svcCount > 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+                      <button onClick={() => deleteTemplate(tpl.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => deleteTemplate(tpl.id)} title="Supprimer" className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    {/* Preview of services */}
+                    {svcNames.length > 0 && (
+                      <div className="mb-3 space-y-1">
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {svcNames.map((s: any, i: number) => (
+                          <p key={i} className="text-[11px] text-gray-500 truncate">
+                            <span className="text-gray-300 mr-1">•</span>{s.name}
+                          </p>
+                        ))}
+                        {svcCount > 3 && <p className="text-[10px] text-gray-400 italic">+{svcCount - 3} autres…</p>}
+                      </div>
+                    )}
+                    {/* Total + CTA */}
+                    <div className="flex items-center justify-between pt-3 border-t border-[#e9d5ff]/50">
+                      {totalHt > 0 ? (
+                        <p className="text-xs font-bold text-gray-700 tabular-nums">{formatCurrency(totalHt)} <span className="text-[10px] font-normal text-gray-400">HT</span></p>
+                      ) : <span />}
+                      <button
+                        onClick={() => createFromTemplate(tpl.id)}
+                        disabled={creatingFromTpl === tpl.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        {creatingFromTpl === tpl.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                        Utiliser
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => createFromTemplate(tpl.id)}
-                    disabled={creatingFromTpl === tpl.id}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 mt-2 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    {creatingFromTpl === tpl.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                    Créer un devis
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
