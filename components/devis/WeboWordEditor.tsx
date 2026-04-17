@@ -125,6 +125,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [clientSearch, setClientSearch] = useState('');
   const [clientResults, setClientResults] = useState<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null }[]>([]);
   const [showClientPicker, setShowClientPicker] = useState(false);
+  const [adminServices, setAdminServices] = useState<{ id: string; name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean }[]>([]);
   const [structureModal, setStructureModal] = useState<{
     open: boolean;
     items: { index: number; name: string; preview: string; selected: boolean }[];
@@ -286,9 +287,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const openAdminModal = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase.from('quotes')
-      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count')
+      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, services')
       .eq('id', quoteId).single();
     if (data) {
+      // Load services for editing
+      const svcs = Array.isArray(data.services) ? data.services : [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setAdminServices(svcs.filter((s: any) => !s.isPageBreak && s.name).map((s: any) => ({
+        id: s.id || crypto.randomUUID(),
+        name: s.name,
+        quantity: s.quantity || 1,
+        unitPrice: s.unitPrice || 0,
+        isFree: !!s.isFree,
+        isOption: !!s.isOption,
+        removed: false,
+      })));
       setAdminFields({
         clientName: data.client_name || '',
         clientEmail: data.client_email || '',
@@ -442,6 +455,23 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     // Parse event_date: keep ISO if already ISO, otherwise store as-is
     const eventDateVal = adminFields.eventDate || new Date().toISOString().slice(0, 10);
 
+    // Rebuild services array: apply isFree/isOption/removed flags
+    const { data: quoteData } = await supabase.from('quotes').select('services').eq('id', quoteId).single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let updatedServices: any[] = Array.isArray(quoteData?.services) ? [...quoteData.services] : [];
+    // Map admin changes back to the services array
+    const svcMap = new Map(adminServices.map((s) => [s.id, s]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updatedServices = updatedServices.map((s: any) => {
+      const edited = svcMap.get(s.id);
+      if (!edited) return s;
+      if (edited.removed) return { ...s, removed: true };
+      return { ...s, isFree: edited.isFree, isOption: edited.isOption, removed: false };
+    });
+    // Filter out removed for storage but keep the originals for gastro menu
+    // We mark removed services with a flag — they stay in services array for gastro menu
+    // but generateQuoteHtml will skip them in the financial table
+
     const { error: saveErr } = await supabase.from('quotes').update({
       client_name: clientFullName || '',
       client_email: adminFields.clientEmail || null,
@@ -451,6 +481,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       event_date: eventDateVal,
       event_location: adminFields.eventLocation || '',
       guest_count: parseInt(adminFields.guestCount) || 1,
+      services: updatedServices,
     }).eq('id', quoteId);
 
     if (saveErr) {
@@ -483,9 +514,56 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
+    // Update DOM: financial table rows (show/hide/restyle based on isFree/isOption/removed)
+    if (editorRef.current) {
+      const tbody = editorRef.current.querySelector('table tbody, table');
+      if (tbody) {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        // Match rows to services by name (skip header)
+        adminServices.forEach((svc) => {
+          const row = rows.find((r) => {
+            const nameCell = r.querySelector('td strong');
+            return nameCell?.textContent?.trim() === svc.name;
+          });
+          if (!row) return;
+          if (svc.removed) {
+            row.style.display = 'none';
+            changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
+          } else {
+            row.style.display = '';
+            // Update badge
+            const nameCell = row.querySelector('td');
+            if (nameCell) {
+              const existingBadge = nameCell.querySelector('span[style*="border-radius"]');
+              if (existingBadge) existingBadge.remove();
+              if (svc.isFree) {
+                const badge = document.createElement('span');
+                badge.style.cssText = 'display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;';
+                badge.textContent = 'INCLUS';
+                nameCell.querySelector('strong')?.after(badge);
+              } else if (svc.isOption) {
+                const badge = document.createElement('span');
+                badge.style.cssText = 'display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;';
+                badge.textContent = 'OPTION';
+                nameCell.querySelector('strong')?.after(badge);
+              }
+            }
+            // Update price cells
+            const tds = Array.from(row.querySelectorAll('td'));
+            if (svc.isFree && tds.length >= 4) {
+              tds[tds.length - 2].textContent = 'Inclus';
+              tds[tds.length - 2].style.cssText += 'text-decoration:line-through;color:#9ca3af;';
+              tds[tds.length - 1].textContent = 'Inclus';
+              tds[tds.length - 1].style.cssText += 'text-decoration:line-through;color:#9ca3af;';
+            }
+          }
+        });
+      }
+    }
+
     if (changes.length > 0) {
       setAdminChanges((prev) => [...prev, ...changes]);
-      setToast(`${changes.length} champ${changes.length > 1 ? 's' : ''} mis à jour et sauvegardé`);
+      setToast(`${changes.length} modification${changes.length > 1 ? 's' : ''} appliquée${changes.length > 1 ? 's' : ''}`);
     } else {
       setToast('Informations sauvegardées');
     }
@@ -1315,6 +1393,50 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+              {/* Prestations section */}
+              <div>
+                <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Prestations (page financière)</p>
+                <p className="text-[10px] text-gray-400 mb-2">Modifie le tableau financier uniquement. La carte gastronomique reste inchangée.</p>
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="grid grid-cols-[1fr_60px_60px] gap-0 px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                    <span>Prestation</span>
+                    <span className="text-center">Statut</span>
+                    <span className="text-right">Prix</span>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto divide-y divide-gray-100">
+                    {adminServices.map((svc, idx) => (
+                      <div key={svc.id} className={`grid grid-cols-[1fr_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${svc.removed ? 'bg-red-50/50 opacity-50' : ''}`}>
+                        <div className="min-w-0">
+                          <p className={`text-xs font-medium truncate ${svc.removed ? 'line-through text-gray-400' : 'text-gray-900'}`}>{svc.name}</p>
+                        </div>
+                        <div className="flex justify-center">
+                          <select
+                            value={svc.removed ? 'removed' : svc.isFree ? 'free' : svc.isOption ? 'option' : 'normal'}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setAdminServices((prev) => prev.map((s, i) => i === idx ? {
+                                ...s,
+                                removed: v === 'removed',
+                                isFree: v === 'free',
+                                isOption: v === 'option',
+                              } : s));
+                            }}
+                            className="text-[10px] border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="free">Inclus</option>
+                            <option value="option">Option</option>
+                            <option value="removed">Retiré</option>
+                          </select>
+                        </div>
+                        <p className={`text-xs text-right tabular-nums ${svc.isFree ? 'text-emerald-600' : svc.removed ? 'text-gray-300 line-through' : 'text-gray-700'}`}>
+                          {svc.isFree ? 'Inclus' : `${(svc.quantity * svc.unitPrice).toFixed(0)} €`}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
