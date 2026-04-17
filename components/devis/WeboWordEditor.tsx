@@ -1365,9 +1365,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
                       <input
+                        type="date"
                         value={adminFields.eventDate}
                         onChange={(e) => setAdminFields((f) => ({ ...f, eventDate: e.target.value }))}
-                        placeholder="14 mars 2026"
                         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
                       />
                     </div>
