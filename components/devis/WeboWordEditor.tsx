@@ -436,22 +436,19 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     // Parse event_date: keep ISO if already ISO, otherwise store as-is
     const eventDateVal = adminFields.eventDate || new Date().toISOString().slice(0, 10);
 
-    // Rebuild services array: apply isFree/isOption/removed flags
+    // Rebuild services array: match by name (IDs may not exist or differ)
     const { data: quoteData } = await supabase.from('quotes').select('services').eq('id', quoteId).single();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let updatedServices: any[] = Array.isArray(quoteData?.services) ? [...quoteData.services] : [];
-    // Map admin changes back to the services array
-    const svcMap = new Map(adminServices.map((s) => [s.id, s]));
+    const origServices: any[] = Array.isArray(quoteData?.services) ? [...quoteData.services] : [];
+    // Build a map by name for matching
+    const svcByName = new Map(adminServices.map((s) => [s.name, s]));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    updatedServices = updatedServices.map((s: any) => {
-      const edited = svcMap.get(s.id);
+    const updatedServices = origServices.map((s: any) => {
+      if (s.isPageBreak) return s;
+      const edited = svcByName.get(s.name);
       if (!edited) return s;
-      if (edited.removed) return { ...s, removed: true };
-      return { ...s, quantity: edited.quantity, isFree: edited.isFree, isOption: edited.isOption, removed: false };
+      return { ...s, quantity: edited.quantity, isFree: !!edited.isFree, isOption: !!edited.isOption, removed: !!edited.removed };
     });
-    // Filter out removed for storage but keep the originals for gastro menu
-    // We mark removed services with a flag — they stay in services array for gastro menu
-    // but generateQuoteHtml will skip them in the financial table
 
     const { error: saveErr } = await supabase.from('quotes').update({
       client_name: clientFullName || '',

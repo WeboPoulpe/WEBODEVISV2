@@ -27,6 +27,7 @@ export interface QuoteHtmlData {
     hideDescOnPdf?: boolean;
     isFree?: boolean;
     isOption?: boolean;
+    removed?: boolean;
   }>;
   vatRate: number;
   remarks?: string | null;
@@ -54,8 +55,9 @@ const dateFr = (s?: string | null) => {
 };
 
 export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
-  const htSansOption = d.services.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
-  const optionHt = d.services.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+  const activeServices = d.services.filter((s) => !s.removed);
+  const htSansOption = activeServices.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
+  const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
   const ht  = htSansOption + optionHt;
   const vat = ht * (d.vatRate / 100);
   const ttc = ht + vat;
@@ -100,7 +102,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     : '';
 
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
-  const tableRows = d.services.map((s) => {
+  const tableRows = activeServices.map((s) => {
     const badge = s.isFree
       ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">INCLUS</span>'
       : s.isOption
