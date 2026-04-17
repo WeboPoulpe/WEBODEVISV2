@@ -517,14 +517,13 @@ export default function DevisPage() {
     }
 
     // Create new quote with content_html preserved
-    const { data: newQuote } = await supabase.from('quotes').insert({
+    const basePayload = {
       user_id: user.id,
       client_name: '',
       status: 'draft',
       services: data.services || [],
       content_html: data.content_html || null,
       selected_font: data.selected_font || null,
-      selected_font_size: data.selected_font_size || 12,
       template: data.template || 'standard',
       event_type: data.event_type || null,
       event_date: data.event_date || null,
@@ -534,8 +533,13 @@ export default function DevisPage() {
       vat_rate: data.vat_rate ?? 20,
       hide_price: data.hide_price ?? false,
       images: data.images || [],
-      total_amount: null,
-    }).select('id').single();
+    };
+    // Try with selected_font_size, fallback without it
+    let res = await supabase.from('quotes').insert({ ...basePayload, selected_font_size: data.selected_font_size || 12 }).select('id').single();
+    if (res.error) {
+      res = await supabase.from('quotes').insert(basePayload).select('id').single();
+    }
+    const newQuote = res.data;
 
     setDupModal({ open: false, quoteId: null, saving: false, templateName: '' });
 

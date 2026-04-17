@@ -7,6 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
+  PenLine, History, X,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -117,6 +118,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
   const [lineHeight, setLineHeight] = useState('1.4');
+  const [adminModal, setAdminModal] = useState(false);
+  const [adminFields, setAdminFields] = useState({ clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', eventType: '', eventDate: '', eventLocation: '', guestCount: '' });
+  const [adminChanges, setAdminChanges] = useState<{ field: string; from: string; to: string }[]>([]);
+  const [showChanges, setShowChanges] = useState(false);
   const [structureModal, setStructureModal] = useState<{
     open: boolean;
     items: { index: number; name: string; preview: string; selected: boolean }[];
@@ -273,6 +278,159 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setStructureModal({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
     setToast(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''}`);
   }, [structureModal]);
+
+  // ── Admin fields: extract from DOM ──────────────────────────────────────────
+  const openAdminModal = useCallback(() => {
+    if (!editorRef.current) return;
+    const el = editorRef.current;
+
+    // Find CLIENT block and EVENT block
+    const blocks = Array.from(el.querySelectorAll('div[style*="flex:1"]'));
+    const clientBlock = blocks.find((b) => b.querySelector('p')?.textContent?.trim() === 'CLIENT') as HTMLElement | undefined;
+    const eventBlock = blocks.find((b) => b.querySelector('p')?.textContent?.trim() === 'ÉVÉNEMENT') as HTMLElement | undefined;
+
+    // Client: label(0), name(1), email?(2), phone?(3), address?(4)
+    const clientPs = clientBlock ? Array.from(clientBlock.querySelectorAll('p')) : [];
+    const cName = clientPs[1]?.textContent?.trim() || '';
+    const clientInfoTexts: string[] = [];
+    for (let i = 2; i < clientPs.length; i++) clientInfoTexts.push(clientPs[i]?.textContent?.trim() || '');
+
+    // Event: label(0), type(1), date?(2), guests?(3), location?(4)
+    const eventPs = eventBlock ? Array.from(eventBlock.querySelectorAll('p')) : [];
+    const evType = eventPs[1]?.textContent?.trim() || '';
+    const eventInfoTexts: string[] = [];
+    for (let i = 2; i < eventPs.length; i++) eventInfoTexts.push(eventPs[i]?.textContent?.trim() || '');
+
+    const extractField = (texts: string[], prefix: string) => {
+      const line = texts.find((t) => t.startsWith(prefix));
+      return line ? line.replace(prefix, '').trim() : '';
+    };
+
+    setAdminFields({
+      clientName: cName === 'À compléter' ? '' : cName,
+      clientEmail: clientInfoTexts.find((t) => t.includes('@')) || '',
+      clientPhone: clientInfoTexts.find((t) => /^\d|^0/.test(t)) || '',
+      clientAddress: clientInfoTexts.filter((t) => !t.includes('@') && !/^\d|^0/.test(t.replace(/\s/g, '')))[0] || '',
+      eventType: evType === 'À préciser' ? '' : evType,
+      eventDate: extractField(eventInfoTexts, '📅 ') || extractField(eventInfoTexts, '📅'),
+      guestCount: (extractField(eventInfoTexts, '👥 ') || extractField(eventInfoTexts, '👥')).replace(/\D+/g, ''),
+      eventLocation: extractField(eventInfoTexts, '📍 ') || extractField(eventInfoTexts, '📍'),
+    });
+    setAdminModal(true);
+  }, []);
+
+  // ── Admin fields: apply changes to DOM ────────────────────────────────────
+  const applyAdminChanges = useCallback(() => {
+    if (!editorRef.current) return;
+    const el = editorRef.current;
+    const changes: { field: string; from: string; to: string }[] = [];
+
+    // Find blocks
+    const allBlocks = Array.from(el.querySelectorAll('div[style*="flex:1"]'));
+    const clientBlock = allBlocks.find((b) => b.querySelector('p')?.textContent?.trim() === 'CLIENT') as HTMLElement | undefined;
+    const eventBlock = allBlocks.find((b) => b.querySelector('p')?.textContent?.trim() === 'ÉVÉNEMENT') as HTMLElement | undefined;
+
+    // Helper: update or create a <p> in a block
+    const updateField = (block: HTMLElement | undefined, index: number, newVal: string, label: string) => {
+      if (!block) return;
+      const ps = Array.from(block.querySelectorAll('p'));
+      const oldVal = ps[index]?.textContent?.trim() || '';
+      if (oldVal !== newVal && (oldVal || newVal)) {
+        changes.push({ field: label, from: oldVal, to: newVal });
+        if (ps[index]) {
+          ps[index].textContent = newVal;
+        }
+      }
+    };
+
+    // Update client name (index 1)
+    updateField(clientBlock, 1, adminFields.clientName || 'À compléter', 'Nom client');
+
+    // Client info lines (email, phone, address) - rebuild
+    if (clientBlock) {
+      const ps = Array.from(clientBlock.querySelectorAll('p'));
+      // Remove old info lines (keep label + name)
+      const toRemove = ps.slice(2);
+      const oldInfos = toRemove.map((p) => p.textContent?.trim() || '');
+      toRemove.forEach((p) => p.remove());
+      // Add new info lines
+      const newInfos: string[] = [];
+      if (adminFields.clientEmail) newInfos.push(adminFields.clientEmail);
+      if (adminFields.clientPhone) newInfos.push(adminFields.clientPhone);
+      if (adminFields.clientAddress) newInfos.push(adminFields.clientAddress);
+      newInfos.forEach((info) => {
+        const p = document.createElement('p');
+        p.style.cssText = 'color:#555;margin:0 0 2px;font-size:11px;';
+        p.textContent = info;
+        clientBlock.appendChild(p);
+      });
+      // Track changes
+      const oldStr = oldInfos.join(', ');
+      const newStr = newInfos.join(', ');
+      if (oldStr !== newStr) changes.push({ field: 'Infos client', from: oldStr, to: newStr });
+    }
+
+    // Update event type (index 1)
+    updateField(eventBlock, 1, adminFields.eventType || 'À préciser', 'Type événement');
+
+    // Event info lines - rebuild
+    if (eventBlock) {
+      const evPs = Array.from(eventBlock.querySelectorAll('p'));
+      const toRemoveEv = evPs.slice(2);
+      const oldInfos = toRemoveEv.map((p) => p.textContent?.trim() || '');
+      toRemoveEv.forEach((p) => p.remove());
+      const newInfos: string[] = [];
+      if (adminFields.eventDate) newInfos.push(`📅 ${adminFields.eventDate}`);
+      if (adminFields.guestCount) newInfos.push(`👥 ${adminFields.guestCount} invité${parseInt(adminFields.guestCount) > 1 ? 's' : ''}`);
+      if (adminFields.eventLocation) newInfos.push(`📍 ${adminFields.eventLocation}`);
+      newInfos.forEach((info) => {
+        const p = document.createElement('p');
+        p.style.cssText = 'color:#555;margin:0 0 2px;font-size:11px;';
+        p.textContent = info;
+        eventBlock.appendChild(p);
+      });
+      const oldStr = oldInfos.join(', ');
+      const newStr = newInfos.join(', ');
+      if (oldStr !== newStr) changes.push({ field: 'Infos événement', from: oldStr, to: newStr });
+    }
+
+    // Update intro text (letter salutation)
+    const introP = el.querySelector('div[style*="border-left:4px"] p');
+    if (introP) {
+      const name = adminFields.clientName || '';
+      const evtType = adminFields.eventType || 'événement';
+      const dateStr = adminFields.eventDate ? ` du ${adminFields.eventDate}` : '';
+      const locStr = adminFields.eventLocation ? ` à ${adminFields.eventLocation}` : '';
+      introP.innerHTML = `Madame, Monsieur ${name},<br><br>Nous vous remercions de votre confiance et avons le plaisir de vous soumettre notre proposition pour votre ${evtType}${dateStr}${locStr}. Vous trouverez ci-dessous le détail de nos prestations.`;
+    }
+
+    // Update gastro menu header (event type + date + location)
+    const gastroHeader = el.querySelector('.gastro-header, .gastro-page div[style*="gradient"]');
+    if (gastroHeader) {
+      const ps = gastroHeader.querySelectorAll('p');
+      // First p = event type + date
+      if (ps[0]) {
+        const datePart = adminFields.eventDate ? ` — ${adminFields.eventDate.toUpperCase()}` : '';
+        ps[0].textContent = `${(adminFields.eventType || 'ÉVÉNEMENT').toUpperCase()}${datePart}`;
+      }
+      // h2 or second strong = "Menu de votre [Name]"
+      const h2 = gastroHeader.querySelector('h2, em');
+      if (h2 && adminFields.clientName) {
+        h2.textContent = `Menu de votre ${adminFields.eventType || 'Réception'}`;
+      }
+      // Location
+      const locP = Array.from(ps).find((p) => p.textContent?.includes('📍'));
+      if (locP && adminFields.eventLocation) {
+        locP.textContent = `📍 ${adminFields.eventLocation}`;
+      }
+    }
+
+    if (changes.length > 0) {
+      setAdminChanges((prev) => [...prev, ...changes]);
+      setToast(`${changes.length} champ${changes.length > 1 ? 's' : ''} mis à jour`);
+    }
+    setAdminModal(false);
+  }, [adminFields]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
@@ -925,6 +1083,208 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         {/* Bottom padding for visual comfort */}
         <div className="h-12 print:hidden" />
       </div>
+
+      {/* ── Floating admin edit button ─────────────────────────────────────── */}
+      <div className="fixed bottom-6 right-6 flex flex-col items-end gap-2 z-40 print:hidden">
+        {adminChanges.length > 0 && (
+          <button
+            onClick={() => setShowChanges(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-semibold rounded-full shadow-lg hover:bg-amber-600 transition-colors"
+          >
+            <History className="h-3.5 w-3.5" />
+            {adminChanges.length} modif{adminChanges.length > 1 ? 's' : ''}
+          </button>
+        )}
+        <button
+          onClick={openAdminModal}
+          className="flex items-center gap-2 px-4 py-3 bg-[#9c27b0] text-white text-sm font-semibold rounded-full shadow-xl hover:bg-[#7b1fa2] transition-all hover:scale-105"
+          title="Modifier les informations administratives (client, événement)"
+        >
+          <PenLine className="h-4 w-4" />
+          Modifier les infos
+        </button>
+      </div>
+
+      {/* ── Admin edit modal ───────────────────────────────────────────────── */}
+      {adminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setAdminModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-[#f3e5f5] rounded-xl">
+                  <PenLine className="h-4 w-4 text-[#9c27b0]" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900 text-sm">Informations administratives</h2>
+                  <p className="text-[10px] text-gray-400">Modifie uniquement la partie administrative du devis</p>
+                </div>
+              </div>
+              <button onClick={() => setAdminModal(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Client section */}
+              <div>
+                <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Client</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Nom complet</label>
+                    <input
+                      value={adminFields.clientName}
+                      onChange={(e) => setAdminFields((f) => ({ ...f, clientName: e.target.value }))}
+                      placeholder="Jean Dupont"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                      <input
+                        value={adminFields.clientEmail}
+                        onChange={(e) => setAdminFields((f) => ({ ...f, clientEmail: e.target.value }))}
+                        placeholder="jean@email.com"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone</label>
+                      <input
+                        value={adminFields.clientPhone}
+                        onChange={(e) => setAdminFields((f) => ({ ...f, clientPhone: e.target.value }))}
+                        placeholder="06 12 34 56 78"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Adresse</label>
+                    <input
+                      value={adminFields.clientAddress}
+                      onChange={(e) => setAdminFields((f) => ({ ...f, clientAddress: e.target.value }))}
+                      placeholder="12 rue des Lilas, 75001 Paris"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Event section */}
+              <div>
+                <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Événement</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                      <select
+                        value={adminFields.eventType}
+                        onChange={(e) => setAdminFields((f) => ({ ...f, eventType: e.target.value }))}
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      >
+                        <option value="">— Choisir —</option>
+                        {['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'].map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                      <input
+                        value={adminFields.eventDate}
+                        onChange={(e) => setAdminFields((f) => ({ ...f, eventDate: e.target.value }))}
+                        placeholder="14 mars 2026"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nombre de couverts</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={adminFields.guestCount}
+                        onChange={(e) => setAdminFields((f) => ({ ...f, guestCount: e.target.value }))}
+                        placeholder="120"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Lieu</label>
+                      <input
+                        value={adminFields.eventLocation}
+                        onChange={(e) => setAdminFields((f) => ({ ...f, eventLocation: e.target.value }))}
+                        placeholder="Château de Villebougis"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onClick={() => setAdminModal(false)} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                Annuler
+              </button>
+              <button
+                onClick={applyAdminChanges}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors"
+              >
+                <Check className="h-4 w-4" />
+                Appliquer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Changes history modal ──────────────────────────────────────────── */}
+      {showChanges && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowChanges(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-amber-500" />
+                <h2 className="font-semibold text-gray-900 text-sm">Modifications apportées</h2>
+              </div>
+              <button onClick={() => setShowChanges(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-2">
+              {adminChanges.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">Aucune modification</p>
+              ) : (
+                adminChanges.map((c, i) => (
+                  <div key={i} className="border border-gray-100 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-gray-900 mb-1">{c.field}</p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-red-500 line-through bg-red-50 px-2 py-0.5 rounded truncate max-w-[45%]">{c.from || '(vide)'}</span>
+                      <span className="text-gray-300">→</span>
+                      <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded truncate max-w-[45%]">{c.to || '(vide)'}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-between">
+              <button
+                onClick={() => { setAdminChanges([]); setShowChanges(false); }}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Effacer l&#39;historique
+              </button>
+              <button onClick={() => setShowChanges(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
