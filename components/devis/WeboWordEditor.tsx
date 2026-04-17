@@ -455,9 +455,16 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     console.log('Original services:', origServices.length);
     console.log('Updated services:', updatedServices.map((s: { name: string; quantity: number; isFree?: boolean; isOption?: boolean; removed?: boolean }) => ({ name: s.name, qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
 
+    // Split name into first/last for the quote
+    const nameParts = clientFullName.split(' ');
+    const cFirstName = nameParts[0] || '';
+    const cLastName = nameParts.slice(1).join(' ') || '';
+
     // Single update: save everything + reset content_html in ONE call
     const { error: saveErr } = await supabase.from('quotes').update({
       client_name: clientFullName || '',
+      client_first_name: cFirstName || null,
+      client_last_name: cLastName || null,
       client_email: adminFields.clientEmail || null,
       client_phone: adminFields.clientPhone || null,
       client_address: adminFields.clientAddress || null,
@@ -506,7 +513,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
 
     setAdminModal(false);
-    window.location.reload();
+    // Navigate with cache-busting param to force fresh server fetch
+    window.location.href = `/devis/${quoteId}/modifier?mode=weboword&t=${Date.now()}`;
   }, [adminFields, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
