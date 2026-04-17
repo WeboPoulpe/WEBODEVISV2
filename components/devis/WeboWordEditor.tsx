@@ -162,35 +162,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     return () => document.removeEventListener('mousedown', handler);
   }, [showFontMenu]);
 
-  // Inject initial HTML once + detect existing gastro-menu width + auto-open structure modal
-  const structureAutoOpened = useRef(false);
+  // Inject initial HTML once + detect existing gastro-menu width
   useEffect(() => {
     if (!initDone.current && editorRef.current) {
       editorRef.current.innerHTML = initialHtml;
       initDone.current = true;
       const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
       if (menu?.style.maxWidth) setMenuWidth(menu.style.maxWidth);
-      // Auto-open structure modal on first load if there are unstructured descriptions
-      if (!structureAutoOpened.current) {
-        structureAutoOpened.current = true;
-        setTimeout(() => {
-          if (!editorRef.current) return;
-          const descs = editorRef.current.querySelectorAll('.svc-desc');
-          const items: { index: number; name: string; preview: string; selected: boolean }[] = [];
-          descs.forEach((el, i) => {
-            const raw = el.textContent || '';
-            if (!raw.trim()) return;
-            const parent = el.closest('div[style]') || el.parentElement;
-            const nameEl = parent?.querySelector('h3, strong');
-            const name = nameEl?.textContent || `Description ${i + 1}`;
-            const alreadyStructured = el.querySelectorAll('p, li').length > 2;
-            items.push({ index: i, name, preview: raw.substring(0, 120) + (raw.length > 120 ? '…' : ''), selected: !alreadyStructured });
-          });
-          if (items.length > 0 && items.some((it) => it.selected)) {
-            setStructureModal({ open: true, items, titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
-          }
-        }, 300);
-      }
     }
   }, [initialHtml]);
 
