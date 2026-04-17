@@ -450,10 +450,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       return { ...s, quantity: edited.quantity, isFree: !!edited.isFree, isOption: !!edited.isOption, removed: !!edited.removed };
     });
 
-    // Log what we're saving
+    // Debug: what the user changed in the modal vs what we're saving
     console.log('=== ADMIN SAVE ===');
-    console.log('Original services:', origServices.length);
-    console.log('Updated services:', updatedServices.map((s: { name: string; quantity: number; isFree?: boolean; isOption?: boolean; removed?: boolean }) => ({ name: s.name, qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
+    console.log('adminServices (from modal):', adminServices.map((s) => ({ name: s.name.slice(0, 25), qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
+    console.log('origServices names:', origServices.map((s: { name: string }) => s.name?.slice(0, 25)));
+    console.log('svcByName keys:', Array.from(svcByName.keys()).map((k) => k.slice(0, 25)));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.log('updatedServices (to save):', updatedServices.map((s: any) => ({ name: s.name?.slice(0, 25), qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
 
     // Split name into first/last for the quote
     const nameParts = clientFullName.split(' ');
