@@ -466,7 +466,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       const edited = svcMap.get(s.id);
       if (!edited) return s;
       if (edited.removed) return { ...s, removed: true };
-      return { ...s, isFree: edited.isFree, isOption: edited.isOption, removed: false };
+      return { ...s, quantity: edited.quantity, isFree: edited.isFree, isOption: edited.isOption, removed: false };
     });
     // Filter out removed for storage but keep the originals for gastro menu
     // We mark removed services with a flag — they stay in services array for gastro menu
@@ -514,51 +514,92 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
-    // Update DOM: financial table rows (show/hide/restyle based on isFree/isOption/removed)
+    // Update DOM: financial table rows
     if (editorRef.current) {
-      const tbody = editorRef.current.querySelector('table tbody, table');
-      if (tbody) {
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        // Match rows to services by name (skip header)
-        adminServices.forEach((svc) => {
-          const row = rows.find((r) => {
-            const nameCell = r.querySelector('td strong');
-            return nameCell?.textContent?.trim() === svc.name;
-          });
-          if (!row) return;
-          if (svc.removed) {
-            row.style.display = 'none';
-            changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
-          } else {
-            row.style.display = '';
-            // Update badge
-            const nameCell = row.querySelector('td');
-            if (nameCell) {
-              const existingBadge = nameCell.querySelector('span[style*="border-radius"]');
-              if (existingBadge) existingBadge.remove();
-              if (svc.isFree) {
-                const badge = document.createElement('span');
-                badge.style.cssText = 'display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;';
-                badge.textContent = 'INCLUS';
-                nameCell.querySelector('strong')?.after(badge);
-              } else if (svc.isOption) {
-                const badge = document.createElement('span');
-                badge.style.cssText = 'display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;';
-                badge.textContent = 'OPTION';
-                nameCell.querySelector('strong')?.after(badge);
-              }
-            }
-            // Update price cells
-            const tds = Array.from(row.querySelectorAll('td'));
-            if (svc.isFree && tds.length >= 4) {
-              tds[tds.length - 2].textContent = 'Inclus';
-              tds[tds.length - 2].style.cssText += 'text-decoration:line-through;color:#9ca3af;';
-              tds[tds.length - 1].textContent = 'Inclus';
-              tds[tds.length - 1].style.cssText += 'text-decoration:line-through;color:#9ca3af;';
+      const allRows = Array.from(editorRef.current.querySelectorAll('table tr'));
+      // Skip header row (has <th>)
+      const dataRows = allRows.filter((r) => r.querySelector('td'));
+
+      adminServices.forEach((svc) => {
+        // Match by strong text content (the prestation name)
+        const row = dataRows.find((r) => {
+          const strong = r.querySelector('strong');
+          return strong?.textContent?.trim() === svc.name;
+        }) as HTMLElement | undefined;
+        if (!row) return;
+
+        if (svc.removed) {
+          row.style.display = 'none';
+          changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
+        } else {
+          row.style.display = '';
+          const firstTd = row.querySelector('td') as HTMLElement | null;
+          if (firstTd) {
+            // Remove existing badges
+            firstTd.querySelectorAll('span').forEach((s) => s.remove());
+            // Add new badge
+            if (svc.isFree || svc.isOption) {
+              const badge = document.createElement('span');
+              badge.style.cssText = svc.isFree
+                ? 'display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;'
+                : 'display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;';
+              badge.textContent = svc.isFree ? 'INCLUS' : 'OPTION';
+              firstTd.querySelector('strong')?.after(badge);
+              changes.push({ field: svc.name, from: 'Normal', to: svc.isFree ? 'Inclus' : 'Option' });
             }
           }
-        });
-      }
+          // Update quantity cell (2nd td)
+          const tds = Array.from(row.querySelectorAll('td')) as HTMLElement[];
+          if (tds.length >= 2) {
+            tds[1].textContent = String(svc.quantity);
+          }
+          // Update price cells
+          if (tds.length >= 4) {
+            const priceTd = tds[tds.length - 2];
+            const totalTd = tds[tds.length - 1];
+            if (svc.isFree) {
+              priceTd.textContent = 'Inclus';
+              priceTd.style.textDecoration = 'line-through';
+              priceTd.style.color = '#9ca3af';
+              totalTd.textContent = 'Inclus';
+              totalTd.style.textDecoration = 'line-through';
+              totalTd.style.color = '#9ca3af';
+            } else {
+              priceTd.style.textDecoration = '';
+              priceTd.style.color = '';
+              totalTd.style.textDecoration = '';
+              totalTd.style.color = '';
+              // Recalculate total for this row
+              const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format;
+              totalTd.textContent = money(svc.quantity * svc.unitPrice);
+            }
+          }
+        }
+      });
+
+      // Recalculate and update totals in DOM
+      const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
+      const ht = adminServices.filter((s) => !s.removed && !s.isFree).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+      const vatRate = 20; // default
+      const vat = ht * (vatRate / 100);
+      const ttc = ht + vat;
+      // Find totals block (div with "Sous-total HT", "TVA", "Total TTC")
+      const allSpans = Array.from(editorRef.current.querySelectorAll('span'));
+      allSpans.forEach((span) => {
+        const txt = span.textContent?.trim();
+        if (txt === 'Sous-total HT') {
+          const next = span.parentElement?.querySelector('span:last-child');
+          if (next && next !== span) next.textContent = money(ht);
+        }
+        if (txt?.startsWith('TVA')) {
+          const next = span.parentElement?.querySelector('span:last-child');
+          if (next && next !== span) next.textContent = money(vat);
+        }
+        if (txt === 'Total TTC') {
+          const next = span.parentElement?.querySelector('span:last-child');
+          if (next && next !== span) next.textContent = money(ttc);
+        }
+      });
     }
 
     if (changes.length > 0) {
@@ -1401,37 +1442,43 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Prestations (page financière)</p>
                 <p className="text-[10px] text-gray-400 mb-2">Modifie le tableau financier uniquement. La carte gastronomique reste inchangée.</p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[1fr_60px_60px] gap-0 px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  <div className="grid grid-cols-[1fr_45px_65px_55px] gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                     <span>Prestation</span>
+                    <span className="text-center">Qté</span>
                     <span className="text-center">Statut</span>
                     <span className="text-right">Prix</span>
                   </div>
                   <div className="max-h-52 overflow-y-auto divide-y divide-gray-100">
                     {adminServices.map((svc, idx) => (
-                      <div key={svc.id} className={`grid grid-cols-[1fr_60px_60px] gap-0 px-3 py-2 items-center transition-colors ${svc.removed ? 'bg-red-50/50 opacity-50' : ''}`}>
+                      <div key={svc.id} className={`grid grid-cols-[1fr_45px_65px_55px] gap-1 px-3 py-2 items-center transition-colors ${svc.removed ? 'bg-red-50/50 opacity-50' : ''}`}>
                         <div className="min-w-0">
                           <p className={`text-xs font-medium truncate ${svc.removed ? 'line-through text-gray-400' : 'text-gray-900'}`}>{svc.name}</p>
                         </div>
-                        <div className="flex justify-center">
-                          <select
-                            value={svc.removed ? 'removed' : svc.isFree ? 'free' : svc.isOption ? 'option' : 'normal'}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setAdminServices((prev) => prev.map((s, i) => i === idx ? {
-                                ...s,
-                                removed: v === 'removed',
-                                isFree: v === 'free',
-                                isOption: v === 'option',
-                              } : s));
-                            }}
-                            className="text-[10px] border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="free">Inclus</option>
-                            <option value="option">Option</option>
-                            <option value="removed">Retiré</option>
-                          </select>
-                        </div>
+                        <input
+                          type="number" min={1}
+                          value={svc.quantity}
+                          onChange={(e) => setAdminServices((prev) => prev.map((s, i) => i === idx ? { ...s, quantity: parseInt(e.target.value) || 1 } : s))}
+                          disabled={svc.removed}
+                          className="w-full text-[11px] text-center border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 disabled:opacity-40"
+                        />
+                        <select
+                          value={svc.removed ? 'removed' : svc.isFree ? 'free' : svc.isOption ? 'option' : 'normal'}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setAdminServices((prev) => prev.map((s, i) => i === idx ? {
+                              ...s,
+                              removed: v === 'removed',
+                              isFree: v === 'free',
+                              isOption: v === 'option',
+                            } : s));
+                          }}
+                          className="text-[10px] border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="free">Inclus</option>
+                          <option value="option">Option</option>
+                          <option value="removed">Retiré</option>
+                        </select>
                         <p className={`text-xs text-right tabular-nums ${svc.isFree ? 'text-emerald-600' : svc.removed ? 'text-gray-300 line-through' : 'text-gray-700'}`}>
                           {svc.isFree ? 'Inclus' : `${(svc.quantity * svc.unitPrice).toFixed(0)} €`}
                         </p>
