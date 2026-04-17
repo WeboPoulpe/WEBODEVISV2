@@ -447,7 +447,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       if (s.isPageBreak) return s;
       const edited = svcByName.get(s.name);
       if (!edited) return s;
-      return { ...s, quantity: edited.quantity, isFree: !!edited.isFree, isOption: !!edited.isOption, removed: !!edited.removed };
+      return { ...s, quantity: edited.quantity, unitPrice: edited.unitPrice, isFree: !!edited.isFree, isOption: !!edited.isOption, removed: !!edited.removed };
     });
 
     // Debug: what the user changed in the modal vs what we're saving
@@ -1356,15 +1356,16 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Prestations (page financière)</p>
                 <p className="text-[10px] text-gray-400 mb-2">Modifie le tableau financier uniquement. La carte gastronomique reste inchangée.</p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[1fr_45px_65px_55px] gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  <div className="grid grid-cols-[1fr_45px_55px_65px_55px] gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                     <span>Prestation</span>
                     <span className="text-center">Qté</span>
+                    <span className="text-center">PU</span>
                     <span className="text-center">Statut</span>
-                    <span className="text-right">Prix</span>
+                    <span className="text-right">Total</span>
                   </div>
                   <div className="max-h-52 overflow-y-auto divide-y divide-gray-100">
                     {adminServices.map((svc, idx) => (
-                      <div key={svc.id} className={`grid grid-cols-[1fr_45px_65px_55px] gap-1 px-3 py-2 items-center transition-colors ${svc.removed ? 'bg-red-50/50 opacity-50' : ''}`}>
+                      <div key={svc.id} className={`grid grid-cols-[1fr_45px_55px_65px_55px] gap-1 px-3 py-2 items-center transition-colors ${svc.removed ? 'bg-red-50/50 opacity-50' : ''}`}>
                         <div className="min-w-0">
                           <p className={`text-xs font-medium truncate ${svc.removed ? 'line-through text-gray-400' : 'text-gray-900'}`}>{svc.name}</p>
                         </div>
@@ -1374,6 +1375,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                           onChange={(e) => setAdminServices((prev) => prev.map((s, i) => i === idx ? { ...s, quantity: parseInt(e.target.value) || 1 } : s))}
                           disabled={svc.removed}
                           className="w-full text-[11px] text-center border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 disabled:opacity-40"
+                        />
+                        <input
+                          type="number" min={0} step={0.01}
+                          value={svc.unitPrice}
+                          onChange={(e) => setAdminServices((prev) => prev.map((s, i) => i === idx ? { ...s, unitPrice: parseFloat(e.target.value) || 0 } : s))}
+                          disabled={svc.removed}
+                          className="w-full text-[11px] text-right border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 disabled:opacity-40"
                         />
                         <select
                           value={svc.removed ? 'removed' : svc.isFree ? 'free' : svc.isOption ? 'option' : 'normal'}
