@@ -212,7 +212,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       </div>
       ${optionHt > 0 ? `
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;">
-        <span>dont Options HT</span><span>${money(optionHt)}</span>
+        <span>si Options HT</span><span>${money(optionHt)}</span>
       </div>
       ` : ''}
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">

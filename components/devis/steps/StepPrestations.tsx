@@ -524,7 +524,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
           <Row label="Sous-total HT" value={formatCurrency(ht)} />
           {optionHt > 0 && (
             <div className="flex justify-between gap-6 text-sm text-amber-600 bg-amber-50 -mx-2 px-2 py-0.5 rounded">
-              <span>dont Options</span>
+              <span>si Options</span>
               <span className="tabular-nums">{formatCurrency(optionHt)}</span>
             </div>
           )}
