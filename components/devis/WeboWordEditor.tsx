@@ -478,8 +478,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
 
     // Verify save worked
-    const { data: verify } = await supabase.from('quotes').select('services, content_html, client_name').eq('id', quoteId).single();
-    console.log('Verify after save:', { client_name: verify?.client_name, content_html: verify?.content_html === null ? 'NULL (ok)' : 'NOT NULL (bad)', servicesCount: Array.isArray(verify?.services) ? verify.services.length : 0 });
+    const { data: verify } = await supabase.from('quotes').select('services, content_html, client_name, guest_count').eq('id', quoteId).single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const verifySvcs = Array.isArray(verify?.services) ? verify.services.map((s: any) => ({ name: s.name?.slice(0, 25), qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })) : [];
+    console.log('Verify after save:', { client_name: verify?.client_name, guest_count: verify?.guest_count, content_html: verify?.content_html === null ? 'NULL ✓' : 'HAS HTML ✗', services: verifySvcs });
 
     // Upsert client in customers table
     if (clientFullName && adminFields.clientEmail) {
