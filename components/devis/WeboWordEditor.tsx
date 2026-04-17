@@ -320,7 +320,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, []);
 
   // ── Admin fields: apply changes to DOM ────────────────────────────────────
-  const applyAdminChanges = useCallback(() => {
+  const applyAdminChanges = useCallback(async () => {
     if (!editorRef.current) return;
     const el = editorRef.current;
     const changes: { field: string; from: string; to: string }[] = [];
