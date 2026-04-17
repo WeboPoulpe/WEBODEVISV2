@@ -516,8 +516,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
 
     setAdminModal(false);
-    setToast('Sauvegardé — vérifiez la console puis rechargez manuellement');
-  }, [adminFields, quoteId]);
+    window.location.href = `/devis/${quoteId}/modifier?mode=weboword&t=${Date.now()}`;
+  }, [adminFields, adminServices, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
   const exec = useCallback((cmd: string, value?: string) => {
