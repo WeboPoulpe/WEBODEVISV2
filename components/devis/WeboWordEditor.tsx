@@ -527,43 +527,26 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         hidePrice: quoteMeta?.hide_price ?? false,
       }, { template: tmpl, font });
 
-      // Extract only page 1 from generated HTML (before screen-sep)
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = fullHtml;
-      const screenSep = tempDiv.querySelector('.screen-sep');
+      // Split current content at screen-sep to preserve page 2
+      const currentHtml = editorRef.current.innerHTML;
+      const sepMarker = 'class="screen-sep"';
+      const sepIdx = currentHtml.indexOf(sepMarker);
 
-      // Save page 2 (everything after screen-sep) from current editor
-      const currentContent = editorRef.current.innerHTML;
-      const currentDiv = document.createElement('div');
-      currentDiv.innerHTML = currentContent;
-      const currentSep = currentDiv.querySelector('.screen-sep');
+      // Split generated HTML at screen-sep to get new page 1
+      const genSepIdx = fullHtml.indexOf(sepMarker);
 
-      let page2Html = '';
-      if (currentSep) {
-        // Collect everything from screen-sep onward
-        let node = currentSep as Node | null;
-        while (node) {
-          if (node instanceof HTMLElement) page2Html += node.outerHTML;
-          else if (node.nodeType === Node.TEXT_NODE) page2Html += node.textContent;
-          node = node.nextSibling;
-        }
-      }
-
-      // Build page 1 from generated HTML (before screen-sep)
-      let page1Html = '';
-      if (screenSep) {
-        let node = tempDiv.firstChild as Node | null;
-        while (node && node !== screenSep) {
-          if (node instanceof HTMLElement) page1Html += node.outerHTML;
-          else if (node.nodeType === Node.TEXT_NODE) page1Html += node.textContent;
-          node = node.nextSibling;
-        }
+      if (sepIdx !== -1 && genSepIdx !== -1) {
+        // Find the start of the <div with screen-sep in both
+        const currentSepStart = currentHtml.lastIndexOf('<div', sepIdx);
+        const genSepStart = fullHtml.lastIndexOf('<div', genSepIdx);
+        // New page 1 (from generated) + old page 2 (from current)
+        const newPage1 = fullHtml.substring(0, genSepStart);
+        const oldPage2 = currentHtml.substring(currentSepStart);
+        editorRef.current.innerHTML = newPage1 + oldPage2;
       } else {
-        page1Html = fullHtml;
+        // No separator found — replace everything
+        editorRef.current.innerHTML = fullHtml;
       }
-
-      // Combine: new page 1 + old separator + old page 2
-      editorRef.current.innerHTML = page1Html + page2Html;
 
       // Track changes
       adminServices.forEach((svc) => {
