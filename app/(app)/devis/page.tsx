@@ -460,16 +460,59 @@ export default function DevisPage() {
   const [view, setView] = useState<ViewMode>('grid');
   const [sheetQuote, setSheetQuote] = useState<Quote | null>(null);
   const [dupModal, setDupModal] = useState<{ open: boolean; quoteId: string | null; saving: boolean; templateName: string }>({ open: false, quoteId: null, saving: false, templateName: '' });
+  const [templates, setTemplates] = useState<{ id: string; name: string; template: string; created_at: string; services: unknown[] }[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [creatingFromTpl, setCreatingFromTpl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    createClient()
-      .from('quotes')
-      .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services')
-      .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { setQuotes(data ?? []); setLoading(false); });
+    const supabase = createClient();
+    Promise.all([
+      supabase.from('quotes')
+        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services')
+        .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
+        .order('created_at', { ascending: false }),
+      supabase.from('devis_templates')
+        .select('id, name, template, created_at, services')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+    ]).then(([quotesRes, tplRes]) => {
+      setQuotes(quotesRes.data ?? []);
+      setTemplates(tplRes.data ?? []);
+      setLoading(false);
+    });
   }, [user]);
+
+  // Create a devis from a template
+  const createFromTemplate = useCallback(async (tplId: string) => {
+    if (!user) return;
+    setCreatingFromTpl(tplId);
+    const supabase = createClient();
+    const { data: tpl } = await supabase.from('devis_templates').select('*').eq('id', tplId).single();
+    if (!tpl) { setCreatingFromTpl(null); return; }
+    const basePayload = {
+      user_id: user.id,
+      client_name: '',
+      status: 'draft',
+      services: tpl.services || [],
+      content_html: tpl.content_html || null,
+      selected_font: tpl.selected_font || null,
+      template: tpl.template || 'standard',
+      remarks: tpl.remarks || null,
+      vat_rate: tpl.vat_rate ?? 20,
+      hide_price: tpl.hide_price ?? false,
+    };
+    let res = await supabase.from('quotes').insert({ ...basePayload, selected_font_size: tpl.selected_font_size || 12 }).select('id').single();
+    if (res.error) res = await supabase.from('quotes').insert(basePayload).select('id').single();
+    setCreatingFromTpl(null);
+    if (res.data) router.push(`/devis/${res.data.id}/modifier?mode=weboword`);
+  }, [user, router]);
+
+  const deleteTemplate = useCallback(async (id: string) => {
+    if (!confirm('Supprimer ce modèle ?')) return;
+    await createClient().from('devis_templates').delete().eq('id', id);
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const handleStatusChange = useCallback((id: string, status: string) => {
     setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, status } : q));
@@ -586,6 +629,47 @@ export default function DevisPage() {
           </Link>
         </div>
       </div>
+
+      {/* ── Templates section ──────────────────────────────────────────── */}
+      {templates.length > 0 && (
+        <div className="mb-5">
+          <button
+            onClick={() => setShowTemplates((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#9c27b0] transition-colors mb-3"
+          >
+            <Library className="h-4 w-4" />
+            Mes modèles ({templates.length})
+            <span className={`text-xs transition-transform ${showTemplates ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+          {showTemplates && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+              {templates.map((tpl) => (
+                <div key={tpl.id} className="group bg-gradient-to-br from-[#faf5ff] to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-[#9c27b0]/40 transition-all">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{tpl.name}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {Array.isArray(tpl.services) ? tpl.services.length : 0} prestation{Array.isArray(tpl.services) && tpl.services.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <button onClick={() => deleteTemplate(tpl.id)} title="Supprimer" className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => createFromTemplate(tpl.id)}
+                    disabled={creatingFromTpl === tpl.id}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 mt-2 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    {creatingFromTpl === tpl.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                    Créer un devis
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search + filter */}
       {view !== 'pipeline' && (
