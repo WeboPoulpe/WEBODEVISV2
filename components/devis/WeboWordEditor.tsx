@@ -514,71 +514,64 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
-    // Update DOM: financial table rows
+    // Update DOM: financial table rows — match by name substring (handles truncation)
     if (editorRef.current) {
       const allRows = Array.from(editorRef.current.querySelectorAll('table tr'));
-      // Skip header row (has <th>)
-      const dataRows = allRows.filter((r) => r.querySelector('td'));
+      const dataRows = allRows.filter((r) => r.querySelector('td')) as HTMLElement[];
+      const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
 
       adminServices.forEach((svc) => {
-        // Match by strong text content (the prestation name)
+        // Match by finding a row whose strong text starts with or contains the service name
         const row = dataRows.find((r) => {
           const strong = r.querySelector('strong');
-          return strong?.textContent?.trim() === svc.name;
-        }) as HTMLElement | undefined;
+          if (!strong) return false;
+          const txt = strong.textContent?.trim() || '';
+          return txt === svc.name || txt.startsWith(svc.name.slice(0, 20)) || svc.name.startsWith(txt.slice(0, 20));
+        });
         if (!row) return;
 
         if (svc.removed) {
           row.style.display = 'none';
           changes.push({ field: svc.name, from: 'Affiché', to: 'Retiré' });
-        } else {
-          row.style.display = '';
-          const firstTd = row.querySelector('td') as HTMLElement | null;
-          if (firstTd) {
-            // Remove existing badges
-            firstTd.querySelectorAll('span').forEach((s) => s.remove());
-            // Add new badge
-            if (svc.isFree || svc.isOption) {
-              const badge = document.createElement('span');
-              badge.style.cssText = svc.isFree
-                ? 'display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;'
-                : 'display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;';
-              badge.textContent = svc.isFree ? 'INCLUS' : 'OPTION';
-              firstTd.querySelector('strong')?.after(badge);
-              changes.push({ field: svc.name, from: 'Normal', to: svc.isFree ? 'Inclus' : 'Option' });
-            }
+          return;
+        }
+        row.style.display = '';
+
+        // First td: name + badge
+        const firstTd = row.querySelector('td') as HTMLElement | null;
+        if (firstTd) {
+          // Remove ALL existing badge spans (keep strong)
+          Array.from(firstTd.querySelectorAll('span')).forEach((s) => s.remove());
+          if (svc.isFree || svc.isOption) {
+            const badge = document.createElement('span');
+            badge.style.cssText = svc.isFree
+              ? 'display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;'
+              : 'display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;';
+            badge.textContent = svc.isFree ? 'INCLUS' : 'OPTION';
+            firstTd.querySelector('strong')?.after(badge);
+            changes.push({ field: svc.name, from: 'Normal', to: svc.isFree ? 'Inclus' : 'Option' });
           }
-          // Update quantity cell (2nd td)
-          const tds = Array.from(row.querySelectorAll('td')) as HTMLElement[];
-          if (tds.length >= 2) {
-            tds[1].textContent = String(svc.quantity);
-          }
-          // Update price cells
-          if (tds.length >= 4) {
-            const priceTd = tds[tds.length - 2];
-            const totalTd = tds[tds.length - 1];
-            if (svc.isFree) {
-              priceTd.textContent = 'Inclus';
-              priceTd.style.textDecoration = 'line-through';
-              priceTd.style.color = '#9ca3af';
-              totalTd.textContent = 'Inclus';
-              totalTd.style.textDecoration = 'line-through';
-              totalTd.style.color = '#9ca3af';
-            } else {
-              priceTd.style.textDecoration = '';
-              priceTd.style.color = '';
-              totalTd.style.textDecoration = '';
-              totalTd.style.color = '';
-              // Recalculate total for this row
-              const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format;
-              totalTd.textContent = money(svc.quantity * svc.unitPrice);
-            }
+        }
+
+        const tds = Array.from(row.querySelectorAll('td')) as HTMLElement[];
+        // Update quantity (2nd td)
+        if (tds.length >= 2) tds[1].textContent = String(svc.quantity);
+        // Update price cells (last 2 tds)
+        if (tds.length >= 4) {
+          const puTd = tds[tds.length - 2];
+          const totalTd = tds[tds.length - 1];
+          if (svc.isFree) {
+            puTd.textContent = 'Inclus'; puTd.style.textDecoration = 'line-through'; puTd.style.color = '#9ca3af';
+            totalTd.textContent = 'Inclus'; totalTd.style.textDecoration = 'line-through'; totalTd.style.color = '#9ca3af';
+          } else {
+            puTd.style.textDecoration = ''; puTd.style.color = '';
+            totalTd.style.textDecoration = ''; totalTd.style.color = '';
+            totalTd.textContent = money(svc.quantity * svc.unitPrice);
           }
         }
       });
 
       // Recalculate and update totals in DOM
-      const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
       const active = adminServices.filter((s) => !s.removed && !s.isFree);
       const htSansOption = active.filter((s) => !s.isOption).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
       const optionHt = active.filter((s) => s.isOption).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
@@ -1421,7 +1414,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         type="number"
                         min={1}
                         value={adminFields.guestCount}
-                        onChange={(e) => setAdminFields((f) => ({ ...f, guestCount: e.target.value }))}
+                        onChange={(e) => {
+                          const count = e.target.value;
+                          setAdminFields((f) => ({ ...f, guestCount: count }));
+                          // Auto-fill all service quantities with guest count
+                          const n = parseInt(count) || 1;
+                          setAdminServices((prev) => prev.map((s) => ({ ...s, quantity: n })));
+                        }}
                         placeholder="120"
                         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
                       />
