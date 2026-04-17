@@ -517,22 +517,23 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
-    // Regenerate the full HTML with updated data and re-inject into editor
+    // Regenerate page 1 only, keep page 2 (gastro menu) intact
     if (editorRef.current) {
-      // Build services for generateQuoteHtml (exclude removed, apply flags)
+      // Get quote metadata for template/vat
+      const { data: quoteMeta } = await supabase.from('quotes')
+        .select('template, vat_rate, hide_price, remarks')
+        .eq('id', quoteId).single();
+
       const svcForHtml = updatedServices
         .filter((s: { removed?: boolean; isPageBreak?: boolean }) => !s.removed && !s.isPageBreak)
         .map((s: { name: string; description?: string; quantity: number; unitPrice: number; hideDescOnPdf?: boolean; isFree?: boolean; isOption?: boolean }) => ({
-          name: s.name,
-          description: s.description || null,
-          quantity: s.quantity,
-          unitPrice: s.unitPrice,
-          hideDescOnPdf: s.hideDescOnPdf,
-          isFree: s.isFree,
-          isOption: s.isOption,
+          name: s.name, description: s.description || null,
+          quantity: s.quantity, unitPrice: s.unitPrice,
+          hideDescOnPdf: s.hideDescOnPdf, isFree: s.isFree, isOption: s.isOption,
         }));
 
-      const newHtml = generateQuoteHtml({
+      const tmpl = (quoteMeta?.template as 'standard' | 'mariage' | 'business') || 'standard';
+      const fullHtml = generateQuoteHtml({
         companyName: profile?.company_name ?? 'Votre entreprise',
         clientName: clientFullName || 'À compléter',
         clientEmail: adminFields.clientEmail || null,
@@ -543,12 +544,48 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         eventLocation: adminFields.eventLocation || null,
         guestCount: parseInt(adminFields.guestCount) || null,
         services: svcForHtml,
-        vatRate: 20,
-        remarks: null,
-        hidePrice: false,
-      }, { template: (editorRef.current.querySelector('.gastro-page') ? undefined : 'standard'), font });
+        vatRate: quoteMeta?.vat_rate ?? 20,
+        remarks: quoteMeta?.remarks || null,
+        hidePrice: quoteMeta?.hide_price ?? false,
+      }, { template: tmpl, font });
 
-      editorRef.current.innerHTML = newHtml;
+      // Extract only page 1 from generated HTML (before screen-sep)
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = fullHtml;
+      const screenSep = tempDiv.querySelector('.screen-sep');
+
+      // Save page 2 (everything after screen-sep) from current editor
+      const currentContent = editorRef.current.innerHTML;
+      const currentDiv = document.createElement('div');
+      currentDiv.innerHTML = currentContent;
+      const currentSep = currentDiv.querySelector('.screen-sep');
+
+      let page2Html = '';
+      if (currentSep) {
+        // Collect everything from screen-sep onward
+        let node = currentSep as Node | null;
+        while (node) {
+          if (node instanceof HTMLElement) page2Html += node.outerHTML;
+          else if (node.nodeType === Node.TEXT_NODE) page2Html += node.textContent;
+          node = node.nextSibling;
+        }
+      }
+
+      // Build page 1 from generated HTML (before screen-sep)
+      let page1Html = '';
+      if (screenSep) {
+        let node = tempDiv.firstChild as Node | null;
+        while (node && node !== screenSep) {
+          if (node instanceof HTMLElement) page1Html += node.outerHTML;
+          else if (node.nodeType === Node.TEXT_NODE) page1Html += node.textContent;
+          node = node.nextSibling;
+        }
+      } else {
+        page1Html = fullHtml;
+      }
+
+      // Combine: new page 1 + old separator + old page 2
+      editorRef.current.innerHTML = page1Html + page2Html;
 
       // Track changes
       adminServices.forEach((svc) => {
