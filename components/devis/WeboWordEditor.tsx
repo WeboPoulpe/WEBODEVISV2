@@ -138,7 +138,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     descItalic: boolean;
   }>({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
   const [showFontMenu, setShowFontMenu] = useState(false);
-  const [menuWidth, setMenuWidth] = useState('400px');
+  const [menuWidth, setMenuWidth] = useState('100%');
 
   // ── Load Google Font when font changes ────────────────────────────────────
   useEffect(() => {
