@@ -492,26 +492,27 @@ export default function DevisPage() {
     const { data: tpl } = await supabase.from('devis_templates').select('*').eq('id', tplId).single();
     if (!tpl) { setCreatingFromTpl(null); return; }
 
-    // Build payload — only include fields we know exist
+    // Build payload — match exact columns from quotes table
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: Record<string, any> = {
       user_id: user.id,
+      owner_user_id: user.id,
       client_name: '',
       status: 'draft',
       services: tpl.services || [],
       content_html: tpl.content_html || null,
       template: tpl.template || 'standard',
+      selected_font: tpl.selected_font || null,
+      selected_font_size: tpl.selected_font_size || 12,
       remarks: tpl.remarks || null,
       vat_rate: tpl.vat_rate ?? 20,
       hide_price: tpl.hide_price ?? false,
     };
-    if (tpl.selected_font) payload.selected_font = tpl.selected_font;
 
-    let res = await supabase.from('quotes').insert(payload).select('id').single();
+    const res = await supabase.from('quotes').insert(payload).select('id').single();
     if (res.error) {
-      // Retry without content_html if that column doesn't exist
-      delete payload.content_html;
-      res = await supabase.from('quotes').insert(payload).select('id').single();
+      console.error('Erreur création devis depuis template:', res.error.message, res.error.code);
+      alert('Erreur: ' + res.error.message);
     }
     setCreatingFromTpl(null);
     if (res.data) router.push(`/devis/${res.data.id}/modifier?mode=weboword`);
@@ -569,13 +570,15 @@ export default function DevisPage() {
     }
 
     // Create new quote with content_html preserved
-    const basePayload = {
+    const dupPayload = {
       user_id: user.id,
+      owner_user_id: user.id,
       client_name: '',
       status: 'draft',
       services: data.services || [],
       content_html: data.content_html || null,
       selected_font: data.selected_font || null,
+      selected_font_size: data.selected_font_size || 12,
       template: data.template || 'standard',
       event_type: data.event_type || null,
       event_date: data.event_date || null,
@@ -586,10 +589,10 @@ export default function DevisPage() {
       hide_price: data.hide_price ?? false,
       images: data.images || [],
     };
-    // Try with selected_font_size, fallback without it
-    let res = await supabase.from('quotes').insert({ ...basePayload, selected_font_size: data.selected_font_size || 12 }).select('id').single();
+    const res = await supabase.from('quotes').insert(dupPayload).select('id').single();
     if (res.error) {
-      res = await supabase.from('quotes').insert(basePayload).select('id').single();
+      console.error('Erreur duplication:', res.error.message);
+      alert('Erreur: ' + res.error.message);
     }
     const newQuote = res.data;
 
