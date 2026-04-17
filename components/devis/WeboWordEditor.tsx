@@ -450,6 +450,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       return { ...s, quantity: edited.quantity, isFree: !!edited.isFree, isOption: !!edited.isOption, removed: !!edited.removed };
     });
 
+    // Log what we're saving
+    console.log('=== ADMIN SAVE ===');
+    console.log('Original services:', origServices.length);
+    console.log('Updated services:', updatedServices.map((s: { name: string; quantity: number; isFree?: boolean; isOption?: boolean; removed?: boolean }) => ({ name: s.name, qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
+
+    // Single update: save everything + reset content_html in ONE call
     const { error: saveErr } = await supabase.from('quotes').update({
       client_name: clientFullName || '',
       client_email: adminFields.clientEmail || null,
@@ -460,21 +466,26 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       event_location: adminFields.eventLocation || '',
       guest_count: parseInt(adminFields.guestCount) || 1,
       services: updatedServices,
+      content_html: null, // Force regeneration on next load
     }).eq('id', quoteId);
 
+    console.log('Save result:', saveErr ? saveErr.message : 'OK');
+
     if (saveErr) {
-      console.error('Erreur sauvegarde admin:', saveErr.message);
-      setToast('Erreur: ' + saveErr.message);
+      alert('Erreur sauvegarde: ' + saveErr.message);
       setAdminModal(false);
       return;
     }
 
-    // Upsert client in customers table if name + email provided
+    // Verify save worked
+    const { data: verify } = await supabase.from('quotes').select('services, content_html, client_name').eq('id', quoteId).single();
+    console.log('Verify after save:', { client_name: verify?.client_name, content_html: verify?.content_html === null ? 'NULL (ok)' : 'NOT NULL (bad)', servicesCount: Array.isArray(verify?.services) ? verify.services.length : 0 });
+
+    // Upsert client in customers table
     if (clientFullName && adminFields.clientEmail) {
       const names = clientFullName.split(' ');
       const firstName = names[0] || '';
       const lastName = names.slice(1).join(' ') || '';
-      // Check if customer exists by email
       const { data: existing } = await supabase.from('customers')
         .select('id').eq('email', adminFields.clientEmail.toLowerCase()).maybeSingle();
       if (existing) {
@@ -492,11 +503,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       }
     }
 
-    // Reset content_html to force regeneration with new data, then reload
-    await supabase.from('quotes').update({ content_html: null }).eq('id', quoteId);
-
     setAdminModal(false);
-    // Reload page to regenerate WeboWord with updated data
     window.location.reload();
   }, [adminFields, quoteId]);
 

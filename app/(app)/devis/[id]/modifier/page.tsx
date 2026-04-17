@@ -5,6 +5,8 @@ import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import QuoteInlineEditor from '@/components/devis/QuoteInlineEditor';
 import WeboWordEditor from '@/components/devis/WeboWordEditor';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Server Component — fetches the quote (V1 or V2), then delegates to:
  *  • WeboWordEditor  — mode=weboword | content_html already saved (and mode≠wizard)
@@ -104,6 +106,7 @@ export default async function ModifierPage({
             hideDescOnPdf: (s as ServiceLine & { hideDescOnPdf?: boolean }).hideDescOnPdf,
             isFree:       (s as ServiceLine & { isFree?: boolean }).isFree,
             isOption:     (s as ServiceLine & { isOption?: boolean }).isOption,
+            removed:      (s as ServiceLine & { removed?: boolean }).removed,
           })),
         vatRate:    quote.vat_rate   ?? 20,
         remarks:    quote.remarks    ?? null,
