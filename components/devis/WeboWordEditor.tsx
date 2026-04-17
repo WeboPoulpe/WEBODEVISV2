@@ -516,8 +516,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
 
     setAdminModal(false);
-    // Navigate with cache-busting param to force fresh server fetch
-    window.location.href = `/devis/${quoteId}/modifier?mode=weboword&t=${Date.now()}`;
+    setToast('Sauvegardé — vérifiez la console puis rechargez manuellement');
   }, [adminFields, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
