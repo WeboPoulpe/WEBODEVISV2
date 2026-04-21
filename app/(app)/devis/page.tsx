@@ -286,10 +286,6 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate }: { quote: Quote
             className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
             <Copy className="h-3.5 w-3.5" />
           </button>
-          <Link href={`/devis/${quote.id}/modifier?mode=wizard`} title="Modifier"
-            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
-            <Pencil className="h-3.5 w-3.5" />
-          </Link>
           <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
             className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
             <LayoutTemplate className="h-3.5 w-3.5" />
@@ -342,7 +338,6 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
                   )}
                   <button onClick={() => onOpenSheet(q)} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button>
                   <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="PDF"><Printer className="h-3.5 w-3.5" /></Link>
-                  <Link href={`/devis/${q.id}/modifier?mode=wizard`} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors" title="Modifier les informations"><Pencil className="h-3.5 w-3.5" /></Link>
                   <Link href={`/devis/${q.id}/modifier?mode=weboword`} className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors" title="Ouvrir dans WeboWord"><LayoutTemplate className="h-3.5 w-3.5" /></Link>
                 </div>
               </td>
