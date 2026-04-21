@@ -92,6 +92,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const quoteIdFromPath = pathname?.match(/\/devis\/([^/]+)\/modifier/)?.[1] || null;
   const activePanel = urlParams.panel as 'client' | 'services' | 'event' | 'style' | 'images' | null;
 
+  // Detect Prestation WeboWord mode
+  const isPrestaWeboMode = pathname?.includes('/prestations/') && pathname?.includes('/edit-webo');
+
   const weboItems: { key: string; icon: React.ElementType; label: string }[] = [
     { key: 'client', icon: User, label: 'Client' },
     { key: 'services', icon: Package, label: 'Prestations' },
@@ -192,8 +195,44 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </div>
       </div>
 
-      {/* ── WeboWord mode: replace navigation ──────────────────────────────── */}
-      {isWeboMode ? (
+      {/* ── Prestation WeboWord mode ───────────────────────────────────────── */}
+      {isPrestaWeboMode ? (
+        <nav className="flex-1 py-3 px-3 overflow-y-auto">
+          <Link
+            href="/prestations"
+            className="flex items-center gap-2 px-3 py-2.5 mb-4 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 flex-shrink-0" />
+            {!collapsed && <span className="text-sm font-medium">Retour aux prestations</span>}
+          </Link>
+
+          {!collapsed && (
+            <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
+              Édition prestation
+            </p>
+          )}
+
+          <div className="px-3 py-2 text-xs text-white/50 italic">
+            Stylez la carte gastronomique de votre prestation. Elle sera utilisée automatiquement dans tous les devis.
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-white/10 space-y-1">
+            {!collapsed && (
+              <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
+                Actions
+              </p>
+            )}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('presta-webo:save'))}
+              title={collapsed ? 'Enregistrer' : undefined}
+              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white rounded-xl hover:from-[#7b1fa2] hover:to-[#6a1080] transition-colors shadow-md"
+            >
+              <Save className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="text-sm font-semibold">Enregistrer</span>}
+            </button>
+          </div>
+        </nav>
+      ) : isWeboMode ? (
         <nav className="flex-1 py-3 px-3 overflow-y-auto">
           {/* Back button */}
           <Link

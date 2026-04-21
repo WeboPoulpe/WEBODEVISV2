@@ -69,6 +69,14 @@ export default function PrestationWeboEditor({
     }
   }, [font]);
 
+  // Listen for save event from sidebar
+  useEffect(() => {
+    const onSave = () => handleSave();
+    window.addEventListener('presta-webo:save', onSave);
+    return () => window.removeEventListener('presta-webo:save', onSave);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prestationId]);
+
   const exec = useCallback((cmd: string, value?: string) => {
     editorRef.current?.focus();
     document.execCommand(cmd, false, value);
@@ -120,36 +128,15 @@ export default function PrestationWeboEditor({
 
   return (
     <div className="flex flex-col h-full bg-slate-100">
-      {/* Top bar */}
+      {/* Top bar (minimal: just the title line) */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
-          <div className="flex items-center gap-2 min-w-0">
-            <Link
-              href="/prestations"
-              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-semibold text-gray-800 truncate">{name}</span>
-              <span className="text-xs text-gray-400">· {unitPrice}€ HT</span>
-              {category && <span className="text-xs text-[#9c27b0] bg-[#f3e5f5] px-2 py-0.5 rounded-full capitalize">{category}</span>}
-              {subCategory && <span className="text-xs text-gray-500 italic">{subCategory}</span>}
-            </div>
-          </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={cn(
-              'flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors',
-              saved
-                ? 'bg-emerald-500 text-white'
-                : 'bg-[#9c27b0] text-white hover:bg-[#7b1fa2] disabled:opacity-60',
-            )}
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {saved ? 'Enregistré' : 'Enregistrer'}
-          </button>
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100">
+          <span className="text-sm font-semibold text-gray-800 truncate">{name}</span>
+          <span className="text-xs text-gray-400">· {unitPrice}€ HT</span>
+          {category && <span className="text-xs text-[#9c27b0] bg-[#f3e5f5] px-2 py-0.5 rounded-full capitalize">{category}</span>}
+          {subCategory && <span className="text-xs text-gray-500 italic">{subCategory}</span>}
+          {saved && <span className="ml-auto text-xs text-emerald-600 font-semibold flex items-center gap-1"><Check className="h-3 w-3" /> Enregistré</span>}
+          {saving && <span className="ml-auto text-xs text-gray-400 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Enregistrement…</span>}
         </div>
 
         {/* Formatting bar */}
