@@ -8,6 +8,7 @@ import {
   Package, Settings, Carrot, LayoutTemplate,
   LogOut, ChevronLeft, ChevronRight, UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench,
   User, Calendar as CalendarIcon, Palette, Image as ImageIcon, ArrowLeft,
+  Save, Printer, Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -231,6 +232,39 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 </Link>
               );
             })}
+          </div>
+
+          {/* Actions: Save / Print / PDF (dispatch custom events to WeboWord editor) */}
+          <div className="mt-6 pt-4 border-t border-white/10 space-y-1">
+            {!collapsed && (
+              <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
+                Actions
+              </p>
+            )}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('weboword:save'))}
+              title={collapsed ? 'Enregistrer' : undefined}
+              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white rounded-xl hover:from-[#7b1fa2] hover:to-[#6a1080] transition-colors shadow-md"
+            >
+              <Save className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="text-sm font-semibold">Enregistrer</span>}
+            </button>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))}
+              title={collapsed ? 'Enregistrer PDF' : undefined}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            >
+              <Download className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="text-sm font-medium">Enregistrer PDF</span>}
+            </button>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('weboword:print'))}
+              title={collapsed ? 'Imprimer' : undefined}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            >
+              <Printer className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="text-sm font-medium">Imprimer</span>}
+            </button>
           </div>
         </nav>
       ) : (

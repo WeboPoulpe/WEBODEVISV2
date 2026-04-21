@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   User, Package, Calendar, Palette, Image as ImageIcon,
   X, Search, Loader2, Check, Plus, Trash2, Wand2, ChevronLeft,
+  Save, Printer, Download,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -15,14 +16,29 @@ interface Props {
   activePanel: PanelKey | null;
   onClose: () => void;
   onApplied: () => void; // Called after any save — parent triggers reload
+  // Editor actions (top bar moved here)
+  onSave?: () => void;
+  onPrint?: () => void;
+  onSavePdf?: () => void;
+  saving?: boolean;
+  // Menu width (gastro card)
+  menuWidth?: string;
+  onMenuWidthChange?: (w: string) => void;
 }
+
+const MENU_WIDTHS = [
+  { label: 'Étroit', value: '280px' },
+  { label: 'Normal', value: '400px' },
+  { label: 'Large', value: '560px' },
+  { label: 'Plein', value: '100%' },
+];
 
 interface Client { id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; [key: string]: any; }
 
-export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied }: Props) {
+export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, menuWidth, onMenuWidthChange }: Props) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -378,9 +394,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   <div><label className={labelCls}>Modèle</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { key: 'standard', label: 'Standard', color: '#9c27b0' },
-                        { key: 'mariage', label: 'Mariage', color: '#c8956c' },
-                        { key: 'business', label: 'Business', color: '#1e293b' },
+                        { key: 'standard', label: 'Standard', color: '#9c27b0', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
+                        { key: 'mariage', label: 'Mariage', color: '#c8956c', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
+                        { key: 'business', label: 'Business', color: '#1e293b', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
                       ].map((t) => (
                         <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business')}
                           className={cn('py-2 px-3 rounded-lg text-xs font-semibold border transition-all',
@@ -391,7 +407,73 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       ))}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400 italic">Les autres options de style (couleurs, police, taille) sont disponibles directement dans la barre d&apos;outils du WeboWord.</p>
+
+                  {/* Carte gastronomique width */}
+                  {onMenuWidthChange && (
+                    <div className="border-t border-gray-100 pt-3">
+                      <label className={labelCls}>Largeur carte gastronomique</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {MENU_WIDTHS.map((w) => (
+                          <button key={w.value} onClick={() => onMenuWidthChange(w.value)}
+                            className={cn('py-1.5 px-2 text-xs font-medium rounded-lg border transition-all',
+                              menuWidth === w.value ? 'bg-[#9c27b0] text-white border-[#9c27b0]' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
+                            {w.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live preview */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <label className={labelCls}>Aperçu</label>
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                      {(() => {
+                        const tpl = { standard: { color: '#9c27b0', bg: '#faf5ff', border: '#e9d5ff', font: 'Georgia,serif', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
+                                      mariage:  { color: '#c8956c', bg: '#fffdf7', border: '#f5e6d3', font: '"Playfair Display",serif', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
+                                      business: { color: '#1e293b', bg: '#f8fafc', border: '#e2e8f0', font: 'Montserrat,sans-serif', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' } }[template];
+                        return (
+                          <div style={{ fontFamily: tpl.font, fontSize: 9 }}>
+                            {/* Mini header */}
+                            <div style={{ background: tpl.gradient, padding: '12px 10px', borderRadius: 4, marginBottom: 8 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'white', fontWeight: 700, fontSize: 10 }}>VOTRE ENTREPRISE</span>
+                                <span style={{ color: 'white', border: '1px solid rgba(255,255,255,0.5)', padding: '2px 8px', fontSize: 8, borderRadius: 2, letterSpacing: 1 }}>DEVIS</span>
+                              </div>
+                            </div>
+                            {/* Mini info blocks */}
+                            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                              <div style={{ flex: 1, background: tpl.bg, border: `1px solid ${tpl.border}`, padding: 4, borderRadius: 3 }}>
+                                <p style={{ fontSize: 6, color: tpl.color, fontWeight: 700, margin: 0, letterSpacing: 1 }}>CLIENT</p>
+                                <p style={{ fontSize: 8, fontWeight: 700, margin: 0, color: '#1a1a1a' }}>Nom Client</p>
+                              </div>
+                              <div style={{ flex: 1, background: tpl.bg, border: `1px solid ${tpl.border}`, padding: 4, borderRadius: 3 }}>
+                                <p style={{ fontSize: 6, color: tpl.color, fontWeight: 700, margin: 0, letterSpacing: 1 }}>ÉVÉNEMENT</p>
+                                <p style={{ fontSize: 8, fontWeight: 700, margin: 0, color: '#1a1a1a' }}>Mariage</p>
+                              </div>
+                            </div>
+                            {/* Mini table header */}
+                            <div style={{ background: tpl.gradient, padding: '4px 6px', color: 'white', fontWeight: 700, fontSize: 8, borderRadius: 3, display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Désignation</span><span>Total HT</span>
+                            </div>
+                            {/* Mini table rows */}
+                            <div style={{ padding: '4px 6px', fontSize: 8, borderBottom: `1px solid ${tpl.border}`, display: 'flex', justifyContent: 'space-between', color: '#1a1a1a' }}>
+                              <span style={{ fontWeight: 700 }}>Cocktail</span><span>800 €</span>
+                            </div>
+                            <div style={{ padding: '4px 6px', fontSize: 8, display: 'flex', justifyContent: 'space-between', color: '#1a1a1a' }}>
+                              <span style={{ fontWeight: 700 }}>Repas</span><span>1 200 €</span>
+                            </div>
+                            {/* Mini total */}
+                            <div style={{ background: tpl.bg, border: `1px solid ${tpl.border}`, padding: 6, borderRadius: 3, marginTop: 6, textAlign: 'right' }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: tpl.color }}>Total TTC: 2 400 €</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-gray-400 italic">Les couleurs, polices, taille de texte et autres styles sont disponibles dans la barre d&apos;outils en haut du WeboWord.</p>
                 </>
               )}
 

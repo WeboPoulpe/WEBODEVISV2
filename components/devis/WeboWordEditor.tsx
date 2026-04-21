@@ -174,6 +174,22 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const interval = setInterval(update, 300);
     return () => { window.removeEventListener('popstate', update); clearInterval(interval); };
   }, []);
+
+  // Listen for action events from sidebar (Save / Print / PDF buttons)
+  useEffect(() => {
+    const onSaveEvt = () => handleSave();
+    const onPrintEvt = () => handlePrint();
+    const onSavePdfEvt = () => handleSavePdf();
+    window.addEventListener('weboword:save', onSaveEvt);
+    window.addEventListener('weboword:print', onPrintEvt);
+    window.addEventListener('weboword:savepdf', onSavePdfEvt);
+    return () => {
+      window.removeEventListener('weboword:save', onSaveEvt);
+      window.removeEventListener('weboword:print', onPrintEvt);
+      window.removeEventListener('weboword:savepdf', onSavePdfEvt);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [font, fontSize]);
   const [adminFields, setAdminFields] = useState({ clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', eventType: '', eventDate: '', eventLocation: '', guestCount: '' });
   const [adminChanges, setAdminChanges] = useState<{ field: string; from: string; to: string }[]>([]);
   const [showChanges, setShowChanges] = useState(false);
@@ -586,7 +602,6 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const html = editorRef.current?.innerHTML ?? '';
     setSaving(true); setError(null);
     const supabase = createClient();
-    // Try saving with font size; if column doesn't exist yet, retry without it
     let { error: err } = await supabase
       .from('quotes')
       .update({ content_html: html, selected_font: font, selected_font_size: fontSize })
@@ -600,7 +615,48 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
     setSaving(false);
     if (err) { setError(err.message); return; }
-    setToast('Devis enregistré avec succès');
+    setToast('Devis enregistré avec succès 🎉');
+    // 🎊 Confetti explosion!
+    triggerConfetti();
+  };
+
+  // ── Confetti explosion ────────────────────────────────────────────────────
+  const triggerConfetti = () => {
+    const colors = ['#9c27b0', '#FF2400', '#FFD700', '#1565c0', '#2e7d32', '#FF6B6B', '#4ECDC4', '#FFE66D'];
+    const count = 80;
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
+    document.body.appendChild(container);
+
+    for (let i = 0; i < count; i++) {
+      const confetti = document.createElement('div');
+      const size = Math.random() * 8 + 6;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const shape = Math.random() > 0.5 ? '50%' : '0';
+      const startX = 50 + (Math.random() - 0.5) * 30; // Center spread
+      const angle = (Math.random() - 0.5) * Math.PI; // -90° to +90°
+      const velocity = 200 + Math.random() * 400;
+      const tx = Math.cos(angle - Math.PI / 2) * velocity;
+      const ty = Math.sin(angle - Math.PI / 2) * velocity - 200;
+
+      confetti.style.cssText = `
+        position:absolute;left:${startX}%;top:60%;
+        width:${size}px;height:${size}px;background:${color};
+        border-radius:${shape};
+        transform:translate(-50%,-50%) rotate(${Math.random() * 360}deg);
+        animation:confetti-fly 1.8s cubic-bezier(.2,.6,.4,1) forwards;
+        --tx:${tx}px;--ty:${ty}px;--rot:${Math.random() * 720 - 360}deg;
+      `;
+      container.appendChild(confetti);
+    }
+    // Add keyframes if not present
+    if (!document.getElementById('confetti-style')) {
+      const style = document.createElement('style');
+      style.id = 'confetti-style';
+      style.textContent = `@keyframes confetti-fly { 0%{opacity:1;transform:translate(-50%,-50%) rotate(0deg);} 100%{opacity:0;transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty) + 600px)) rotate(var(--rot));} }`;
+      document.head.appendChild(style);
+    }
+    setTimeout(() => container.remove(), 2000);
   };
 
   // ── Build print HTML (shared by print + PDF) ──────────────────────────────────
@@ -868,67 +924,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm print:hidden">
 
-        {/* Top bar: breadcrumb + save/print */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
-          <div className="flex items-center gap-2 min-w-0">
-            {onBack ? (
-              <button
-                onClick={onBack}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-            ) : (
-              <button
-                onClick={() => router.push('/devis')}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Retour à la liste"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-            )}
-            <div className="flex items-center gap-1.5">
-              <LayoutTemplate className="h-4 w-4 text-[#9c27b0]" />
-              <span className="text-sm font-semibold text-gray-800">WeboWord</span>
-              {clientName && (
-                <span className="text-sm text-gray-400">— {clientName}</span>
-              )}
-            </div>
+        {/* Error display (only when there's an error) */}
+        {error && (
+          <div className="px-4 py-1.5 bg-red-50 border-b border-red-100 text-xs text-red-700">
+            {error}
           </div>
-
-          <div className="flex items-center gap-2">
-            {error && (
-              <span className="text-xs text-red-600 max-w-[200px] truncate">{error}</span>
-            )}
-
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Ouvrir le PDF dans une fenêtre d'impression"
-            >
-              <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Imprimer</span>
-            </button>
-            <button
-              onClick={handleSavePdf}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#9c27b0] border border-[#9c27b0]/40 rounded-lg hover:bg-purple-50 transition-colors"
-              title="Télécharger directement en PDF"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Enregistrer PDF</span>
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
-            >
-              {saving
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <Save className="h-4 w-4" />}
-              Enregistrer
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Formatting bar */}
         <div className="flex items-center gap-0.5 px-4 py-1.5 flex-wrap">
@@ -1078,7 +1079,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               <span className="text-gray-400">▾</span>
             </button>
             {showFontMenu && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl min-w-[170px] py-1">
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl min-w-[180px] max-h-72 overflow-y-auto py-1">
                 {FONTS.map((f) => (
                   <button
                     key={f.value}
@@ -1128,27 +1129,6 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             </select>
           </div>
 
-          <Sep />
-
-          {/* Gastro menu width */}
-          <div className="flex items-center gap-1" title="Largeur de la carte gastronomique">
-            <span className="text-[10px] text-gray-400 mr-0.5 hidden sm:inline">Carte :</span>
-            {MENU_WIDTHS.map((w) => (
-              <button
-                key={w.value}
-                onMouseDown={(e) => { e.preventDefault(); applyMenuWidth(w.value); }}
-                title={`Largeur carte gastronomique : ${w.label}`}
-                className={cn(
-                  'px-2 py-1 text-xs rounded-lg transition-colors border',
-                  menuWidth === w.value
-                    ? 'bg-[#9c27b0] text-white border-[#9c27b0]'
-                    : 'border-gray-200 text-gray-500 hover:bg-gray-100',
-                )}
-              >
-                {w.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -1209,6 +1189,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       <WeboWordSidePanels
         quoteId={quoteId}
         activePanel={activePanel}
+        menuWidth={menuWidth}
+        onMenuWidthChange={(w) => applyMenuWidth(w)}
         onClose={() => {
           setActivePanel(null);
           // Remove panel query param
