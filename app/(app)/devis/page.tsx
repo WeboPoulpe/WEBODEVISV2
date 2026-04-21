@@ -464,6 +464,9 @@ export default function DevisPage() {
   const [templates, setTemplates] = useState<{ id: string; name: string; template: string; created_at: string; services: any[]; remarks: string | null; vat_rate: number; hide_price: boolean }[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [creatingFromTpl, setCreatingFromTpl] = useState<string | null>(null);
+  const [previewTpl, setPreviewTpl] = useState<{ id: string; name: string; template: string; content_html: string | null } | null>(null);
+  const [renamingTpl, setRenamingTpl] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -526,6 +529,19 @@ export default function DevisPage() {
     if (!confirm('Supprimer ce modèle ?')) return;
     await createClient().from('devis_templates').delete().eq('id', id);
     setTemplates((prev) => prev.filter((t) => t.id !== id));
+    setPreviewTpl(null);
+  }, []);
+
+  const openPreview = useCallback(async (tplId: string) => {
+    const { data } = await createClient().from('devis_templates').select('id, name, template, content_html').eq('id', tplId).single();
+    if (data) setPreviewTpl(data);
+  }, []);
+
+  const renameTemplate = useCallback(async (id: string, newName: string) => {
+    if (!newName.trim()) { setRenamingTpl(null); return; }
+    await createClient().from('devis_templates').update({ name: newName.trim() }).eq('id', id);
+    setTemplates((prev) => prev.map((t) => t.id === id ? { ...t, name: newName.trim() } : t));
+    setRenamingTpl(null);
   }, []);
 
   const handleStatusChange = useCallback((id: string, status: string) => {
@@ -668,18 +684,38 @@ export default function DevisPage() {
                 const templateLabel = tpl.template === 'mariage' ? 'Mariage' : tpl.template === 'business' ? 'Business' : 'Standard';
                 const templateColor = tpl.template === 'mariage' ? 'text-amber-700 bg-amber-50' : tpl.template === 'business' ? 'text-slate-700 bg-slate-100' : 'text-[#9c27b0] bg-[#f3e5f5]';
                 return (
-                  <div key={tpl.id} className="group bg-gradient-to-br from-[#faf5ff] to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-[#9c27b0]/40 transition-all">
+                  <div key={tpl.id} className="group bg-gradient-to-br from-[#faf5ff] to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-[#9c27b0]/40 transition-all cursor-pointer" onClick={() => renamingTpl !== tpl.id && openPreview(tpl.id)}>
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-gray-900 truncate">{tpl.name}</p>
+                        {renamingTpl === tpl.id ? (
+                          <input
+                            autoFocus
+                            value={renameName}
+                            onChange={(e) => setRenameName(e.target.value)}
+                            onBlur={() => renameTemplate(tpl.id, renameName)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') renameTemplate(tpl.id, renameName);
+                              if (e.key === 'Escape') setRenamingTpl(null);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm font-bold text-gray-900 w-full border border-[#9c27b0] rounded px-2 py-0.5 focus:outline-none"
+                          />
+                        ) : (
+                          <p className="text-sm font-bold text-gray-900 truncate">{tpl.name}</p>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${templateColor}`}>{templateLabel}</span>
                           <span className="text-[10px] text-gray-400">{svcCount} prestation{svcCount > 1 ? 's' : ''}</span>
                         </div>
                       </div>
-                      <button onClick={() => deleteTemplate(tpl.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={(e) => { e.stopPropagation(); setRenamingTpl(tpl.id); setRenameName(tpl.name); }} title="Renommer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                     {/* Preview of services */}
                     {svcNames.length > 0 && (
@@ -699,7 +735,7 @@ export default function DevisPage() {
                         <p className="text-xs font-bold text-gray-700 tabular-nums">{formatCurrency(totalHt)} <span className="text-[10px] font-normal text-gray-400">HT</span></p>
                       ) : <span />}
                       <button
-                        onClick={() => createFromTemplate(tpl.id)}
+                        onClick={(e) => { e.stopPropagation(); createFromTemplate(tpl.id); }}
                         disabled={creatingFromTpl === tpl.id}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors disabled:opacity-50"
                       >
@@ -768,6 +804,55 @@ export default function DevisPage() {
       )}
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}
+      {/* ── Template preview sheet ─────────────────────────────────────── */}
+      {previewTpl && (
+        <div className="fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPreviewTpl(null)} />
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 bg-[#f3e5f5] rounded-xl flex-shrink-0">
+                  <Library className="h-4 w-4 text-[#9c27b0]" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-gray-900 text-sm truncate">{previewTpl.name}</h2>
+                  <p className="text-[10px] text-gray-400 capitalize">{previewTpl.template}</p>
+                </div>
+              </div>
+              <button onClick={() => setPreviewTpl(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+              {previewTpl.content_html ? (
+                <div
+                  className="bg-white shadow-sm rounded-xl p-6 min-h-full"
+                  dangerouslySetInnerHTML={{ __html: previewTpl.content_html }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">
+                  Pas d&apos;aperçu disponible
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between gap-2 px-6 py-4 border-t border-gray-100">
+              <Link href={`/devis/templates/${previewTpl.id}/edit`}
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <Pencil className="h-4 w-4" />
+                Modifier
+              </Link>
+              <button
+                onClick={() => { createFromTemplate(previewTpl.id); setPreviewTpl(null); }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Créer un devis
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {dupModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !dupModal.saving && setDupModal({ open: false, quoteId: null, saving: false, templateName: '' })} />

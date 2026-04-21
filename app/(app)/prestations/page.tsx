@@ -46,6 +46,16 @@ const CATEGORIES = [
   { key: 'logistique',   label: 'Logistique',  icon: Truck },
 ];
 
+// Sous-catégories par catégorie (catégorie → liste de sous-catégories)
+const SUB_CATEGORIES: Record<string, string[]> = {
+  cocktail:    ['Vin d\'honneur', 'Apéritif', 'Bouchées salées', 'Bouchées sucrées', 'Buffet', 'Autre'],
+  dîner:       ['Entrée', 'Plat principal', 'Accompagnement', 'Fromage', 'Dessert', 'Menu complet', 'Autre'],
+  boissons:    ['Alcoolisées', 'Sans alcool', 'Vins', 'Champagne', 'Café & thé', 'Autre'],
+  matériel:    ['Vaisselle', 'Mobilier', 'Nappage', 'Décoration', 'Cuisine', 'Autre'],
+  personnel:   ['Serveur', 'Chef à domicile', 'Maître d\'hôtel', 'Plongeur', 'Barman', 'Autre'],
+  logistique:  ['Transport', 'Livraison', 'Installation', 'Déménagement', 'Autre'],
+};
+
 // Mapping catégories CSV → clés internes
 const CSV_CAT_MAP: Record<string, string> = {
   'Personnel':   'personnel',
@@ -387,6 +397,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [price, setPrice] = useState(String(initial?.unit_price ?? ''));
   const [category, setCategory] = useState(initial?.category ?? '');
+  const [subCategory, setSubCategory] = useState(initial?.sub_category ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [isOption, setIsOption] = useState(initial?.is_option ?? false);
   const [loading, setLoading] = useState(false);
@@ -454,6 +465,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
       name: name.trim(),
       unit_price: parseFloat(price) || 0,
       category: category.trim() || null,
+      sub_category: subCategory.trim() || null,
       description: description.trim() || null,
       is_option: isOption,
       user_id: user.id,
@@ -500,7 +512,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               label="Nom *" value={name} onChange={setName}
               ref={inputRef} placeholder="Plateau cocktail dînatoire"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Field
                 label="Prix unitaire HT *" value={price} onChange={setPrice}
                 type="number" placeholder="85.00"
@@ -509,12 +521,26 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Catégorie</label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => { setCategory(e.target.value); setSubCategory(''); }}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
                 >
                   <option value="">— Aucune —</option>
                   {CATEGORIES.filter(c => c.key !== 'all').map(c => (
                     <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Sous-catégorie</label>
+                <select
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                  disabled={!category || !SUB_CATEGORIES[category]}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">— Aucune —</option>
+                  {category && SUB_CATEGORIES[category]?.map((sc) => (
+                    <option key={sc} value={sc}>{sc}</option>
                   ))}
                 </select>
               </div>
@@ -641,15 +667,18 @@ function PrestationCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-        {p.category ? (
-          <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${colors.bg} ${colors.text}`}>
-            {p.category}
-          </span>
-        ) : (
-          <span />
-        )}
-        <p className="font-bold text-gray-900 tabular-nums">
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {p.category && (
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize flex-shrink-0 ${colors.bg} ${colors.text}`}>
+              {p.category}
+            </span>
+          )}
+          {p.sub_category && (
+            <span className="text-[10px] text-gray-500 truncate italic">{p.sub_category}</span>
+          )}
+        </div>
+        <p className="font-bold text-gray-900 tabular-nums flex-shrink-0">
           {formatCurrency(p.unit_price)}
           <span className="text-xs font-normal text-gray-400 ml-1">HT</span>
         </p>
