@@ -13,6 +13,7 @@ interface Prestation {
   category: string | null;
   description: string | null;
   is_option: boolean;
+  gastro_card_html?: string | null;
 }
 
 interface Props {
@@ -52,7 +53,7 @@ function PrestationSearch({
       const supabase = createClient();
       const { data } = await supabase
         .from('prestations')
-        .select('id, name, unit_price, category, description, is_option')
+        .select('id, name, unit_price, category, description, is_option, gastro_card_html')
         .ilike('name', `%${q}%`)
         .limit(8);
       if (data && data.length > 0) { setResults(data); setOpen(true); }
@@ -157,6 +158,7 @@ function ServiceRow({
     onUpdate('unitPrice', p.unit_price);
     onUpdate('category', p.category ?? '');
     onUpdate('description', p.description ? stripHtml(p.description) : '');
+    if (p.gastro_card_html) onUpdate('gastroCardHtml', p.gastro_card_html);
     if (p.is_option) { onUpdate('isOption', true); onUpdate('isFree', false); }
     if (p.description || p.is_option) setShowDesc(true);
   };

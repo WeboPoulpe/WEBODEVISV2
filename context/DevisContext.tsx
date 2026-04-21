@@ -20,6 +20,8 @@ export interface ServiceLine {
   isFree?: boolean;
   /** true = prestation en option (affichée avec badge "Option") */
   isOption?: boolean;
+  /** HTML pré-stylé de la carte gastronomique (depuis prestations.gastro_card_html) */
+  gastroCardHtml?: string | null;
 }
 
 export type QuoteTemplate = 'standard' | 'mariage' | 'business';

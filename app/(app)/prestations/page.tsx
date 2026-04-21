@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Plus, Wine, UtensilsCrossed, Coffee, Wrench, Users, Package,
-  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot,
+  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -396,6 +396,8 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
   const { user } = useAuth();
   const [name, setName] = useState(initial?.name ?? '');
   const [price, setPrice] = useState(String(initial?.unit_price ?? ''));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [costPrice, setCostPrice] = useState(String((initial as any)?.cost_price ?? ''));
   const [category, setCategory] = useState(initial?.category ?? '');
   const [subCategory, setSubCategory] = useState(initial?.sub_category ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -455,6 +457,32 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
     }
   };
 
+  const handleSaveAndWebo = async () => {
+    if (!name.trim() || !price) { setError('Nom et prix requis.'); return; }
+    if (!user) return;
+    setLoading(true); setError(null);
+    const supabase = createClient();
+    const payload = {
+      name: name.trim(),
+      unit_price: parseFloat(price) || 0,
+      cost_price: parseFloat(costPrice) || 0,
+      category: category.trim() || null,
+      sub_category: subCategory.trim() || null,
+      is_option: isOption,
+      user_id: user.id,
+    };
+    let prestationId = initial?.id;
+    if (initial) {
+      await supabase.from('prestations').update(payload).eq('id', initial.id);
+    } else {
+      const { data, error: err } = await supabase.from('prestations').insert([payload]).select().single();
+      if (err) { setLoading(false); setError(err.message); return; }
+      prestationId = data.id;
+    }
+    setLoading(false);
+    window.location.href = `/prestations/${prestationId}/edit-webo`;
+  };
+
   const handleSave = async () => {
     if (!name.trim() || !price) { setError('Nom et prix requis.'); return; }
     if (!user) return;
@@ -464,6 +492,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
     const payload = {
       name: name.trim(),
       unit_price: parseFloat(price) || 0,
+      cost_price: parseFloat(costPrice) || 0,
       category: category.trim() || null,
       sub_category: subCategory.trim() || null,
       description: description.trim() || null,
@@ -512,11 +541,17 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               label="Nom *" value={name} onChange={setName}
               ref={inputRef} placeholder="Plateau cocktail dînatoire"
             />
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Field
                 label="Prix unitaire HT *" value={price} onChange={setPrice}
                 type="number" placeholder="85.00"
               />
+              <Field
+                label="Prix de revient" value={costPrice} onChange={setCostPrice}
+                type="number" placeholder="50.00"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Catégorie</label>
                 <select
@@ -599,21 +634,32 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               </p>
             )}
 
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="flex justify-between gap-2 pt-1">
               <button
                 onClick={onClose}
                 className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Annuler
               </button>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                {initial ? 'Enregistrer' : 'Ajouter au catalogue'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveAndWebo}
+                  disabled={loading || !name.trim() || !price}
+                  title="Enregistrer et styler dans WeboWord"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#9c27b0] border border-[#9c27b0]/40 rounded-lg hover:bg-[#9c27b0]/5 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
+                  Styler dans WeboWord
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {initial ? 'Enregistrer' : 'Ajouter'}
+                </button>
+              </div>
             </div>
           </div>
 

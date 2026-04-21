@@ -28,6 +28,7 @@ export interface QuoteHtmlData {
     isFree?: boolean;
     isOption?: boolean;
     removed?: boolean;
+    gastroCardHtml?: string | null;
   }>;
   vatRate: number;
   remarks?: string | null;
@@ -125,10 +126,14 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     </tr>`;
   }).join('');
 
-  // ── Menu items Page 2 — descriptions always shown regardless of hideDescOnPdf ──
+  // ── Menu items Page 2 — use gastroCardHtml if available, otherwise fallback ──
   const menuItems = d.services
     .filter((s) => s.name)
     .map((s) => {
+      // If prestation has a custom gastro_card_html, use it as-is (wrapped in container)
+      if (s.gastroCardHtml) {
+        return `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${s.gastroCardHtml}</div>`;
+      }
       const optBadge = s.isOption
         ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">OPTION</span>'
         : '';
