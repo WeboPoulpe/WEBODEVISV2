@@ -32,6 +32,7 @@ export default async function PrestationEditWebo({
       category={prestation.category}
       subCategory={prestation.sub_category}
       initialHtml={prestation.gastro_card_html ?? ''}
+      initialHtmlEn={prestation.gastro_card_html_en ?? ''}
       description={prestation.description ?? ''}
     />
   );

@@ -17,20 +17,63 @@ interface Props {
   category: string | null;
   subCategory: string | null;
   initialHtml: string;
+  initialHtmlEn?: string;
   description: string;
 }
 
 const FONTS = [
-  { label: 'Georgia', value: 'Georgia' },
-  { label: 'Playfair', value: 'Playfair Display', google: true },
+  // System fonts
+  { label: 'Georgia (défaut)', value: 'Georgia', google: false },
+  { label: 'Times New Roman', value: 'Times New Roman', google: false },
+  { label: 'Arial', value: 'Arial', google: false },
+  { label: 'Helvetica', value: 'Helvetica', google: false },
+  { label: 'Verdana', value: 'Verdana', google: false },
+  { label: 'Courier New', value: 'Courier New', google: false },
+  { label: 'Trebuchet MS', value: 'Trebuchet MS', google: false },
+  { label: 'Garamond', value: 'Garamond', google: false },
+  // Google Fonts — Serif
+  { label: 'Playfair Display', value: 'Playfair Display', google: true },
+  { label: 'Merriweather', value: 'Merriweather', google: true },
+  { label: 'Lora', value: 'Lora', google: true },
+  { label: 'Cormorant Garamond', value: 'Cormorant Garamond', google: true },
+  { label: 'EB Garamond', value: 'EB Garamond', google: true },
+  { label: 'Crimson Text', value: 'Crimson Text', google: true },
+  { label: 'Libre Baskerville', value: 'Libre Baskerville', google: true },
+  { label: 'Spectral', value: 'Spectral', google: true },
+  // Google Fonts — Sans-serif
   { label: 'Montserrat', value: 'Montserrat', google: true },
   { label: 'Roboto', value: 'Roboto', google: true },
+  { label: 'Open Sans', value: 'Open Sans', google: true },
+  { label: 'Lato', value: 'Lato', google: true },
+  { label: 'Poppins', value: 'Poppins', google: true },
+  { label: 'Inter', value: 'Inter', google: true },
+  { label: 'Raleway', value: 'Raleway', google: true },
+  { label: 'Nunito', value: 'Nunito', google: true },
+  { label: 'Source Sans 3', value: 'Source Sans 3', google: true },
+  { label: 'Work Sans', value: 'Work Sans', google: true },
+  // Display & Script
+  { label: 'Dancing Script', value: 'Dancing Script', google: true },
+  { label: 'Great Vibes', value: 'Great Vibes', google: true },
+  { label: 'Pinyon Script', value: 'Pinyon Script', google: true },
+  { label: 'Cinzel', value: 'Cinzel', google: true },
+  { label: 'Abril Fatface', value: 'Abril Fatface', google: true },
+  { label: 'Bebas Neue', value: 'Bebas Neue', google: true },
+  { label: 'Oswald', value: 'Oswald', google: true },
 ];
 
-const COLORS = ['#1a1a1a', '#9c27b0', '#c8956c', '#1565c0', '#2e7d32', '#c62828', '#FF2400', '#e65100'];
+const COLORS = [
+  '#1a1a1a', '#666666', '#999999', '#ffffff',
+  '#9c27b0', '#7b1fa2', '#6a1080', '#ab47bc',
+  '#c8956c', '#8b5a2b', '#e2b99a', '#daa520',
+  '#1565c0', '#0d47a1', '#3f51b5', '#1e88e5',
+  '#2e7d32', '#1b5e20', '#388e3c', '#43a047',
+  '#c62828', '#b71c1c', '#FF2400', '#e65100',
+  '#f9a825', '#ffd700', '#ff6b6b', '#d4a5a5',
+  '#1e293b', '#334155', '#475569', '#64748b',
+];
 
 export default function PrestationWeboEditor({
-  prestationId, name, unitPrice, category, subCategory, initialHtml, description,
+  prestationId, name, unitPrice, category, subCategory, initialHtml, initialHtmlEn, description,
 }: Props) {
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -40,20 +83,42 @@ export default function PrestationWeboEditor({
   const [saved, setSaved] = useState(false);
   const [font, setFont] = useState('Georgia');
   const [fontSize, setFontSize] = useState(12);
+  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
 
-  // Default template for the gastro card
-  const defaultHtml = `<div class="gastro-card" style="text-align:center;margin:0 auto;max-width:600px;padding:20px;">
+  // In-memory storage for both versions (avoid losing edits when switching tabs)
+  const htmlFrRef = useRef(initialHtml || '');
+  const htmlEnRef = useRef(initialHtmlEn || '');
+
+  // Default templates for the gastro card
+  const defaultHtmlFr = `<div class="gastro-card" style="text-align:center;margin:0 auto;max-width:600px;padding:20px;">
   <h3 class="presta-title" style="font-size:16px;font-weight:bold;color:#9c27b0;margin:0 0 8px;letter-spacing:0.3px;">${name}</h3>
   <p class="presta-desc" style="font-size:12px;color:#555;font-style:italic;line-height:1.6;margin:0;">${description || 'Saisissez la description de votre prestation ici…'}</p>
 </div>`;
 
+  const defaultHtmlEn = `<div class="gastro-card" style="text-align:center;margin:0 auto;max-width:600px;padding:20px;">
+  <h3 class="presta-title" style="font-size:16px;font-weight:bold;color:#9c27b0;margin:0 0 8px;letter-spacing:0.3px;">${name}</h3>
+  <p class="presta-desc" style="font-size:12px;color:#555;font-style:italic;line-height:1.6;margin:0;">Type the English description here…</p>
+</div>`;
+
   useEffect(() => {
     if (!initDone.current && editorRef.current) {
-      editorRef.current.innerHTML = initialHtml || defaultHtml;
+      editorRef.current.innerHTML = initialHtml || defaultHtmlFr;
       initDone.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialHtml]);
+
+  // Switch between FR and EN versions
+  const switchLanguage = (lang: 'fr' | 'en') => {
+    if (!editorRef.current) return;
+    // Save current content to the corresponding ref
+    if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
+    else htmlEnRef.current = editorRef.current.innerHTML;
+    // Load the other version
+    if (lang === 'fr') editorRef.current.innerHTML = htmlFrRef.current || defaultHtmlFr;
+    else editorRef.current.innerHTML = htmlEnRef.current || defaultHtmlEn;
+    setLanguage(lang);
+  };
 
   // Load Google Font
   useEffect(() => {
@@ -112,11 +177,23 @@ export default function PrestationWeboEditor({
   const handleSave = async () => {
     if (!editorRef.current) return;
     setSaving(true);
-    const html = editorRef.current.innerHTML;
+    // Update the in-memory ref for the active language
+    if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
+    else htmlEnRef.current = editorRef.current.innerHTML;
+
     const supabase = createClient();
-    const { error } = await supabase.from('prestations')
-      .update({ gastro_card_html: html })
+    // Try to save both fields; if gastro_card_html_en doesn't exist, retry without it
+    let { error } = await supabase.from('prestations')
+      .update({ gastro_card_html: htmlFrRef.current, gastro_card_html_en: htmlEnRef.current })
       .eq('id', prestationId);
+    if (error?.code === '42703' || error?.message?.includes('gastro_card_html_en')) {
+      // Fallback without English column
+      const res = await supabase.from('prestations')
+        .update({ gastro_card_html: htmlFrRef.current })
+        .eq('id', prestationId);
+      error = res.error;
+      if (!error) alert('⚠️ Version anglaise non sauvegardée — exécutez le SQL:\nALTER TABLE prestations ADD COLUMN gastro_card_html_en TEXT;');
+    }
     setSaving(false);
     if (!error) {
       setSaved(true);
@@ -128,15 +205,38 @@ export default function PrestationWeboEditor({
 
   return (
     <div className="flex flex-col h-full bg-slate-100">
-      {/* Top bar (minimal: just the title line) */}
+      {/* Top bar (minimal: title + language tabs + status) */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100">
           <span className="text-sm font-semibold text-gray-800 truncate">{name}</span>
           <span className="text-xs text-gray-400">· {unitPrice}€ HT</span>
           {category && <span className="text-xs text-[#9c27b0] bg-[#f3e5f5] px-2 py-0.5 rounded-full capitalize">{category}</span>}
           {subCategory && <span className="text-xs text-gray-500 italic">{subCategory}</span>}
-          {saved && <span className="ml-auto text-xs text-emerald-600 font-semibold flex items-center gap-1"><Check className="h-3 w-3" /> Enregistré</span>}
-          {saving && <span className="ml-auto text-xs text-gray-400 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Enregistrement…</span>}
+
+          {/* Language tabs */}
+          <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => switchLanguage('fr')}
+              className={cn(
+                'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
+                language === 'fr' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              🇫🇷 Français
+            </button>
+            <button
+              onClick={() => switchLanguage('en')}
+              className={cn(
+                'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
+                language === 'en' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              🇬🇧 English
+            </button>
+          </div>
+
+          {saved && <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1"><Check className="h-3 w-3" /> Enregistré</span>}
+          {saving && <span className="text-xs text-gray-400 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Enregistrement…</span>}
         </div>
 
         {/* Formatting bar */}
