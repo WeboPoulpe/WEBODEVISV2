@@ -164,6 +164,13 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const cFirst = clientParts[0] || '';
     const cLast = clientParts.slice(1).join(' ') || '';
 
+    // Compute total_amount (TTC) from services
+    const ht = services.reduce((sum, s) => {
+      if (s.removed || s.isFree || s.isPageBreak) return sum;
+      return sum + (s.quantity || 0) * (s.unitPrice || 0);
+    }, 0);
+    const totalTtc = ht * (1 + vatRate / 100);
+
     const { error } = await supabase.from('quotes').update({
       client_name: clientName.trim() || '',
       client_first_name: cFirst || null,
@@ -178,6 +185,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       remarks: remarks || null,
       vat_rate: vatRate,
       hide_price: hidePrice,
+      total_amount: totalTtc > 0 ? totalTtc : null,
       template,
       services,
       content_html: null, // Force regeneration

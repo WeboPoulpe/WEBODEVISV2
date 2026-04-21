@@ -39,6 +39,22 @@ interface Quote {
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function computeQuoteTotal(quote: { total_amount: number | null; services: QuoteService[] | null }): number | null {
+  // Calculate from services (excludes free + removed)
+  if (Array.isArray(quote.services) && quote.services.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const services = quote.services as any[];
+    const ht = services.reduce((sum, s) => {
+      if (s.removed || s.isFree || s.isPageBreak) return sum;
+      return sum + (s.quantity || 0) * (s.unitPrice || 0);
+    }, 0);
+    if (ht > 0) return ht * 1.2; // TTC = HT × 1.20 (default VAT)
+  }
+  // Fallback to total_amount in DB
+  return quote.total_amount;
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 const EVENT_ICONS: Record<string, React.ElementType> = {
   mariage: Heart, anniversaire: PartyPopper, dîner: UtensilsCrossed, diner: UtensilsCrossed,
@@ -163,12 +179,12 @@ function DevisSheet({
             </div>
           )}
 
-          {quote.total_amount && (
+          {(() => { const t = computeQuoteTotal(quote); return t ? (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <span className="text-sm text-gray-600">Total TTC</span>
-              <span className="text-lg font-bold text-gray-900">{formatCurrency(quote.total_amount)}</span>
+              <span className="text-lg font-bold text-gray-900">{formatCurrency(t)}</span>
             </div>
-          )}
+          ) : null; })()}
           {/* Gérer l'événement */}
           <Link
             href={`/evenements/${quote.id}`}
@@ -252,9 +268,9 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate }: { quote: Quote
       </div>
       <div className="pt-3 border-t border-gray-100 space-y-2.5">
         <div className="flex items-center justify-between">
-          {quote.total_amount ? (
-            <p className="font-bold text-gray-900 text-base">{formatCurrency(quote.total_amount)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
-          ) : <p className="text-sm text-gray-400 italic">—</p>}
+          {(() => { const t = computeQuoteTotal(quote); return t ? (
+            <p className="font-bold text-gray-900 text-base">{formatCurrency(t)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
+          ) : <p className="text-sm text-gray-400 italic">—</p>; })()}
           <StatusBadge status={quote.status} />
         </div>
         <div className="flex items-center gap-1">
@@ -317,7 +333,7 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
                   <StatusBadge status={q.status} />
                 </div>
               </td>
-              <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{q.total_amount ? formatCurrency(q.total_amount) : '—'}</td>
+              <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{(() => { const t = computeQuoteTotal(q); return t ? formatCurrency(t) : '—'; })()}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 justify-end">
                   <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
@@ -365,7 +381,7 @@ function PipelineView({
       {PIPELINE_ORDER.map((statusKey) => {
         const cfg = STATUS_CONFIG[statusKey];
         const col = quotes.filter((q) => q.status === statusKey);
-        const colTotal = col.reduce((s, q) => s + (q.total_amount ?? 0), 0);
+        const colTotal = col.reduce((s, q) => s + (computeQuoteTotal(q) ?? 0), 0);
         const isOver = draggingOver === statusKey;
 
         return (
@@ -410,7 +426,7 @@ function PipelineView({
                     </div>
                     {q.event_date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mb-1.5"><CalendarDays className="h-2.5 w-2.5" />{formatDate(q.event_date)}</p>}
                     <div className="flex items-center justify-between mt-1">
-                      {q.total_amount ? <p className="text-xs font-bold text-gray-900 tabular-nums">{formatCurrency(q.total_amount)}</p> : <span />}
+                      {(() => { const t = computeQuoteTotal(q); return t ? <p className="text-xs font-bold text-gray-900 tabular-nums">{formatCurrency(t)}</p> : <span />; })()}
                       <button onClick={() => onOpenSheet(q)} className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
                         <ArrowRight className="h-3 w-3" />
                       </button>
