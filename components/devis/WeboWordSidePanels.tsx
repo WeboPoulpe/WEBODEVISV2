@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   User, Package, Calendar, Palette, Image as ImageIcon,
   X, Search, Loader2, Check, Plus, Trash2, Wand2, ChevronLeft,
-  Save, Printer, Download,
+  Save, Printer, Download, GripVertical,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -68,6 +68,35 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [prestationResults, setPrestationResults] = useState<any[]>([]);
   const [showPrestationPicker, setShowPrestationPicker] = useState(false);
+
+  // Drag & drop reorder
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const onDragStart = (e: React.DragEvent, idx: number) => {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx));
+  };
+  const onDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIdx(idx);
+  };
+  const onDragLeave = () => setDragOverIdx(null);
+  const onDrop = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return; }
+    setServices((prev) => {
+      const arr = [...prev];
+      const [moved] = arr.splice(dragIdx, 1);
+      arr.splice(idx, 0, moved);
+      return arr;
+    });
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+  const onDragEnd = () => { setDragIdx(null); setDragOverIdx(null); };
 
   // ── Load data when panel opens ──
   useEffect(() => {
@@ -304,14 +333,33 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                     Ligne personnalisée
                   </button>
 
-                  {/* Services list */}
+                  {/* Services list — drag & drop reorder */}
                   <div className="space-y-2 border-t border-gray-100 pt-3">
                     {services.length === 0 ? (
                       <p className="text-xs text-gray-400 italic text-center py-4">Aucune prestation</p>
                     ) : (
-                      services.map((svc, idx) => (
-                        <div key={svc.id || idx} className={`border rounded-xl p-3 space-y-2 ${svc.removed ? 'bg-red-50/30 opacity-50' : 'bg-white'}`}>
-                          <div className="flex items-start gap-2">
+                      <>
+                        <p className="text-[10px] text-gray-400 italic">💡 Glissez les prestations pour réordonner</p>
+                        {services.map((svc, idx) => (
+                        <div
+                          key={svc.id || idx}
+                          draggable
+                          onDragStart={(e) => onDragStart(e, idx)}
+                          onDragOver={(e) => onDragOver(e, idx)}
+                          onDragLeave={onDragLeave}
+                          onDrop={(e) => onDrop(e, idx)}
+                          onDragEnd={onDragEnd}
+                          className={cn(
+                            'border rounded-xl p-3 space-y-2 transition-all',
+                            svc.removed ? 'bg-red-50/30 opacity-50' : 'bg-white',
+                            dragIdx === idx && 'opacity-30 scale-95',
+                            dragOverIdx === idx && dragIdx !== idx && 'border-[#9c27b0] border-2 shadow-lg scale-[1.02]',
+                          )}
+                        >
+                          <div className="flex items-start gap-1">
+                            <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#9c27b0] mt-1.5 flex-shrink-0" title="Glisser pour réordonner">
+                              <GripVertical className="h-4 w-4" />
+                            </div>
                             <input
                               value={svc.name}
                               onChange={(e) => setServices((prev) => prev.map((s, i) => i === idx ? { ...s, name: e.target.value } : s))}
@@ -356,7 +404,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                             </div>
                           </div>
                         </div>
-                      ))
+                        ))}
+                      </>
                     )}
                   </div>
                 </>
