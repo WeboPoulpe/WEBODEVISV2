@@ -490,6 +490,71 @@ function CreateDevisModal({
   );
 }
 
+// ── Save prospect as customer button ──────────────────────────────────────────
+function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [alreadyExists, setAlreadyExists] = useState(false);
+
+  useEffect(() => {
+    if (!prospect.email) return;
+    const supabase = createClient();
+    supabase.from('customers').select('id').eq('email', prospect.email.toLowerCase()).maybeSingle()
+      .then(({ data }) => { if (data) setAlreadyExists(true); });
+  }, [prospect.email]);
+
+  const save = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+    const { error } = await supabase.from('customers').insert({
+      user_id: user.id,
+      first_name: prospect.first_name || null,
+      last_name: prospect.last_name || null,
+      email: prospect.email.toLowerCase(),
+      phone: prospect.phone || null,
+      customer_type: 'particulier',
+    });
+    setLoading(false);
+    if (error) {
+      alert('Erreur: ' + error.message);
+    } else {
+      setSaved(true);
+      setAlreadyExists(true);
+    }
+  };
+
+  if (alreadyExists && !saved) {
+    return (
+      <div className="flex items-center justify-center gap-2 w-full py-2.5 text-emerald-600 bg-emerald-50 rounded-xl text-sm">
+        <Check className="h-4 w-4" />
+        Déjà dans vos clients
+      </div>
+    );
+  }
+
+  if (saved) {
+    return (
+      <div className="flex items-center justify-center gap-2 w-full py-2.5 text-emerald-600 bg-emerald-50 rounded-xl text-sm font-semibold">
+        <Check className="h-4 w-4" />
+        Ajouté aux clients !
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={save}
+      disabled={loading}
+      className="flex items-center justify-center gap-2 w-full py-2.5 border border-[#9c27b0]/30 text-[#9c27b0] text-sm font-semibold rounded-xl hover:bg-[#f3e5f5] transition-colors disabled:opacity-60"
+    >
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+      Enregistrer en client
+    </button>
+  );
+}
+
 // ── Prospect Drawer ────────────────────────────────────────────────────────────
 function ProspectDrawer({
   prospect,
@@ -660,6 +725,7 @@ function ProspectDrawer({
             Créer un devis
           </button>
         )}
+        <SaveAsCustomerButton prospect={prospect} />
         <button
           onClick={() => onDelete(prospect.id)}
           className="flex items-center justify-center gap-2 w-full py-2 text-red-500 text-sm hover:bg-red-50 rounded-xl transition-colors"

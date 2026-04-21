@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowRight, Loader2, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
-  Users, MapPin, Calendar, User, ArrowLeft, Sparkles,
+  Users, MapPin, Calendar, User, ArrowLeft, Sparkles, Search, Building2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -41,9 +41,49 @@ export default function NouveauDevisOnboarding() {
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientResults, setClientResults] = useState<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; customer_type: string }[]>([]);
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
 
   const canNext1 = !!eventType && !!eventDate && !!guestCount;
+
+  // Client search
+  const searchCustomers = useCallback(async (q: string) => {
+    setClientSearch(q);
+    if (!q.trim() || q.length < 2) { setClientResults([]); setShowCustomerPicker(false); return; }
+    const supabase = createClient();
+    const { data } = await supabase.from('customers')
+      .select('id, first_name, last_name, email, phone, company_name, customer_type')
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,company_name.ilike.%${q}%`)
+      .limit(8);
+    setClientResults(data || []);
+    setShowCustomerPicker(true);
+  }, []);
+
+  const selectCustomer = (c: typeof clientResults[number]) => {
+    const fullName = c.customer_type === 'entreprise' && c.company_name
+      ? c.company_name
+      : [c.first_name, c.last_name].filter(Boolean).join(' ');
+    setClientName(fullName);
+    setClientEmail(c.email || '');
+    setClientPhone(c.phone || '');
+    setSelectedCustomerId(c.id);
+    setShowCustomerPicker(false);
+    setClientSearch(fullName);
+  };
+
+  const resetClient = () => {
+    setClientName('');
+    setClientEmail('');
+    setClientPhone('');
+    setClientAddress('');
+    setSelectedCustomerId(null);
+    setClientSearch('');
+  };
   const canNext2 = !!clientName.trim();
   const canFinish = !!template;
 
@@ -55,9 +95,30 @@ export default function NouveauDevisOnboarding() {
     const cFirst = nameParts[0] || '';
     const cLast = nameParts.slice(1).join(' ') || '';
 
+    // If "new client" mode and email is provided, create the customer in DB
+    let customerId = selectedCustomerId;
+    if (mode === 'new' && clientName.trim() && clientEmail.trim()) {
+      const { data: existing } = await supabase.from('customers')
+        .select('id').eq('email', clientEmail.toLowerCase()).maybeSingle();
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const { data: newCustomer } = await supabase.from('customers').insert({
+          user_id: user.id,
+          first_name: cFirst,
+          last_name: cLast,
+          email: clientEmail.toLowerCase(),
+          phone: clientPhone || null,
+          customer_type: 'particulier',
+        }).select('id').single();
+        if (newCustomer) customerId = newCustomer.id;
+      }
+    }
+
     const { data, error } = await supabase.from('quotes').insert({
       user_id: user.id,
       owner_user_id: user.id,
+      customer_id: customerId,
       client_name: clientName.trim(),
       client_first_name: cFirst || null,
       client_last_name: cLast || null,
@@ -178,48 +239,134 @@ export default function NouveauDevisOnboarding() {
 
           {/* STEP 2 — Client */}
           {step === 2 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-200">
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Pour quel client ?</h2>
-                <p className="text-sm text-gray-500 mt-1">Les coordonnées de votre client. Vous pourrez en ajouter plus tard.</p>
+                <p className="text-sm text-gray-500 mt-1">Sélectionnez un client existant ou créez-en un nouveau.</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  <User className="h-3 w-3 inline mr-1" />
-                  Nom complet *
-                </label>
-                <input
-                  autoFocus
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Jean Dupont"
-                  className="w-full text-base border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
-                />
+              {/* Tabs: Existant vs Nouveau */}
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+                <button
+                  onClick={() => { setMode('existing'); resetClient(); }}
+                  className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
+                    mode === 'existing' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700')}
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Client existant
+                </button>
+                <button
+                  onClick={() => { setMode('new'); resetClient(); }}
+                  className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
+                    mode === 'new' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700')}
+                >
+                  <User className="h-3.5 w-3.5" />
+                  Nouveau client
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
-                  <input
-                    type="email"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    placeholder="jean@email.com"
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Téléphone</label>
-                  <input
-                    type="tel"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="06 12 34 56 78"
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
-                  />
-                </div>
-              </div>
+              {/* EXISTING CLIENT — Search */}
+              {mode === 'existing' && (
+                <>
+                  <div className="relative">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Rechercher un client
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        autoFocus
+                        value={clientSearch}
+                        onChange={(e) => searchCustomers(e.target.value)}
+                        placeholder="Nom, email, entreprise…"
+                        className="w-full text-sm border border-gray-200 rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      />
+                    </div>
+                    {showCustomerPicker && clientResults.length > 0 && (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                        {clientResults.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => selectCustomer(c)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#faf5ff] transition-colors text-left border-b border-gray-50 last:border-0"
+                          >
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center flex-shrink-0">
+                              {c.customer_type === 'entreprise'
+                                ? <Building2 className="h-4 w-4 text-white" />
+                                : <span className="text-sm font-bold text-white">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-gray-900 truncate">
+                                {c.customer_type === 'entreprise' && c.company_name
+                                  ? c.company_name
+                                  : [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email}
+                              </p>
+                              <p className="text-xs text-gray-400 truncate">{c.email}{c.phone ? ` · ${c.phone}` : ''}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showCustomerPicker && clientResults.length === 0 && clientSearch.length >= 2 && (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-4 text-center">
+                        <p className="text-xs text-gray-400">Aucun client trouvé.</p>
+                        <button onClick={() => { setMode('new'); setClientName(clientSearch); setClientSearch(''); setShowCustomerPicker(false); }}
+                          className="text-xs text-[#9c27b0] hover:underline mt-1 font-medium">
+                          Créer « {clientSearch} » comme nouveau client
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected client preview */}
+                  {selectedCustomerId && (
+                    <div className="bg-[#faf5ff] border border-[#9c27b0]/20 rounded-xl p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center flex-shrink-0">
+                          <User className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-gray-900 truncate">{clientName}</p>
+                          <p className="text-xs text-gray-500 truncate">{clientEmail}{clientPhone ? ` · ${clientPhone}` : ''}</p>
+                        </div>
+                        <button onClick={resetClient} className="text-xs text-gray-400 hover:text-red-500">Changer</button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* NEW CLIENT — Form */}
+              {mode === 'new' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      <User className="h-3 w-3 inline mr-1" />
+                      Nom complet *
+                    </label>
+                    <input
+                      autoFocus
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="Jean Dupont"
+                      className="w-full text-base border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
+                      <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="jean@email.com"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Téléphone</label>
+                      <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="06 12 34 56 78"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <p className="text-xs text-gray-400 italic">💡 Vous pourrez modifier ces infos et ajouter une adresse depuis le panneau Client du WeboWord.</p>
             </div>
