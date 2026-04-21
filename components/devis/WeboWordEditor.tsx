@@ -13,6 +13,9 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { useAuth } from '@/context/AuthContext';
+import WeboWordSidePanels, { SidePanelIcons } from './WeboWordSidePanels';
+
+type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Props {
@@ -122,6 +125,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
   const [lineHeight, setLineHeight] = useState('1.4');
   const [adminModal, setAdminModal] = useState(false);
+  const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [adminFields, setAdminFields] = useState({ clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', eventType: '', eventDate: '', eventLocation: '', guestCount: '' });
   const [adminChanges, setAdminChanges] = useState<{ field: string; from: string; to: string }[]>([]);
   const [showChanges, setShowChanges] = useState(false);
@@ -688,7 +692,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-100">
+    <div className="flex flex-col h-full bg-slate-100 pl-14">
 
       {/* CSS: font override + font size + description toggle + gastro menu width */}
       <style>{`
@@ -1171,26 +1175,19 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         <div className="h-12 print:hidden" />
       </div>
 
-      {/* ── Floating admin edit button ─────────────────────────────────────── */}
-      <div className="fixed bottom-6 right-6 flex flex-col items-end gap-2 z-40 print:hidden">
-        {adminChanges.length > 0 && (
-          <button
-            onClick={() => setShowChanges(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white text-xs font-semibold rounded-full shadow-lg hover:bg-amber-600 transition-colors"
-          >
-            <History className="h-3.5 w-3.5" />
-            {adminChanges.length} modif{adminChanges.length > 1 ? 's' : ''}
-          </button>
-        )}
-        <button
-          onClick={openAdminModal}
-          className="flex items-center gap-2 px-4 py-3 bg-[#9c27b0] text-white text-sm font-semibold rounded-full shadow-xl hover:bg-[#7b1fa2] transition-all hover:scale-105"
-          title="Modifier les informations administratives (client, événement)"
-        >
-          <PenLine className="h-4 w-4" />
-          Modifier les infos
-        </button>
-      </div>
+      {/* ── Side panel icons (always visible on left) ──────────────────────── */}
+      <SidePanelIcons activePanel={activePanel} onSelect={(p) => setActivePanel(p)} />
+
+      {/* ── Side panel (Client / Services / Event / Style / Images) ────────── */}
+      <WeboWordSidePanels
+        quoteId={quoteId}
+        activePanel={activePanel}
+        onClose={() => setActivePanel(null)}
+        onApplied={() => {
+          setActivePanel(null);
+          window.location.href = `/devis/${quoteId}/modifier?mode=weboword&t=${Date.now()}`;
+        }}
+      />
 
       {/* ── Admin edit modal ───────────────────────────────────────────────── */}
       {adminModal && (
