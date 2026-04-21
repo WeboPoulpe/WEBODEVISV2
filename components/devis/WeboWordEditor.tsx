@@ -41,11 +41,43 @@ const MENU_WIDTHS = [
 
 // ── Available fonts ────────────────────────────────────────────────────────────
 const FONTS = [
+  // System fonts
   { label: 'Georgia (défaut)', value: 'Georgia', google: false },
+  { label: 'Times New Roman', value: 'Times New Roman', google: false },
+  { label: 'Arial', value: 'Arial', google: false },
+  { label: 'Helvetica', value: 'Helvetica', google: false },
+  { label: 'Verdana', value: 'Verdana', google: false },
+  { label: 'Courier New', value: 'Courier New', google: false },
+  { label: 'Trebuchet MS', value: 'Trebuchet MS', google: false },
+  { label: 'Garamond', value: 'Garamond', google: false },
+  // Google Fonts — Serif élégantes
   { label: 'Playfair Display', value: 'Playfair Display', google: true },
+  { label: 'Merriweather', value: 'Merriweather', google: true },
+  { label: 'Lora', value: 'Lora', google: true },
+  { label: 'Cormorant Garamond', value: 'Cormorant Garamond', google: true },
+  { label: 'EB Garamond', value: 'EB Garamond', google: true },
+  { label: 'Crimson Text', value: 'Crimson Text', google: true },
+  { label: 'Libre Baskerville', value: 'Libre Baskerville', google: true },
+  { label: 'Spectral', value: 'Spectral', google: true },
+  // Google Fonts — Sans-serif modernes
   { label: 'Montserrat', value: 'Montserrat', google: true },
   { label: 'Roboto', value: 'Roboto', google: true },
   { label: 'Open Sans', value: 'Open Sans', google: true },
+  { label: 'Lato', value: 'Lato', google: true },
+  { label: 'Poppins', value: 'Poppins', google: true },
+  { label: 'Inter', value: 'Inter', google: true },
+  { label: 'Raleway', value: 'Raleway', google: true },
+  { label: 'Nunito', value: 'Nunito', google: true },
+  { label: 'Source Sans 3', value: 'Source Sans 3', google: true },
+  { label: 'Work Sans', value: 'Work Sans', google: true },
+  // Google Fonts — Display & Script
+  { label: 'Dancing Script', value: 'Dancing Script', google: true },
+  { label: 'Great Vibes', value: 'Great Vibes', google: true },
+  { label: 'Pinyon Script', value: 'Pinyon Script', google: true },
+  { label: 'Cinzel', value: 'Cinzel', google: true },
+  { label: 'Abril Fatface', value: 'Abril Fatface', google: true },
+  { label: 'Bebas Neue', value: 'Bebas Neue', google: true },
+  { label: 'Oswald', value: 'Oswald', google: true },
 ];
 
 // ── Colour presets for the text-colour picker ─────────────────────────────────
@@ -187,8 +219,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     if (!initDone.current && editorRef.current) {
       editorRef.current.innerHTML = initialHtml;
       initDone.current = true;
+      // Force menu width to 100% (Plein) by default — override any saved width
       const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
-      if (menu?.style.maxWidth) setMenuWidth(menu.style.maxWidth);
+      if (menu) menu.style.maxWidth = '100%';
     }
   }, [initialHtml]);
 
@@ -867,25 +900,6 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             {error && (
               <span className="text-xs text-red-600 max-w-[200px] truncate">{error}</span>
             )}
-
-            {/* Modifier les informations → back to wizard */}
-            <Link
-              href={`/devis/${quoteId}/modifier?mode=wizard`}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Modifier les informations du devis (client, prestations, options)"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Modifier les infos</span>
-            </Link>
-
-            {/* Bell icon → notifications */}
-            <Link
-              href="/notifications"
-              className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-purple-50 rounded-lg transition-colors"
-              title="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-            </Link>
 
             <button
               onClick={handlePrint}
