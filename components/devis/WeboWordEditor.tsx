@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { useAuth } from '@/context/AuthContext';
-import WeboWordSidePanels, { SidePanelIcons } from './WeboWordSidePanels';
+import WeboWordSidePanels from './WeboWordSidePanels';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images';
 
@@ -126,6 +126,22 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [lineHeight, setLineHeight] = useState('1.4');
   const [adminModal, setAdminModal] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
+  // Sync activePanel with URL query param (using window to avoid Suspense issue)
+  useEffect(() => {
+    const update = () => {
+      if (typeof window === 'undefined') return;
+      const p = new URLSearchParams(window.location.search).get('panel');
+      if (p === 'client' || p === 'services' || p === 'event' || p === 'style' || p === 'images') {
+        setActivePanel(p);
+      } else {
+        setActivePanel(null);
+      }
+    };
+    update();
+    window.addEventListener('popstate', update);
+    const interval = setInterval(update, 300);
+    return () => { window.removeEventListener('popstate', update); clearInterval(interval); };
+  }, []);
   const [adminFields, setAdminFields] = useState({ clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', eventType: '', eventDate: '', eventLocation: '', guestCount: '' });
   const [adminChanges, setAdminChanges] = useState<{ field: string; from: string; to: string }[]>([]);
   const [showChanges, setShowChanges] = useState(false);
@@ -692,7 +708,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 pl-14">
+    <div className="flex flex-col h-full bg-slate-100 relative">
 
       {/* CSS: font override + font size + description toggle + gastro menu width */}
       <style>{`
@@ -1175,14 +1191,17 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         <div className="h-12 print:hidden" />
       </div>
 
-      {/* ── Side panel icons (always visible on left) ──────────────────────── */}
-      <SidePanelIcons activePanel={activePanel} onSelect={(p) => setActivePanel(p)} />
-
       {/* ── Side panel (Client / Services / Event / Style / Images) ────────── */}
       <WeboWordSidePanels
         quoteId={quoteId}
         activePanel={activePanel}
-        onClose={() => setActivePanel(null)}
+        onClose={() => {
+          setActivePanel(null);
+          // Remove panel query param
+          const url = new URL(window.location.href);
+          url.searchParams.delete('panel');
+          window.history.replaceState(null, '', url.toString());
+        }}
         onApplied={() => {
           setActivePanel(null);
           window.location.href = `/devis/${quoteId}/modifier?mode=weboword&t=${Date.now()}`;

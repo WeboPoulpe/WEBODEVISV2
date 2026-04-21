@@ -179,11 +179,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 z-40 bg-black/20 print:hidden" onClick={onClose} />
+      {/* Overlay — full screen but doesn't cover sidebar */}
+      <div className="fixed inset-0 z-40 bg-black/20 print:hidden" style={{ left: 240 }} onClick={onClose} />
 
-      {/* Panel */}
-      <div className="fixed left-14 top-0 bottom-0 w-80 bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200 print:hidden">
+      {/* Panel — positioned right after the app sidebar */}
+      <div className="fixed top-0 bottom-0 w-80 bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200 print:hidden" style={{ left: 240 }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -429,7 +429,7 @@ export function SidePanelIcons({ activePanel, onSelect }: { activePanel: PanelKe
     { key: 'images', icon: ImageIcon, label: 'Images' },
   ];
   return (
-    <div className="fixed left-0 top-20 bottom-0 w-14 bg-white border-r border-gray-200 flex flex-col items-center pt-4 gap-1 z-30 print:hidden">
+    <div className="flex-shrink-0 w-14 bg-white border-r border-gray-200 flex flex-col items-center pt-4 gap-1 print:hidden">
       {items.map(({ key, icon: Icon, label }) => (
         <button key={key} onClick={() => onSelect(key)} title={label}
           className={cn(

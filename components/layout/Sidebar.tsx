@@ -7,6 +7,7 @@ import {
   LayoutDashboard, FileText, Users, CalendarDays, CalendarRange,
   Package, Settings, Carrot, LayoutTemplate,
   LogOut, ChevronLeft, ChevronRight, UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench,
+  User, Calendar as CalendarIcon, Palette, Image as ImageIcon, ArrowLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -70,6 +71,33 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
+
+  // Read URL params via window (avoid useSearchParams suspense issue)
+  const [urlParams, setUrlParams] = useState<{ mode: string | null; panel: string | null }>({ mode: null, panel: null });
+  useEffect(() => {
+    const update = () => {
+      if (typeof window === 'undefined') return;
+      const sp = new URLSearchParams(window.location.search);
+      setUrlParams({ mode: sp.get('mode'), panel: sp.get('panel') });
+    };
+    update();
+    window.addEventListener('popstate', update);
+    const interval = setInterval(update, 300); // Catch pushState changes
+    return () => { window.removeEventListener('popstate', update); clearInterval(interval); };
+  }, []);
+
+  // Detect WeboWord mode (on modifier page with mode=weboword)
+  const isWeboMode = pathname?.includes('/devis/') && pathname?.includes('/modifier') && urlParams.mode === 'weboword';
+  const quoteIdFromPath = pathname?.match(/\/devis\/([^/]+)\/modifier/)?.[1] || null;
+  const activePanel = urlParams.panel as 'client' | 'services' | 'event' | 'style' | 'images' | null;
+
+  const weboItems: { key: string; icon: React.ElementType; label: string }[] = [
+    { key: 'client', icon: User, label: 'Client' },
+    { key: 'services', icon: Package, label: 'Prestations' },
+    { key: 'event', icon: CalendarIcon, label: 'Événement' },
+    { key: 'style', icon: Palette, label: 'Style' },
+    { key: 'images', icon: ImageIcon, label: 'Images' },
+  ];
 
   const [pendingDevis, setPendingDevis]   = useState(0);
   const [hasTodayEvent, setHasTodayEvent] = useState(false);
@@ -163,7 +191,49 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </div>
       </div>
 
-      {/* ── Navigation ────────────────────────────────────────────────────── */}
+      {/* ── WeboWord mode: replace navigation ──────────────────────────────── */}
+      {isWeboMode ? (
+        <nav className="flex-1 py-3 px-3 overflow-y-auto">
+          {/* Back button */}
+          <Link
+            href="/devis"
+            className="flex items-center gap-2 px-3 py-2.5 mb-4 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 flex-shrink-0" />
+            {!collapsed && <span className="text-sm font-medium">Retour aux devis</span>}
+          </Link>
+
+          {!collapsed && (
+            <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
+              Édition du devis
+            </p>
+          )}
+
+          <div className="space-y-1">
+            {weboItems.map((item) => {
+              const active = activePanel === item.key;
+              const Icon = item.icon;
+              const href = `/devis/${quoteIdFromPath}/modifier?mode=weboword&panel=${item.key}`;
+              return (
+                <Link
+                  key={item.key}
+                  href={href}
+                  title={collapsed ? item.label : undefined}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+                    active
+                      ? 'bg-white/15 text-white'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white',
+                  )}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      ) : (
       <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden scrollbar-none">
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.title} className={gi > 0 ? 'mt-5' : ''}>
@@ -244,6 +314,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         ))}
       </nav>
+      )}
 
       {/* ── Footer ────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-white/[0.06]">
