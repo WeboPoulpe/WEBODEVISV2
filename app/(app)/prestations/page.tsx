@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Plus, Wine, UtensilsCrossed, Coffee, Wrench, Users, Package,
-  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate,
+  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -512,7 +512,8 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
         .from('prestations').insert([payload]).select().single();
       setLoading(false);
       if (err) { setError(err.message); return; }
-      onSaved(data);
+      // À la création: ouvre automatiquement le WeboWord pour styler la carte gastro
+      window.location.href = `/prestations/${data.id}/edit-webo`;
     }
   };
 
@@ -675,9 +676,9 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
 
 // ── Prestation card ───────────────────────────────────────────────────────────
 function PrestationCard({
-  p, onEdit, onDelete,
+  p, onEdit, onDelete, onDuplicate,
 }: {
-  p: Prestation; onEdit: () => void; onDelete: () => void;
+  p: Prestation; onEdit: () => void; onDelete: () => void; onDuplicate: () => void;
 }) {
   const colors = categoryColor(p.category);
   return (
@@ -700,12 +701,21 @@ function PrestationCard({
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           <button
             onClick={onEdit}
+            title="Modifier"
             className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
+            onClick={onDuplicate}
+            title="Dupliquer"
+            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button
             onClick={onDelete}
+            title="Supprimer"
             className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -812,6 +822,27 @@ export default function PrestationsPage() {
     const supabase = createClient();
     await supabase.from('prestations').delete().eq('id', id);
     setItems((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleDuplicate = async (p: Prestation) => {
+    if (!user) return;
+    const supabase = createClient();
+    // Fetch full prestation data including gastro_card_html and cost_price
+    const { data: full } = await supabase.from('prestations').select('*').eq('id', p.id).single();
+    if (!full) return;
+    const { data, error } = await supabase.from('prestations').insert([{
+      user_id: user.id,
+      name: `${full.name} (copie)`,
+      unit_price: full.unit_price,
+      cost_price: full.cost_price,
+      category: full.category,
+      sub_category: full.sub_category,
+      description: full.description,
+      is_option: full.is_option,
+      gastro_card_html: full.gastro_card_html,
+    }]).select().single();
+    if (error) { alert('Erreur: ' + error.message); return; }
+    if (data) setItems((prev) => [data, ...prev]);
   };
 
   const filtered = items.filter((p) => {
@@ -926,6 +957,7 @@ export default function PrestationsPage() {
               p={p}
               onEdit={() => setModal({ open: true, editing: p })}
               onDelete={() => handleDelete(p.id)}
+              onDuplicate={() => handleDuplicate(p)}
             />
           ))}
         </div>
