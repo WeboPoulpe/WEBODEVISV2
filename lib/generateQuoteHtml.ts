@@ -180,8 +180,21 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     ? `<style>@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(opts.font)}:wght@400;600;700&display=swap');</style>`
     : '';
 
+  // Extract English title from gastroCardHtmlEn (looks for h3 or h2 text content)
+  const extractEnTitle = (htmlEn?: string | null): string | null => {
+    if (!htmlEn) return null;
+    // Match <h3>...</h3> or <h2>...</h2>, strip inner tags, return text
+    const match = htmlEn.match(/<h[23][^>]*>(.*?)<\/h[23]>/is);
+    if (!match) return null;
+    return match[1].replace(/<[^>]*>/g, '').trim() || null;
+  };
+
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
   const tableRows = activeServices.map((s) => {
+    // For EN devis, prefer English title from gastroCardHtmlEn if available
+    const displayName = lang === 'en'
+      ? (extractEnTitle(s.gastroCardHtmlEn) || s.name || '—')
+      : (s.name || '—');
     const badge = s.isFree
       ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.inclusBadge}</span>`
       : s.isOption
@@ -194,7 +207,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     return `
     <tr style="${rowBg}">
       <td style="padding:9px 12px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
-        <strong style="font-size:12px;${nameColor}">${s.name || '—'}</strong>${badge}
+        <strong style="font-size:12px;${nameColor}">${displayName}</strong>${badge}
       </td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${isOpt ? 'color:#d97706;' : ''}">${s.quantity}</td>
       ${!d.hidePrice ? `
