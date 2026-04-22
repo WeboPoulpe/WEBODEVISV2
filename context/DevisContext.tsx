@@ -22,6 +22,8 @@ export interface ServiceLine {
   isOption?: boolean;
   /** HTML pré-stylé de la carte gastronomique (depuis prestations.gastro_card_html) */
   gastroCardHtml?: string | null;
+  /** Version anglaise du gastro card */
+  gastroCardHtmlEn?: string | null;
 }
 
 export type QuoteTemplate = 'standard' | 'mariage' | 'business';

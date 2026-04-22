@@ -14,6 +14,7 @@ interface Prestation {
   description: string | null;
   is_option: boolean;
   gastro_card_html?: string | null;
+  gastro_card_html_en?: string | null;
 }
 
 interface Props {
@@ -53,7 +54,7 @@ function PrestationSearch({
       const supabase = createClient();
       const { data } = await supabase
         .from('prestations')
-        .select('id, name, unit_price, category, description, is_option, gastro_card_html')
+        .select('id, name, unit_price, category, description, is_option, gastro_card_html, gastro_card_html_en')
         .ilike('name', `%${q}%`)
         .limit(8);
       if (data && data.length > 0) { setResults(data); setOpen(true); }
@@ -159,6 +160,7 @@ function ServiceRow({
     onUpdate('category', p.category ?? '');
     onUpdate('description', p.description ? stripHtml(p.description) : '');
     if (p.gastro_card_html) onUpdate('gastroCardHtml', p.gastro_card_html);
+    if (p.gastro_card_html_en) onUpdate('gastroCardHtmlEn', p.gastro_card_html_en);
     if (p.is_option) { onUpdate('isOption', true); onUpdate('isFree', false); }
     if (p.description || p.is_option) setShowDesc(true);
   };

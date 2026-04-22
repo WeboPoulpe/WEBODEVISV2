@@ -56,6 +56,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [vatRate, setVatRate] = useState(20);
   const [hidePrice, setHidePrice] = useState(false);
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
+  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
 
   // Client picker
@@ -103,7 +104,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     if (!activePanel) return;
     setLoading(true);
     supabase.from('quotes')
-      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, services, remarks, vat_rate, hide_price, template')
+      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, services, remarks, vat_rate, hide_price, template, language')
       .eq('id', quoteId).single()
       .then(({ data }) => {
         if (data) {
@@ -119,6 +120,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setVatRate(data.vat_rate ?? 20);
           setHidePrice(data.hide_price ?? false);
           setTemplate((data.template as 'standard' | 'mariage' | 'business') || 'standard');
+          setLanguage((data.language as 'fr' | 'en') || 'fr');
           setServices(Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : []);
         }
         setLoading(false);
@@ -216,6 +218,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       hide_price: hidePrice,
       total_amount: totalTtc > 0 ? totalTtc : null,
       template,
+      language,
       services,
       content_html: null, // Force regeneration
     }).eq('id', quoteId);
@@ -463,6 +466,24 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Language */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <label className={labelCls}>Langue du devis</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button onClick={() => setLanguage('fr')}
+                        className={cn('py-2 px-2 text-xs font-semibold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5',
+                          language === 'fr' ? 'border-[#9c27b0] bg-[#faf5ff] text-[#9c27b0]' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
+                        🇫🇷 Français
+                      </button>
+                      <button onClick={() => setLanguage('en')}
+                        className={cn('py-2 px-2 text-xs font-semibold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5',
+                          language === 'en' ? 'border-[#9c27b0] bg-[#faf5ff] text-[#9c27b0]' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
+                        🇬🇧 English
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 italic mt-1.5">Cartes gastronomiques affichées dans cette langue (si dispo).</p>
                   </div>
 
                   {/* Carte gastronomique width */}

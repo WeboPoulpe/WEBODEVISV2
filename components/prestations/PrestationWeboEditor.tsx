@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Bold, Italic, Underline, ArrowLeft, Save, Loader2, Check, Palette,
-  AlignLeft, AlignCenter, AlignRight, Type, Wand2,
+  AlignLeft, AlignCenter, AlignRight, Type, Wand2, Languages,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -84,6 +84,56 @@ export default function PrestationWeboEditor({
   const [font, setFont] = useState('Georgia');
   const [fontSize, setFontSize] = useState(12);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
+  const [translating, setTranslating] = useState(false);
+
+  // Auto-translate FR → EN (uses free MyMemory API, walks through text nodes only)
+  const autoTranslateToEn = async () => {
+    if (!editorRef.current) return;
+    // First save current FR content
+    if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
+    const sourceHtml = htmlFrRef.current;
+    if (!sourceHtml.trim()) { alert('Aucun contenu FR à traduire'); return; }
+
+    setTranslating(true);
+    try {
+      // Parse HTML, find text nodes, translate each
+      const tmp = document.createElement('div');
+      tmp.innerHTML = sourceHtml;
+      const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
+      const nodes: Text[] = [];
+      let node = walker.nextNode();
+      while (node) { nodes.push(node as Text); node = walker.nextNode(); }
+
+      // Translate each non-empty text node
+      for (const n of nodes) {
+        const txt = (n.textContent || '').trim();
+        if (!txt || txt.length < 2) continue;
+        try {
+          const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=fr|en`);
+          const data = await res.json();
+          if (data?.responseData?.translatedText) {
+            n.textContent = data.responseData.translatedText;
+          }
+        } catch {
+          // Skip on error
+        }
+        // Tiny delay to avoid rate limiting
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      htmlEnRef.current = tmp.innerHTML;
+      // If we're currently on EN tab, update the editor
+      if (language === 'en' && editorRef.current) {
+        editorRef.current.innerHTML = htmlEnRef.current;
+      } else {
+        // Switch to EN to show the result
+        switchLanguage('en');
+      }
+    } catch (err) {
+      alert('Erreur de traduction: ' + (err as Error).message);
+    }
+    setTranslating(false);
+  };
 
   // In-memory storage for both versions (avoid losing edits when switching tabs)
   const htmlFrRef = useRef(initialHtml || '');
@@ -181,13 +231,34 @@ export default function PrestationWeboEditor({
     if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
     else htmlEnRef.current = editorRef.current.innerHTML;
 
+    // Auto-translate FR → EN if EN is empty AND we're saving FR with content
+    if (language === 'fr' && !htmlEnRef.current.trim() && htmlFrRef.current.trim()) {
+      try {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = htmlFrRef.current;
+        const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
+        const nodes: Text[] = [];
+        let node = walker.nextNode();
+        while (node) { nodes.push(node as Text); node = walker.nextNode(); }
+        for (const n of nodes) {
+          const txt = (n.textContent || '').trim();
+          if (!txt || txt.length < 2) continue;
+          try {
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=fr|en`);
+            const data = await res.json();
+            if (data?.responseData?.translatedText) n.textContent = data.responseData.translatedText;
+          } catch { /* skip */ }
+          await new Promise((r) => setTimeout(r, 80));
+        }
+        htmlEnRef.current = tmp.innerHTML;
+      } catch { /* skip translation on error */ }
+    }
+
     const supabase = createClient();
-    // Try to save both fields; if gastro_card_html_en doesn't exist, retry without it
     let { error } = await supabase.from('prestations')
       .update({ gastro_card_html: htmlFrRef.current, gastro_card_html_en: htmlEnRef.current })
       .eq('id', prestationId);
     if (error?.code === '42703' || error?.message?.includes('gastro_card_html_en')) {
-      // Fallback without English column
       const res = await supabase.from('prestations')
         .update({ gastro_card_html: htmlFrRef.current })
         .eq('id', prestationId);
@@ -213,8 +284,19 @@ export default function PrestationWeboEditor({
           {category && <span className="text-xs text-[#9c27b0] bg-[#f3e5f5] px-2 py-0.5 rounded-full capitalize">{category}</span>}
           {subCategory && <span className="text-xs text-gray-500 italic">{subCategory}</span>}
 
+          {/* Auto-translate button */}
+          <button
+            onClick={autoTranslateToEn}
+            disabled={translating}
+            title="Traduire automatiquement la version FR vers l'anglais"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 hover:bg-[#f3e5f5] disabled:opacity-50 transition-colors"
+          >
+            {translating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
+            {translating ? 'Traduction…' : 'Traduire FR→EN'}
+          </button>
+
           {/* Language tabs */}
-          <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => switchLanguage('fr')}
               className={cn(

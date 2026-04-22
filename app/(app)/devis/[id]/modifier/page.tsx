@@ -108,11 +108,13 @@ export default async function ModifierPage({
             isOption:     (s as ServiceLine & { isOption?: boolean }).isOption,
             removed:      (s as ServiceLine & { removed?: boolean }).removed,
             gastroCardHtml: (s as ServiceLine & { gastroCardHtml?: string | null }).gastroCardHtml,
+            gastroCardHtmlEn: (s as ServiceLine & { gastroCardHtmlEn?: string | null }).gastroCardHtmlEn,
           })),
         vatRate:    quote.vat_rate   ?? 20,
         remarks:    quote.remarks    ?? null,
         hidePrice:  quote.hide_price ?? false,
         cgv:        profileData?.cgv ?? null,
+        language:   (quote.language as 'fr' | 'en') ?? 'fr',
       },
       {
         template: (quote.template as 'standard' | 'mariage' | 'business') ?? 'standard',

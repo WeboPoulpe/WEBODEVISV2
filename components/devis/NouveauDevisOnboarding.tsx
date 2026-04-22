@@ -48,6 +48,7 @@ export default function NouveauDevisOnboarding() {
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
+  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
 
   const canNext1 = !!eventType && !!eventDate && !!guestCount;
 
@@ -131,6 +132,7 @@ export default function NouveauDevisOnboarding() {
       event_location: eventLocation || '',
       guest_count: parseInt(guestCount) || 1,
       template,
+      language,
       vat_rate: 20,
       hide_price: false,
     }).select('id').single();
@@ -397,6 +399,34 @@ export default function NouveauDevisOnboarding() {
                     </div>
                   </button>
                 ))}
+              </div>
+
+              {/* Language selector */}
+              <div className="border-t border-gray-100 pt-5">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Langue du devis</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setLanguage('fr')}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all',
+                      language === 'fr' ? 'border-[#9c27b0] bg-[#faf5ff] shadow-sm' : 'border-gray-200 hover:border-gray-300',
+                    )}
+                  >
+                    <span className="text-2xl">🇫🇷</span>
+                    <span className={cn('font-semibold text-sm', language === 'fr' ? 'text-[#9c27b0]' : 'text-gray-600')}>Français</span>
+                  </button>
+                  <button
+                    onClick={() => setLanguage('en')}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all',
+                      language === 'en' ? 'border-[#9c27b0] bg-[#faf5ff] shadow-sm' : 'border-gray-200 hover:border-gray-300',
+                    )}
+                  >
+                    <span className="text-2xl">🇬🇧</span>
+                    <span className={cn('font-semibold text-sm', language === 'en' ? 'text-[#9c27b0]' : 'text-gray-600')}>English</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 italic mt-2">Les prestations utiliseront leur version traduite si disponible.</p>
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
