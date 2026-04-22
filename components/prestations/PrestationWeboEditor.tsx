@@ -101,7 +101,11 @@ export default function PrestationWeboEditor({
     const frHtml = editorRef.current.innerHTML;
     htmlFrRef.current = frHtml;
 
-    if (!frHtml.trim() || frHtml === defaultHtmlFr) {
+    // Check if there's actually some text to translate (not just empty divs)
+    const tmpCheck = document.createElement('div');
+    tmpCheck.innerHTML = frHtml;
+    const textContent = (tmpCheck.textContent || '').trim();
+    if (!textContent) {
       alert('Aucun contenu français à traduire');
       return;
     }
