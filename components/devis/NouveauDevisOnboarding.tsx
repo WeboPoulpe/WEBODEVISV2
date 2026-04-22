@@ -147,8 +147,94 @@ export default function NouveauDevisOnboarding() {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center p-4 bg-gradient-to-br from-[#faf5ff] via-white to-[#fff7ed]">
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+    <div className="min-h-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-[#faf5ff] via-white to-[#fff7ed]">
+      {/* Animated background blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="blob blob-1" />
+        <div className="blob blob-2" />
+        <div className="blob blob-3" />
+        <div className="blob blob-4" />
+        {/* Floating sparkles */}
+        <div className="sparkle sparkle-1">✨</div>
+        <div className="sparkle sparkle-2">⭐</div>
+        <div className="sparkle sparkle-3">💫</div>
+        <div className="sparkle sparkle-4">✨</div>
+        <div className="sparkle sparkle-5">⭐</div>
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'linear-gradient(#9c27b0 1px, transparent 1px), linear-gradient(90deg, #9c27b0 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }} />
+      </div>
+
+      <style>{`
+        .blob {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(60px);
+          opacity: 0.4;
+          mix-blend-mode: multiply;
+        }
+        .blob-1 {
+          width: 400px; height: 400px;
+          background: radial-gradient(circle, #ddb3f5 0%, #9c27b0 100%);
+          top: -100px; left: -100px;
+          animation: blob-float-1 20s ease-in-out infinite;
+        }
+        .blob-2 {
+          width: 350px; height: 350px;
+          background: radial-gradient(circle, #ffd4a8 0%, #ff9d3a 100%);
+          bottom: -80px; right: -80px;
+          animation: blob-float-2 25s ease-in-out infinite;
+        }
+        .blob-3 {
+          width: 300px; height: 300px;
+          background: radial-gradient(circle, #b3d9ff 0%, #4a90e2 100%);
+          top: 50%; left: 70%;
+          animation: blob-float-3 22s ease-in-out infinite;
+        }
+        .blob-4 {
+          width: 280px; height: 280px;
+          background: radial-gradient(circle, #ffd1e0 0%, #ec4899 100%);
+          bottom: 30%; left: 20%;
+          animation: blob-float-4 18s ease-in-out infinite;
+        }
+        @keyframes blob-float-1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(40px, 60px) scale(1.1); }
+          66% { transform: translate(-20px, 40px) scale(0.95); }
+        }
+        @keyframes blob-float-2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-50px, -30px) scale(1.15); }
+        }
+        @keyframes blob-float-3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-60px, 20px) scale(0.9); }
+          66% { transform: translate(30px, -40px) scale(1.1); }
+        }
+        @keyframes blob-float-4 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(50px, -50px) scale(1.05); }
+        }
+        .sparkle {
+          position: absolute;
+          font-size: 20px;
+          opacity: 0.6;
+          animation: sparkle-float 8s ease-in-out infinite;
+        }
+        .sparkle-1 { top: 15%; left: 10%; animation-delay: 0s; }
+        .sparkle-2 { top: 25%; right: 15%; animation-delay: 1.5s; font-size: 16px; }
+        .sparkle-3 { bottom: 20%; left: 8%; animation-delay: 3s; font-size: 22px; }
+        .sparkle-4 { bottom: 30%; right: 12%; animation-delay: 4.5s; }
+        .sparkle-5 { top: 60%; left: 5%; animation-delay: 2s; font-size: 18px; }
+        @keyframes sparkle-float {
+          0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.4; }
+          50% { transform: translateY(-30px) rotate(180deg); opacity: 0.8; }
+        }
+      `}</style>
+
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden relative z-10 backdrop-blur-sm">
         {/* Top bar */}
         <div className="bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
