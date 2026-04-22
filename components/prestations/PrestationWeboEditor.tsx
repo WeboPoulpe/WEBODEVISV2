@@ -86,25 +86,39 @@ export default function PrestationWeboEditor({
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [translating, setTranslating] = useState(false);
 
-  // Auto-translate FR → EN (uses free MyMemory API, walks through text nodes only)
+  // Auto-translate FR → EN (uses free MyMemory API)
+  // Logic: ONLY reads from htmlFrRef (forces user to be on FR first), writes ONLY to htmlEnRef
   const autoTranslateToEn = async () => {
     if (!editorRef.current) return;
-    // First save current FR content
-    if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
-    const sourceHtml = htmlFrRef.current;
-    if (!sourceHtml.trim()) { alert('Aucun contenu FR à traduire'); return; }
+
+    // SAFETY: only allow translation if user is on FR tab (avoids overwriting wrong version)
+    if (language !== 'fr') {
+      alert('Pour traduire, placez-vous d\'abord sur l\'onglet 🇫🇷 Français');
+      return;
+    }
+
+    // Capture current editor content as FR (we are on FR tab)
+    const frHtml = editorRef.current.innerHTML;
+    htmlFrRef.current = frHtml;
+
+    if (!frHtml.trim() || frHtml === defaultHtmlFr) {
+      alert('Aucun contenu français à traduire');
+      return;
+    }
+
+    if (htmlEnRef.current.trim() && htmlEnRef.current !== defaultHtmlEn) {
+      if (!confirm('La version anglaise existe déjà. Voulez-vous l\'écraser ?')) return;
+    }
 
     setTranslating(true);
     try {
-      // Parse HTML, find text nodes, translate each
       const tmp = document.createElement('div');
-      tmp.innerHTML = sourceHtml;
+      tmp.innerHTML = frHtml;
       const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
       const nodes: Text[] = [];
       let node = walker.nextNode();
       while (node) { nodes.push(node as Text); node = walker.nextNode(); }
 
-      // Translate each non-empty text node
       for (const n of nodes) {
         const txt = (n.textContent || '').trim();
         if (!txt || txt.length < 2) continue;
@@ -114,25 +128,22 @@ export default function PrestationWeboEditor({
           if (data?.responseData?.translatedText) {
             n.textContent = data.responseData.translatedText;
           }
-        } catch {
-          // Skip on error
-        }
-        // Tiny delay to avoid rate limiting
+        } catch { /* skip */ }
         await new Promise((r) => setTimeout(r, 100));
       }
 
+      // Save translation to EN ref (NEVER touches htmlFrRef or the editor while on FR)
       htmlEnRef.current = tmp.innerHTML;
-      // If we're currently on EN tab, update the editor
-      if (language === 'en' && editorRef.current) {
-        editorRef.current.innerHTML = htmlEnRef.current;
-      } else {
-        // Switch to EN to show the result
-        switchLanguage('en');
-      }
+      setTranslating(false);
+
+      // Now switch to EN tab to show the result (saves FR from editor first as a safety)
+      htmlFrRef.current = editorRef.current.innerHTML; // re-capture FR before switching
+      editorRef.current.innerHTML = htmlEnRef.current;
+      setLanguage('en');
     } catch (err) {
+      setTranslating(false);
       alert('Erreur de traduction: ' + (err as Error).message);
     }
-    setTranslating(false);
   };
 
   // In-memory storage for both versions (avoid losing edits when switching tabs)
@@ -227,32 +238,13 @@ export default function PrestationWeboEditor({
   const handleSave = async () => {
     if (!editorRef.current) return;
     setSaving(true);
-    // Update the in-memory ref for the active language
-    if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
+    // Capture the active language at save time (avoid race conditions)
+    const activeLang = language;
+    // Update the in-memory ref for the active language ONLY
+    if (activeLang === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
     else htmlEnRef.current = editorRef.current.innerHTML;
 
-    // Auto-translate FR → EN if EN is empty AND we're saving FR with content
-    if (language === 'fr' && !htmlEnRef.current.trim() && htmlFrRef.current.trim()) {
-      try {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = htmlFrRef.current;
-        const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
-        const nodes: Text[] = [];
-        let node = walker.nextNode();
-        while (node) { nodes.push(node as Text); node = walker.nextNode(); }
-        for (const n of nodes) {
-          const txt = (n.textContent || '').trim();
-          if (!txt || txt.length < 2) continue;
-          try {
-            const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=fr|en`);
-            const data = await res.json();
-            if (data?.responseData?.translatedText) n.textContent = data.responseData.translatedText;
-          } catch { /* skip */ }
-          await new Promise((r) => setTimeout(r, 80));
-        }
-        htmlEnRef.current = tmp.innerHTML;
-      } catch { /* skip translation on error */ }
-    }
+    // No auto-translate at save — use the manual "Traduire FR→EN" button instead
 
     const supabase = createClient();
     let { error } = await supabase.from('prestations')
