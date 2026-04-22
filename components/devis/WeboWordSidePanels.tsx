@@ -152,7 +152,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     setPrestationSearch(q);
     if (!q.trim()) { setPrestationResults([]); setShowPrestationPicker(false); return; }
     const { data } = await supabase.from('prestations')
-      .select('id, name, unit_price, category, description, is_option, gastro_card_html')
+      .select('id, name, unit_price, category, description, is_option, gastro_card_html, gastro_card_html_en')
       .ilike('name', `%${q}%`)
       .limit(8);
     setPrestationResults(data || []);
@@ -169,6 +169,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       unitPrice: p.unit_price,
       category: p.category,
       gastroCardHtml: p.gastro_card_html,
+      gastroCardHtmlEn: p.gastro_card_html_en,
       isOption: !!p.is_option,
     };
     setServices((prev) => [...prev, newSvc]);
