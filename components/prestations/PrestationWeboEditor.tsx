@@ -85,19 +85,22 @@ export default function PrestationWeboEditor({
   const [fontSize, setFontSize] = useState(12);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [translating, setTranslating] = useState(false);
+  // Synchronous ref to know which version is currently in the editor
+  // (state update is async, ref gives us instant truth)
+  const activeLangRef = useRef<'fr' | 'en'>('fr');
 
   // Auto-translate FR → EN (uses free MyMemory API)
   // Logic: ONLY reads from htmlFrRef (forces user to be on FR first), writes ONLY to htmlEnRef
   const autoTranslateToEn = async () => {
     if (!editorRef.current) return;
 
-    // SAFETY: only allow translation if user is on FR tab (avoids overwriting wrong version)
-    if (language !== 'fr') {
+    // SAFETY: only allow translation if user is on FR tab (use sync ref, not state)
+    if (activeLangRef.current !== 'fr') {
       alert('Pour traduire, placez-vous d\'abord sur l\'onglet 🇫🇷 Français');
       return;
     }
 
-    // Capture current editor content as FR (we are on FR tab)
+    // Capture current editor content as FR (we are on FR tab — verified above)
     const frHtml = editorRef.current.innerHTML;
     htmlFrRef.current = frHtml;
 
@@ -140,9 +143,11 @@ export default function PrestationWeboEditor({
       htmlEnRef.current = tmp.innerHTML;
       setTranslating(false);
 
-      // Now switch to EN tab to show the result (saves FR from editor first as a safety)
-      htmlFrRef.current = editorRef.current.innerHTML; // re-capture FR before switching
+      // Now switch to EN tab to show the result
+      // Re-capture FR before switching (editor still shows FR at this point)
+      htmlFrRef.current = editorRef.current.innerHTML;
       editorRef.current.innerHTML = htmlEnRef.current;
+      activeLangRef.current = 'en'; // SYNCHRONOUS update — critical
       setLanguage('en');
     } catch (err) {
       setTranslating(false);
@@ -173,15 +178,16 @@ export default function PrestationWeboEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialHtml]);
 
-  // Switch between FR and EN versions
+  // Switch between FR and EN versions — uses synchronous ref to avoid stale state bugs
   const switchLanguage = (lang: 'fr' | 'en') => {
     if (!editorRef.current) return;
-    // Save current content to the corresponding ref
-    if (language === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
+    // Save current content to the corresponding ref (using SYNCHRONOUS ref, not state)
+    if (activeLangRef.current === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
     else htmlEnRef.current = editorRef.current.innerHTML;
     // Load the other version
     if (lang === 'fr') editorRef.current.innerHTML = htmlFrRef.current || defaultHtmlFr;
     else editorRef.current.innerHTML = htmlEnRef.current || defaultHtmlEn;
+    activeLangRef.current = lang;
     setLanguage(lang);
   };
 
@@ -242,9 +248,8 @@ export default function PrestationWeboEditor({
   const handleSave = async () => {
     if (!editorRef.current) return;
     setSaving(true);
-    // Capture the active language at save time (avoid race conditions)
-    const activeLang = language;
-    // Update the in-memory ref for the active language ONLY
+    // Use synchronous ref, NOT React state (which may be stale during transitions)
+    const activeLang = activeLangRef.current;
     if (activeLang === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
     else htmlEnRef.current = editorRef.current.innerHTML;
 
