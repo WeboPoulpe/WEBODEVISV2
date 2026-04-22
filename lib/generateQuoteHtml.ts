@@ -184,7 +184,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   const extractEnTitle = (htmlEn?: string | null): string | null => {
     if (!htmlEn) return null;
     // Match <h3>...</h3> or <h2>...</h2>, strip inner tags, return text
-    const match = htmlEn.match(/<h[23][^>]*>(.*?)<\/h[23]>/is);
+    const match = htmlEn.match(/<h[23][^>]*>([\s\S]*?)<\/h[23]>/i);
     if (!match) return null;
     return match[1].replace(/<[^>]*>/g, '').trim() || null;
   };
