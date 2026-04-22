@@ -181,9 +181,16 @@ export default function PrestationWeboEditor({
   // Switch between FR and EN versions — uses synchronous ref to avoid stale state bugs
   const switchLanguage = (lang: 'fr' | 'en') => {
     if (!editorRef.current) return;
-    // Save current content to the corresponding ref (using SYNCHRONOUS ref, not state)
-    if (activeLangRef.current === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
-    else htmlEnRef.current = editorRef.current.innerHTML;
+    if (activeLangRef.current === lang) return; // No-op if same tab
+    // Save current content to the corresponding ref (using SYNCHRONOUS ref)
+    const currentEditorHtml = editorRef.current.innerHTML;
+    if (activeLangRef.current === 'fr') {
+      htmlFrRef.current = currentEditorHtml;
+      console.log('[SWITCH] Saved FR:', currentEditorHtml.slice(0, 80));
+    } else {
+      htmlEnRef.current = currentEditorHtml;
+      console.log('[SWITCH] Saved EN:', currentEditorHtml.slice(0, 80));
+    }
     // Load the other version
     if (lang === 'fr') editorRef.current.innerHTML = htmlFrRef.current || defaultHtmlFr;
     else editorRef.current.innerHTML = htmlEnRef.current || defaultHtmlEn;
@@ -248,10 +255,16 @@ export default function PrestationWeboEditor({
   const handleSave = async () => {
     if (!editorRef.current) return;
     setSaving(true);
-    // Use synchronous ref, NOT React state (which may be stale during transitions)
+    // GLOBAL SAVE: capture current editor content into the active language ref
     const activeLang = activeLangRef.current;
-    if (activeLang === 'fr') htmlFrRef.current = editorRef.current.innerHTML;
-    else htmlEnRef.current = editorRef.current.innerHTML;
+    const editorHtml = editorRef.current.innerHTML;
+    if (activeLang === 'fr') htmlFrRef.current = editorHtml;
+    else htmlEnRef.current = editorHtml;
+
+    // Debug log to verify both versions
+    console.log('[SAVE] activeLang:', activeLang);
+    console.log('[SAVE] htmlFrRef:', htmlFrRef.current.slice(0, 100));
+    console.log('[SAVE] htmlEnRef:', htmlEnRef.current.slice(0, 100));
 
     // No auto-translate at save — use the manual "Traduire FR→EN" button instead
 
