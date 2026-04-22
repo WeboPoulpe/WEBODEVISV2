@@ -57,6 +57,36 @@ const dateFmt = (s?: string | null, lang: 'fr' | 'en' = 'fr') => {
   }
 };
 
+// Translation of common event types FR → EN
+const EVENT_TYPE_EN: Record<string, string> = {
+  'mariage': 'Wedding',
+  'cocktail': 'Cocktail',
+  'anniversaire': 'Birthday',
+  'séminaire': 'Seminar',
+  'seminaire': 'Seminar',
+  'gala': 'Gala',
+  'communion': 'Communion',
+  'baptême': 'Christening',
+  'bapteme': 'Christening',
+  'dîner': 'Dinner',
+  'diner': 'Dinner',
+  'soirée': 'Evening',
+  'soiree': 'Evening',
+  'réception': 'Reception',
+  'reception': 'Reception',
+  'conférence': 'Conference',
+  'conference': 'Conference',
+  'autre': 'Other',
+  'événement': 'Event',
+  'evenement': 'Event',
+};
+
+const translateEventType = (fr: string, lang: 'fr' | 'en'): string => {
+  if (lang !== 'en' || !fr) return fr;
+  const en = EVENT_TYPE_EN[fr.toLowerCase().trim()];
+  return en || fr; // Fallback to FR if not in dict
+};
+
 // Translations dictionary
 const T = {
   fr: {
@@ -141,6 +171,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   const vat = ht * (d.vatRate / 100);
   const ttc = ht + vat;
   const today = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR');
+  // Translate event type if devis is in English
+  const eventTypeT = translateEventType(d.eventType || '', lang);
 
   // ── Template / theme vars ──────────────────────────────────────────────────
   const tmpl = opts.template ?? 'standard';
@@ -268,7 +300,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     </div>
     <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
-      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${d.eventType || t.aPreciser}</p>
+      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${eventTypeT || t.aPreciser}</p>
       ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">📅 ${dateFr(d.eventDate)}</p>` : ''}
       ${d.guestCount    ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${t.invite(d.guestCount)}</p>` : ''}
       ${d.eventLocation ? `<p style="color:#555;margin:0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
@@ -278,7 +310,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <!-- ── Intro ── -->
   <div style="margin-bottom:16px;padding:11px 14px;border-left:4px solid ${accentColor};background:#fafafa;border-radius:0 5px 5px 0;">
     <p style="margin:0;font-style:italic;color:#555;font-size:12px;">
-      ${t.intro(d.clientName || '', d.eventType || '', d.eventDate ? dateFr(d.eventDate) : '', d.eventLocation || '')}
+      ${t.intro(d.clientName || '', eventTypeT, d.eventDate ? dateFr(d.eventDate) : '', d.eventLocation || '')}
     </p>
   </div>
 
@@ -334,9 +366,9 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <!-- ── Header Carte (pleine largeur) ── -->
   <div class="gastro-header" style="${headerGradient}margin:24px -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">
     <p style="font-size:9px;font-weight:bold;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:3px;margin:0 0 5px;">
-      ${t.eventLabel(d.eventType || '', d.eventDate ? dateFr(d.eventDate) : '')}
+      ${t.eventLabel(eventTypeT, d.eventDate ? dateFr(d.eventDate) : '')}
     </p>
-    <h2 style="font-size:24px;font-weight:bold;color:white;margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">${t.menuTitle(d.eventType || '')}</h2>
+    <h2 style="font-size:24px;font-weight:bold;color:white;margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">${t.menuTitle(eventTypeT)}</h2>
     ${d.eventLocation ? `<p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
     <div style="width:36px;height:2px;background:rgba(255,255,255,0.35);margin:12px auto 0;"></div>
   </div>
