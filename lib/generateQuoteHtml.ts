@@ -43,13 +43,13 @@ export interface QuoteHtmlOptions {
   template?: 'standard' | 'mariage' | 'business';
 }
 
-const money = (n: number) =>
-  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
+const money = (n: number, lang: 'fr' | 'en' = 'fr') =>
+  new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
 
-const dateFr = (s?: string | null) => {
+const dateFmt = (s?: string | null, lang: 'fr' | 'en' = 'fr') => {
   if (!s) return '';
   try {
-    return new Date(s).toLocaleDateString('fr-FR', {
+    return new Date(s).toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR', {
       day: '2-digit', month: 'long', year: 'numeric',
     });
   } catch {
@@ -57,14 +57,90 @@ const dateFr = (s?: string | null) => {
   }
 };
 
+// Translations dictionary
+const T = {
+  fr: {
+    devis: 'DEVIS',
+    date: 'Date',
+    traiteurChef: 'Traiteur & Chef à domicile',
+    client: 'CLIENT',
+    aCompleter: 'À compléter',
+    evenement: 'ÉVÉNEMENT',
+    aPreciser: 'À préciser',
+    invite: (n: number) => `${n} invité${n > 1 ? 's' : ''}`,
+    intro: (clientName: string, eventType: string, dateStr: string, locStr: string) =>
+      `Madame, Monsieur ${clientName},<br><br>Nous vous remercions de votre confiance et avons le plaisir de vous soumettre notre proposition pour votre ${eventType || 'événement'}${dateStr ? ` du ${dateStr}` : ''}${locStr ? ` à ${locStr}` : ''}. Vous trouverez ci-dessous le détail de nos prestations.`,
+    designation: 'Désignation',
+    qte: 'Qté',
+    puHt: 'PU HT',
+    totalHt: 'Total HT',
+    aucunePrestation: 'Aucune prestation',
+    sousTotalHt: 'Sous-total HT',
+    siOptionsHt: 'si Options HT',
+    tva: 'TVA',
+    totalTtc: 'Total TTC',
+    sautPage: '✂  SAUT DE PAGE — Carte Gastronomique ci-dessous',
+    eventLabel: (type: string, date: string) => `${(type || 'ÉVÉNEMENT').toUpperCase()}${date ? ` — ${date.toUpperCase()}` : ''}`,
+    menuTitle: (eventType: string) => `Menu de votre ${eventType || 'Réception'}`,
+    inclus: 'Inclus',
+    option: 'OPTION',
+    inclusBadge: 'INCLUS',
+    bonAccord: 'BON POUR ACCORD — CLIENT',
+    dateSignature: 'Date et signature :',
+    prestataire: 'PRESTATAIRE',
+    devisValide: 'Ce devis est valable 30 jours. Toute commande implique l\'acceptation de nos conditions générales de vente.',
+    menuCompleter: 'Menu à compléter',
+    remarques: 'REMARQUES',
+    cgv: 'Conditions Générales de Vente',
+  },
+  en: {
+    devis: 'QUOTE',
+    date: 'Date',
+    traiteurChef: 'Catering & Private Chef',
+    client: 'CLIENT',
+    aCompleter: 'To be completed',
+    evenement: 'EVENT',
+    aPreciser: 'To be specified',
+    invite: (n: number) => `${n} guest${n > 1 ? 's' : ''}`,
+    intro: (clientName: string, eventType: string, dateStr: string, locStr: string) =>
+      `Dear ${clientName},<br><br>Thank you for your trust. We are pleased to submit our proposal for your ${eventType || 'event'}${dateStr ? ` on ${dateStr}` : ''}${locStr ? ` at ${locStr}` : ''}. You will find below the details of our services.`,
+    designation: 'Description',
+    qte: 'Qty',
+    puHt: 'Unit Price',
+    totalHt: 'Total',
+    aucunePrestation: 'No service',
+    sousTotalHt: 'Subtotal',
+    siOptionsHt: 'incl. Options',
+    tva: 'VAT',
+    totalTtc: 'Total (incl. VAT)',
+    sautPage: '✂  PAGE BREAK — Gastronomic Menu below',
+    eventLabel: (type: string, date: string) => `${(type || 'EVENT').toUpperCase()}${date ? ` — ${date.toUpperCase()}` : ''}`,
+    menuTitle: (eventType: string) => `${eventType || 'Reception'} Menu`,
+    inclus: 'Included',
+    option: 'OPTION',
+    inclusBadge: 'INCLUDED',
+    bonAccord: 'AGREEMENT — CLIENT',
+    dateSignature: 'Date and signature:',
+    prestataire: 'PROVIDER',
+    devisValide: 'This quote is valid for 30 days. Any order implies acceptance of our terms and conditions of sale.',
+    menuCompleter: 'Menu to be defined',
+    remarques: 'REMARKS',
+    cgv: 'Terms & Conditions',
+  },
+};
+
 export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
+  const lang: 'fr' | 'en' = d.language === 'en' ? 'en' : 'fr';
+  const t = T[lang];
+  const m = (n: number) => money(n, lang);
+  const dateFr = (s?: string | null) => dateFmt(s, lang);
   const activeServices = d.services.filter((s) => !s.removed);
   const htSansOption = activeServices.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
   const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
   const ht  = htSansOption + optionHt;
   const vat = ht * (d.vatRate / 100);
   const ttc = ht + vat;
-  const today = new Date().toLocaleDateString('fr-FR');
+  const today = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR');
 
   // ── Template / theme vars ──────────────────────────────────────────────────
   const tmpl = opts.template ?? 'standard';
@@ -107,9 +183,9 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
   const tableRows = activeServices.map((s) => {
     const badge = s.isFree
-      ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">INCLUS</span>'
+      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.inclusBadge}</span>`
       : s.isOption
-      ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">OPTION</span>'
+      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
       : '';
     const isOpt = s.isOption;
     const rowBg = isOpt ? `background-color:#fffbeb;` : '';
@@ -122,8 +198,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       </td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${isOpt ? 'color:#d97706;' : ''}">${s.quantity}</td>
       ${!d.hidePrice ? `
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? 'Inclus' : money(s.unitPrice)}</td>
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? 'Inclus' : money(s.quantity * s.unitPrice)}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.unitPrice)}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.quantity * s.unitPrice)}</td>
       ` : ''}
     </tr>`;
   }).join('');
@@ -139,7 +215,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
         return `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
       }
       const optBadge = s.isOption
-        ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">OPTION</span>'
+        ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
         : '';
       return `
       <div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
@@ -159,11 +235,11 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div>
         <h1 style="font-size:22px;font-weight:bold;color:white;margin:0 0 3px;letter-spacing:-0.5px;">${d.companyName}</h1>
-        <p style="color:rgba(255,255,255,0.65);margin:0;font-size:11px;">Traiteur &amp; Chef à domicile</p>
+        <p style="color:rgba(255,255,255,0.65);margin:0;font-size:11px;">${t.traiteurChef}</p>
       </div>
       <div style="text-align:right;">
-        <div style="background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.5);color:white;padding:5px 16px;border-radius:5px;font-size:18px;font-weight:bold;letter-spacing:3px;display:inline-block;">DEVIS</div>
-        <p style="color:rgba(255,255,255,0.65);margin:6px 0 0;font-size:11px;">Date : ${today}</p>
+        <div style="background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.5);color:white;padding:5px 16px;border-radius:5px;font-size:18px;font-weight:bold;letter-spacing:3px;display:inline-block;">${t.devis}</div>
+        <p style="color:rgba(255,255,255,0.65);margin:6px 0 0;font-size:11px;">${t.date} : ${today}</p>
       </div>
     </div>
   </div>
@@ -171,17 +247,17 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <!-- ── Client + Événement ── -->
   <div style="display:flex;gap:14px;margin-top:18px;margin-bottom:16px;">
     <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
-      <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">CLIENT</p>
-      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${d.clientName || 'À compléter'}</p>
+      <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.client}</p>
+      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${d.clientName || t.aCompleter}</p>
       ${d.clientEmail   ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientEmail}</p>` : ''}
       ${d.clientPhone   ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientPhone}</p>` : ''}
       ${d.clientAddress ? `<p style="color:#555;margin:0;font-size:11px;">${d.clientAddress}</p>` : ''}
     </div>
     <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
-      <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">ÉVÉNEMENT</p>
-      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${d.eventType || 'À préciser'}</p>
+      <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
+      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${d.eventType || t.aPreciser}</p>
       ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">📅 ${dateFr(d.eventDate)}</p>` : ''}
-      ${d.guestCount    ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${d.guestCount} invité${d.guestCount > 1 ? 's' : ''}</p>` : ''}
+      ${d.guestCount    ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${t.invite(d.guestCount)}</p>` : ''}
       ${d.eventLocation ? `<p style="color:#555;margin:0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
     </div>
   </div>
@@ -189,9 +265,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <!-- ── Intro ── -->
   <div style="margin-bottom:16px;padding:11px 14px;border-left:4px solid ${accentColor};background:#fafafa;border-radius:0 5px 5px 0;">
     <p style="margin:0;font-style:italic;color:#555;font-size:12px;">
-      Madame, Monsieur ${d.clientName || ''},<br><br>
-      Nous vous remercions de votre confiance et avons le plaisir de vous soumettre notre proposition pour votre ${d.eventType || 'événement'}${d.eventDate ? ` du ${dateFr(d.eventDate)}` : ''}${d.eventLocation ? ` à ${d.eventLocation}` : ''}.
-      Vous trouverez ci-dessous le détail de nos prestations.
+      ${t.intro(d.clientName || '', d.eventType || '', d.eventDate ? dateFr(d.eventDate) : '', d.eventLocation || '')}
     </p>
   </div>
 
@@ -199,16 +273,16 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;">
     <thead>
       <tr style="${headerGradient}color:white;">
-        <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.4px;">Désignation</th>
-        <th style="padding:9px 12px;text-align:center;width:50px;font-size:11px;font-weight:600;">Qté</th>
+        <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:0.4px;">${t.designation}</th>
+        <th style="padding:9px 12px;text-align:center;width:50px;font-size:11px;font-weight:600;">${t.qte}</th>
         ${!d.hidePrice ? `
-        <th style="padding:9px 12px;text-align:right;width:88px;font-size:11px;font-weight:600;">PU HT</th>
-        <th style="padding:9px 12px;text-align:right;width:95px;font-size:11px;font-weight:600;">Total HT</th>
+        <th style="padding:9px 12px;text-align:right;width:88px;font-size:11px;font-weight:600;">${t.puHt}</th>
+        <th style="padding:9px 12px;text-align:right;width:95px;font-size:11px;font-weight:600;">${t.totalHt}</th>
         ` : ''}
       </tr>
     </thead>
     <tbody>
-      ${tableRows || `<tr><td colspan="4" style="padding:14px;color:#bbb;font-style:italic;text-align:center;">Aucune prestation</td></tr>`}
+      ${tableRows || `<tr><td colspan="4" style="padding:14px;color:#bbb;font-style:italic;text-align:center;">${t.aucunePrestation}</td></tr>`}
     </tbody>
   </table>
 
@@ -217,18 +291,18 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
     <div style="min-width:220px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
-        <span>Sous-total HT</span><span>${money(htSansOption)}</span>
+        <span>${t.sousTotalHt}</span><span>${m(htSansOption)}</span>
       </div>
       ${optionHt > 0 ? `
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;">
-        <span>si Options HT</span><span>${money(optionHt)}</span>
+        <span>${t.siOptionsHt}</span><span>${m(optionHt)}</span>
       </div>
       ` : ''}
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
-        <span>TVA (${d.vatRate}%)</span><span>${money(vat)}</span>
+        <span>${t.tva} (${d.vatRate}%)</span><span>${m(vat)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;color:${accentColor};">
-        <span>Total TTC</span><span>${money(ttc)}</span>
+        <span>${t.totalTtc}</span><span>${m(ttc)}</span>
       </div>
     </div>
   </div>
@@ -238,7 +312,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
 
 <!-- ─── SÉPARATEUR : visible écran · page-break à l'impression ─── -->
 <div class="screen-sep" style="page-break-after:always;break-after:page;margin:26px -20mm;border-top:2px dashed #e9d5ff;padding:7px 20mm;text-align:center;color:#9c27b0;font-size:10px;letter-spacing:0.08em;user-select:none;">
-  ✂&nbsp;&nbsp;SAUT DE PAGE — Carte Gastronomique ci-dessous
+  ${t.sautPage.replace('✂  ', '✂&nbsp;&nbsp;')}
 </div>
 
 <!-- ═══════════════════════ CARTE GASTRONOMIQUE ═══════════════════════ -->
@@ -247,45 +321,45 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <!-- ── Header Carte (pleine largeur) ── -->
   <div class="gastro-header" style="${headerGradient}margin:24px -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">
     <p style="font-size:9px;font-weight:bold;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:3px;margin:0 0 5px;">
-      ${d.eventType || 'Réception'}${d.eventDate ? ` — ${dateFr(d.eventDate)}` : ''}
+      ${t.eventLabel(d.eventType || '', d.eventDate ? dateFr(d.eventDate) : '')}
     </p>
-    <h2 style="font-size:24px;font-weight:bold;color:white;margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">Menu de votre Réception</h2>
+    <h2 style="font-size:24px;font-weight:bold;color:white;margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">${t.menuTitle(d.eventType || '')}</h2>
     ${d.eventLocation ? `<p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
     <div style="width:36px;height:2px;background:rgba(255,255,255,0.35);margin:12px auto 0;"></div>
   </div>
 
   <!-- ── Plats ── -->
   <div class="gastro-menu" style="max-width:400px;margin:0 auto;">
-    ${menuItems || `<p style="text-align:center;color:#bbb;font-style:italic;">Menu à compléter</p>`}
+    ${menuItems || `<p style="text-align:center;color:#bbb;font-style:italic;">${t.menuCompleter}</p>`}
   </div>
 
   <!-- ── Pied de carte ── -->
   <div style="margin-top:28px;text-align:center;padding-top:14px;border-top:1px solid #f3e5f5;">
-    <p style="font-size:11px;color:#ccc;font-style:italic;margin:0;">${d.companyName} — Traiteur &amp; Chef à domicile</p>
+    <p style="font-size:11px;color:#ccc;font-style:italic;margin:0;">${d.companyName} — ${t.traiteurChef}</p>
   </div>
 </div>
 
 <!-- ═══════════════════════ REMARQUES + SIGNATURES + CONDITIONS ═══════════════════════ -->
 ${d.remarks ? `
 <div style="margin:20px 0 16px;">
-  <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">REMARQUES</p>
+  <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.remarques}</p>
   <p style="font-size:12px;color:#555;white-space:pre-line;margin:0;">${d.remarks}</p>
 </div>
 ` : ''}
 
 <div style="display:flex;gap:14px;margin-top:16px;">
   <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">BON POUR ACCORD — Client</p>
-    <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">Date et signature :</p>
+    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.bonAccord}</p>
+    <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">${t.dateSignature}</p>
   </div>
   <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">PRESTATAIRE</p>
+    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.prestataire}</p>
     <p style="font-size:12px;font-weight:600;margin:0;">${d.companyName}</p>
   </div>
 </div>
 
 <div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
-  <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">Ce devis est valable 30 jours. Toute commande implique l'acceptation de nos conditions générales de vente.</p>
+  <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">${t.devisValide}</p>
 </div>
 
 ${d.cgv ? `
@@ -293,7 +367,7 @@ ${d.cgv ? `
 <div style="page-break-before:always;break-before:page;margin-top:24px;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
     <div style="flex:1;height:1px;background:#e0e0e0;"></div>
-    <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:2px;margin:0;">Conditions Générales de Vente</p>
+    <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:2px;margin:0;">${t.cgv}</p>
     <div style="flex:1;height:1px;background:#e0e0e0;"></div>
   </div>
   <div style="font-size:10px;color:#555;line-height:1.6;">${d.cgv}</div>
