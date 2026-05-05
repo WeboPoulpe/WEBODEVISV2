@@ -4,8 +4,16 @@
 
 -- 1. Te désigner admin (remplace l'email par le tien)
 UPDATE profiles SET role = 'admin' WHERE email = 'maxence.medard10@gmail.com';
+
+-- 1bis. Admin secondaire dédié maxence@webomax.fr
+UPDATE profiles SET role = 'admin' WHERE email = 'maxence@webomax.fr';
+
+-- 1ter. Retirer le rôle admin à Convivial Event (s'il avait été promu par erreur)
+UPDATE profiles SET role = 'user'
+WHERE email = 'convivialevent@yahoo.fr';
+
 -- Vérifie:
--- SELECT id, email, role FROM profiles WHERE role = 'admin';
+-- SELECT id, email, company_name, role FROM profiles WHERE role = 'admin';
 
 -- 2. RLS supplémentaires pour permettre aux admins de gérer les catégories globales
 

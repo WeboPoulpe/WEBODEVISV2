@@ -45,7 +45,8 @@ const MONTHS_FR  = [
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
 const CONFIRMED = new Set(['accepted']);
-const PENDING   = new Set(['sent', 'pending']);
+const PENDING   = new Set(['sent', 'pending', 'draft']);
+const REJECTED  = new Set(['rejected', 'refuse_client', 'refuse_traiteur']);
 
 function quoteVariant(status: string): 'confirmed' | 'pending' | 'other' {
   if (CONFIRMED.has(status)) return 'confirmed';
@@ -346,7 +347,7 @@ function Legend() {
       </div>
       <div className="flex items-center gap-1.5">
         <span className="w-3 h-3 rounded border border-[#9c27b0]/50 bg-white" />
-        Envoyé / En attente
+        Brouillon / En attente / Envoyé
       </div>
       <div className="flex items-center gap-1.5">
         <span className="w-3 h-3 rounded border border-gray-200 bg-gray-100" />
@@ -380,6 +381,7 @@ export default function CalendrierPage() {
       .from('quotes')
       .select('id, client_name, event_type, event_date, guest_count, total_amount, status, client_address, services')
       .not('event_date', 'is', null)
+      .not('status', 'in', '(rejected,refuse_client,refuse_traiteur)')
       .order('event_date', { ascending: true });
 
     if (error) console.error('[Calendrier] Supabase error:', error.message);
