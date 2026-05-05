@@ -18,6 +18,8 @@ interface Prestation {
   unit_price: number;
   category: string | null;
   sub_category: string | null;
+  category_id: string | null;
+  sub_category_id: string | null;
   description: string | null;
   is_option: boolean;
 }
@@ -872,12 +874,23 @@ export default function PrestationsPage() {
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [importing, setImporting] = useState(false);
+  const { categories: dbCategories } = usePrestationCategories();
+
+  // Combine hardcoded categories + DB-fetched custom categories (only those not already in hardcoded)
+  const HARDCODED_KEYS = new Set(CATEGORIES.map((c) => c.key));
+  const dynamicCategories = dbCategories
+    .filter((c) => !HARDCODED_KEYS.has(c.name.toLowerCase()))
+    .map((c) => ({ key: `id:${c.id}`, label: c.name, icon: Package, isCustom: true }));
+  const allCategories = [
+    ...CATEGORIES.map((c) => ({ ...c, isCustom: false })),
+    ...dynamicCategories,
+  ];
 
   const load = async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from('prestations')
-      .select('id, name, unit_price, category, sub_category, description, is_option')
+      .select('id, name, unit_price, category, sub_category, category_id, sub_category_id, description, is_option')
       .order('category')
       .order('name');
     setItems(data ?? []);
@@ -961,7 +974,11 @@ export default function PrestationsPage() {
   };
 
   const filtered = items.filter((p) => {
-    const matchTab = activeTab === 'all' || p.category?.toLowerCase() === activeTab;
+    const matchTab =
+      activeTab === 'all' ||
+      (activeTab.startsWith('id:')
+        ? p.category_id === activeTab.slice(3)
+        : p.category?.toLowerCase() === activeTab);
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
     return matchTab && matchSearch;
   });
@@ -1003,7 +1020,7 @@ export default function PrestationsPage() {
 
       {/* Category tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-4">
-        {CATEGORIES.map(({ key, label, icon: Icon }) => (
+        {allCategories.map(({ key, label, icon: Icon, isCustom }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
@@ -1012,7 +1029,9 @@ export default function PrestationsPage() {
               activeTab === key
                 ? 'bg-[#9c27b0] text-white shadow-sm'
                 : 'bg-white border border-gray-200 text-gray-600 hover:border-[#9c27b0]/30 hover:bg-[#f3e5f5]/50',
+              isCustom && activeTab !== key ? 'border-dashed border-[#9c27b0]/30' : '',
             ].join(' ')}
+            title={isCustom ? 'Catégorie perso' : undefined}
           >
             <Icon className="h-4 w-4" />
             {label}
