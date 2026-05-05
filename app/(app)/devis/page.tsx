@@ -251,7 +251,7 @@ function DevisSheet({
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onOpenFinance: (id: string) => void }) {
+function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, onEditImport }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onOpenFinance: (id: string) => void; onEditImport: (id: string) => void }) {
   const Icon = getEventIcon(quote.event_type || '');
   return (
     <div className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200">
@@ -307,10 +307,23 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance }:
             className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
             <Wallet className="h-3.5 w-3.5" />
           </button>
-          <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
-            className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
-            <LayoutTemplate className="h-3.5 w-3.5" />
-          </Link>
+          {quote.imported && quote.imported_file_url ? (
+            <a href={quote.imported_file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir le document importé"
+              className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+              <FileText className="h-3.5 w-3.5" />
+            </a>
+          ) : (
+            <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
+              className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+              <LayoutTemplate className="h-3.5 w-3.5" />
+            </Link>
+          )}
+          {quote.imported && (
+            <button onClick={() => onEditImport(quote.id)} title="Modifier l'import (prix, fichier, infos)"
+              className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
           {quote.status === 'draft' && (
             <button onClick={() => onDelete(quote.id)} title="Supprimer"
               className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -500,6 +513,7 @@ export default function DevisPage() {
   const [renamingTpl, setRenamingTpl] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
   const [importModal, setImportModal] = useState(false);
+  const [editImportId, setEditImportId] = useState<string | null>(null);
   const [financeQuoteId, setFinanceQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -836,7 +850,7 @@ export default function DevisPage() {
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} />)}
+          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
         </div>
       ) : view === 'table' ? (
         <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
@@ -857,10 +871,11 @@ export default function DevisPage() {
         onClose={() => setFinanceQuoteId(null)}
       />
 
-      {/* ── Import devis modal ─────────────────────────────────────────── */}
+      {/* ── Import devis modal (création + édition) ──────────────────── */}
       <ImportDevisModal
-        open={importModal}
-        onClose={() => setImportModal(false)}
+        open={importModal || editImportId !== null}
+        editQuoteId={editImportId}
+        onClose={() => { setImportModal(false); setEditImportId(null); }}
         onCreated={() => {
           // Reload quotes
           if (!user) return;

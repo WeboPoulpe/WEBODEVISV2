@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { X, UploadCloud, Loader2, Check, FileText, Trash2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, UploadCloud, Loader2, Check, FileText, Trash2, ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -9,11 +9,13 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  /** If provided, the modal opens in EDIT mode and updates this quote */
+  editQuoteId?: string | null;
 }
 
 const EVENT_TYPES = ['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
 
-export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
+export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId = null }: Props) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,7 +30,40 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
   const [guestCount, setGuestCount] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
+  const [existingFileName, setExistingFileName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+
+  const isEdit = !!editQuoteId;
+
+  // Load existing data in edit mode
+  useEffect(() => {
+    if (!open || !editQuoteId) return;
+    setLoadingEdit(true);
+    const sb = createClient();
+    sb.from('quotes')
+      .select('client_first_name, client_last_name, client_name, client_email, client_phone, client_address, event_location, event_type, event_date, guest_count, total_amount, imported_file_url, imported_file_name')
+      .eq('id', editQuoteId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setFirstName(data.client_first_name || (data.client_name?.split(' ')[0] ?? ''));
+          setLastName(data.client_last_name || (data.client_name?.split(' ').slice(1).join(' ') ?? ''));
+          setEmail(data.client_email || '');
+          setPhone(data.client_phone || '');
+          setBillingAddress(data.client_address || '');
+          setEventAddress(data.event_location || '');
+          setEventType(data.event_type || '');
+          setEventDate(data.event_date || '');
+          setGuestCount(data.guest_count != null ? String(data.guest_count) : '');
+          setTotalAmount(data.total_amount != null ? String(data.total_amount) : '');
+          setExistingFileUrl(data.imported_file_url || null);
+          setExistingFileName(data.imported_file_name || null);
+        }
+        setLoadingEdit(false);
+      });
+  }, [open, editQuoteId]);
 
   if (!open) return null;
 
@@ -41,6 +76,7 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
     setFirstName(''); setLastName(''); setEmail(''); setPhone('');
     setBillingAddress(''); setEventAddress(''); setEventType('');
     setEventDate(''); setGuestCount(''); setTotalAmount(''); setFile(null);
+    setExistingFileUrl(null); setExistingFileName(null);
   };
 
   const handleSave = async () => {
@@ -50,16 +86,16 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
 
     setSaving(true);
     const supabase = createClient();
-    let fileUrl: string | null = null;
-    let fileName: string | null = null;
+    let fileUrl: string | null = existingFileUrl;
+    let fileName: string | null = existingFileName;
 
-    // Upload file if present
+    // Upload new file if selected (replaces existing in edit mode)
     if (file) {
       const ext = file.name.split('.').pop() || 'pdf';
       const path = `imported-devis/${user.id}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('storage').upload(path, file);
       if (uploadErr) {
-        alert('Erreur upload fichier: ' + uploadErr.message);
+        alert('Erreur upload fichier: ' + uploadErr.message + '\n\nVérifie que le bucket "storage" existe dans Supabase et que les RLS permettent l\'upload.');
         setSaving(false);
         return;
       }
@@ -69,9 +105,7 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
     }
 
     const clientFullName = `${firstName.trim()} ${lastName.trim()}`;
-    const { error } = await supabase.from('quotes').insert({
-      user_id: user.id,
-      owner_user_id: user.id,
+    const payload = {
       client_name: clientFullName,
       client_first_name: firstName.trim(),
       client_last_name: lastName.trim(),
@@ -83,15 +117,28 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
       event_date: eventDate,
       guest_count: parseInt(guestCount) || 1,
       total_amount: parseFloat(totalAmount) || null,
-      status: 'accepted', // Imported = considered accepted
-      services: [],
-      template: 'standard',
-      vat_rate: 20,
-      hide_price: false,
-      imported: true,
       imported_file_url: fileUrl,
       imported_file_name: fileName,
-    });
+    };
+
+    let error;
+    if (isEdit && editQuoteId) {
+      const res = await supabase.from('quotes').update(payload).eq('id', editQuoteId);
+      error = res.error;
+    } else {
+      const res = await supabase.from('quotes').insert({
+        ...payload,
+        user_id: user.id,
+        owner_user_id: user.id,
+        status: 'accepted',
+        services: [],
+        template: 'standard',
+        vat_rate: 20,
+        hide_price: false,
+        imported: true,
+      });
+      error = res.error;
+    }
 
     setSaving(false);
     if (error) {
@@ -101,6 +148,10 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
     reset();
     onCreated();
     onClose();
+  };
+
+  const removeExistingFile = () => {
+    setExistingFileUrl(null); setExistingFileName(null);
   };
 
   const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]';
@@ -117,14 +168,20 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
               <UploadCloud className="h-4 w-4 text-amber-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900 text-sm">Importer un devis existant</h2>
-              <p className="text-[10px] text-gray-400">Devis déjà fait dans un autre logiciel</p>
+              <h2 className="font-semibold text-gray-900 text-sm">{isEdit ? 'Modifier l\'import' : 'Importer un devis existant'}</h2>
+              <p className="text-[10px] text-gray-400">{isEdit ? 'Mettre à jour les infos, le prix ou le fichier' : 'Devis déjà fait dans un autre logiciel'}</p>
             </div>
           </div>
           <button onClick={onClose} disabled={saving} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {loadingEdit && (
+          <div className="flex items-center justify-center py-8 gap-2 text-gray-400 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+          </div>
+        )}
 
         <div className="p-6 space-y-5">
           {/* Client */}
@@ -168,17 +225,37 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
           {/* File upload */}
           <div>
             <label className={labelCls}>Fichier du devis (PDF, Word…)</label>
-            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.odt" onChange={handleFileSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.odt,image/*" onChange={handleFileSelect} className="hidden" />
             {file ? (
               <div className="flex items-center gap-3 p-3 border border-emerald-200 bg-emerald-50 rounded-lg">
                 <FileText className="h-5 w-5 text-emerald-600 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                  <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(1)} Ko</p>
+                  <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(1)} Ko · Sera uploadé à la sauvegarde</p>
                 </div>
                 <button onClick={() => setFile(null)} className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
+              </div>
+            ) : existingFileUrl ? (
+              <div className="space-y-2">
+                <a href={existingFileUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 border border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors group">
+                  <FileText className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{existingFileName || 'Document existant'}</p>
+                    <p className="text-[10px] text-blue-600 group-hover:underline">Cliquer pour ouvrir</p>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-blue-500" />
+                </a>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => fileInputRef.current?.click()} className="flex-1 text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                    Remplacer le fichier
+                  </button>
+                  <button onClick={removeExistingFile} className="text-xs px-3 py-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    Retirer
+                  </button>
+                </div>
               </div>
             ) : (
               <button
@@ -187,7 +264,7 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
               >
                 <UploadCloud className="h-6 w-6 text-gray-400" />
                 <span className="text-xs text-gray-500">Cliquer pour sélectionner un fichier</span>
-                <span className="text-[10px] text-gray-400">PDF, DOC, DOCX, ODT</span>
+                <span className="text-[10px] text-gray-400">PDF, DOC, DOCX, ODT, image</span>
               </button>
             )}
           </div>
@@ -197,9 +274,9 @@ export default function ImportDevisModal({ open, onClose, onCreated }: Props) {
           <button onClick={onClose} disabled={saving} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
             Annuler
           </button>
-          <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving || loadingEdit} className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            Importer le devis
+            {isEdit ? 'Enregistrer les modifications' : 'Importer le devis'}
           </button>
         </div>
       </div>
