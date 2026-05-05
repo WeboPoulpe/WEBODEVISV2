@@ -5,6 +5,8 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileTabBar from './MobileTabBar';
 import OnboardingOverlay from '@/components/onboarding/OnboardingOverlay';
+import HelpWidget from '@/components/help/HelpWidget';
+import HelpTrigger from '@/components/help/HelpTrigger';
 import { useAuth } from '@/context/AuthContext';
 
 const SIDEBAR_W = 240;
@@ -12,6 +14,7 @@ const SIDEBAR_W_COLLAPSED = 64;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const { user, profile, loading } = useAuth();
 
   const sidebarWidth = collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W;
@@ -39,6 +42,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <MobileTabBar />
+
+      {/* Floating help — persists across navigation */}
+      <HelpTrigger open={helpOpen} onClick={() => setHelpOpen(true)} />
+      <HelpWidget open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
