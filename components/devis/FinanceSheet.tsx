@@ -18,7 +18,11 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
   const [vatRate, setVatRate] = useState(20);
-  const [costMap, setCostMap] = useState<Record<string, number>>({}); // name → cost_price
+  const [costMap, setCostMap] = useState<Record<string, number>>({});           // key → unit cost
+  const [catalogIds, setCatalogIds] = useState<Record<string, string>>({});     // key → prestation id
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [extraCosts, setExtraCosts] = useState<{ id: string; label: string; amount: number }[]>([]);
 
   useEffect(() => {
@@ -32,20 +36,48 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
         setServices(svcs.filter((s) => !s.isPageBreak && s.name));
         setVatRate(data.vat_rate ?? 20);
 
-        // Fetch cost_price for ALL user's prestations (case-insensitive match later)
-        const { data: prestations } = await sb.from('prestations').select('name, cost_price');
+        const { data: prestations } = await sb.from('prestations').select('id, name, cost_price');
         const map: Record<string, number> = {};
-        (prestations || []).forEach((p: { name: string; cost_price: number | null }) => {
+        const ids: Record<string, string> = {};
+        (prestations || []).forEach((p: { id: string; name: string; cost_price: number | null }) => {
           const key = (p.name || '').trim().toLowerCase();
-          if (key) map[key] = p.cost_price ?? 0;
+          if (key) {
+            map[key] = p.cost_price ?? 0;
+            ids[key] = p.id;
+          }
         });
         setCostMap(map);
+        setCatalogIds(ids);
         setLoading(false);
       });
   }, [open, quoteId]);
 
-  // Case-insensitive cost lookup
-  const costFor = (name: string) => costMap[(name || '').trim().toLowerCase()] || 0;
+  const keyOf = (name: string) => (name || '').trim().toLowerCase();
+  const costFor = (name: string) => costMap[keyOf(name)] || 0;
+  const isInCatalog = (name: string) => catalogIds[keyOf(name)] !== undefined;
+
+  const startEdit = (name: string) => {
+    if (!isInCatalog(name)) return;
+    const key = keyOf(name);
+    setEditingKey(key);
+    setEditValue(String(costMap[key] || ''));
+  };
+
+  const saveEdit = async (name: string) => {
+    const key = keyOf(name);
+    const id = catalogIds[key];
+    if (!id) { setEditingKey(null); return; }
+    const parsed = parseFloat((editValue || '').replace(',', '.'));
+    const newCost = isNaN(parsed) ? 0 : parsed;
+    setSavingKey(key);
+    const sb = createClient();
+    await sb.from('prestations').update({ cost_price: newCost }).eq('id', id);
+    setCostMap((prev) => ({ ...prev, [key]: newCost }));
+    setEditingKey(null);
+    setSavingKey(null);
+  };
+
+  const cancelEdit = () => { setEditingKey(null); setEditValue(''); };
 
   if (!open) return null;
 
@@ -129,7 +161,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
               <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Détail par prestation</h3>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  <div className="grid grid-cols-[1fr_70px_90px_70px_70px] gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                     <span>Prestation</span>
                     <span className="text-right">Vente</span>
                     <span className="text-right">Coût</span>
@@ -144,14 +176,49 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                       const m = sale - cost;
                       const pct = sale > 0 ? (m / sale) * 100 : 0;
                       const hasCost = unitCost > 0;
+                      const inCatalog = isInCatalog(svc.name);
+                      const key = keyOf(svc.name);
+                      const isEditing = editingKey === key;
+                      const isSaving = savingKey === key;
                       return (
-                        <div key={idx} className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-2 px-4 py-2.5 items-center text-xs">
+                        <div key={idx} className="grid grid-cols-[1fr_70px_90px_70px_70px] gap-2 px-4 py-2.5 items-center text-xs">
                           <div className="min-w-0">
                             <p className="font-medium text-gray-900 truncate">{svc.name}</p>
                             <p className="text-[10px] text-gray-400">{svc.quantity} × {formatCurrency(svc.unitPrice)}{svc.isOption ? ' · Option' : ''}{svc.isFree ? ' · Inclus' : ''}</p>
                           </div>
                           <span className="text-right tabular-nums text-gray-900">{formatCurrency(sale)}</span>
-                          <span className={`text-right tabular-nums ${hasCost ? 'text-amber-700' : 'text-gray-300 italic'}`}>{hasCost ? formatCurrency(cost) : '—'}</span>
+                          {/* COÛT — éditable inline si la presta est au catalogue */}
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                autoFocus
+                                type="number"
+                                step="0.01"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={() => saveEdit(svc.name)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') { e.currentTarget.blur(); }
+                                  else if (e.key === 'Escape') cancelEdit();
+                                }}
+                                placeholder="0.00"
+                                className="w-full text-right text-xs px-1.5 py-1 border border-amber-400 rounded focus:outline-none focus:ring-2 focus:ring-amber-300"
+                              />
+                              <span className="text-[10px] text-gray-400">/u</span>
+                            </div>
+                          ) : inCatalog ? (
+                            <button
+                              onClick={() => startEdit(svc.name)}
+                              title={hasCost ? `${formatCurrency(unitCost)} × ${svc.quantity} (cliquer pour modifier)` : 'Cliquer pour saisir le coût unitaire'}
+                              className={`text-right tabular-nums hover:bg-amber-50 hover:ring-1 hover:ring-amber-300 rounded px-1.5 py-0.5 transition-all w-full ${
+                                isSaving ? 'opacity-50' : ''
+                              } ${hasCost ? 'text-amber-700' : 'text-gray-300 italic hover:text-amber-600 hover:not-italic'}`}
+                            >
+                              {hasCost ? formatCurrency(cost) : '+ ajouter'}
+                            </button>
+                          ) : (
+                            <span title="Cette ligne n'est pas dans votre catalogue — créez-la d'abord pour pouvoir saisir un coût" className="text-right tabular-nums text-gray-300 italic">—</span>
+                          )}
                           <span className={`text-right tabular-nums font-semibold ${hasCost ? (m >= 0 ? 'text-emerald-700' : 'text-red-600') : 'text-gray-300'}`}>{hasCost ? formatCurrency(m) : '—'}</span>
                           <span className={`text-right tabular-nums text-[10px] ${hasCost ? (m >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-gray-300'}`}>{hasCost ? `${pct.toFixed(0)}%` : '—'}</span>
                         </div>
@@ -162,7 +229,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                     )}
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-400 italic mt-2">💡 Renseignez le prix de revient sur vos prestations pour voir la marge réelle.</p>
+                <p className="text-[10px] text-gray-400 italic mt-2">💡 Cliquez sur la colonne <strong className="text-amber-600 not-italic">Coût</strong> pour saisir le prix de revient unitaire HT (sauvegardé sur la prestation, partagé avec tous tes devis).</p>
               </div>
 
               {/* Frais additionnels */}
