@@ -9,7 +9,8 @@ ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS volume_unit_price NUMERIC DEFAU
 ALTER TABLE ingredients ADD COLUMN IF NOT EXISTS preferred_supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL;
 
 -- 2. Quantité par invité sur la liaison prestation_ingredients
-ALTER TABLE service_ingredients ADD COLUMN IF NOT EXISTS quantity_per_guest NUMERIC DEFAULT 0;
+-- (Le champ qty_per_person existe déjà — pas besoin de l'ajouter)
+-- ALTER TABLE service_ingredients ADD COLUMN IF NOT EXISTS qty_per_person NUMERIC DEFAULT 0;
 
 -- 3. Mouvements de stock (historique in/out)
 CREATE TABLE IF NOT EXISTS stock_movements (

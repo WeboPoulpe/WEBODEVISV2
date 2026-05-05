@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, UtensilsCrossed, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, UtensilsCrossed, CheckCircle2, Calculator, ShoppingCart } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -71,6 +71,102 @@ export default function CoursesPage() {
       setItems((ei ?? []) as unknown as EventIngredient[]);
       setLoading(false);
     });
+  }, [id]);
+
+  const [computing, setComputing] = useState(false);
+
+  // Auto-compute needs from prestations.service_ingredients × guest_count
+  const autoComputeAndCreateOrders = useCallback(async () => {
+    if (!confirm('Calculer automatiquement les besoins depuis les prestations du devis et créer les commandes fournisseurs ?')) return;
+    setComputing(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setComputing(false); return; }
+
+    // Fetch quote with services + guest_count
+    const { data: q } = await supabase.from('quotes').select('services, guest_count').eq('id', id).single();
+    if (!q || !Array.isArray(q.services)) { alert('Aucune prestation dans ce devis'); setComputing(false); return; }
+    const guestCount = q.guest_count ?? 1;
+
+    // Fetch all prestations with their service_ingredients
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const presNames = q.services.filter((s: any) => s.name && !s.isPageBreak).map((s: any) => s.name);
+    if (presNames.length === 0) { alert('Aucune prestation valide'); setComputing(false); return; }
+
+    const { data: prestations } = await supabase.from('prestations')
+      .select('id, name, service_ingredients(ingredient_id, qty_per_person, ingredient:ingredients(id, name, unit, preferred_supplier_id, volume_unit_price))')
+      .in('name', presNames);
+
+    // Aggregate needs per ingredient: total_qty = sum(quantity_per_guest × guest_count) per prestation occurrence
+    const needsByIng: Record<string, { ingredient_id: string; quantity: number; supplier_id: string | null; unit_price: number }> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (prestations || []).forEach((p: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const presInQuote = q.services.filter((s: any) => s.name === p.name && !s.isPageBreak);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const totalUnits = presInQuote.reduce((sum: number, s: any) => sum + (s.quantity || 1), 0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (p.service_ingredients || []).forEach((si: any) => {
+        const qty = (si.qty_per_person || 0) * guestCount * totalUnits;
+        if (qty <= 0) return;
+        const ing = si.ingredient;
+        if (!ing) return;
+        if (!needsByIng[ing.id]) {
+          needsByIng[ing.id] = {
+            ingredient_id: ing.id,
+            quantity: 0,
+            supplier_id: ing.preferred_supplier_id || null,
+            unit_price: ing.volume_unit_price ?? 0,
+          };
+        }
+        needsByIng[ing.id].quantity += qty;
+      });
+    });
+
+    const allNeeds = Object.values(needsByIng);
+    if (allNeeds.length === 0) {
+      alert('Aucun ingrédient n\'a de quantité par invité définie. Va dans Prestations → édite une prestation → ajoute les ingrédients avec une quantité par invité.');
+      setComputing(false);
+      return;
+    }
+
+    // Group by supplier
+    const bySupplier: Record<string, typeof allNeeds> = {};
+    allNeeds.forEach((n) => {
+      const key = n.supplier_id || 'no-supplier';
+      if (!bySupplier[key]) bySupplier[key] = [];
+      bySupplier[key].push(n);
+    });
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    for (const [supId, needs] of Object.entries(bySupplier)) {
+      if (supId === 'no-supplier') {
+        skippedCount += needs.length;
+        continue;
+      }
+      const total = needs.reduce((s, n) => s + n.quantity * n.unit_price, 0);
+      const { data: order } = await supabase.from('supplier_orders').insert({
+        user_id: user.id,
+        supplier_id: supId,
+        event_id: id,
+        status: 'draft',
+        total_amount: total,
+        notes: `Auto-calculé depuis l'événement (${guestCount} invités)`,
+      }).select('id').single();
+      if (order) {
+        await supabase.from('supplier_order_items').insert(needs.map((n) => ({
+          order_id: order.id,
+          ingredient_id: n.ingredient_id,
+          quantity: n.quantity,
+          unit_price: n.unit_price,
+        })));
+        createdCount++;
+      }
+    }
+
+    setComputing(false);
+    alert(`✅ ${createdCount} commande(s) créée(s) en brouillon.${skippedCount > 0 ? `\n⚠️ ${skippedCount} ingrédient(s) sans fournisseur préféré ignoré(s).` : ''}\n\nVoir page Commandes.`);
   }, [id]);
 
   // Toggle checked state (optimistic + persist)
@@ -147,6 +243,18 @@ export default function CoursesPage() {
               <p className="text-sm font-bold text-[#9c27b0]">{pct}%</p>
               <p className="text-xs text-gray-400">{doneCount}/{totalCount}</p>
             </div>
+            <button
+              onClick={autoComputeAndCreateOrders}
+              disabled={computing}
+              title="Calculer auto les besoins depuis les prestations + créer les commandes par fournisseur"
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 disabled:opacity-50"
+            >
+              {computing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calculator className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">Calcul auto + commandes</span>
+            </button>
+            <Link href="/commandes" title="Voir toutes les commandes" className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl">
+              <ShoppingCart className="h-4 w-4" />
+            </Link>
           </div>
 
           {/* Progress bar */}

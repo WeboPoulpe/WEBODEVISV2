@@ -235,6 +235,14 @@ function IngredientModal({
   const [minStockAlert, setMinStockAlert] = useState(String((initial as any)?.min_stock_alert ?? ''));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [volumeUnitPrice, setVolumeUnitPrice] = useState(String((initial as any)?.volume_unit_price ?? ''));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [preferredSupplierId, setPreferredSupplierId] = useState((initial as any)?.preferred_supplier_id ?? '');
+  const [suppliersList, setSuppliersList] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    createClient().from('suppliers').select('id, name').order('name').then(({ data }) => {
+      setSuppliersList((data as { id: string; name: string }[]) ?? []);
+    });
+  }, []);
   const [saving,      setSaving]      = useState(false);
 
   // OFF autocomplete
@@ -280,6 +288,8 @@ function IngredientModal({
       min_stock_alert: parseFloat(minStockAlert) || 0,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       volume_unit_price: parseFloat(volumeUnitPrice) || 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preferred_supplier_id: preferredSupplierId || null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
     setSaving(false);
@@ -393,6 +403,18 @@ function IngredientModal({
               placeholder="Ex. : Volaille, Fromage, Champignons…"
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
             />
+          </div>
+
+          {/* Fournisseur préféré */}
+          <div className="pt-3 border-t border-gray-100">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Fournisseur préféré <span className="text-gray-400 font-normal">(pour calcul auto commandes)</span>
+            </label>
+            <select value={preferredSupplierId} onChange={(e) => setPreferredSupplierId(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]">
+              <option value="">— Aucun —</option>
+              {suppliersList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
           </div>
 
           {/* Stock + Prix */}
