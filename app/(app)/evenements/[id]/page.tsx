@@ -8,8 +8,9 @@ import {
   Plus, Trash2, Printer, Loader2, ChevronUp, ChevronDown,
   UtensilsCrossed, Search, X, Smartphone, Users2,
   ChevronLeft, ChevronRight, Pencil, Check, ExternalLink, Wand2,
-  MapPin, Users, Calendar, CreditCard, Eye, CheckCircle2,
+  MapPin, Users, Calendar, CreditCard, Eye, CheckCircle2, Wallet,
 } from 'lucide-react';
+import FinanceSheet from '@/components/devis/FinanceSheet';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { formatCurrency } from '@/lib/utils';
@@ -1871,6 +1872,7 @@ export default function EvenementPage() {
   const [quote, setQuote]     = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab]         = useState<Tab>('checklist');
+  const [financeOpen, setFinanceOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -1955,7 +1957,7 @@ export default function EvenementPage() {
                 </div>
               </div>
 
-              {/* Price + link */}
+              {/* Price + actions */}
               <div className="text-right flex-shrink-0 space-y-2">
                 {quote.total_amount != null && (
                   <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] shadow-lg shadow-purple-200/50">
@@ -1963,7 +1965,13 @@ export default function EvenementPage() {
                     <span className="text-lg font-bold text-white tabular-nums">{formatCurrency(quote.total_amount)}</span>
                   </div>
                 )}
-                <div>
+                <div className="flex items-center justify-end gap-2">
+                  <button onClick={() => setFinanceOpen(true)}
+                    title="Gestion financière (CA, marge, coûts)"
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors">
+                    <Wallet className="h-3 w-3" />
+                    Finance
+                  </button>
                   <Link href={`/devis/${quote.id}/modifier`} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#9c27b0] transition-colors">
                     <Eye className="h-3 w-3" />
                     Voir le devis
@@ -2007,6 +2015,13 @@ export default function EvenementPage() {
           {tab === 'staffing'  && <StaffingTab quoteId={id!} quote={quote} />}
         </div>
       </div>
+
+      {/* ── Finance sheet ────────────────────────────────────────────────── */}
+      <FinanceSheet
+        open={financeOpen}
+        quoteId={financeOpen ? quote.id : null}
+        onClose={() => setFinanceOpen(false)}
+      />
     </div>
   );
 }

@@ -20,7 +20,7 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   exact: boolean;
-  badge?: 'pendingDevis' | 'todayEvent' | 'newProspects';
+  badge?: 'pendingDevis' | 'todayEvent' | 'newProspects' | 'stockAlert';
 }
 
 interface NavGroup {
@@ -46,7 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/evenements',  icon: CalendarRange, label: 'Événements',  exact: false },
       { href: '/extras',      icon: Users2,        label: 'Extras',      exact: false },
       { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
-      { href: '/stock',           icon: Boxes,          label: 'Stock',            exact: false },
+      { href: '/stock',           icon: Boxes,          label: 'Stock',            exact: false, badge: 'stockAlert' },
       { href: '/commandes',       icon: ShoppingBasket, label: 'Commandes',        exact: false },
       { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
       { href: '/fournisseurs',       icon: Truck,          label: 'Fournisseurs',      exact: false },
@@ -106,6 +106,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   ];
 
   const [pendingDevis, setPendingDevis]   = useState(0);
+  const [stockAlertCount, setStockAlertCount] = useState(0);
   const [hasTodayEvent, setHasTodayEvent] = useState(false);
   const [newProspects, setNewProspects]   = useState(0);
   const { user } = useAuth();
@@ -140,6 +141,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           .in('user_token', tokens)
           .then(({ count }) => setNewProspects(count ?? 0));
       });
+
+    // Fetch stock alert count (ingredients where stock <= min_stock_alert)
+    supabase.from('ingredients')
+      .select('id, stock_quantity, min_stock_alert')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        const count = (data || []).filter((i: { stock_quantity: number | null; min_stock_alert: number | null }) =>
+          (i.min_stock_alert ?? 0) > 0 && (i.stock_quantity ?? 0) <= (i.min_stock_alert ?? 0)
+        ).length;
+        setStockAlertCount(count);
+      });
   }, [user]);
 
   // Active state logic
@@ -160,6 +172,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     if (key === 'pendingDevis' && pendingDevis > 0) return pendingDevis;
     if (key === 'todayEvent'   && hasTodayEvent)    return 'dot';
     if (key === 'newProspects' && newProspects > 0) return newProspects;
+    if (key === 'stockAlert'   && stockAlertCount > 0) return stockAlertCount;
     return null;
   };
 

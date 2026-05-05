@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type NotifType = 'prospect_request' | 'upcoming_event' | 'invoice_due' | 'support_ticket' | 'system_update' | 'task_reminder';
+type NotifType = 'prospect_request' | 'upcoming_event' | 'invoice_due' | 'support_ticket' | 'system_update' | 'task_reminder' | 'stock_alert';
 type Priority   = 'low' | 'medium' | 'high';
 type Filter     = 'all' | 'unread' | 'read';
 
@@ -30,6 +30,7 @@ const TYPE_CONFIG: Record<NotifType, { icon: React.ElementType; bg: string; text
   support_ticket:  { icon: AlertCircle, bg: 'bg-rose-50',   text: 'text-rose-600'   },
   system_update:   { icon: Info,        bg: 'bg-gray-100',  text: 'text-gray-600'   },
   task_reminder:   { icon: CheckSquare, bg: 'bg-emerald-50',text: 'text-emerald-600'},
+  stock_alert:     { icon: AlertCircle, bg: 'bg-orange-50', text: 'text-orange-600' },
 };
 
 const PRIORITY_BADGE: Record<Priority, string> = {
