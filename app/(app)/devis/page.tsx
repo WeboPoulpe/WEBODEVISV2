@@ -217,12 +217,12 @@ function DevisSheet({
               <Pencil className="h-4 w-4" />Éditer
             </Link>
           </div>
-          {status === 'draft' && (
+          {(status === 'draft' || quote.imported) && (
             <button
               onClick={() => { onDelete(quote.id); onClose(); }}
               className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors mt-1"
             >
-              <Trash2 className="h-4 w-4" />Supprimer ce brouillon
+              <Trash2 className="h-4 w-4" />{quote.imported ? 'Supprimer cet import' : 'Supprimer ce brouillon'}
             </button>
           )}
         </div>
@@ -324,7 +324,7 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
               <Pencil className="h-3.5 w-3.5" />
             </button>
           )}
-          {quote.status === 'draft' && (
+          {(quote.status === 'draft' || quote.imported) && (
             <button onClick={() => onDelete(quote.id)} title="Supprimer"
               className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
               <Trash2 className="h-3.5 w-3.5" />
@@ -598,7 +598,7 @@ export default function DevisPage() {
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Supprimer ce brouillon ? Cette action est irréversible.')) return;
+    if (!confirm('Supprimer ce devis ? Cette action est irréversible.')) return;
     await createClient().from('quotes').delete().eq('id', id);
     setQuotes((prev) => prev.filter((q) => q.id !== id));
     setSheetQuote((prev) => prev?.id === id ? null : prev);
