@@ -52,6 +52,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [eventDate, setEventDate] = useState('');
   const [eventLocation, setEventLocation] = useState('');
   const [guestCount, setGuestCount] = useState('');
+  const [guestAdults, setGuestAdults] = useState('');
+  const [guestChildren, setGuestChildren] = useState('');
   const [remarks, setRemarks] = useState('');
   const [vatRate, setVatRate] = useState(20);
   const [hidePrice, setHidePrice] = useState(false);
@@ -104,7 +106,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     if (!activePanel) return;
     setLoading(true);
     supabase.from('quotes')
-      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, services, remarks, vat_rate, hide_price, template, language')
+      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language')
       .eq('id', quoteId).single()
       .then(({ data }) => {
         if (data) {
@@ -116,6 +118,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setEventDate(data.event_date || '');
           setEventLocation(data.event_location || '');
           setGuestCount(data.guest_count ? String(data.guest_count) : '');
+          setGuestAdults(data.guest_count_adults ? String(data.guest_count_adults) : '');
+          setGuestChildren(data.guest_count_children ? String(data.guest_count_children) : '');
           setRemarks(data.remarks || '');
           setVatRate(data.vat_rate ?? 20);
           setHidePrice(data.hide_price ?? false);
@@ -213,7 +217,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       event_type: eventType || '',
       event_date: eventDate || new Date().toISOString().slice(0, 10),
       event_location: eventLocation || '',
-      guest_count: parseInt(guestCount) || 1,
+      guest_count: parseInt(guestCount) || (parseInt(guestAdults) + parseInt(guestChildren) || 1),
+      guest_count_adults: parseInt(guestAdults) || null,
+      guest_count_children: parseInt(guestChildren) || 0,
       remarks: remarks || null,
       vat_rate: vatRate,
       hide_price: hidePrice,
@@ -424,10 +430,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       {['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'].map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
+                  <div><label className={labelCls}>Date</label><input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputCls} /></div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div><label className={labelCls}>Date</label><input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputCls} /></div>
-                    <div><label className={labelCls}>Couverts</label><input type="number" min={1} value={guestCount} onChange={(e) => setGuestCount(e.target.value)} className={inputCls} /></div>
+                    <div><label className={labelCls}>👤 Adultes</label><input type="number" min={0} value={guestAdults} onChange={(e) => { setGuestAdults(e.target.value); setGuestCount(String((parseInt(e.target.value) || 0) + (parseInt(guestChildren) || 0))); }} className={inputCls} placeholder="120" /></div>
+                    <div><label className={labelCls}>🧒 Enfants</label><input type="number" min={0} value={guestChildren} onChange={(e) => { setGuestChildren(e.target.value); setGuestCount(String((parseInt(guestAdults) || 0) + (parseInt(e.target.value) || 0))); }} className={inputCls} placeholder="0" /></div>
                   </div>
+                  <p className="text-[10px] text-gray-400 italic -mt-2">Total couverts : {(parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0)}</p>
                   <div><label className={labelCls}>Lieu</label><input value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} className={inputCls} placeholder="Château de Villebougis" /></div>
                   <div className="border-t border-gray-100 pt-3 space-y-3">
                     <div><label className={labelCls}>TVA (%)</label>

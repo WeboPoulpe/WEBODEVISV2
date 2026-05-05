@@ -36,6 +36,8 @@ export interface QuoteHtmlData {
   hidePrice?: boolean;
   cgv?: string | null;
   language?: 'fr' | 'en';
+  guestCountAdults?: number | null;
+  guestCountChildren?: number | null;
 }
 
 export interface QuoteHtmlOptions {
@@ -302,7 +304,9 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
       <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${eventTypeT || t.aPreciser}</p>
       ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">📅 ${dateFr(d.eventDate)}</p>` : ''}
-      ${d.guestCount    ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${t.invite(d.guestCount)}</p>` : ''}
+      ${d.guestCountAdults || d.guestCountChildren
+        ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${d.guestCountAdults || 0} ${lang === 'en' ? 'adults' : 'adultes'}${d.guestCountChildren ? ` + ${d.guestCountChildren} ${lang === 'en' ? (d.guestCountChildren > 1 ? 'children' : 'child') : (d.guestCountChildren > 1 ? 'enfants' : 'enfant')}` : ''}</p>`
+        : (d.guestCount ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${t.invite(d.guestCount)}</p>` : '')}
       ${d.eventLocation ? `<p style="color:#555;margin:0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
     </div>
   </div>

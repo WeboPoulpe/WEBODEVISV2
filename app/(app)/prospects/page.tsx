@@ -13,8 +13,20 @@ import { cn } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ProspectStatus =
-  | 'nouveau' | 'devis' | 'flyer' | 'rdv_degust'
-  | 'attente_reponse' | 'acompte' | 'relance' | 'refuse' | 'refuse_client' | 'refuse_traiteur';
+  | 'nouveau'
+  | 'broch_envoyee'
+  | 'devis_a_faire'
+  | 'devis_envoye'
+  | 'rdv_deg_a_venir'
+  | 'rdv_deg_fait'
+  | 'devis_final'
+  | 'refus_traiteur'
+  | 'refus_client'
+  | 'valide'
+  | 'acompte'
+  | 'paye'
+  // Legacy (gardés pour rétrocompatibilité données)
+  | 'devis' | 'flyer' | 'rdv_degust' | 'attente_reponse' | 'relance' | 'refuse';
 
 interface Prospect {
   id: string;
@@ -47,16 +59,18 @@ const STATUSES: {
   key: ProspectStatus; label: string;
   bg: string; text: string; dot: string;
 }[] = [
-  { key: 'nouveau',          label: 'Nouveau',         bg: 'bg-sky-50',    text: 'text-sky-700',     dot: 'bg-sky-400'    },
-  { key: 'devis',            label: 'Devis envoyé',    bg: 'bg-amber-50',  text: 'text-amber-700',   dot: 'bg-amber-400'  },
-  { key: 'rdv_degust',       label: 'RDV Dégustation', bg: 'bg-violet-50', text: 'text-violet-700',  dot: 'bg-violet-400' },
-  { key: 'attente_reponse',  label: 'En attente',      bg: 'bg-orange-50', text: 'text-orange-700',  dot: 'bg-orange-400' },
-  { key: 'acompte',          label: 'Acompte reçu',    bg: 'bg-emerald-50',text: 'text-emerald-700', dot: 'bg-emerald-400'},
-  { key: 'relance',          label: 'Relance',         bg: 'bg-pink-50',   text: 'text-pink-700',    dot: 'bg-pink-400'   },
-  { key: 'flyer',            label: 'Flyer envoyé',    bg: 'bg-slate-100', text: 'text-slate-600',   dot: 'bg-slate-400'  },
-  { key: 'refuse',           label: 'Refusé',           bg: 'bg-red-50',    text: 'text-red-700',     dot: 'bg-red-400'    },
-  { key: 'refuse_client',    label: 'Refus client',     bg: 'bg-red-50',    text: 'text-red-600',     dot: 'bg-red-300'    },
-  { key: 'refuse_traiteur',  label: 'Refus traiteur',   bg: 'bg-rose-50',   text: 'text-rose-700',    dot: 'bg-rose-400'   },
+  { key: 'nouveau',          label: 'Nouveau',          bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400'     },
+  { key: 'broch_envoyee',    label: 'Brochure envoyée', bg: 'bg-slate-100',  text: 'text-slate-600',   dot: 'bg-slate-400'   },
+  { key: 'devis_a_faire',    label: 'Devis à faire',    bg: 'bg-yellow-50',  text: 'text-yellow-700',  dot: 'bg-yellow-400'  },
+  { key: 'devis_envoye',     label: 'Devis envoyé',     bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400'   },
+  { key: 'rdv_deg_a_venir',  label: 'RDV/Dég à venir',  bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-400'  },
+  { key: 'rdv_deg_fait',     label: 'RDV/Dég fait',     bg: 'bg-purple-50',  text: 'text-purple-700',  dot: 'bg-purple-400'  },
+  { key: 'devis_final',      label: 'Devis final',      bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-400'  },
+  { key: 'valide',           label: 'Validé',           bg: 'bg-teal-50',    text: 'text-teal-700',    dot: 'bg-teal-400'    },
+  { key: 'acompte',          label: 'Acompte reçu',     bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400' },
+  { key: 'paye',             label: 'Payé',             bg: 'bg-green-50',   text: 'text-green-700',   dot: 'bg-green-500'   },
+  { key: 'refus_client',     label: 'Refus client',     bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-300'     },
+  { key: 'refus_traiteur',   label: 'Refus traiteur',   bg: 'bg-rose-50',    text: 'text-rose-700',    dot: 'bg-rose-400'    },
 ];
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map((s) => [s.key, s]));

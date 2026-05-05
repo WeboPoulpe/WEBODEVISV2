@@ -7,12 +7,13 @@ import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, ArrowRight, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X,
+  BookCopy, Library, X, UploadCloud, FileText, Download,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
+import ImportDevisModal from '@/components/devis/ImportDevisModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -62,16 +63,16 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
   conference: Briefcase, séminaire: Briefcase, seminaire: Briefcase,
 };
 const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string; column: string; colBorder: string }> = {
-  draft:    { label: 'Brouillon',   dot: 'bg-gray-400',    badge: 'bg-gray-100 text-gray-600',      column: 'bg-gray-50',       colBorder: 'border-gray-200' },
+  draft:    { label: 'En attente',  dot: 'bg-gray-400',    badge: 'bg-gray-100 text-gray-600',      column: 'bg-gray-50',       colBorder: 'border-gray-200' },
   pending:  { label: 'En attente',  dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700',     column: 'bg-amber-50/40',   colBorder: 'border-amber-200' },
   sent:     { label: 'Envoyé',      dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700',       column: 'bg-blue-50/40',    colBorder: 'border-blue-200' },
   accepted: { label: 'Accepté',     dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700', column: 'bg-emerald-50/40', colBorder: 'border-emerald-200' },
   rejected: { label: 'Refusé',      dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700',         column: 'bg-red-50/40',     colBorder: 'border-red-200' },
 };
 const PIPELINE_ORDER = ['draft', 'pending', 'sent', 'accepted', 'rejected'];
-const STATUSES = ['Tous', 'Brouillon', 'Envoyé', 'Accepté', 'En attente', 'Refusé'];
+const STATUSES = ['Tous', 'En attente', 'Envoyé', 'Accepté', 'Refusé'];
 const STATUS_VALUES: Record<string, string> = {
-  Brouillon: 'draft', Envoyé: 'sent', Accepté: 'accepted', 'En attente': 'pending', Refusé: 'rejected',
+  'En attente': 'draft', Envoyé: 'sent', Accepté: 'accepted', Refusé: 'rejected',
 };
 
 function getEventIcon(eventType: string): React.ElementType {
@@ -478,6 +479,7 @@ export default function DevisPage() {
   const [previewTpl, setPreviewTpl] = useState<{ id: string; name: string; template: string; content_html: string | null } | null>(null);
   const [renamingTpl, setRenamingTpl] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
+  const [importModal, setImportModal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -637,6 +639,9 @@ export default function DevisPage() {
 
   const filtered = quotes.filter((q) => {
     const matchSearch = !search || q.client_name?.toLowerCase().includes(search.toLowerCase()) || q.event_type?.toLowerCase().includes(search.toLowerCase());
+    // Hide rejected quotes by default — only show them when filter is explicitly "Refusé"
+    const isRejected = q.status === 'rejected' || q.status === 'refuse_client' || q.status === 'refuse_traiteur';
+    if (isRejected && activeStatus !== 'Refusé') return false;
     const matchStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
     return matchSearch && matchStatus;
   });
@@ -666,6 +671,14 @@ export default function DevisPage() {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => setImportModal(true)}
+            title="Importer un devis déjà fait dans un autre logiciel"
+            className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <UploadCloud className="h-4 w-4" />
+            <span className="hidden sm:inline">Importer</span>
+          </button>
           <Link href="/devis/nouveau"
             className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors">
             <Plus className="h-4 w-4" />Nouveau
@@ -816,6 +829,22 @@ export default function DevisPage() {
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}
       {/* ── Template preview sheet ─────────────────────────────────────── */}
+      {/* ── Import devis modal ─────────────────────────────────────────── */}
+      <ImportDevisModal
+        open={importModal}
+        onClose={() => setImportModal(false)}
+        onCreated={() => {
+          // Reload quotes
+          if (!user) return;
+          createClient()
+            .from('quotes')
+            .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services')
+            .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
+            .order('created_at', { ascending: false })
+            .then(({ data }) => { if (data) setQuotes(data); });
+        }}
+      />
+
       {previewTpl && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPreviewTpl(null)} />

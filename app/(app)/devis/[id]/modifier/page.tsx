@@ -96,6 +96,8 @@ export default async function ModifierPage({
         eventDate:     quote.event_date     ?? null,
         eventLocation: quote.event_location ?? null,
         guestCount:    quote.guest_count    ?? null,
+        guestCountAdults:   (quote as { guest_count_adults?: number | null }).guest_count_adults ?? null,
+        guestCountChildren: (quote as { guest_count_children?: number | null }).guest_count_children ?? null,
         services: services
           .filter((s) => !s.isPageBreak)
           .map((s) => ({
