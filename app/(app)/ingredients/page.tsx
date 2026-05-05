@@ -231,6 +231,10 @@ function IngredientModal({
   const [unit,        setUnit]        = useState(initial?.unit         ?? 'Unité');
   const [imageUrl,    setImageUrl]    = useState(initial?.image_url    ?? '');
   const [offId,       setOffId]       = useState(initial?.off_product_id ?? '');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [minStockAlert, setMinStockAlert] = useState(String((initial as any)?.min_stock_alert ?? ''));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [volumeUnitPrice, setVolumeUnitPrice] = useState(String((initial as any)?.volume_unit_price ?? ''));
   const [saving,      setSaving]      = useState(false);
 
   // OFF autocomplete
@@ -272,7 +276,12 @@ function IngredientModal({
       unit: unit || 'Unité',
       image_url: imageUrl || null,
       off_product_id: offId || null,
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      min_stock_alert: parseFloat(minStockAlert) || 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      volume_unit_price: parseFloat(volumeUnitPrice) || 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
     setSaving(false);
   };
 
@@ -384,6 +393,36 @@ function IngredientModal({
               placeholder="Ex. : Volaille, Fromage, Champignons…"
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
             />
+          </div>
+
+          {/* Stock + Prix */}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Seuil d&apos;alerte <span className="text-gray-400 font-normal">(optionnel)</span>
+              </label>
+              <input
+                type="number" min={0} step={0.01}
+                value={minStockAlert}
+                onChange={(e) => setMinStockAlert(e.target.value)}
+                placeholder="10"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Alerte si stock ≤ ce seuil</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Prix unitaire (€) <span className="text-gray-400 font-normal">(optionnel)</span>
+              </label>
+              <input
+                type="number" min={0} step={0.01}
+                value={volumeUnitPrice}
+                onChange={(e) => setVolumeUnitPrice(e.target.value)}
+                placeholder="2.50"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">€ par {unit || 'unité'}</p>
+            </div>
           </div>
         </div>
 

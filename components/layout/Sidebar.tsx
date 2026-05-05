@@ -46,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/evenements',  icon: CalendarRange, label: 'Événements',  exact: false },
       { href: '/extras',      icon: Users2,        label: 'Extras',      exact: false },
       { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
+      { href: '/stock',           icon: Boxes,          label: 'Stock',            exact: false },
       { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
       { href: '/fournisseurs',       icon: Truck,          label: 'Fournisseurs',      exact: false },
       { href: '/location-globale',   icon: Boxes,          label: 'Location globale',  exact: false },
