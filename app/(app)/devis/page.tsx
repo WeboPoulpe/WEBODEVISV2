@@ -7,13 +7,14 @@ import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, ArrowRight, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X, UploadCloud, FileText, Download,
+  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 import ImportDevisModal from '@/components/devis/ImportDevisModal';
+import FinanceSheet from '@/components/devis/FinanceSheet';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -247,7 +248,7 @@ function DevisSheet({
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void }) {
+function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onOpenFinance: (id: string) => void }) {
   const Icon = getEventIcon(quote.event_type || '');
   return (
     <div className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200">
@@ -286,6 +287,10 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate }: { quote: Quote
           <button onClick={() => onDuplicate(quote.id)} title="Dupliquer"
             className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
             <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => onOpenFinance(quote.id)} title="Gestion financière"
+            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+            <Wallet className="h-3.5 w-3.5" />
           </button>
           <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
             className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
@@ -480,6 +485,7 @@ export default function DevisPage() {
   const [renamingTpl, setRenamingTpl] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
   const [importModal, setImportModal] = useState(false);
+  const [financeQuoteId, setFinanceQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -815,7 +821,7 @@ export default function DevisPage() {
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />)}
+          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} />)}
         </div>
       ) : view === 'table' ? (
         <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
@@ -829,6 +835,13 @@ export default function DevisPage() {
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}
       {/* ── Template preview sheet ─────────────────────────────────────── */}
+      {/* ── Finance sheet (gestion financière du devis) ────────────────── */}
+      <FinanceSheet
+        open={financeQuoteId !== null}
+        quoteId={financeQuoteId}
+        onClose={() => setFinanceQuoteId(null)}
+      />
+
       {/* ── Import devis modal ─────────────────────────────────────────── */}
       <ImportDevisModal
         open={importModal}

@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
+import { usePrestationCategories } from '@/hooks/usePrestationCategories';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Prestation {
@@ -400,6 +401,13 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
   const [costPrice, setCostPrice] = useState(String((initial as any)?.cost_price ?? ''));
   const [category, setCategory] = useState(initial?.category ?? '');
   const [subCategory, setSubCategory] = useState(initial?.sub_category ?? '');
+  const [categoryId, setCategoryId] = useState<string>((initial as Prestation & { category_id?: string | null })?.category_id ?? '');
+  const [subCategoryId, setSubCategoryId] = useState<string>((initial as Prestation & { sub_category_id?: string | null })?.sub_category_id ?? '');
+  const { categories: dbCategories, subcategoriesFor, reload: reloadCategories } = usePrestationCategories();
+  const [creatingCat, setCreatingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [creatingSubCat, setCreatingSubCat] = useState(false);
+  const [newSubCatName, setNewSubCatName] = useState('');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [isOption, setIsOption] = useState(initial?.is_option ?? false);
   const [loading, setLoading] = useState(false);
@@ -457,6 +465,39 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
     }
   };
 
+  const createCategory = async () => {
+    if (!user || !newCatName.trim()) return;
+    const sb = createClient();
+    const { data, error } = await sb.from('prestation_categories').insert({
+      user_id: user.id, name: newCatName.trim(),
+    }).select().single();
+    if (error) { alert('Erreur: ' + error.message); return; }
+    if (data) {
+      await reloadCategories();
+      setCategoryId(data.id);
+      setSubCategoryId('');
+      setCategory(data.name); // sync legacy string field
+    }
+    setNewCatName('');
+    setCreatingCat(false);
+  };
+
+  const createSubCategory = async () => {
+    if (!user || !newSubCatName.trim() || !categoryId) return;
+    const sb = createClient();
+    const { data, error } = await sb.from('prestation_subcategories').insert({
+      user_id: user.id, category_id: categoryId, name: newSubCatName.trim(),
+    }).select().single();
+    if (error) { alert('Erreur: ' + error.message); return; }
+    if (data) {
+      await reloadCategories();
+      setSubCategoryId(data.id);
+      setSubCategory(data.name);
+    }
+    setNewSubCatName('');
+    setCreatingSubCat(false);
+  };
+
   const handleSaveAndWebo = async () => {
     if (!name.trim() || !price) { setError('Nom et prix requis.'); return; }
     if (!user) return;
@@ -468,6 +509,8 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
       cost_price: parseFloat(costPrice) || 0,
       category: category.trim() || null,
       sub_category: subCategory.trim() || null,
+      category_id: categoryId || null,
+      sub_category_id: subCategoryId || null,
       is_option: isOption,
       user_id: user.id,
     };
@@ -495,6 +538,8 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
       cost_price: parseFloat(costPrice) || 0,
       category: category.trim() || null,
       sub_category: subCategory.trim() || null,
+      category_id: categoryId || null,
+      sub_category_id: subCategoryId || null,
       description: description.trim() || null,
       is_option: isOption,
       user_id: user.id,
@@ -553,32 +598,93 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
+              {/* Catégorie dynamique avec création inline */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Catégorie</label>
-                <select
-                  value={category}
-                  onChange={(e) => { setCategory(e.target.value); setSubCategory(''); }}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
-                >
-                  <option value="">— Aucune —</option>
-                  {CATEGORIES.filter(c => c.key !== 'all').map(c => (
-                    <option key={c.key} value={c.key}>{c.label}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center justify-between">
+                  Catégorie
+                  <button type="button" onClick={() => setCreatingCat((v) => !v)} className="text-[10px] text-[#9c27b0] hover:underline font-normal">
+                    {creatingCat ? 'Annuler' : '+ Nouvelle'}
+                  </button>
+                </label>
+                {creatingCat ? (
+                  <div className="flex gap-1.5">
+                    <input
+                      autoFocus
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') createCategory(); if (e.key === 'Escape') setCreatingCat(false); }}
+                      placeholder="Nom de la catégorie…"
+                      className="flex-1 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
+                    />
+                    <button type="button" onClick={createCategory} className="px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
+                      <Check className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={categoryId}
+                    onChange={(e) => {
+                      setCategoryId(e.target.value);
+                      setSubCategoryId('');
+                      const cat = dbCategories.find((c) => c.id === e.target.value);
+                      setCategory(cat?.name || '');
+                      setSubCategory('');
+                    }}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                  >
+                    <option value="">— Aucune —</option>
+                    {dbCategories.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.user_id ? ' ⭐' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
+
+              {/* Sous-catégorie dynamique avec création inline */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Sous-catégorie</label>
-                <select
-                  value={subCategory}
-                  onChange={(e) => setSubCategory(e.target.value)}
-                  disabled={!category || !SUB_CATEGORIES[category]}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors disabled:bg-gray-50 disabled:text-gray-400"
-                >
-                  <option value="">— Aucune —</option>
-                  {category && SUB_CATEGORIES[category]?.map((sc) => (
-                    <option key={sc} value={sc}>{sc}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center justify-between">
+                  Sous-catégorie
+                  {categoryId && (
+                    <button type="button" onClick={() => setCreatingSubCat((v) => !v)} className="text-[10px] text-[#9c27b0] hover:underline font-normal">
+                      {creatingSubCat ? 'Annuler' : '+ Nouvelle'}
+                    </button>
+                  )}
+                </label>
+                {creatingSubCat ? (
+                  <div className="flex gap-1.5">
+                    <input
+                      autoFocus
+                      value={newSubCatName}
+                      onChange={(e) => setNewSubCatName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') createSubCategory(); if (e.key === 'Escape') setCreatingSubCat(false); }}
+                      placeholder="Nom de la sous-catégorie…"
+                      className="flex-1 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
+                    />
+                    <button type="button" onClick={createSubCategory} className="px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
+                      <Check className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={subCategoryId}
+                    onChange={(e) => {
+                      setSubCategoryId(e.target.value);
+                      const sub = subcategoriesFor(categoryId).find((s) => s.id === e.target.value);
+                      setSubCategory(sub?.name || '');
+                    }}
+                    disabled={!categoryId}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors disabled:bg-gray-50 disabled:text-gray-400"
+                  >
+                    <option value="">— Aucune —</option>
+                    {subcategoriesFor(categoryId).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}{s.user_id ? ' ⭐' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
