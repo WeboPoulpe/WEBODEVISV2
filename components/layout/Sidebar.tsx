@@ -8,7 +8,7 @@ import {
   Package, Settings, Carrot, LayoutTemplate,
   LogOut, ChevronLeft, ChevronRight, UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench,
   User, Calendar as CalendarIcon, Palette, Image as ImageIcon, ArrowLeft,
-  Save, Printer, Download,
+  Save, Printer, Download, Shield, FolderTree, Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -26,6 +26,8 @@ interface NavItem {
 interface NavGroup {
   title: string;
   items: NavItem[];
+  /** If set, group is collapsible and starts collapsed unless an item inside is active */
+  collapsible?: boolean;
 }
 
 // ── Navigation structure ──────────────────────────────────────────────────────
@@ -40,29 +42,45 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: 'Logistique',
+    title: 'Production',
     items: [
-      { href: '/calendrier',  icon: CalendarDays,  label: 'Calendrier',  exact: false, badge: 'todayEvent' },
-      { href: '/evenements',  icon: CalendarRange, label: 'Événements',  exact: false },
-      { href: '/extras',      icon: Users2,        label: 'Extras',      exact: false },
-      { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
-      { href: '/stock',           icon: Boxes,          label: 'Stock',            exact: false, badge: 'stockAlert' },
-      { href: '/commandes',       icon: ShoppingBasket, label: 'Commandes',        exact: false },
-      { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
-      { href: '/fournisseurs',       icon: Truck,          label: 'Fournisseurs',      exact: false },
-      { href: '/location-globale',   icon: Boxes,          label: 'Location globale',  exact: false },
-      { href: '/courses-globales',   icon: ShoppingBasket, label: 'Courses globales',  exact: false },
+      { href: '/calendrier', icon: CalendarDays,   label: 'Calendrier', exact: false, badge: 'todayEvent' },
+      { href: '/evenements', icon: CalendarRange,  label: 'Événements', exact: false },
+      { href: '/commandes',  icon: ShoppingBasket, label: 'Commandes',  exact: false },
     ],
   },
   {
-    title: 'Configuration',
+    title: 'Stock',
     items: [
-      { href: '/parametres', icon: Settings,        label: 'Paramètres',     exact: false },
-      { href: '/modeles',    icon: LayoutTemplate,  label: 'Modèles de devis', exact: false },
-      { href: '/location-templates', icon: Wrench,  label: 'Templates location', exact: false },
+      { href: '/stock', icon: Boxes, label: 'Stock', exact: false, badge: 'stockAlert' },
+    ],
+  },
+  {
+    title: 'Catalogue',
+    collapsible: true,
+    items: [
+      { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
+      { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
+      { href: '/extras',          icon: Users2,         label: 'Extras',           exact: false },
+      { href: '/location-globale',   icon: Boxes,       label: 'Location',         exact: false },
+      { href: '/courses-globales',   icon: ShoppingBasket, label: 'Courses globales', exact: false },
+      { href: '/fournisseurs',    icon: Truck,          label: 'Fournisseurs',     exact: false },
+    ],
+  },
+  {
+    title: 'Paramètres',
+    collapsible: true,
+    items: [
+      { href: '/parametres/categories', icon: FolderTree,     label: 'Catégories',         exact: false },
+      { href: '/parametres',            icon: Building2,      label: 'Profil entreprise',  exact: true  },
+      { href: '/modeles',               icon: LayoutTemplate, label: 'Modèles de devis',   exact: false },
+      { href: '/location-templates',    icon: Wrench,         label: 'Templates location', exact: false },
     ],
   },
 ];
+
+// Optional admin link (added at runtime if profile.role === 'admin')
+const ADMIN_ITEM: NavItem = { href: '/admin', icon: Shield, label: 'Espace admin', exact: false };
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface SidebarProps {
@@ -109,7 +127,15 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [stockAlertCount, setStockAlertCount] = useState(0);
   const [hasTodayEvent, setHasTodayEvent] = useState(false);
   const [newProspects, setNewProspects]   = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { user } = useAuth();
+
+  // Inject "Espace admin" link in Paramètres group when role=admin
+  const effectiveGroups: NavGroup[] = NAV_GROUPS.map((g) =>
+    g.title === 'Paramètres' && profile?.role === 'admin'
+      ? { ...g, items: [...g.items, ADMIN_ITEM] }
+      : g,
+  );
 
   // Load badge data
   useEffect(() => {
@@ -323,11 +349,25 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </nav>
       ) : (
       <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden scrollbar-none">
-        {NAV_GROUPS.map((group, gi) => (
+        {effectiveGroups.map((group, gi) => {
+          const groupHasActive = group.items.some((it) => isActive(it));
+          const isOpen = !group.collapsible || groupHasActive || openGroups[group.title];
+          return (
           <div key={group.title} className={gi > 0 ? 'mt-5' : ''}>
             {/* Group label */}
             {collapsed ? (
               <div className="mx-auto my-2 w-6 h-px bg-white/[0.08]" />
+            ) : group.collapsible ? (
+              <button
+                onClick={() => setOpenGroups((s) => ({ ...s, [group.title]: !isOpen }))}
+                className="w-full flex items-center justify-between px-5 mb-1 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase select-none hover:text-white/50 transition-colors"
+              >
+                <span>{group.title}</span>
+                <ChevronRight
+                  className={cn('h-3 w-3 transition-transform', isOpen ? 'rotate-90' : '')}
+                  strokeWidth={2}
+                />
+              </button>
             ) : (
               <p className="px-5 mb-1 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase select-none">
                 {group.title}
@@ -335,6 +375,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
 
             {/* Items */}
+            {(!group.collapsible || isOpen || collapsed) && (
             <div className="space-y-px">
               {group.items.map((item) => {
                 const active = isActive(item);
@@ -399,8 +440,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 );
               })}
             </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </nav>
       )}
 
