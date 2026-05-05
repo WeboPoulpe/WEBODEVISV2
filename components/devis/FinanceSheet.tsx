@@ -32,28 +32,27 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
         setServices(svcs.filter((s) => !s.isPageBreak && s.name));
         setVatRate(data.vat_rate ?? 20);
 
-        // Fetch cost_price for each prestation by name
-        const names = Array.from(new Set(svcs.filter((s) => s.name && !s.isPageBreak).map((s) => s.name)));
-        if (names.length > 0) {
-          const { data: prestations } = await sb.from('prestations')
-            .select('name, cost_price')
-            .in('name', names);
-          const map: Record<string, number> = {};
-          (prestations || []).forEach((p: { name: string; cost_price: number | null }) => {
-            map[p.name] = p.cost_price ?? 0;
-          });
-          setCostMap(map);
-        }
+        // Fetch cost_price for ALL user's prestations (case-insensitive match later)
+        const { data: prestations } = await sb.from('prestations').select('name, cost_price');
+        const map: Record<string, number> = {};
+        (prestations || []).forEach((p: { name: string; cost_price: number | null }) => {
+          const key = (p.name || '').trim().toLowerCase();
+          if (key) map[key] = p.cost_price ?? 0;
+        });
+        setCostMap(map);
         setLoading(false);
       });
   }, [open, quoteId]);
+
+  // Case-insensitive cost lookup
+  const costFor = (name: string) => costMap[(name || '').trim().toLowerCase()] || 0;
 
   if (!open) return null;
 
   // Calculations
   const activeServices = services.filter((s) => !s.removed);
   const ca_ht = activeServices.reduce((sum, s) => sum + (s.isFree ? 0 : s.quantity * s.unitPrice), 0);
-  const totalCost = activeServices.reduce((sum, s) => sum + s.quantity * (costMap[s.name] || 0), 0);
+  const totalCost = activeServices.reduce((sum, s) => sum + s.quantity * costFor(s.name), 0);
   const extraTotal = extraCosts.reduce((sum, e) => sum + e.amount, 0);
   const totalChargesHT = totalCost + extraTotal;
   const margeHT = ca_ht - totalChargesHT;
@@ -140,10 +139,11 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                   <div className="divide-y divide-gray-100">
                     {activeServices.map((svc, idx) => {
                       const sale = svc.isFree ? 0 : svc.quantity * svc.unitPrice;
-                      const cost = svc.quantity * (costMap[svc.name] || 0);
+                      const unitCost = costFor(svc.name);
+                      const cost = svc.quantity * unitCost;
                       const m = sale - cost;
                       const pct = sale > 0 ? (m / sale) * 100 : 0;
-                      const hasCost = costMap[svc.name] !== undefined && costMap[svc.name] > 0;
+                      const hasCost = unitCost > 0;
                       return (
                         <div key={idx} className="grid grid-cols-[1fr_70px_70px_70px_70px] gap-2 px-4 py-2.5 items-center text-xs">
                           <div className="min-w-0">
