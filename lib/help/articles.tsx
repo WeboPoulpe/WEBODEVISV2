@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import {
   Rocket, FileText, Users, CalendarRange, Boxes, Package, Settings,
-  Plus, Send, Save, Download, Printer, Search, Trash2, Pencil,
-  ChevronDown, MoreHorizontal, Bell, ArrowRight, Eye, Wallet,
+  Plus, Send, Save, Download, Printer, Search, Trash2, Pencil, Copy,
+  ChevronDown, Bell, ArrowRight, Eye, Wallet, Heart,
   LayoutDashboard, UserCheck, ShoppingBasket, Carrot, Truck, FolderTree,
   LayoutTemplate, Wrench, Building2, Shield, CalendarDays, Users2,
   type LucideIcon,
@@ -285,24 +285,64 @@ const Pointer = ({ n, label, children }: { n: number; label: string; children: R
   </div>
 );
 
-/** Quote row mockup — like a real card on the Devis page */
-const QuoteCardMockup = ({ name, status, amount, date, withMenu = true }: {
-  name: string; status: { color: 'gray'|'amber'|'blue'|'green'|'red'; label: string }; amount: string; date: string; withMenu?: boolean;
+/** Quote card mockup — fidèle à la vraie carte de la page Devis */
+const QuoteCardMockup = ({ name, eventType = 'Mariage', status, amount, date, guests = 100, highlightAction }: {
+  name: string;
+  eventType?: string;
+  status: { color: 'gray'|'amber'|'blue'|'green'|'red'; label: string };
+  amount: string;
+  date: string;
+  guests?: number;
+  /** Optionally pulse one action button to indicate "click here" */
+  highlightAction?: 'apercu' | 'pdf' | 'duplicate' | 'finance' | 'weboword' | 'delete';
 }) => (
-  <div className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-3 max-w-md">
-    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center flex-shrink-0">
-      <FileText className="h-4 w-4 text-[#9c27b0]" />
+  <div className="bg-white border border-gray-200 rounded-2xl p-4 max-w-sm">
+    {/* Header: icon + name + event type */}
+    <div className="flex items-center gap-3 mb-3">
+      <div className="w-10 h-10 rounded-xl bg-[#f3e5f5] flex items-center justify-center flex-shrink-0">
+        <Heart className="h-4 w-4 text-[#9c27b0]" />
+      </div>
+      <div className="min-w-0">
+        <p className="font-semibold text-gray-900 text-sm truncate">{name}</p>
+        <p className="text-xs text-gray-500 truncate">{eventType}</p>
+      </div>
     </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-      <p className="text-[10px] text-gray-500">{date} · {amount}</p>
+
+    {/* Date + couverts */}
+    <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-3">
+      <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{date}</span>
+      <span className="flex items-center gap-1"><Users className="h-3 w-3" />{guests} couverts</span>
     </div>
-    <StatusPill color={status.color} label={status.label} />
-    {withMenu && (
-      <button className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-gray-100 rounded-md transition-colors">
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-    )}
+
+    {/* Amount + status */}
+    <div className="pt-3 border-t border-gray-100 flex items-center justify-between mb-2.5">
+      <p className="font-bold text-gray-900 text-sm">{amount}<span className="text-[10px] font-normal text-gray-400 ml-1">TTC</span></p>
+      <StatusPill color={status.color} label={status.label} />
+    </div>
+
+    {/* Action row : Aperçu + 5 icônes */}
+    <div className="flex items-center gap-1">
+      <div className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium text-gray-500 border border-gray-200 rounded-lg ${highlightAction === 'apercu' ? 'ring-2 ring-rose-400 ring-offset-1 animate-pulse' : ''}`}>
+        <Eye className="h-3 w-3" /> Aperçu
+      </div>
+      <div className={`p-1.5 text-gray-400 ${highlightAction === 'pdf' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse' : ''}`}><Printer className="h-3 w-3" /></div>
+      <div className={`p-1.5 text-gray-400 ${highlightAction === 'duplicate' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-[#9c27b0]' : ''}`}><Copy className="h-3 w-3" /></div>
+      <div className={`p-1.5 text-gray-400 ${highlightAction === 'finance' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-emerald-600' : ''}`}><Wallet className="h-3 w-3" /></div>
+      <div className={`p-1.5 text-[#9c27b0]/50 ${highlightAction === 'weboword' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-[#9c27b0]' : ''}`}><LayoutTemplate className="h-3 w-3" /></div>
+      <div className={`p-1.5 text-gray-300 ${highlightAction === 'delete' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-rose-500' : ''}`}><Trash2 className="h-3 w-3" /></div>
+    </div>
+  </div>
+);
+
+/** Légende des 6 actions disponibles sur une carte devis */
+const QuoteCardActionsLegend = () => (
+  <div className="grid grid-cols-2 gap-2 text-xs">
+    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"><Eye className="h-3.5 w-3.5 text-gray-500" /> <span><strong>Aperçu</strong> — sheet latérale</span></div>
+    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"><Printer className="h-3.5 w-3.5 text-gray-500" /> <span><strong>PDF</strong> — imprimer</span></div>
+    <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><Copy className="h-3.5 w-3.5 text-[#9c27b0]" /> <span><strong>Dupliquer</strong></span></div>
+    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg"><Wallet className="h-3.5 w-3.5 text-emerald-600" /> <span><strong>Finance</strong></span></div>
+    <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><LayoutTemplate className="h-3.5 w-3.5 text-[#9c27b0]" /> <span><strong>WeboWord</strong> — éditer</span></div>
+    <div className="flex items-center gap-2 p-2 bg-rose-50 rounded-lg"><Trash2 className="h-3.5 w-3.5 text-rose-500" /> <span><strong>Supprimer</strong> (brouillons)</span></div>
   </div>
 );
 
@@ -476,20 +516,21 @@ export const HELP_ARTICLES: HelpArticle[] = [
         <Note>Le devis est sauvegardé automatiquement à chaque modification — tu ne perds jamais ton travail, même si tu fermes l'onglet.</Note>
 
         <Section icon="🎯" title="Après l'envoi">
-          <P>Tu retrouves ton devis sous cette forme dans la liste :</P>
+          <P>Tu retrouves ton devis sous cette forme dans la liste — la rangée du bas contient 6 actions :</P>
           <QuoteCardMockup
-            name="M. et Mme MARTIN — Mariage"
+            name="M. et Mme MARTIN"
+            eventType="Mariage"
             status={{ color: 'blue', label: 'Envoyé' }}
             amount="11 540 €"
             date="29 mai 2027"
           />
           <Bullets items={[
             <>Quand le client accepte → passe en <StatusPill color="green" label="Accepté" />, devient un événement visible dans le calendrier.</>,
-            <>Tu peux dupliquer ce devis pour un client similaire (icône <MoreHorizontal className="inline h-3 w-3" /> sur la carte).</>,
+            <>Tu peux dupliquer ce devis pour un client similaire avec l'icône <Copy className="inline h-3 w-3 text-[#9c27b0]" /> sur la carte.</>,
           ]} />
         </Section>
 
-        <Tip>Pour aller encore plus vite, sauvegarde ton devis comme <strong>modèle</strong> (menu <MoreHorizontal className="inline h-3 w-3" /> sur la carte). Tu pourras réutiliser sa structure en un clic.</Tip>
+        <Tip>Pour aller encore plus vite, sauvegarde ton devis comme <strong>modèle</strong> au moment de la duplication (case à cocher dans la modal). Tu pourras le réutiliser via le bandeau "Mes modèles" en haut de la page Devis.</Tip>
       </div>
     ),
   },
@@ -612,33 +653,19 @@ export const HELP_ARTICLES: HelpArticle[] = [
         <Lead>Plutôt que de tout refaire à la main, dupliquer ou modéliser un devis existant fait gagner ~80% du temps sur des devis similaires.</Lead>
 
         <Section icon="📋" title="Dupliquer un devis (one-shot)">
-          <P>Sur la liste des devis, repère la carte du devis source :</P>
+          <P>Sur la liste des devis, en bas de chaque carte tu as une rangée de 6 boutons d'action. Le bouton <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> est dédié à la duplication :</P>
           <QuoteCardMockup
-            name="M. et Mme MARTIN — Mariage"
-            status={{ color: 'green', label: 'Accepté' }}
-            amount="11 540 €"
+            name="RICHARD"
+            eventType="Mariage"
+            status={{ color: 'gray', label: 'En attente' }}
+            amount="13 848,00 €"
             date="29 mai 2027"
+            guests={100}
+            highlightAction="duplicate"
           />
-          <P>Clique sur l'icône <MoreHorizontal className="inline h-3.5 w-3.5 text-gray-500" /> à droite de la carte → menu déroulant :</P>
-          <Frame>
-            <div className="bg-white border border-gray-200 rounded-lg p-1 max-w-[180px]">
-              <div className="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                <Pencil className="h-3 w-3" /> Modifier
-              </div>
-              <div className="px-3 py-1.5 text-xs text-[#9c27b0] hover:bg-purple-50 cursor-pointer font-semibold flex items-center gap-2 bg-purple-50/40">
-                <FileText className="h-3 w-3" /> Dupliquer
-              </div>
-              <div className="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                <Save className="h-3 w-3" /> Sauvegarder comme modèle
-              </div>
-              <div className="border-t border-gray-100 mt-1 pt-1">
-                <div className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer flex items-center gap-2">
-                  <Trash2 className="h-3 w-3" /> Supprimer
-                </div>
-              </div>
-            </div>
-          </Frame>
-          <P>Une copie est créée immédiatement avec :</P>
+          <Note>Les 6 actions de la carte (de gauche à droite) :</Note>
+          <QuoteCardActionsLegend />
+          <P>Une fois <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> cliqué, une copie est créée immédiatement avec :</P>
           <Bullets items={[
             <>Toutes les prestations, prix, remarques, style et images.</>,
             <>Le statut <StatusPill color="gray" label="Brouillon" />.</>,
@@ -649,11 +676,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
         </Section>
 
         <Section icon="📚" title="Créer un modèle réutilisable">
-          <P>Si tu vends souvent la même structure (ex : "Mariage 100 couverts standard"), modélise-la une bonne fois :</P>
-          <Step n={1} title="Ouvre le menu d'un devis abouti">Icône <Code>⋯</Code> sur la carte.</Step>
-          <Step n={2} title="Choisis « Sauvegarder comme modèle »">Donne-lui un nom parlant (ex : <Code>Mariage 100p Premium</Code>).</Step>
+          <P>Si tu vends souvent la même structure (ex : "Mariage 100 couverts standard"), tu peux la sauvegarder comme modèle au moment où tu duplique :</P>
+          <Step n={1} title="Clique sur Dupliquer (icône Copy)">Sur la carte du devis source.</Step>
+          <Step n={2} title="Dans la modal qui s'ouvre, coche « Sauvegarder aussi comme modèle »">Renseigne un nom parlant (ex : <Code>Mariage 100p Premium</Code>).</Step>
           <Step n={3} title="Réutilise-le">
-            <P>Sur la page Devis, clique le bandeau <Code>Mes modèles (3)</Code>. Choisis le modèle → un nouveau devis est créé avec sa structure complète.</P>
+            <P>Sur la page Devis, juste sous le titre, tu vois <RealBtn label="Mes modèles (3)" variant="secondary" />. Clique → tu vois la liste de tes modèles → choisis-en un → nouveau devis créé avec sa structure complète.</P>
           </Step>
         </Section>
 
@@ -809,7 +836,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
 
         <Section icon="🔁" title="Avenants (bonne pratique)">
           <P>Pour un changement après acceptation officielle :</P>
-          <Step n={1} title="Duplique le devis original">Menu <Code>⋯ → Dupliquer</Code>.</Step>
+          <Step n={1} title="Duplique le devis original">Icône <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> sur la carte.</Step>
           <Step n={2} title="Renomme-le « [Nom client] - Avenant 1 »">Pour la traçabilité.</Step>
           <Step n={3} title="Applique les modifications et envoie">Le client a alors les 2 documents : original + avenant.</Step>
         </Section>
