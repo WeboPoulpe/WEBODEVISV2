@@ -399,6 +399,8 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
   const [price, setPrice] = useState(String(initial?.unit_price ?? ''));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [costPrice, setCostPrice] = useState(String((initial as any)?.cost_price ?? ''));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [childPrice, setChildPrice] = useState(String((initial as any)?.child_unit_price ?? ''));
   const [category, setCategory] = useState(initial?.category ?? '');
   const [subCategory, setSubCategory] = useState(initial?.sub_category ?? '');
   const [categoryId, setCategoryId] = useState<string>((initial as Prestation & { category_id?: string | null })?.category_id ?? '');
@@ -507,6 +509,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
       name: name.trim(),
       unit_price: parseFloat(price) || 0,
       cost_price: parseFloat(costPrice) || 0,
+      child_unit_price: childPrice ? parseFloat(childPrice) : null,
       category: category.trim() || null,
       sub_category: subCategory.trim() || null,
       category_id: categoryId || null,
@@ -536,6 +539,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
       name: name.trim(),
       unit_price: parseFloat(price) || 0,
       cost_price: parseFloat(costPrice) || 0,
+      child_unit_price: childPrice ? parseFloat(childPrice) : null,
       category: category.trim() || null,
       sub_category: subCategory.trim() || null,
       category_id: categoryId || null,
@@ -587,16 +591,21 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               label="Nom *" value={name} onChange={setName}
               ref={inputRef} placeholder="Plateau cocktail dînatoire"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Field
                 label="Prix unitaire HT *" value={price} onChange={setPrice}
                 type="number" placeholder="85.00"
+              />
+              <Field
+                label="Prix enfant" value={childPrice} onChange={setChildPrice}
+                type="number" placeholder="40.00"
               />
               <Field
                 label="Prix de revient" value={costPrice} onChange={setCostPrice}
                 type="number" placeholder="50.00"
               />
             </div>
+            <p className="text-[10px] text-gray-400 italic -mt-2">💡 Prix enfant optionnel — utilisé si renseigné, sinon prix adulte appliqué pour tous</p>
             <div className="grid grid-cols-2 gap-3">
               {/* Catégorie dynamique avec création inline */}
               <div>

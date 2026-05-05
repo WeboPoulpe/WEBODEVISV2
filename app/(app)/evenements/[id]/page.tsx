@@ -8,7 +8,7 @@ import {
   Plus, Trash2, Printer, Loader2, ChevronUp, ChevronDown,
   UtensilsCrossed, Search, X, Smartphone, Users2,
   ChevronLeft, ChevronRight, Pencil, Check, ExternalLink, Wand2,
-  MapPin, Users, Calendar, CreditCard, Eye,
+  MapPin, Users, Calendar, CreditCard, Eye, CheckCircle2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -119,6 +119,7 @@ interface RentalItem {
   supplier: Supplier | null;
   source?: string | null;
   ordered?: boolean;
+  confirmed_individually?: boolean;
 }
 
 interface RentalTemplate {
@@ -415,6 +416,14 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
   const toggleOrdered = async (id: string, ordered: boolean) => {
     await createClient().from('rental_items').update({ ordered }).eq('id', id);
     setRentalItems((p) => p.map((r) => r.id === id ? { ...r, ordered } : r));
+  };
+
+  const toggleConfirmedIndividually = async (id: string, confirmed: boolean) => {
+    await createClient().from('rental_items').update({
+      confirmed_individually: confirmed,
+      confirmed_at: confirmed ? new Date().toISOString() : null,
+    }).eq('id', id);
+    setRentalItems((p) => p.map((r) => r.id === id ? { ...r, confirmed_individually: confirmed } : r));
   };
 
   const generateFromTemplates = async () => {
@@ -883,7 +892,17 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                           ].join(' ')}>
                             {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
                           </span>
+                          {r.confirmed_individually && (
+                            <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold flex-shrink-0">commandé séparément</span>
+                          )}
                           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleConfirmedIndividually(r.id, !r.confirmed_individually); }}
+                              title={r.confirmed_individually ? 'Réintégrer dans Location globale' : 'Marquer comme commandé séparément (masque de Location globale)'}
+                              className={`p-1.5 rounded-lg transition-all ${r.confirmed_individually ? 'text-amber-600 hover:bg-amber-100' : 'text-gray-300 hover:text-amber-600 hover:bg-amber-50'}`}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                            </button>
                             <button
                               onClick={() => startEditRental(r)}
                               className="p-1.5 text-gray-300 hover:text-[#9c27b0] rounded-lg hover:bg-purple-50 transition-all"

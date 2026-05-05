@@ -38,6 +38,9 @@ interface Quote {
   user_id: string | null;       // null on true V1 devis (old system)
   owner_user_id: string | null;
   services: QuoteService[] | null;
+  imported?: boolean | null;
+  imported_file_url?: string | null;
+  imported_file_name?: string | null;
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
@@ -262,8 +265,20 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance }:
             <p className="text-sm text-gray-500 capitalize truncate">{quote.event_type || 'Événement'}</p>
           </div>
         </div>
-        {!quote.user_id && <div className="flex-shrink-0"><V1Badge /></div>}
+        <div className="flex-shrink-0 flex items-center gap-1">
+          {quote.imported && (
+            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Importé</span>
+          )}
+          {!quote.user_id && <V1Badge />}
+        </div>
       </div>
+      {quote.imported && quote.imported_file_url && (
+        <a href={quote.imported_file_url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 hover:bg-amber-100 transition-colors">
+          <Download className="h-3 w-3" />
+          <span className="truncate flex-1">{quote.imported_file_name || 'Document original'}</span>
+        </a>
+      )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm text-gray-500">
         {quote.event_date && <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-gray-400" />{formatDate(quote.event_date)}</span>}
         {quote.guest_count && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-gray-400" />{quote.guest_count} couvert{quote.guest_count > 1 ? 's' : ''}</span>}
@@ -492,7 +507,7 @@ export default function DevisPage() {
     const supabase = createClient();
     Promise.all([
       supabase.from('quotes')
-        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services')
+        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name')
         .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false }),
       supabase.from('devis_templates')
@@ -851,7 +866,7 @@ export default function DevisPage() {
           if (!user) return;
           createClient()
             .from('quotes')
-            .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services')
+            .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name')
             .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
             .order('created_at', { ascending: false })
             .then(({ data }) => { if (data) setQuotes(data); });

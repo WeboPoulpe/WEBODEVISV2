@@ -58,7 +58,8 @@ export default function LocationGlobalePage() {
     const { data: rentals } = await supabase
       .from('rental_items')
       .select('*, supplier:suppliers(id, name)')
-      .in('quote_id', quoteIds);
+      .in('quote_id', quoteIds)
+      .or('confirmed_individually.is.null,confirmed_individually.eq.false');
 
     if (!rentals || rentals.length === 0) {
       setRows([]);
