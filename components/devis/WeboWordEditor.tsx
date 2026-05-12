@@ -660,22 +660,17 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const supabase = createClient();
     let { error: err } = await supabase
       .from('quotes')
-      .update({ content_html: html, selected_font: font, selected_font_size: fontSize })
+      .update({ content_html: html, selected_font: font, selected_font_size: fontSize, cover_page_config: coverConfig, photos_page_config: photosConfig })
       .eq('id', quoteId);
     if (err?.message?.includes('selected_font_size') || err?.code === '42703') {
       const res = await supabase
         .from('quotes')
-        .update({ content_html: html, selected_font: font })
+        .update({ content_html: html, selected_font: font, cover_page_config: coverConfig, photos_page_config: photosConfig })
         .eq('id', quoteId);
       err = res.error;
     }
     setSaving(false);
     if (err) { setError(err.message); return; }
-    // Save cover/photos configs
-    await supabase
-      .from('quotes')
-      .update({ cover_page_config: coverConfig, photos_page_config: photosConfig })
-      .eq('id', quoteId);
     setToast('Devis enregistré avec succès 🎉');
     // 🎊 Confetti explosion!
     triggerConfetti();
