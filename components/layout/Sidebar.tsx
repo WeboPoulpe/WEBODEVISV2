@@ -121,6 +121,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { key: 'event', icon: CalendarIcon, label: 'Événement' },
     { key: 'style', icon: Palette, label: 'Style' },
     { key: 'images', icon: ImageIcon, label: 'Images' },
+    { key: 'cover', icon: LayoutTemplate, label: 'Page de garde' },
+    { key: 'photos', icon: ImageIcon, label: 'Page photos' },
   ];
 
   const [pendingDevis, setPendingDevis]   = useState(0);
