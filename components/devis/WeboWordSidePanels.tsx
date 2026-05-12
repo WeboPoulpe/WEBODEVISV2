@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   User, Package, Calendar, Palette, Image as ImageIcon,
   X, Search, Loader2, Check, Plus, Trash2, Wand2, ChevronLeft,
-  Save, Printer, Download, GripVertical,
+  Save, Printer, Download, GripVertical, LayoutTemplate,
 } from 'lucide-react';
+import { PhotoBuilder } from './weboword/PhotoBuilder';
+import { DEFAULT_TRANSFORM } from './weboword/weboword.types';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
-type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images';
+type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
 interface Props {
   quoteId: string;
@@ -24,6 +26,10 @@ interface Props {
   // Menu width (gastro card)
   menuWidth?: string;
   onMenuWidthChange?: (w: string) => void;
+  coverConfig?: import('./weboword/weboword.types').CoverPageConfig
+  onCoverChange?: (c: import('./weboword/weboword.types').CoverPageConfig) => void
+  photosConfig?: import('./weboword/weboword.types').PhotosPageConfig
+  onPhotosChange?: (c: import('./weboword/weboword.types').PhotosPageConfig) => void
 }
 
 const MENU_WIDTHS = [
@@ -38,7 +44,7 @@ interface Client { id: string; first_name: string | null; last_name: string | nu
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; [key: string]: any; }
 
-export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, menuWidth, onMenuWidthChange }: Props) {
+export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,6 +81,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   // Drag & drop reorder
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [editingServicePhotoIdx, setEditingServicePhotoIdx] = useState<number | null>(null);
 
   const onDragStart = (e: React.DragEvent, idx: number) => {
     setDragIdx(idx);
@@ -255,6 +262,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
             {activePanel === 'event' && <><Calendar className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Événement & Options</h2></>}
             {activePanel === 'style' && <><Palette className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Style</h2></>}
             {activePanel === 'images' && <><ImageIcon className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Images</h2></>}
+            {activePanel === 'cover' && <><LayoutTemplate className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Page de garde</h2></>}
+            {activePanel === 'photos' && <><ImageIcon className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Page photos</h2></>}
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
             <X className="h-4 w-4" />
@@ -413,11 +422,49 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               </select>
                             </div>
                           </div>
+                          {/* Photo per prestation */}
+                          <div className="mt-2 flex items-center gap-2">
+                            {(svc as { photo_url?: string }).photo_url ? (
+                              <div className="relative w-12 h-12 rounded overflow-hidden border">
+                                <img src={(svc as { photo_url?: string }).photo_url} className="w-full h-full object-cover" alt="" />
+                                <button
+                                  onClick={() => setEditingServicePhotoIdx(idx)}
+                                  className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-xs transition-opacity"
+                                >Modifier</button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setEditingServicePhotoIdx(idx)}
+                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-600 border border-dashed border-gray-200 rounded px-2 py-1"
+                              >
+                                + Photo
+                              </button>
+                            )}
+                          </div>
                         </div>
                         ))}
                       </>
                     )}
                   </div>
+                  {editingServicePhotoIdx !== null && (
+                    <PhotoBuilder
+                      initial={(services[editingServicePhotoIdx] as { photo_url?: string })?.photo_url
+                        ? { id: String(editingServicePhotoIdx), url: (services[editingServicePhotoIdx] as { photo_url?: string }).photo_url!, transform: DEFAULT_TRANSFORM }
+                        : undefined
+                      }
+                      frameAspect={1}
+                      onApply={async (photo) => {
+                        const svc = services[editingServicePhotoIdx]
+                        const svcId = (svc as { id?: string }).id
+                        if (svcId) {
+                          await supabase.from('prestations').update({ photo_url: photo.url }).eq('id', svcId)
+                        }
+                        setServices(prev => prev.map((s, i) => i === editingServicePhotoIdx ? { ...s, photo_url: photo.url } : s))
+                        setEditingServicePhotoIdx(null)
+                      }}
+                      onClose={() => setEditingServicePhotoIdx(null)}
+                    />
+                  )}
                 </>
               )}
 
@@ -568,6 +615,88 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
               {activePanel === 'images' && (
                 <p className="text-xs text-gray-400 italic text-center py-8">Gestion des images — à venir</p>
               )}
+
+              {/* COVER PANEL */}
+              {activePanel === 'cover' && coverConfig && onCoverChange && (
+                <div className="flex flex-col gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={coverConfig.enabled}
+                      onChange={e => onCoverChange({ ...coverConfig, enabled: e.target.checked })}
+                      className="w-4 h-4 accent-[#9c27b0]" />
+                    <span className="text-sm text-gray-700">Activer la page de garde</span>
+                  </label>
+
+                  {coverConfig.enabled && (
+                    <>
+                      <div className="flex rounded-lg border overflow-hidden text-sm">
+                        <button
+                          onClick={() => onCoverChange({ ...coverConfig, mode: 'template' })}
+                          className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'template' ? 'bg-[#9c27b0] text-white' : 'hover:bg-gray-50'}`}>
+                          Templates
+                        </button>
+                        <button
+                          onClick={() => onCoverChange({ ...coverConfig, mode: 'builder' })}
+                          className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'builder' ? 'bg-[#9c27b0] text-white' : 'hover:bg-gray-50'}`}>
+                          Builder libre
+                        </button>
+                      </div>
+
+                      {coverConfig.mode === 'template' && (
+                        <>
+                          <div>
+                            <p className={labelCls}>Template</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {(['mariage', 'gastronomique', 'business', 'provence', 'luxe'] as const).map(t => (
+                                <button key={t}
+                                  onClick={() => onCoverChange({ ...coverConfig, template: t })}
+                                  className={`py-2 px-3 rounded-lg border text-sm capitalize transition-colors ${coverConfig.template === t ? 'bg-[#faf5ff] border-[#9c27b0] text-[#9c27b0] font-medium' : 'hover:bg-gray-50'}`}>
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {[
+                            { key: 'clientName', label: 'Nom du client', placeholder: 'M. et Mme Dupont', type: 'text' },
+                            { key: 'address', label: 'Lieu / adresse', placeholder: 'Château de Versailles', type: 'text' },
+                            { key: 'eventDate', label: 'Date', placeholder: '', type: 'date' },
+                            { key: 'title', label: 'Titre', placeholder: 'Proposition gastronomique', type: 'text' },
+                            { key: 'subtitle', label: 'Sous-titre', placeholder: 'Mariage — 120 couverts', type: 'text' },
+                          ].map(({ key, label, placeholder, type }) => (
+                            <div key={key}>
+                              <label className={labelCls}>{label}</label>
+                              <input
+                                type={type}
+                                value={(coverConfig as unknown as Record<string, string>)[key] ?? ''}
+                                placeholder={placeholder}
+                                onChange={e => onCoverChange({ ...coverConfig, [key]: e.target.value })}
+                                className={inputCls}
+                              />
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* PHOTOS PANEL */}
+              {activePanel === 'photos' && photosConfig && onPhotosChange && (
+                <div className="flex flex-col gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={photosConfig.enabled}
+                      onChange={e => onPhotosChange({ ...photosConfig, enabled: e.target.checked })}
+                      className="w-4 h-4 accent-[#9c27b0]" />
+                    <span className="text-sm text-gray-700">Activer la page photos</span>
+                  </label>
+                  {photosConfig.enabled && (
+                    <p className="text-sm text-gray-400 bg-gray-50 rounded-lg p-3">
+                      Gérez vos photos directement dans la page photos en bas du document.
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -596,6 +725,8 @@ export function SidePanelIcons({ activePanel, onSelect }: { activePanel: PanelKe
     { key: 'event', icon: Calendar, label: 'Événement' },
     { key: 'style', icon: Palette, label: 'Style' },
     { key: 'images', icon: ImageIcon, label: 'Images' },
+    { key: 'cover', icon: LayoutTemplate, label: 'Page de garde' },
+    { key: 'photos', icon: ImageIcon, label: 'Page photos' },
   ];
   return (
     <div className="flex-shrink-0 w-14 bg-white border-r border-gray-200 flex flex-col items-center pt-4 gap-1 print:hidden">
