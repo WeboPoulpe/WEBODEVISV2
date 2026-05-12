@@ -78,6 +78,53 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [prestationResults, setPrestationResults] = useState<any[]>([]);
   const [showPrestationPicker, setShowPrestationPicker] = useState(false);
 
+  // ── Saved templates (cover + photos) — localStorage ──
+  type SavedTemplate<T> = { id: string; name: string; config: T }
+  const [savedCoverTemplates, setSavedCoverTemplates] = useState<SavedTemplate<CoverPageConfig>[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('weboword_cover_templates') ?? '[]') } catch { return [] }
+  })
+  const [savedPhotosTemplates, setSavedPhotosTemplates] = useState<SavedTemplate<PhotosPageConfig>[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('weboword_photos_templates') ?? '[]') } catch { return [] }
+  })
+  const [saveCoverName, setSaveCoverName] = useState('')
+  const [savePhotosName, setSavePhotosName] = useState('')
+  const [showSaveCoverInput, setShowSaveCoverInput] = useState(false)
+  const [showSavePhotosInput, setShowSavePhotosInput] = useState(false)
+
+  function saveCoverTemplate() {
+    if (!coverConfig || !saveCoverName.trim()) return
+    const tpl: SavedTemplate<CoverPageConfig> = { id: crypto.randomUUID(), name: saveCoverName.trim(), config: { ...coverConfig } }
+    const next = [...savedCoverTemplates, tpl]
+    setSavedCoverTemplates(next)
+    localStorage.setItem('weboword_cover_templates', JSON.stringify(next))
+    setSaveCoverName('')
+    setShowSaveCoverInput(false)
+  }
+
+  function deleteCoverTemplate(id: string) {
+    const next = savedCoverTemplates.filter(t => t.id !== id)
+    setSavedCoverTemplates(next)
+    localStorage.setItem('weboword_cover_templates', JSON.stringify(next))
+  }
+
+  function savePhotosTemplate() {
+    if (!photosConfig || !savePhotosName.trim()) return
+    const tpl: SavedTemplate<PhotosPageConfig> = { id: crypto.randomUUID(), name: savePhotosName.trim(), config: { ...photosConfig } }
+    const next = [...savedPhotosTemplates, tpl]
+    setSavedPhotosTemplates(next)
+    localStorage.setItem('weboword_photos_templates', JSON.stringify(next))
+    setSavePhotosName('')
+    setShowSavePhotosInput(false)
+  }
+
+  function deletePhotosTemplate(id: string) {
+    const next = savedPhotosTemplates.filter(t => t.id !== id)
+    setSavedPhotosTemplates(next)
+    localStorage.setItem('weboword_photos_templates', JSON.stringify(next))
+  }
+
   // Drag & drop reorder
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -677,6 +724,46 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                           ))}
                         </>
                       )}
+
+                      {/* Saved templates */}
+                      <div className="border-t pt-4 mt-2">
+                        <p className={labelCls}>Modèles enregistrés</p>
+                        {savedCoverTemplates.length === 0 && (
+                          <p className="text-xs text-gray-400 italic mb-2">Aucun modèle enregistré</p>
+                        )}
+                        {savedCoverTemplates.map(tpl => (
+                          <div key={tpl.id} className="flex items-center gap-2 mb-1.5">
+                            <button
+                              onClick={() => onCoverChange({ ...tpl.config, enabled: coverConfig.enabled })}
+                              className="flex-1 text-left text-sm py-1.5 px-2.5 rounded-lg border hover:bg-purple-50 hover:border-purple-300 transition-colors truncate"
+                            >
+                              {tpl.name}
+                            </button>
+                            <button onClick={() => deleteCoverTemplate(tpl.id)} className="text-red-400 hover:text-red-600 p-1 flex-shrink-0">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {showSaveCoverInput ? (
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              autoFocus
+                              value={saveCoverName}
+                              onChange={e => setSaveCoverName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveCoverTemplate(); if (e.key === 'Escape') setShowSaveCoverInput(false) }}
+                              placeholder="Nom du modèle…"
+                              className={inputCls + ' flex-1'}
+                            />
+                            <button onClick={saveCoverTemplate} disabled={!saveCoverName.trim()} className="px-3 py-1.5 bg-[#9c27b0] text-white text-sm rounded-lg disabled:opacity-50">
+                              <Check className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowSaveCoverInput(true)} className="flex items-center gap-1.5 text-sm text-[#9c27b0] hover:text-[#7b1fa2] mt-1">
+                            <Save className="w-3.5 h-3.5" /> Enregistrer comme modèle
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -692,9 +779,51 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                     <span className="text-sm text-gray-700">Activer la page photos</span>
                   </label>
                   {photosConfig.enabled && (
-                    <p className="text-sm text-gray-400 bg-gray-50 rounded-lg p-3">
-                      Gérez vos photos directement dans la page photos en bas du document.
-                    </p>
+                    <>
+                      <p className="text-sm text-gray-400 bg-gray-50 rounded-lg p-3">
+                        Gérez vos photos directement dans la page photos en bas du document.
+                      </p>
+
+                      {/* Saved photos templates */}
+                      <div className="border-t pt-4 mt-2">
+                        <p className={labelCls}>Modèles enregistrés</p>
+                        {savedPhotosTemplates.length === 0 && (
+                          <p className="text-xs text-gray-400 italic mb-2">Aucun modèle enregistré</p>
+                        )}
+                        {savedPhotosTemplates.map(tpl => (
+                          <div key={tpl.id} className="flex items-center gap-2 mb-1.5">
+                            <button
+                              onClick={() => onPhotosChange({ ...tpl.config, enabled: photosConfig.enabled })}
+                              className="flex-1 text-left text-sm py-1.5 px-2.5 rounded-lg border hover:bg-purple-50 hover:border-purple-300 transition-colors truncate"
+                            >
+                              {tpl.name}
+                            </button>
+                            <button onClick={() => deletePhotosTemplate(tpl.id)} className="text-red-400 hover:text-red-600 p-1 flex-shrink-0">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {showSavePhotosInput ? (
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              autoFocus
+                              value={savePhotosName}
+                              onChange={e => setSavePhotosName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') savePhotosTemplate(); if (e.key === 'Escape') setShowSavePhotosInput(false) }}
+                              placeholder="Nom du modèle…"
+                              className={inputCls + ' flex-1'}
+                            />
+                            <button onClick={savePhotosTemplate} disabled={!savePhotosName.trim()} className="px-3 py-1.5 bg-[#9c27b0] text-white text-sm rounded-lg disabled:opacity-50">
+                              <Check className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowSavePhotosInput(true)} className="flex items-center gap-1.5 text-sm text-[#9c27b0] hover:text-[#7b1fa2] mt-1">
+                            <Save className="w-3.5 h-3.5" /> Enregistrer comme modèle
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               )}

@@ -1323,8 +1323,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
         {/* Devis editor (A4) */}
         <div
-          style={{ width: '210mm', minHeight: '297mm' }}
-          className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full print:min-h-0"
+          style={{ width: '210mm' }}
+          className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full"
         >
           <style>{`
             #weboword-sheet,
@@ -1364,7 +1364,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             suppressContentEditableWarning
             spellCheck
             style={{ padding: '20mm', fontSize: `${fontSize}px`, lineHeight: lineHeight }}
-            className="outline-none min-h-[297mm] prose prose-sm max-w-none focus:ring-2 focus:ring-[#9c27b0]/20 rounded-lg"
+            className="outline-none min-h-[120px] prose prose-sm max-w-none focus:ring-2 focus:ring-[#9c27b0]/20 rounded-lg"
             data-placeholder="Cliquez ici pour commencer à modifier votre devis…"
           />
         </div>
