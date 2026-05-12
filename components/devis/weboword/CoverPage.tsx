@@ -19,29 +19,13 @@ export function CoverPage({ config, onChange }: Props) {
   const templateHtml = COVER_TEMPLATES[config.template](config)
 
   if (config.mode === 'builder') {
-    return (
-      <>
-        <CoverPageBuilder config={config} onChange={onChange} />
-        {showPhotoBuilder && (
-          <PhotoBuilder
-            initial={config.photoUrl ? { id: 'cover', url: config.photoUrl, transform: config.photoTransform } : undefined}
-            frameAspect={16 / 9}
-            onApply={photo => {
-              onChange({ ...config, photoUrl: photo.url, photoTransform: photo.transform })
-              setShowPhotoBuilder(false)
-            }}
-            onClose={() => setShowPhotoBuilder(false)}
-          />
-        )}
-      </>
-    )
+    return <CoverPageBuilder config={config} onChange={onChange} />
   }
 
   return (
-    <>
+    <div className="relative group">
       {/* Template preview via dangerouslySetInnerHTML */}
       <div
-        className="relative group"
         dangerouslySetInnerHTML={{ __html: templateHtml }}
       />
       {/* Photo edit overlay button */}
@@ -76,6 +60,6 @@ export function CoverPage({ config, onChange }: Props) {
           onClose={() => setShowPhotoBuilder(false)}
         />
       )}
-    </>
+    </div>
   )
 }
