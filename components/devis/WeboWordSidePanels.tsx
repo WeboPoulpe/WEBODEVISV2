@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { PhotoBuilder } from './weboword/PhotoBuilder';
 import { DEFAULT_TRANSFORM } from './weboword/weboword.types';
+import type { CoverPageConfig, PhotosPageConfig } from './weboword/weboword.types';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -22,14 +23,13 @@ interface Props {
   onSave?: () => void;
   onPrint?: () => void;
   onSavePdf?: () => void;
-  saving?: boolean;
   // Menu width (gastro card)
   menuWidth?: string;
   onMenuWidthChange?: (w: string) => void;
-  coverConfig?: import('./weboword/weboword.types').CoverPageConfig
-  onCoverChange?: (c: import('./weboword/weboword.types').CoverPageConfig) => void
-  photosConfig?: import('./weboword/weboword.types').PhotosPageConfig
-  onPhotosChange?: (c: import('./weboword/weboword.types').PhotosPageConfig) => void
+  coverConfig?: CoverPageConfig;
+  onCoverChange?: (c: CoverPageConfig) => void;
+  photosConfig?: PhotosPageConfig;
+  onPhotosChange?: (c: PhotosPageConfig) => void;
 }
 
 const MENU_WIDTHS = [
@@ -42,7 +42,7 @@ const MENU_WIDTHS = [
 interface Client { id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; [key: string]: any; }
+interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; photo_url?: string; [key: string]: any; }
 
 export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
   const supabase = createClient();
@@ -424,9 +424,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                           </div>
                           {/* Photo per prestation */}
                           <div className="mt-2 flex items-center gap-2">
-                            {(svc as { photo_url?: string }).photo_url ? (
+                            {svc.photo_url ? (
                               <div className="relative w-12 h-12 rounded overflow-hidden border">
-                                <img src={(svc as { photo_url?: string }).photo_url} className="w-full h-full object-cover" alt="" />
+                                <img src={svc.photo_url} className="w-full h-full object-cover" alt="" />
                                 <button
                                   onClick={() => setEditingServicePhotoIdx(idx)}
                                   className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center text-white text-xs transition-opacity"
@@ -448,17 +448,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   </div>
                   {editingServicePhotoIdx !== null && (
                     <PhotoBuilder
-                      initial={(services[editingServicePhotoIdx] as { photo_url?: string })?.photo_url
-                        ? { id: String(editingServicePhotoIdx), url: (services[editingServicePhotoIdx] as { photo_url?: string }).photo_url!, transform: DEFAULT_TRANSFORM }
+                      initial={services[editingServicePhotoIdx]?.photo_url
+                        ? { id: String(editingServicePhotoIdx), url: services[editingServicePhotoIdx].photo_url!, transform: DEFAULT_TRANSFORM }
                         : undefined
                       }
                       frameAspect={1}
-                      onApply={async (photo) => {
-                        const svc = services[editingServicePhotoIdx]
-                        const svcId = (svc as { id?: string }).id
-                        if (svcId) {
-                          await supabase.from('prestations').update({ photo_url: photo.url }).eq('id', svcId)
-                        }
+                      onApply={(photo) => {
                         setServices(prev => prev.map((s, i) => i === editingServicePhotoIdx ? { ...s, photo_url: photo.url } : s))
                         setEditingServicePhotoIdx(null)
                       }}
@@ -640,6 +635,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                           Builder libre
                         </button>
                       </div>
+
+                      {coverConfig.mode === 'builder' && (
+                        <p className="text-sm text-gray-400 bg-gray-50 rounded-lg p-3">
+                          Utilisez le canevas A4 visible dans le document pour construire votre page de garde librement.
+                        </p>
+                      )}
 
                       {coverConfig.mode === 'template' && (
                         <>
