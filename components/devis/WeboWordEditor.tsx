@@ -245,6 +245,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [coverConfig, setCoverConfig] = useState<CoverPageConfig>(DEFAULT_COVER_CONFIG);
   const [photosConfig, setPhotosConfig] = useState<PhotosPageConfig>(DEFAULT_PHOTOS_CONFIG);
   const [showPhotoBlockPicker, setShowPhotoBlockPicker] = useState(false);
+  const savedRange = useRef<Range | null>(null);
 
   // ── Load Google Font when font changes ────────────────────────────────────
   useEffect(() => {
@@ -293,11 +294,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       const supabase = createClient();
       const { data } = await supabase
         .from('quotes')
-        .select('cover_page_config, photos_page_config')
+        .select('cover_page_config, photos_page_config, client_name, client_address, event_date, event_location, event_type')
         .eq('id', quoteId)
         .single();
       if (data?.cover_page_config) {
         setCoverConfig(data.cover_page_config as CoverPageConfig);
+      } else if (data) {
+        // Pre-fill cover config from quote data on first use
+        setCoverConfig(prev => ({
+          ...prev,
+          clientName: data.client_name || '',
+          address: data.event_location || '',
+          eventDate: data.event_date || '',
+          title: data.event_type ? `Proposition — ${data.event_type}` : 'Proposition gastronomique',
+          subtitle: data.event_location || '',
+        }));
       }
       if (data?.photos_page_config) {
         setPhotosConfig(data.photos_page_config as PhotosPageConfig);
@@ -1273,7 +1284,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </TB>
           <Sep />
           <TB
-            onClick={() => setShowPhotoBlockPicker(true)}
+            onClick={() => {
+              const sel = window.getSelection();
+              if (sel && sel.rangeCount > 0) savedRange.current = sel.getRangeAt(0).cloneRange();
+              setShowPhotoBlockPicker(true);
+            }}
             title="Insérer un bloc photo"
           >
             <ImagePlus className="h-3.5 w-3.5" />
@@ -1347,7 +1362,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         </div>
 
         {/* Page photos */}
-        {photosConfig.enabled && photosConfig.pages.length > 0 && (
+        {photosConfig.enabled && (
           <>
             <PageBreakIndicator label="Page photos" />
             <div
@@ -1671,6 +1686,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         <PhotoBlockPicker
           onInsert={html => {
             editorRef.current?.focus();
+            if (savedRange.current) {
+              const sel = window.getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(savedRange.current);
+              savedRange.current = null;
+            }
             document.execCommand('insertHTML', false, html);
             setShowPhotoBlockPicker(false);
           }}
