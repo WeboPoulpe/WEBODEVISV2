@@ -7,15 +7,23 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
-  PenLine, History, X, Search,
+  PenLine, History, X, Search, Image as ImageIcon, ImagePlus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { useAuth } from '@/context/AuthContext';
 import WeboWordSidePanels from './WeboWordSidePanels';
+import { CoverPage } from './weboword/CoverPage';
+import { PhotosPage } from './weboword/PhotosPage';
+import { PageBreakIndicator } from './weboword/PageBreakIndicator';
+import { PhotoBlockPicker } from './weboword/PhotoBlock';
+import {
+  type CoverPageConfig, type PhotosPageConfig,
+  DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG,
+} from './weboword/weboword.types';
 
-type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images';
+type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Props {
@@ -189,7 +197,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const update = () => {
       if (typeof window === 'undefined') return;
       const p = new URLSearchParams(window.location.search).get('panel');
-      if (p === 'client' || p === 'services' || p === 'event' || p === 'style' || p === 'images') {
+      if (p === 'client' || p === 'services' || p === 'event' || p === 'style' || p === 'images' || p === 'cover' || p === 'photos') {
         setActivePanel(p);
       } else {
         setActivePanel(null);
@@ -233,6 +241,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }>({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
   const [showFontMenu, setShowFontMenu] = useState(false);
   const [menuWidth, setMenuWidth] = useState('100%');
+  const [coverConfig, setCoverConfig] = useState<CoverPageConfig>(DEFAULT_COVER_CONFIG);
+  const [photosConfig, setPhotosConfig] = useState<PhotosPageConfig>(DEFAULT_PHOTOS_CONFIG);
+  const [showPhotoBlockPicker, setShowPhotoBlockPicker] = useState(false);
 
   // ── Load Google Font when font changes ────────────────────────────────────
   useEffect(() => {
@@ -274,6 +285,25 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       editorRef.current.style.lineHeight = lineHeight;
     }
   }, [fontSize, lineHeight]);
+
+  // Load cover/photos configs from Supabase on mount
+  useEffect(() => {
+    async function loadConfigs() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('quotes')
+        .select('cover_page_config, photos_page_config')
+        .eq('id', quoteId)
+        .single();
+      if (data?.cover_page_config) {
+        setCoverConfig(data.cover_page_config as CoverPageConfig);
+      }
+      if (data?.photos_page_config) {
+        setPhotosConfig(data.photos_page_config as PhotosPageConfig);
+      }
+    }
+    loadConfigs();
+  }, [quoteId]);
 
   // Apply menuWidth to .gastro-menu div (bake before save/print)
   const applyMenuWidth = (width: string) => {
@@ -641,6 +671,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
     setSaving(false);
     if (err) { setError(err.message); return; }
+    // Save cover/photos configs
+    await supabase
+      .from('quotes')
+      .update({ cover_page_config: coverConfig, photos_page_config: photosConfig })
+      .eq('id', quoteId);
     setToast('Devis enregistré avec succès 🎉');
     // 🎊 Confetti explosion!
     triggerConfetti();
@@ -1216,11 +1251,49 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             </select>
           </div>
 
+          <Sep />
+          <TB
+            onClick={() => setActivePanel(activePanel === 'cover' ? null : 'cover')}
+            title="Page de garde"
+            active={activePanel === 'cover'}
+          >
+            <LayoutTemplate className="h-3.5 w-3.5" />
+          </TB>
+          <TB
+            onClick={() => setActivePanel(activePanel === 'photos' ? null : 'photos')}
+            title="Page photos"
+            active={activePanel === 'photos'}
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+          </TB>
+          <Sep />
+          <TB
+            onClick={() => setShowPhotoBlockPicker(true)}
+            title="Insérer un bloc photo"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+          </TB>
+
         </div>
       </div>
 
       {/* ── A4 workspace ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto py-8 px-4 print:p-0 print:overflow-visible">
+
+        {/* Page de garde */}
+        {coverConfig.enabled && (
+          <>
+            <div
+              style={{ width: '210mm' }}
+              className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full relative overflow-hidden"
+            >
+              <CoverPage config={coverConfig} onChange={setCoverConfig} />
+            </div>
+            <PageBreakIndicator label="Page 2 — Devis" />
+          </>
+        )}
+
+        {/* Devis editor (A4) */}
         <div
           style={{ width: '210mm', minHeight: '297mm' }}
           className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full print:min-h-0"
@@ -1268,7 +1341,20 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           />
         </div>
 
-        {/* Bottom padding for visual comfort */}
+        {/* Page photos */}
+        {photosConfig.enabled && photosConfig.pages.length > 0 && (
+          <>
+            <PageBreakIndicator label="Page photos" />
+            <div
+              style={{ width: '210mm' }}
+              className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full p-8"
+            >
+              <PhotosPage config={photosConfig} onChange={setPhotosConfig} />
+            </div>
+          </>
+        )}
+
+        {/* Bottom padding */}
         <div className="h-12 print:hidden" />
       </div>
 
@@ -1278,6 +1364,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         activePanel={activePanel}
         menuWidth={menuWidth}
         onMenuWidthChange={(w) => applyMenuWidth(w)}
+        coverConfig={coverConfig}
+        onCoverChange={setCoverConfig}
+        photosConfig={photosConfig}
+        onPhotosChange={setPhotosConfig}
         onClose={() => {
           setActivePanel(null);
           // Remove panel query param
@@ -1569,6 +1659,18 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             </div>
           </div>
         </div>
+      )}
+
+      {/* Photo block picker modal */}
+      {showPhotoBlockPicker && (
+        <PhotoBlockPicker
+          onInsert={html => {
+            editorRef.current?.focus();
+            document.execCommand('insertHTML', false, html);
+            setShowPhotoBlockPicker(false);
+          }}
+          onClose={() => setShowPhotoBlockPicker(false)}
+        />
       )}
 
     </div>
