@@ -22,6 +22,7 @@ import {
   type CoverPageConfig, type PhotosPageConfig,
   DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG,
 } from './weboword/weboword.types';
+import { buildCoverPageHtml, buildPhotosPageHtml } from './weboword/printHelpers';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -726,6 +727,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const fontImport = fontEntry?.google
       ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
       : '';
+    const coverHtml = buildCoverPageHtml(coverConfig)
+    const photosHtml = buildPhotosPageHtml(photosConfig)
     return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -751,7 +754,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   </style>
 </head>
 <body>
+  ${coverHtml}
   <div style="padding:20mm;">${content}</div>
+  ${photosHtml}
   <script>
     var els = document.querySelectorAll('[style]');
     var sep = false;
@@ -791,6 +796,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
       : '';
 
+    const coverHtml = buildCoverPageHtml(coverConfig)
+    const photosHtml = buildPhotosPageHtml(photosConfig)
+
     // Build a self-contained HTML document optimized for PDF printing
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -824,7 +832,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   </style>
 </head>
 <body>
+  ${coverHtml}
   <div class="pdf-wrap">${content}</div>
+  ${photosHtml}
   <script>
     window.onload = function() {
       var els = document.querySelectorAll('[style]');
