@@ -21,15 +21,24 @@ export type CoverPageTemplate = 'mariage' | 'gastronomique' | 'business' | 'prov
 export type CoverPageLayoutElement = {
   id: string
   type: 'text' | 'photo' | 'shape'
-  x: number         // px from left of A4 canvas (794px wide)
-  y: number         // px from top
-  width: number     // px
-  height: number    // px
-  content: string   // text content, photo URL, or shape color
+  x: number
+  y: number
+  width: number
+  height: number
+  content: string   // text content | photo URL | shape fill color
   fontSize?: number
+  fontFamily?: string
   fontWeight?: string
+  fontStyle?: string
+  textDecoration?: string
+  textAlign?: 'left' | 'center' | 'right'
+  letterSpacing?: number
   color?: string
   bgColor?: string
+  opacity?: number
+  borderRadius?: number
+  borderWidth?: number
+  borderColor?: string
 }
 
 export type CoverPageConfig = {
@@ -44,6 +53,7 @@ export type CoverPageConfig = {
   photoUrl: string
   photoTransform: PhotoTransform
   customLayout: CoverPageLayoutElement[]
+  canvasBg?: string
 }
 
 export const DEFAULT_COVER_CONFIG: CoverPageConfig = {

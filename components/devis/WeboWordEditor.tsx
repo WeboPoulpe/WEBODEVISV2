@@ -1312,8 +1312,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         {coverConfig.enabled && (
           <>
             <div
-              style={{ width: '210mm' }}
-              className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full relative overflow-hidden"
+              style={{ width: '210mm', minHeight: '297mm' }}
+              className="mx-auto shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full relative overflow-hidden"
             >
               <CoverPage config={coverConfig} onChange={setCoverConfig} />
             </div>

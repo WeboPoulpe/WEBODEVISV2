@@ -15,7 +15,7 @@ function dateFr(s: string) {
 // ── Template 1: Mariage ─────────────────────────────────────────────────────
 export function templateMariage(c: CoverPageConfig): string {
   return `
-<div style="width:100%;min-height:297mm;background:#fdf8f0;font-family:Georgia,serif;display:flex;flex-direction:column;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
+<div style="width:100%;height:297mm;background:#fdf8f0;font-family:Georgia,serif;display:flex;flex-direction:column;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
   ${c.photoUrl ? `
   <div style="width:100%;height:420px;overflow:hidden;position:relative;">
     <img src="${c.photoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;${photoStyle(c.photoTransform)}" />
@@ -41,7 +41,7 @@ export function templateMariage(c: CoverPageConfig): string {
 // ── Template 2: Gastronomique ──────────────────────────────────────────────
 export function templateGastronomique(c: CoverPageConfig): string {
   return `
-<div style="width:100%;min-height:297mm;background:#1a1a1a;font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;page-break-after:always;break-after:page;padding:60px 40px;box-sizing:border-box;">
+<div style="width:100%;height:297mm;background:#1a1a1a;font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;page-break-after:always;break-after:page;padding:60px 40px;box-sizing:border-box;">
   ${c.photoUrl ? `
   <div style="width:280px;height:280px;border-radius:50%;overflow:hidden;border:3px solid #c9a96e;margin-bottom:48px;flex-shrink:0;position:relative;">
     <img src="${c.photoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;${photoStyle(c.photoTransform)}" />
@@ -61,7 +61,7 @@ export function templateGastronomique(c: CoverPageConfig): string {
 // ── Template 3: Business ──────────────────────────────────────────────────
 export function templateBusiness(c: CoverPageConfig): string {
   return `
-<div style="width:100%;min-height:297mm;background:#ffffff;font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:row;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
+<div style="width:100%;height:297mm;background:#ffffff;font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:row;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
   <div style="width:8px;background:#9c27b0;flex-shrink:0;"></div>
   <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:80px 60px;">
     <p style="font-size:11px;color:#9c27b0;letter-spacing:4px;text-transform:uppercase;margin:0 0 24px;">Proposition commerciale</p>
@@ -85,7 +85,7 @@ export function templateBusiness(c: CoverPageConfig): string {
 // ── Template 4: Provence ──────────────────────────────────────────────────
 export function templateProvence(c: CoverPageConfig): string {
   return `
-<div style="width:100%;min-height:297mm;background:#f7f3ec;font-family:Georgia,serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;box-sizing:border-box;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
+<div style="width:100%;height:297mm;background:#f7f3ec;font-family:Georgia,serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;box-sizing:border-box;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
   <div style="position:absolute;top:24px;left:24px;right:24px;bottom:24px;border:1px solid #c8b89a;pointer-events:none;"></div>
   <div style="position:absolute;top:30px;left:30px;right:30px;bottom:30px;border:1px solid #e8dcc8;pointer-events:none;"></div>
   ${c.photoUrl ? `
@@ -111,7 +111,7 @@ export function templateProvence(c: CoverPageConfig): string {
 // ── Template 5: Luxe ──────────────────────────────────────────────────────
 export function templateLuxe(c: CoverPageConfig): string {
   return `
-<div style="width:100%;min-height:297mm;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
+<div style="width:100%;height:297mm;background:#0a0a0a;font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;overflow:hidden;page-break-after:always;break-after:page;">
   ${c.photoUrl ? `
   <div style="position:absolute;inset:0;overflow:hidden;">
     <img src="${c.photoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;${photoStyle(c.photoTransform)}" />
