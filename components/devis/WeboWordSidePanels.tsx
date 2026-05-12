@@ -708,10 +708,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
             <ChevronLeft className="h-4 w-4 inline mr-1" />
             Fermer
           </button>
-          <button onClick={save} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            Appliquer
-          </button>
+          {activePanel !== 'cover' && activePanel !== 'photos' && (
+            <button onClick={save} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              Appliquer
+            </button>
+          )}
         </div>
       </div>
     </>
