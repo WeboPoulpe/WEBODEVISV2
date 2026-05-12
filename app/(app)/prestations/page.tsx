@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Plus, Wine, UtensilsCrossed, Coffee, Wrench, Users, Package,
   Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy,
@@ -867,6 +867,7 @@ export default function PrestationsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [activeSub, setActiveSub] = useState<string | null>(null);
   const [modal, setModal] = useState<{ open: boolean; editing: Prestation | null }>({
     open: false, editing: null,
   });
@@ -874,7 +875,17 @@ export default function PrestationsPage() {
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [importing, setImporting] = useState(false);
-  const { categories: dbCategories } = usePrestationCategories();
+  const { categories: dbCategories, subcategoriesFor } = usePrestationCategories();
+
+  // Sous-catégories disponibles pour l'onglet actif
+  const currentSubList = useMemo(() => {
+    if (activeTab === 'all') return [];
+    if (activeTab.startsWith('id:')) {
+      const catId = activeTab.slice(3);
+      return subcategoriesFor(catId).map((s) => ({ key: s.id, label: s.name }));
+    }
+    return (SUB_CATEGORIES[activeTab] ?? []).map((s) => ({ key: s, label: s }));
+  }, [activeTab, subcategoriesFor]);
 
   // Combine hardcoded categories + DB-fetched custom categories (only those not already in hardcoded)
   const HARDCODED_KEYS = new Set(CATEGORIES.map((c) => c.key));
@@ -979,8 +990,13 @@ export default function PrestationsPage() {
       (activeTab.startsWith('id:')
         ? p.category_id === activeTab.slice(3)
         : p.category?.toLowerCase() === activeTab);
+    const matchSub = !activeSub || (
+      activeTab.startsWith('id:')
+        ? p.sub_category_id === activeSub
+        : p.sub_category === activeSub
+    );
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
-    return matchTab && matchSearch;
+    return matchTab && matchSub && matchSearch;
   });
 
   return (
@@ -1023,7 +1039,7 @@ export default function PrestationsPage() {
         {allCategories.map(({ key, label, icon: Icon, isCustom }) => (
           <button
             key={key}
-            onClick={() => setActiveTab(key)}
+            onClick={() => { setActiveTab(key); setActiveSub(null); }}
             className={[
               'flex items-center gap-1.5 flex-shrink-0 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors',
               activeTab === key
@@ -1038,6 +1054,26 @@ export default function PrestationsPage() {
           </button>
         ))}
       </div>
+
+      {/* Subcategory pills */}
+      {currentSubList.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-4">
+          {currentSubList.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveSub(activeSub === key ? null : key)}
+              className={[
+                'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                activeSub === key
+                  ? 'bg-[#9c27b0]/15 text-[#9c27b0] border border-[#9c27b0]/40'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-[#9c27b0]/30 hover:bg-[#f3e5f5]/50',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-5">
