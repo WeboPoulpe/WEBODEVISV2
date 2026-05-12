@@ -211,10 +211,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, []);
 
   // Listen for action events from sidebar (Save / Print / PDF buttons)
+  // Refs are updated on every render so listeners always call the latest version of each handler
   useEffect(() => {
-    const onSaveEvt = () => handleSave();
-    const onPrintEvt = () => handlePrint();
-    const onSavePdfEvt = () => handleSavePdf();
+    const onSaveEvt = () => handleSaveRef.current();
+    const onPrintEvt = () => handlePrintRef.current();
+    const onSavePdfEvt = () => handleSavePdfRef.current();
     window.addEventListener('weboword:save', onSaveEvt);
     window.addEventListener('weboword:print', onPrintEvt);
     window.addEventListener('weboword:savepdf', onSavePdfEvt);
@@ -223,8 +224,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       window.removeEventListener('weboword:print', onPrintEvt);
       window.removeEventListener('weboword:savepdf', onSavePdfEvt);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [font, fontSize]);
+  }, []);
   const [adminFields, setAdminFields] = useState({ clientName: '', clientEmail: '', clientPhone: '', clientAddress: '', eventType: '', eventDate: '', eventLocation: '', guestCount: '' });
   const [adminChanges, setAdminChanges] = useState<{ field: string; from: string; to: string }[]>([]);
   const [showChanges, setShowChanges] = useState(false);
@@ -246,6 +246,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [photosConfig, setPhotosConfig] = useState<PhotosPageConfig>(DEFAULT_PHOTOS_CONFIG);
   const [showPhotoBlockPicker, setShowPhotoBlockPicker] = useState(false);
   const savedRange = useRef<Range | null>(null);
+  const handlePrintRef = useRef<() => void>(() => {});
+  const handleSavePdfRef = useRef<() => void>(() => {});
+  const handleSaveRef = useRef<() => void>(() => {});
 
   // ── Load Google Font when font changes ────────────────────────────────────
   useEffect(() => {
@@ -876,6 +879,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     if (!win) { URL.revokeObjectURL(url); return; }
     win.onafterprint = () => { URL.revokeObjectURL(url); };
   };
+
+  // Keep refs up-to-date so the event listeners (registered once) always call the latest handler
+  handleSaveRef.current = handleSave;
+  handlePrintRef.current = handlePrint;
+  handleSavePdfRef.current = handleSavePdf;
 
   return (
     <div className="flex flex-col h-full bg-slate-100 relative">
