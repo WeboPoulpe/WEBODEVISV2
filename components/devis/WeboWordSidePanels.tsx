@@ -281,7 +281,6 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       template,
       language,
       services,
-      content_html: null, // Force regeneration
     }).eq('id', quoteId);
 
     setSaving(false);
