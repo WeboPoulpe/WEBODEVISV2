@@ -245,6 +245,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [coverConfig, setCoverConfig] = useState<CoverPageConfig>(DEFAULT_COVER_CONFIG);
   const [photosConfig, setPhotosConfig] = useState<PhotosPageConfig>(DEFAULT_PHOTOS_CONFIG);
   const [showPhotoBlockPicker, setShowPhotoBlockPicker] = useState(false);
+  const [localDraft, setLocalDraft] = useState<{ html: string; savedAt: string } | null>(null);
   const savedRange = useRef<Range | null>(null);
   const handlePrintRef = useRef<() => void>(() => {});
   const handleSavePdfRef = useRef<() => void>(() => {});
@@ -273,15 +274,41 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, [showFontMenu]);
 
   // Inject initial HTML once + detect existing gastro-menu width
+  // Also check for a localStorage draft newer than what the server gave us
   useEffect(() => {
     if (!initDone.current && editorRef.current) {
-      editorRef.current.innerHTML = initialHtml;
+      const draftKey = `weboword_draft_${quoteId}`;
+      try {
+        const raw = localStorage.getItem(draftKey);
+        if (raw) {
+          const draft = JSON.parse(raw) as { html: string; savedAt: string };
+          // If draft exists and DB has no content (null→generated) or draft is recent, offer restore
+          setLocalDraft(draft);
+          editorRef.current.innerHTML = initialHtml;
+        } else {
+          editorRef.current.innerHTML = initialHtml;
+        }
+      } catch {
+        editorRef.current.innerHTML = initialHtml;
+      }
       initDone.current = true;
-      // Force menu width to 100% (Plein) by default — override any saved width
       const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
       if (menu) menu.style.maxWidth = '100%';
     }
-  }, [initialHtml]);
+  }, [initialHtml, quoteId]);
+
+  // Autosave to localStorage every 30 seconds
+  useEffect(() => {
+    const draftKey = `weboword_draft_${quoteId}`;
+    const interval = setInterval(() => {
+      const html = editorRef.current?.innerHTML;
+      if (!html || !initDone.current) return;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ html, savedAt: new Date().toISOString() }));
+      } catch { /* quota exceeded — ignore */ }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [quoteId]);
 
   // Apply fontSize + lineHeight directly to DOM so contentEditable sees it immediately
   useEffect(() => {
@@ -686,6 +713,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }
     setSaving(false);
     if (err) { setError(err.message); return; }
+    // Clear local draft — content is safely in DB
+    try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
+    setLocalDraft(null);
     setToast('Devis enregistré avec succès 🎉');
     // 🎊 Confetti explosion!
     triggerConfetti();
@@ -1307,6 +1337,34 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
       {/* ── A4 workspace ─────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto py-8 px-4 print:p-0 print:overflow-visible">
+
+        {/* Local draft restore banner */}
+        {localDraft && (
+          <div className="mx-auto mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl text-sm print:hidden" style={{ width: '210mm' }}>
+            <span className="text-amber-600 font-medium flex-1">
+              💾 Brouillon local trouvé — sauvegardé le {new Date(localDraft.savedAt).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button
+              onClick={() => {
+                if (editorRef.current) editorRef.current.innerHTML = localDraft.html;
+                setLocalDraft(null);
+                setToast('Brouillon restauré — pense à sauvegarder !');
+              }}
+              className="px-3 py-1.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors flex-shrink-0"
+            >
+              Restaurer
+            </button>
+            <button
+              onClick={() => {
+                try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
+                setLocalDraft(null);
+              }}
+              className="px-3 py-1.5 text-amber-600 hover:text-amber-800 flex-shrink-0"
+            >
+              Ignorer
+            </button>
+          </div>
+        )}
 
         {/* Page de garde */}
         {coverConfig.enabled && (
