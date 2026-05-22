@@ -66,9 +66,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
-  // Initial style values — used to detect changes that require content_html regeneration
-  const [initialTemplate, setInitialTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
-  const [initialLanguage, setInitialLanguage] = useState<'fr' | 'en'>('fr');
+  // Snapshot of the data loaded from DB — used to detect changes that require
+  // content_html regeneration. We compare current form state to this snapshot;
+  // if anything that feeds into the rendered HTML has changed, content_html is
+  // reset so the page regenerates with the new data on reload.
+  const [initialSnapshot, setInitialSnapshot] = useState<string>('');
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -167,26 +169,58 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       .eq('id', quoteId).single()
       .then(({ data }) => {
         if (data) {
-          setClientName(data.client_name || '');
-          setClientEmail(data.client_email || '');
-          setClientPhone(data.client_phone || '');
-          setClientAddress(data.client_address || '');
-          setEventType(data.event_type || '');
-          setEventDate(data.event_date || '');
-          setEventLocation(data.event_location || '');
-          setGuestCount(data.guest_count ? String(data.guest_count) : '');
-          setGuestAdults(data.guest_count_adults ? String(data.guest_count_adults) : '');
-          setGuestChildren(data.guest_count_children ? String(data.guest_count_children) : '');
-          setRemarks(data.remarks || '');
-          setVatRate(data.vat_rate ?? 20);
-          setHidePrice(data.hide_price ?? false);
+          const loadedClientName = data.client_name || '';
+          const loadedClientEmail = data.client_email || '';
+          const loadedClientPhone = data.client_phone || '';
+          const loadedClientAddress = data.client_address || '';
+          const loadedEventType = data.event_type || '';
+          const loadedEventDate = data.event_date || '';
+          const loadedEventLocation = data.event_location || '';
+          const loadedGuestCount = data.guest_count ? String(data.guest_count) : '';
+          const loadedGuestAdults = data.guest_count_adults ? String(data.guest_count_adults) : '';
+          const loadedGuestChildren = data.guest_count_children ? String(data.guest_count_children) : '';
+          const loadedRemarks = data.remarks || '';
+          const loadedVatRate = data.vat_rate ?? 20;
+          const loadedHidePrice = data.hide_price ?? false;
           const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business') || 'standard';
           const loadedLanguage = (data.language as 'fr' | 'en') || 'fr';
+          const loadedServices = Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : [];
+
+          setClientName(loadedClientName);
+          setClientEmail(loadedClientEmail);
+          setClientPhone(loadedClientPhone);
+          setClientAddress(loadedClientAddress);
+          setEventType(loadedEventType);
+          setEventDate(loadedEventDate);
+          setEventLocation(loadedEventLocation);
+          setGuestCount(loadedGuestCount);
+          setGuestAdults(loadedGuestAdults);
+          setGuestChildren(loadedGuestChildren);
+          setRemarks(loadedRemarks);
+          setVatRate(loadedVatRate);
+          setHidePrice(loadedHidePrice);
           setTemplate(loadedTemplate);
           setLanguage(loadedLanguage);
-          setInitialTemplate(loadedTemplate);
-          setInitialLanguage(loadedLanguage);
-          setServices(Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : []);
+          setServices(loadedServices);
+
+          setInitialSnapshot(JSON.stringify({
+            clientName: loadedClientName,
+            clientEmail: loadedClientEmail,
+            clientPhone: loadedClientPhone,
+            clientAddress: loadedClientAddress,
+            eventType: loadedEventType,
+            eventDate: loadedEventDate,
+            eventLocation: loadedEventLocation,
+            guestCount: loadedGuestCount,
+            guestAdults: loadedGuestAdults,
+            guestChildren: loadedGuestChildren,
+            remarks: loadedRemarks,
+            vatRate: loadedVatRate,
+            hidePrice: loadedHidePrice,
+            template: loadedTemplate,
+            language: loadedLanguage,
+            services: loadedServices,
+          }));
         }
         setLoading(false);
       });
@@ -268,9 +302,28 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     }, 0);
     const totalTtc = ht * (1 + vatRate / 100);
 
-    // Style changes (template / language) must regenerate content_html so the
-    // new theme is actually applied — otherwise the stale HTML keeps the old style.
-    const styleChanged = template !== initialTemplate || language !== initialLanguage;
+    // Detect if anything that feeds the rendered HTML has changed since load.
+    // If yes → reset content_html so the new data is reflected on next reload.
+    // If no  → preserve content_html (and any manual WeboWord edits with it).
+    const currentSnapshot = JSON.stringify({
+      clientName: clientName.trim(),
+      clientEmail,
+      clientPhone,
+      clientAddress,
+      eventType,
+      eventDate,
+      eventLocation,
+      guestCount,
+      guestAdults,
+      guestChildren,
+      remarks,
+      vatRate,
+      hidePrice,
+      template,
+      language,
+      services,
+    });
+    const dataChanged = currentSnapshot !== initialSnapshot;
 
     const updatePayload: Record<string, unknown> = {
       client_name: clientName.trim() || '',
@@ -293,7 +346,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       language,
       services,
     };
-    if (styleChanged) updatePayload.content_html = null;
+    if (dataChanged) updatePayload.content_html = null;
 
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
 
