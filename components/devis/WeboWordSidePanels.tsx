@@ -66,6 +66,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
+  // Initial style values — used to detect changes that require content_html regeneration
+  const [initialTemplate, setInitialTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
+  const [initialLanguage, setInitialLanguage] = useState<'fr' | 'en'>('fr');
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -177,8 +180,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setRemarks(data.remarks || '');
           setVatRate(data.vat_rate ?? 20);
           setHidePrice(data.hide_price ?? false);
-          setTemplate((data.template as 'standard' | 'mariage' | 'business') || 'standard');
-          setLanguage((data.language as 'fr' | 'en') || 'fr');
+          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business') || 'standard';
+          const loadedLanguage = (data.language as 'fr' | 'en') || 'fr';
+          setTemplate(loadedTemplate);
+          setLanguage(loadedLanguage);
+          setInitialTemplate(loadedTemplate);
+          setInitialLanguage(loadedLanguage);
           setServices(Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : []);
         }
         setLoading(false);
@@ -261,7 +268,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     }, 0);
     const totalTtc = ht * (1 + vatRate / 100);
 
-    const { error } = await supabase.from('quotes').update({
+    // Style changes (template / language) must regenerate content_html so the
+    // new theme is actually applied — otherwise the stale HTML keeps the old style.
+    const styleChanged = template !== initialTemplate || language !== initialLanguage;
+
+    const updatePayload: Record<string, unknown> = {
       client_name: clientName.trim() || '',
       client_first_name: cFirst || null,
       client_last_name: cLast || null,
@@ -281,7 +292,10 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       template,
       language,
       services,
-    }).eq('id', quoteId);
+    };
+    if (styleChanged) updatePayload.content_html = null;
+
+    const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
 
     setSaving(false);
     if (error) { alert('Erreur: ' + error.message); return; }
