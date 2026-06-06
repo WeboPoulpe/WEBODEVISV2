@@ -41,6 +41,7 @@ interface Quote {
   imported?: boolean | null;
   imported_file_url?: string | null;
   imported_file_name?: string | null;
+  prospect_id?: string | null;
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
@@ -67,16 +68,26 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
   conference: Briefcase, séminaire: Briefcase, seminaire: Briefcase,
 };
 const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string; column: string; colBorder: string }> = {
-  draft:    { label: 'En attente',  dot: 'bg-gray-400',    badge: 'bg-gray-100 text-gray-600',      column: 'bg-gray-50',       colBorder: 'border-gray-200' },
-  pending:  { label: 'En attente',  dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700',     column: 'bg-amber-50/40',   colBorder: 'border-amber-200' },
-  sent:     { label: 'Envoyé',      dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700',       column: 'bg-blue-50/40',    colBorder: 'border-blue-200' },
-  accepted: { label: 'Accepté',     dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700', column: 'bg-emerald-50/40', colBorder: 'border-emerald-200' },
-  rejected: { label: 'Refusé',      dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700',         column: 'bg-red-50/40',     colBorder: 'border-red-200' },
+  nouveau:         { label: 'Nouveau',          dot: 'bg-sky-400',     badge: 'bg-sky-50 text-sky-700',         column: 'bg-sky-50/40',     colBorder: 'border-sky-200'     },
+  broch_envoyee:   { label: 'Brochure envoyée', dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600',    column: 'bg-slate-50/40',   colBorder: 'border-slate-200'   },
+  devis_a_faire:   { label: 'Devis à faire',    dot: 'bg-yellow-400',  badge: 'bg-yellow-50 text-yellow-700',   column: 'bg-yellow-50/40',  colBorder: 'border-yellow-200'  },
+  devis_envoye:    { label: 'Devis envoyé',     dot: 'bg-amber-400',   badge: 'bg-amber-50 text-amber-700',     column: 'bg-amber-50/40',   colBorder: 'border-amber-200'   },
+  rdv_deg_a_venir: { label: 'RDV/Dég à venir',  dot: 'bg-violet-400',  badge: 'bg-violet-50 text-violet-700',   column: 'bg-violet-50/40',  colBorder: 'border-violet-200'  },
+  rdv_deg_fait:    { label: 'RDV/Dég fait',     dot: 'bg-purple-400',  badge: 'bg-purple-50 text-purple-700',   column: 'bg-purple-50/40',  colBorder: 'border-purple-200'  },
+  devis_final:     { label: 'Devis final',      dot: 'bg-orange-400',  badge: 'bg-orange-50 text-orange-700',   column: 'bg-orange-50/40',  colBorder: 'border-orange-200'  },
+  valide:          { label: 'Validé',           dot: 'bg-teal-400',    badge: 'bg-teal-50 text-teal-700',       column: 'bg-teal-50/40',    colBorder: 'border-teal-200'    },
+  acompte:         { label: 'Acompte reçu',     dot: 'bg-emerald-400', badge: 'bg-emerald-50 text-emerald-700', column: 'bg-emerald-50/40', colBorder: 'border-emerald-200' },
+  paye:            { label: 'Payé',             dot: 'bg-green-500',   badge: 'bg-green-50 text-green-700',     column: 'bg-green-50/40',   colBorder: 'border-green-200'   },
+  refus_client:    { label: 'Refus client',     dot: 'bg-red-300',     badge: 'bg-red-50 text-red-600',         column: 'bg-red-50/40',     colBorder: 'border-red-200'     },
+  refus_traiteur:  { label: 'Refus traiteur',   dot: 'bg-rose-400',    badge: 'bg-rose-50 text-rose-700',       column: 'bg-rose-50/40',    colBorder: 'border-rose-200'    },
 };
-const PIPELINE_ORDER = ['draft', 'pending', 'sent', 'accepted', 'rejected'];
-const STATUSES = ['Tous', 'En attente', 'Envoyé', 'Accepté', 'Refusé'];
+const PIPELINE_ORDER = ['nouveau', 'broch_envoyee', 'devis_a_faire', 'devis_envoye', 'rdv_deg_a_venir', 'rdv_deg_fait', 'devis_final', 'valide', 'acompte', 'paye', 'refus_client', 'refus_traiteur'];
+const STATUSES = ['Tous', 'Nouveau', 'Brochure envoyée', 'Devis à faire', 'Devis envoyé', 'RDV/Dég à venir', 'RDV/Dég fait', 'Devis final', 'Validé', 'Acompte reçu', 'Payé', 'Refus client', 'Refus traiteur'];
 const STATUS_VALUES: Record<string, string> = {
-  'En attente': 'draft', Envoyé: 'sent', Accepté: 'accepted', Refusé: 'rejected',
+  'Nouveau': 'nouveau', 'Brochure envoyée': 'broch_envoyee', 'Devis à faire': 'devis_a_faire',
+  'Devis envoyé': 'devis_envoye', 'RDV/Dég à venir': 'rdv_deg_a_venir', 'RDV/Dég fait': 'rdv_deg_fait',
+  'Devis final': 'devis_final', 'Validé': 'valide', 'Acompte reçu': 'acompte',
+  'Payé': 'paye', 'Refus client': 'refus_client', 'Refus traiteur': 'refus_traiteur',
 };
 
 function getEventIcon(eventType: string): React.ElementType {
@@ -97,7 +108,7 @@ function V1Badge() {
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.devis_a_faire;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.badge}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
@@ -105,26 +116,70 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Prospect search result type ───────────────────────────────────────────────
+interface ProspectResult {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  event_type: string | null;
+  status: string;
+}
+
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange, onDelete, onDuplicate,
+  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [status, setStatus] = useState(quote.status);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkResults, setLinkResults] = useState<ProspectResult[]>([]);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [prospectId, setProspectId] = useState(quote.prospect_id ?? null);
 
   const Icon = getEventIcon(quote.event_type || '');
 
   const handleStatusChange = async (s: string) => {
     setSavingStatus(true);
-    await createClient().from('quotes').update({ status: s }).eq('id', quote.id);
+    const supabase = createClient();
+    await supabase.from('quotes').update({ status: s }).eq('id', quote.id);
+    if (prospectId) {
+      await supabase.from('prospect_requests').update({ status: s }).eq('id', prospectId);
+    }
     setSavingStatus(false);
     setStatus(s);
     onStatusChange(quote.id, s);
+  };
+
+  const searchProspects = async (q: string) => {
+    setLinkSearch(q);
+    if (!q.trim()) { setLinkResults([]); return; }
+    setLinkLoading(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('prospect_requests')
+      .select('id, first_name, last_name, email, event_type, status')
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(6);
+    setLinkResults(data ?? []);
+    setLinkLoading(false);
+  };
+
+  const linkProspect = async (pid: string) => {
+    const supabase = createClient();
+    await supabase.from('quotes').update({ prospect_id: pid }).eq('id', quote.id);
+    await supabase.from('prospect_requests').update({ status }).eq('id', pid);
+    setProspectId(pid);
+    setLinkOpen(false);
+    setLinkSearch('');
+    setLinkResults([]);
+    onProspectLinked(quote.id, pid);
   };
 
   return (
@@ -147,7 +202,9 @@ function DevisSheet({
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Statut</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Statut{prospectId && <span className="ml-2 text-[10px] font-normal text-[#9c27b0] normal-case">sync prospection activée</span>}
+            </p>
             <div className="flex flex-wrap gap-2">
               {PIPELINE_ORDER.map((s) => {
                 const cfg = STATUS_CONFIG[s];
@@ -159,6 +216,73 @@ function DevisSheet({
                 );
               })}
             </div>
+          </div>
+          {/* Lien / rattachement prospect */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prospection liée</p>
+            {prospectId ? (
+              <div className="flex items-center gap-2 p-3 bg-[#f3e5f5]/40 rounded-xl border border-[#9c27b0]/10">
+                <div className="w-6 h-6 bg-[#9c27b0]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Users className="h-3.5 w-3.5 text-[#9c27b0]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-700">Prospection rattachée</p>
+                  <p className="text-[10px] text-gray-400">Statuts synchronisés automatiquement</p>
+                </div>
+                <Link href="/prospects" className="text-xs font-medium text-[#9c27b0] hover:underline flex-shrink-0">
+                  Voir →
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {!linkOpen ? (
+                  <button
+                    onClick={() => setLinkOpen(true)}
+                    className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-gray-300 rounded-xl text-sm text-gray-400 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] transition-colors"
+                  >
+                    <Users className="h-4 w-4" />
+                    Rattacher une prospection…
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                      <input
+                        autoFocus
+                        value={linkSearch}
+                        onChange={(e) => searchProspects(e.target.value)}
+                        placeholder="Nom, email du prospect…"
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                      />
+                    </div>
+                    {linkLoading && <p className="text-xs text-center text-gray-400 py-2">Recherche…</p>}
+                    {!linkLoading && linkResults.length > 0 && (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+                        {linkResults.map((p) => (
+                          <button key={p.id} onClick={() => linkProspect(p.id)}
+                            className="flex items-start gap-3 w-full px-3 py-2.5 hover:bg-[#f3e5f5]/40 text-left transition-colors">
+                            <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <Users className="h-3 w-3 text-gray-400" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{p.first_name} {p.last_name}</p>
+                              <p className="text-xs text-gray-400 truncate">{p.email}{p.event_type ? ` · ${p.event_type}` : ''}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {!linkLoading && linkSearch && linkResults.length === 0 && (
+                      <p className="text-xs text-center text-gray-400 py-2">Aucun résultat</p>
+                    )}
+                    <button onClick={() => { setLinkOpen(false); setLinkSearch(''); setLinkResults([]); }}
+                      className="text-xs text-gray-400 hover:text-gray-600 w-full text-center py-1">
+                      Annuler
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {/* Prestations */}
           {Array.isArray(quote.services) && quote.services.filter((s: QuoteService) => !s.isPageBreak && s.name).length > 0 && (
@@ -195,13 +319,13 @@ function DevisSheet({
             href={`/evenements/${quote.id}`}
             className={[
               'flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium transition-colors',
-              status === 'accepted'
+              ['valide', 'acompte', 'paye'].includes(status)
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                 : 'border border-gray-200 text-gray-500 hover:bg-gray-50',
             ].join(' ')}
           >
             <CalendarRange className="h-4 w-4" />
-            {status === 'accepted' ? "Gérer l'événement" : "Préparer l'événement"}
+            {['valide', 'acompte', 'paye'].includes(status) ? "Gérer l'événement" : "Préparer l'événement"}
           </Link>
           <div className="flex gap-2 pt-2">
             <Link href={`/devis/${quote.id}/imprimer`} target="_blank"
@@ -217,7 +341,7 @@ function DevisSheet({
               <Pencil className="h-4 w-4" />Éditer
             </Link>
           </div>
-          {(status === 'draft' || quote.imported) && (
+          {(['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(status) || quote.imported) && (
             <button
               onClick={() => { onDelete(quote.id); onClose(); }}
               className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors mt-1"
@@ -324,7 +448,7 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
               <Pencil className="h-3.5 w-3.5" />
             </button>
           )}
-          {(quote.status === 'draft' || quote.imported) && (
+          {(['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(quote.status) || quote.imported) && (
             <button onClick={() => onDelete(quote.id)} title="Supprimer"
               className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
               <Trash2 className="h-3.5 w-3.5" />
@@ -367,7 +491,7 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 justify-end">
                   <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
-                  {q.status === 'draft' && (
+                  {['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(q.status) && (
                     <button onClick={() => onDelete(q.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                   )}
                   <button onClick={() => onOpenSheet(q)} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button>
@@ -398,8 +522,15 @@ function PipelineView({
   const handleDrop = async (targetStatus: string) => {
     const id = draggingIdRef.current;
     if (!id) return;
-    const { error } = await createClient().from('quotes').update({ status: targetStatus }).eq('id', id);
-    if (!error) onStatusChange(id, targetStatus);
+    const supabase = createClient();
+    const { error } = await supabase.from('quotes').update({ status: targetStatus }).eq('id', id);
+    if (!error) {
+      const quote = quotes.find((q) => q.id === id);
+      if (quote?.prospect_id) {
+        await supabase.from('prospect_requests').update({ status: targetStatus }).eq('id', quote.prospect_id);
+      }
+      onStatusChange(id, targetStatus);
+    }
     draggingIdRef.current = null;
     setDraggingId(null);
     setDraggingOver(null);
@@ -521,7 +652,7 @@ export default function DevisPage() {
     const supabase = createClient();
     Promise.all([
       supabase.from('quotes')
-        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name')
+        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id')
         .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false }),
       supabase.from('devis_templates')
@@ -549,7 +680,7 @@ export default function DevisPage() {
       user_id: user.id,
       owner_user_id: user.id,
       client_name: '',
-      status: 'draft',
+      status: 'devis_a_faire',
       services: tpl.services || [],
       content_html: tpl.content_html || null,
       template: tpl.template || 'standard',
@@ -597,6 +728,11 @@ export default function DevisPage() {
     setSheetQuote((prev) => prev?.id === id ? { ...prev, status } : prev);
   }, []);
 
+  const handleProspectLinked = useCallback((id: string, pid: string) => {
+    setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, prospect_id: pid } : q));
+    setSheetQuote((prev) => prev?.id === id ? { ...prev, prospect_id: pid } : prev);
+  }, []);
+
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Supprimer ce devis ? Cette action est irréversible.')) return;
     await createClient().from('quotes').delete().eq('id', id);
@@ -642,7 +778,7 @@ export default function DevisPage() {
       user_id: user.id,
       owner_user_id: user.id,
       client_name: '',
-      status: 'draft',
+      status: 'devis_a_faire',
       services: data.services || [],
       content_html: data.content_html || null,
       selected_font: data.selected_font || null,
@@ -674,9 +810,8 @@ export default function DevisPage() {
 
   const filtered = quotes.filter((q) => {
     const matchSearch = !search || q.client_name?.toLowerCase().includes(search.toLowerCase()) || q.event_type?.toLowerCase().includes(search.toLowerCase());
-    // Hide rejected quotes by default — only show them when filter is explicitly "Refusé"
-    const isRejected = q.status === 'rejected' || q.status === 'refuse_client' || q.status === 'refuse_traiteur';
-    if (isRejected && activeStatus !== 'Refusé') return false;
+    const isRefused = q.status === 'refus_client' || q.status === 'refus_traiteur';
+    if (isRefused && activeStatus !== 'Refus client' && activeStatus !== 'Refus traiteur') return false;
     const matchStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
     return matchSearch && matchStatus;
   });
@@ -859,7 +994,7 @@ export default function DevisPage() {
       )}
 
       {sheetQuote && (
-        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked} />
       )}
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Users, Plus, X, Phone, Mail, MapPin, Calendar, Users2,
@@ -342,7 +343,8 @@ function CreateDevisModal({
           user_id: user.id,
           owner_user_id: user.id,
           customer_id: customerId,
-          status: 'draft',
+          prospect_id: prospect.id,
+          status: 'devis_a_faire',
           event_type: eventType.trim() || null,
           event_date: eventDate || null,
           guest_count: parseInt(guestCount) || null,
@@ -358,7 +360,7 @@ function CreateDevisModal({
       await supabase
         .from('prospect_requests')
         .update({
-          status: 'devis',
+          status: 'devis_a_faire',
           owner_user_id: user.id,
         })
         .eq('id', prospect.id);
@@ -572,12 +574,14 @@ function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
 // ── Prospect Drawer ────────────────────────────────────────────────────────────
 function ProspectDrawer({
   prospect,
+  linkedQuoteId,
   onClose,
   onStatusChange,
   onDelete,
   onCreateDevis,
 }: {
   prospect: Prospect;
+  linkedQuoteId?: string | null;
   onClose: () => void;
   onStatusChange: (id: string, status: ProspectStatus) => void;
   onDelete: (id: string) => void;
@@ -591,6 +595,9 @@ function ProspectDrawer({
     setStatusOpen(false);
     const supabase = createClient();
     await supabase.from('prospect_requests').update({ status: s }).eq('id', prospect.id);
+    if (linkedQuoteId) {
+      await supabase.from('quotes').update({ status: s }).eq('id', linkedQuoteId);
+    }
     onStatusChange(prospect.id, s);
     setUpdatingStatus(false);
   };
@@ -715,6 +722,29 @@ function ProspectDrawer({
             </div>
           )}
 
+          {/* Devis lié */}
+          {linkedQuoteId && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Devis lié</p>
+              <div className="flex items-center gap-3 p-3 bg-[#f3e5f5]/40 rounded-xl border border-[#9c27b0]/10">
+                <div className="w-8 h-8 bg-[#9c27b0]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-4 w-4 text-[#9c27b0]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">Devis créé</p>
+                  <p className="text-[10px] text-gray-400">Les statuts se synchronisent</p>
+                </div>
+                <Link
+                  href={`/devis/${linkedQuoteId}/modifier`}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors"
+                >
+                  <Eye className="h-3 w-3" />
+                  Voir
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Message */}
           {prospect.message && (
             <div>
@@ -730,7 +760,7 @@ function ProspectDrawer({
 
       {/* Footer actions */}
       <div className="flex-shrink-0 border-t border-gray-100 p-4 space-y-2">
-        {prospect.status !== 'devis' && (
+        {!linkedQuoteId && (
           <button
             onClick={onCreateDevis}
             className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
@@ -815,6 +845,7 @@ function ProspectCard({
 export default function ProspectsPage() {
   const { user } = useAuth();
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [prospectQuoteMap, setProspectQuoteMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProspectStatus | 'all'>('all');
   const [eventFilter, setEventFilter] = useState<string>('all');
@@ -850,7 +881,23 @@ export default function ProspectsPage() {
     }
 
     const { data } = await query;
-    setProspects(data ?? []);
+    const loadedProspects = data ?? [];
+    setProspects(loadedProspects);
+
+    // Fetch linked quotes to build prospect → quote map
+    if (loadedProspects.length > 0) {
+      const prospectIds = loadedProspects.map((p: Prospect) => p.id);
+      const { data: linkedQuotes } = await supabase
+        .from('quotes')
+        .select('id, prospect_id')
+        .in('prospect_id', prospectIds);
+      const map: Record<string, string> = {};
+      (linkedQuotes ?? []).forEach((q: { id: string; prospect_id: string }) => {
+        if (q.prospect_id) map[q.prospect_id] = q.id;
+      });
+      setProspectQuoteMap(map);
+    }
+
     setLoading(false);
   }, [user]);
 
@@ -1069,6 +1116,7 @@ export default function ProspectsPage() {
           )}>
             <ProspectDrawer
               prospect={selected}
+              linkedQuoteId={prospectQuoteMap[selected.id] ?? null}
               onClose={() => setSelected(null)}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}

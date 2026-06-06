@@ -14,6 +14,28 @@ ALTER TABLE quotes ADD COLUMN IF NOT EXISTS guest_count_adults INT;
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS guest_count_children INT;
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'fr';
 
+-- ── 1b) Lien prospect ↔ devis + migration des statuts ─────────────────────
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS prospect_id TEXT;
+ALTER TABLE quotes DROP CONSTRAINT IF EXISTS quotes_status_check;
+ALTER TABLE quotes DISABLE TRIGGER USER;
+UPDATE quotes SET status = 'devis_a_faire' WHERE status IN ('draft', 'pending');
+UPDATE quotes SET status = 'devis_envoye'  WHERE status = 'sent';
+UPDATE quotes SET status = 'valide'        WHERE status = 'accepted';
+UPDATE quotes SET status = 'refus_client'  WHERE status IN ('rejected', 'refuse', 'refuse_client');
+UPDATE quotes SET status = 'refus_traiteur' WHERE status = 'refuse_traiteur';
+UPDATE quotes SET status = 'devis_a_faire'
+WHERE status IS NULL OR status NOT IN (
+  'nouveau', 'broch_envoyee', 'devis_a_faire', 'devis_envoye',
+  'rdv_deg_a_venir', 'rdv_deg_fait', 'devis_final', 'valide',
+  'acompte', 'paye', 'refus_client', 'refus_traiteur'
+);
+ALTER TABLE quotes ENABLE TRIGGER USER;
+ALTER TABLE quotes ADD CONSTRAINT quotes_status_check CHECK (status IN (
+  'nouveau', 'broch_envoyee', 'devis_a_faire', 'devis_envoye',
+  'rdv_deg_a_venir', 'rdv_deg_fait', 'devis_final', 'valide',
+  'acompte', 'paye', 'refus_client', 'refus_traiteur'
+));
+
 -- ── 2) Colonnes manquantes sur prestations ─────────────────────────────────
 ALTER TABLE prestations ADD COLUMN IF NOT EXISTS child_unit_price NUMERIC;
 COMMENT ON COLUMN prestations.child_unit_price IS 'Prix unitaire pour les enfants (NULL = même tarif que adultes)';
