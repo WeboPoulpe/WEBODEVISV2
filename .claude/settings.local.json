@@ -22,7 +22,8 @@
       "Bash(node -e ' *)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(grep -l \"prospect_requests\\\\|user_prospect_tokens\" \"c:\\\\Users\\\\Maxence\\\\Desktop\\\\SAAS\\\\LOGICIELS\\\\cuisine-devis-pro-main\\\\v2\"\\\\sql\\\\*.sql 2>/dev/null)",
-      "Read(//c/Users/Maxence/Desktop/SAAS/LOGICIELS/cuisine-devis-pro-main/**)"
+      "Read(//c/Users/Maxence/Desktop/SAAS/LOGICIELS/cuisine-devis-pro-main/**)",
+      "Bash(git pull *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Maxence\\Desktop\\SAAS\\LOGICIELS\\cuisine-devis-pro-main\\v2\\app\\(app)",
