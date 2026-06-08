@@ -125,7 +125,7 @@ export default function NouveauDevisOnboarding() {
       client_last_name: cLast || null,
       client_email: clientEmail || null,
       client_phone: clientPhone || null,
-      status: 'draft',
+      status: 'devis_a_faire',
       services: [],
       event_type: eventType,
       event_date: eventDate,

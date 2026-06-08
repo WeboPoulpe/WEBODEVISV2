@@ -92,7 +92,7 @@ export default function StepResume({ onBack }: Props) {
       // ── INSERT new quote — retrieve the new id ─────────────────────────────
       const { data: inserted, error: err } = await supabase
         .from('quotes')
-        .insert([{ ...quotePayload, user_id: user.id, owner_user_id: user.id, status: 'draft' }])
+        .insert([{ ...quotePayload, user_id: user.id, owner_user_id: user.id, status: 'devis_a_faire' }])
         .select('id')
         .single();
 
