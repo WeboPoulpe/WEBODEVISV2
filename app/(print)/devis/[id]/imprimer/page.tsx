@@ -5,6 +5,9 @@ import QuoteDocument from '@/components/devis/QuoteDocument';
 import QuoteDocumentMariage from '@/components/devis/QuoteDocumentMariage';
 import QuoteDocumentBusiness from '@/components/devis/QuoteDocumentBusiness';
 import AutoPrint from '@/components/devis/AutoPrint';
+import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml } from '@/components/devis/weboword/printHelpers';
+import { DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG } from '@/components/devis/weboword/weboword.types';
+import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/weboword/weboword.types';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -28,11 +31,25 @@ export default async function ImprimerPage({ params }: Props) {
 
   if (!quote) notFound();
 
+  // Fetch company profile (used by both V2 WeboWord and V1 fallback paths)
+  const { data: profile } = user
+    ? await supabase
+        .from('profiles')
+        .select('company_name, company_address, company_phone, logo_url, cgv')
+        .eq('id', user.id)
+        .single()
+    : { data: null };
+
   // ── V2: if WeboWord content_html exists, render it directly ─────────────────
   if (quote.content_html) {
     const selectedFont = (quote.selected_font as string | null) ?? 'Georgia';
     const googleFonts = ['Playfair Display', 'Montserrat', 'Roboto', 'Open Sans'];
     const isGoogleFont = googleFonts.includes(selectedFont);
+
+    const coverHtml = buildCoverPageHtml((quote.cover_page_config as CoverPageConfig) ?? DEFAULT_COVER_CONFIG);
+    const photosHtml = buildPhotosPageHtml((quote.photos_page_config as PhotosPageConfig) ?? DEFAULT_PHOTOS_CONFIG);
+    const logoHtml = buildLogoHeaderHtml(profile?.logo_url);
+    const cgvHtml = buildCgvHtml(profile?.cgv);
 
     return (
       <>
@@ -66,25 +83,20 @@ export default async function ImprimerPage({ params }: Props) {
             line-height: 0 !important;
           }
         `}</style>
+        {coverHtml && <div dangerouslySetInnerHTML={{ __html: coverHtml }} />}
+        {!coverHtml && logoHtml && <div dangerouslySetInnerHTML={{ __html: logoHtml }} />}
         <div
           className="prose prose-sm max-w-none"
           style={{ padding: '20mm', fontFamily: `'${selectedFont}', Georgia, serif` }}
           dangerouslySetInnerHTML={{ __html: quote.content_html as string }}
         />
+        {photosHtml && <div dangerouslySetInnerHTML={{ __html: photosHtml }} />}
+        {cgvHtml && <div dangerouslySetInnerHTML={{ __html: cgvHtml }} />}
       </>
     );
   }
 
   // ── V1 fallback: render via QuoteDocument React components ──────────────────
-
-  // Fetch company profile
-  const { data: profile } = user
-    ? await supabase
-        .from('profiles')
-        .select('company_name, company_address, company_phone, logo_url, cgv')
-        .eq('id', user.id)
-        .single()
-    : { data: null };
 
   const clientName =
     quote.client_type === 'entreprise'
