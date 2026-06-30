@@ -306,9 +306,9 @@ function CreateDevisModal({
         .from('customers')
         .select('id')
         .eq('email', email.trim().toLowerCase())
-        .eq('user_id', user.id)
+        .eq('owner_user_id', user.id)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (existing?.id) {
         customerId = existing.id;
@@ -322,13 +322,13 @@ function CreateDevisModal({
         const { data: newCustomer, error: custErr } = await supabase
           .from('customers')
           .insert({
-            user_id: user.id,
+            owner_user_id: user.id,
             first_name: firstName.trim(),
             last_name: lastName.trim(),
             email: email.trim().toLowerCase(),
             phone: phone.trim() || null,
             address: address.trim() || null,
-            type: 'particulier',
+            customer_type: 'particulier',
           })
           .select('id')
           .single();
@@ -515,8 +515,15 @@ function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
   useEffect(() => {
     if (!prospect.email) return;
     const supabase = createClient();
-    supabase.from('customers').select('id').eq('email', prospect.email.toLowerCase()).maybeSingle()
-      .then(({ data }) => { if (data) setAlreadyExists(true); });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase.from('customers')
+        .select('id')
+        .eq('email', prospect.email.toLowerCase())
+        .eq('owner_user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => { if (data) setAlreadyExists(true); });
+    });
   }, [prospect.email]);
 
   const save = async () => {
@@ -525,7 +532,7 @@ function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
     const { error } = await supabase.from('customers').insert({
-      user_id: user.id,
+      owner_user_id: user.id,
       first_name: prospect.first_name || null,
       last_name: prospect.last_name || null,
       email: prospect.email.toLowerCase(),
