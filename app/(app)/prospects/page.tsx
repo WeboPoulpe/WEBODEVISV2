@@ -351,6 +351,11 @@ function CreateDevisModal({
           services: [],
           total_amount: 0,
           internal_notes: `Créé depuis la demande prospect #${prospect.id}`,
+          client_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+          client_first_name: firstName.trim(),
+          client_last_name: lastName.trim(),
+          client_email: email.trim().toLowerCase() || null,
+          client_phone: phone.trim() || null,
         })
         .select('id')
         .single();

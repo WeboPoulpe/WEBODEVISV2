@@ -42,6 +42,9 @@ interface Quote {
   imported_file_url?: string | null;
   imported_file_name?: string | null;
   prospect_id?: string | null;
+  client_first_name?: string | null;
+  client_last_name?: string | null;
+  client_email?: string | null;
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
@@ -652,7 +655,7 @@ export default function DevisPage() {
     const supabase = createClient();
     Promise.all([
       supabase.from('quotes')
-        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id')
+        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
         .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false }),
       supabase.from('devis_templates')
@@ -809,7 +812,12 @@ export default function DevisPage() {
   }, [dupModal.quoteId, dupModal.templateName, user, router]);
 
   const filtered = quotes.filter((q) => {
-    const matchSearch = !search || q.client_name?.toLowerCase().includes(search.toLowerCase()) || q.event_type?.toLowerCase().includes(search.toLowerCase());
+    const q4 = search.toLowerCase();
+    const haystack = [
+      q.client_name, q.client_first_name, q.client_last_name,
+      q.client_email, q.event_type,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchSearch = !search || haystack.includes(q4);
     const isRefused = q.status === 'refus_client' || q.status === 'refus_traiteur';
     if (isRefused && activeStatus !== 'Refus client' && activeStatus !== 'Refus traiteur') return false;
     const matchStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
@@ -1016,7 +1024,7 @@ export default function DevisPage() {
           if (!user) return;
           createClient()
             .from('quotes')
-            .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name')
+            .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
             .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
             .order('created_at', { ascending: false })
             .then(({ data }) => { if (data) setQuotes(data); });
