@@ -44,3 +44,16 @@ export function buildPhotosPageHtml(config: PhotosPageConfig): string {
     return `<div style="padding:20mm;page-break-before:always;break-before:page;${breakAfter}"><div style="display:flex;flex-wrap:wrap;gap:${gap}px;">${cells}</div></div>`
   }).join('\n')
 }
+
+export function buildLogoHeaderHtml(logoUrl: string | null | undefined): string {
+  if (!logoUrl) return ''
+  return `<div style="text-align:center;padding:10mm 0 4mm;"><img src="${esc(logoUrl)}" alt="Logo" style="max-height:80px;max-width:220px;object-fit:contain;" /></div>`
+}
+
+export function buildCgvHtml(cgv: string | null | undefined): string {
+  if (!cgv || !cgv.trim()) return ''
+  return `<div style="page-break-before:always;break-before:page;padding:18mm 16mm;">
+  <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:0.12em;color:#666;border-bottom:1px solid #ddd;padding-bottom:6px;margin:0 0 10px;">Conditions Générales de Vente</h2>
+  <div style="font-size:8.5px;line-height:1.45;color:#444;column-count:2;column-gap:10mm;text-align:justify;">${cgv}</div>
+</div>`
+}
