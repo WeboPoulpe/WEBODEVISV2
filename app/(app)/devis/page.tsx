@@ -701,27 +701,29 @@ export default function DevisPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
     ]).then(async ([quotesRes, tplRes]) => {
-      setQuotes(quotesRes.data ?? []);
-      setTemplates(tplRes.data ?? []);
+      try {
+        setQuotes(quotesRes.data ?? []);
+        setTemplates(tplRes.data ?? []);
 
-      // Prospects non liés à un devis
-      const linkedProspectIds = new Set(
-        (quotesRes.data ?? []).map((q) => q.prospect_id).filter(Boolean)
-      );
-      const { data: tokenRows } = await supabase
-        .from('user_prospect_tokens').select('token').eq('user_id', user.id);
-      const myTokens = (tokenRows ?? []).map((r: { token: string }) => r.token);
-      let pq = supabase
-        .from('prospect_requests')
-        .select('id, first_name, last_name, email, event_type, event_date, guest_count, status')
-        .order('created_at', { ascending: false });
-      pq = myTokens.length > 0
-        ? pq.or(`owner_user_id.eq.${user.id},user_token.in.(${myTokens.join(',')})`)
-        : pq.eq('owner_user_id', user.id);
-      const { data: prospectRows } = await pq;
-      setProspects(((prospectRows ?? []) as ProspectLite[]).filter((p) => !linkedProspectIds.has(p.id)));
-
-      setLoading(false);
+        // Prospects non liés à un devis
+        const linkedProspectIds = new Set(
+          (quotesRes.data ?? []).map((q) => q.prospect_id).filter(Boolean)
+        );
+        const { data: tokenRows } = await supabase
+          .from('user_prospect_tokens').select('token').eq('user_id', user.id);
+        const myTokens = (tokenRows ?? []).map((r: { token: string }) => r.token);
+        let pq = supabase
+          .from('prospect_requests')
+          .select('id, first_name, last_name, email, event_type, event_date, guest_count, status')
+          .order('created_at', { ascending: false });
+        pq = myTokens.length > 0
+          ? pq.or(`owner_user_id.eq.${user.id},user_token.in.(${myTokens.join(',')})`)
+          : pq.eq('owner_user_id', user.id);
+        const { data: prospectRows } = await pq;
+        setProspects(((prospectRows ?? []) as ProspectLite[]).filter((p) => !linkedProspectIds.has(p.id)));
+      } finally {
+        setLoading(false);
+      }
     });
   }, [user]);
 
