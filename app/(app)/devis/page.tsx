@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
-  LayoutGrid, List, Columns3, StickyNote, Save, Loader2, ArrowRight, TrendingUp, CalendarRange, Copy,
+  LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
   BookCopy, Library, X, UploadCloud, FileText, Download, Wallet,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -512,9 +512,9 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 function PipelineView({
-  quotes, onStatusChange, onOpenSheet,
+  quotes, onStatusChange, onOpenSheet, onDuplicate,
 }: {
-  quotes: Quote[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void;
+  quotes: Quote[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void;
 }) {
   // useRef for draggingId so async handleDrop always reads the current value
   // (avoids stale closure bug when the React re-render hasn't happened yet on fast drags)
@@ -588,11 +588,14 @@ function PipelineView({
                       </div>
                     </div>
                     {q.event_date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mb-1.5"><CalendarDays className="h-2.5 w-2.5" />{formatDate(q.event_date)}</p>}
-                    <div className="flex items-center justify-between mt-1">
+                    <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-gray-100">
                       {(() => { const t = computeQuoteTotal(q); return t ? <p className="text-xs font-bold text-gray-900 tabular-nums">{formatCurrency(t)}</p> : <span />; })()}
-                      <button onClick={() => onOpenSheet(q)} className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
+                      <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => onOpenSheet(q)} title="Aperçu" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Eye className="h-3 w-3" /></button>
+                        <Link href={`/devis/${q.id}/imprimer`} target="_blank" title="PDF" className="p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"><Printer className="h-3 w-3" /></Link>
+                        <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Copy className="h-3 w-3" /></button>
+                        <Link href={`/devis/${q.id}/modifier?mode=weboword`} title="Éditer" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Pencil className="h-3 w-3" /></Link>
+                      </div>
                     </div>
                   </div>
                 );
@@ -998,7 +1001,7 @@ export default function DevisPage() {
       ) : view === 'table' ? (
         <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
       ) : (
-        <PipelineView quotes={filtered} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} />
+        <PipelineView quotes={filtered} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} />
       )}
 
       {sheetQuote && (
