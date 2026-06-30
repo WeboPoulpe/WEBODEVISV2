@@ -22,7 +22,7 @@ import {
   type CoverPageConfig, type PhotosPageConfig,
   DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG,
 } from './weboword/weboword.types';
-import { buildCoverPageHtml, buildPhotosPageHtml } from './weboword/printHelpers';
+import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml } from './weboword/printHelpers';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -153,7 +153,7 @@ const LINE_HEIGHTS = [
 
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize }: Props) {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const editorRef  = useRef<HTMLDivElement>(null);
   const colorInput = useRef<HTMLInputElement>(null);
   const initDone   = useRef(false);
@@ -169,6 +169,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [celebrate, setCelebrate] = useState(false);
   const [celebrateMsgIdx, setCelebrateMsgIdx] = useState(0);
+  const [companyAssets, setCompanyAssets] = useState<{ logo_url: string | null; cgv: string | null }>({ logo_url: null, cgv: null });
 
   // Carousel of compliments
   const CELEBRATE_MSGS = [
@@ -193,6 +194,22 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebrate]);
+
+  // Load logo + CGV from profiles
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    (async () => {
+      const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).maybeSingle();
+      let cgv: string | null = null;
+      try {
+        const { data: c } = await supabase.from('profiles').select('cgv').eq('id', user.id).maybeSingle();
+        cgv = c?.cgv ?? null;
+      } catch { /* colonne cgv absente */ }
+      setCompanyAssets({ logo_url: (data as { logo_url?: string | null } | null)?.logo_url ?? null, cgv });
+    })();
+  }, [user]);
+
   // Sync activePanel with URL query param (using window to avoid Suspense issue)
   useEffect(() => {
     const update = () => {
@@ -773,6 +790,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       : '';
     const coverHtml = buildCoverPageHtml(coverConfig)
     const photosHtml = buildPhotosPageHtml(photosConfig)
+    const logoHtml = buildLogoHeaderHtml(companyAssets.logo_url)
+    const cgvHtml = buildCgvHtml(companyAssets.cgv)
     return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -799,8 +818,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 </head>
 <body>
   ${coverHtml}
+  ${coverHtml ? '' : logoHtml}
   <div style="padding:20mm;">${content}</div>
   ${photosHtml}
+  ${cgvHtml}
   <script>
     var els = document.querySelectorAll('[style]');
     var sep = false;
@@ -842,6 +863,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
     const coverHtml = buildCoverPageHtml(coverConfig)
     const photosHtml = buildPhotosPageHtml(photosConfig)
+    const logoHtml = buildLogoHeaderHtml(companyAssets.logo_url)
+    const cgvHtml = buildCgvHtml(companyAssets.cgv)
 
     // Build a self-contained HTML document optimized for PDF printing
     const html = `<!DOCTYPE html>
@@ -877,8 +900,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 </head>
 <body>
   ${coverHtml}
+  ${coverHtml ? '' : logoHtml}
   <div class="pdf-wrap">${content}</div>
   ${photosHtml}
+  ${cgvHtml}
   <script>
     window.onload = function() {
       var els = document.querySelectorAll('[style]');
