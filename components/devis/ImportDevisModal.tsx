@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, UploadCloud, Loader2, Check, FileText, Trash2, ExternalLink } from 'lucide-react';
+import { X, UploadCloud, Loader2, Check, FileText, Trash2, ExternalLink, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -14,6 +14,15 @@ interface Props {
 }
 
 const EVENT_TYPES = ['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
+
+type CustomerResult = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+};
 
 export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId = null }: Props) {
   const { user } = useAuth();
@@ -34,6 +43,12 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
   const [existingFileName, setExistingFileName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(false);
+
+  // Step 1 — Client selector states
+  const [clientMode, setClientMode] = useState<'new' | 'existing'>('new');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<CustomerResult[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   const isEdit = !!editQuoteId;
 
@@ -77,6 +92,33 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
     setBillingAddress(''); setEventAddress(''); setEventType('');
     setEventDate(''); setGuestCount(''); setTotalAmount(''); setFile(null);
     setExistingFileUrl(null); setExistingFileName(null);
+    // Step 5 — reset client selector states
+    setClientMode('new'); setCustomerSearch(''); setCustomerResults([]); setSelectedCustomerId(null);
+  };
+
+  // Step 2 — Search & pick existing customers
+  const searchCustomers = async (q: string) => {
+    setCustomerSearch(q);
+    if (!q.trim() || !user) { setCustomerResults([]); return; }
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('customers')
+      .select('id, first_name, last_name, email, phone, address')
+      .eq('owner_user_id', user.id)
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(6);
+    setCustomerResults(data ?? []);
+  };
+
+  const pickCustomer = (c: CustomerResult) => {
+    setSelectedCustomerId(c.id);
+    setFirstName(c.first_name ?? '');
+    setLastName(c.last_name ?? '');
+    setEmail(c.email ?? '');
+    setPhone(c.phone ?? '');
+    setBillingAddress(c.address ?? '');
+    setCustomerResults([]);
+    setCustomerSearch(`${c.first_name ?? ''} ${c.last_name ?? ''}`.trim());
   };
 
   const handleSave = async () => {
@@ -102,6 +144,28 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
       const { data: urlData } = supabase.storage.from('storage').getPublicUrl(path);
       fileUrl = urlData.publicUrl;
       fileName = file.name;
+    }
+
+    // Step 4 — Resolve customer id (creation only)
+    let customerId: string | null = selectedCustomerId;
+    if (!isEdit && !customerId && email.trim()) {
+      const supabase2 = createClient();
+      const { data: existing } = await supabase2.from('customers')
+        .select('id').eq('owner_user_id', user.id).eq('email', email.trim().toLowerCase()).maybeSingle();
+      if (existing?.id) {
+        customerId = existing.id;
+      } else {
+        const { data: created } = await supabase2.from('customers').insert({
+          owner_user_id: user.id,
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
+          email: email.trim().toLowerCase(),
+          phone: phone.trim() || null,
+          address: billingAddress.trim() || null,
+          customer_type: 'particulier',
+        }).select('id').single();
+        customerId = created?.id ?? null;
+      }
     }
 
     const clientFullName = `${firstName.trim()} ${lastName.trim()}`;
@@ -136,6 +200,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
         vat_rate: 20,
         hide_price: false,
         imported: true,
+        customer_id: customerId,
       });
       error = res.error;
     }
@@ -187,6 +252,65 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
           {/* Client */}
           <div>
             <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Client</p>
+
+            {/* Step 3 — Client mode toggle (creation only) */}
+            {!isEdit && (
+              <div className="mb-4">
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setClientMode('new'); setSelectedCustomerId(null); }}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${clientMode === 'new' ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    Nouveau client
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClientMode('existing')}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${clientMode === 'existing' ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    Client existant
+                  </button>
+                </div>
+
+                {clientMode === 'existing' && (
+                  <div className="mb-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                      <input
+                        value={customerSearch}
+                        onChange={(e) => searchCustomers(e.target.value)}
+                        className={`${inputCls} pl-8`}
+                        placeholder="Rechercher par nom ou email…"
+                      />
+                    </div>
+                    {customerResults.length > 0 && (
+                      <div className="mt-1 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                        {customerResults.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => pickCustomer(c)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#f3e5f5] transition-colors"
+                          >
+                            <span className="font-medium text-gray-900">
+                              {[c.first_name, c.last_name].filter(Boolean).join(' ')}
+                            </span>
+                            {c.email && <span className="text-gray-500"> · {c.email}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {selectedCustomerId && (
+                      <p className="mt-1.5 text-[10px] text-[#9c27b0] font-medium">
+                        Client sélectionné — champs pré-remplis ci-dessous
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelCls}>Prénom *</label><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputCls} placeholder="Jean" /></div>
               <div><label className={labelCls}>Nom *</label><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputCls} placeholder="Dupont" /></div>
