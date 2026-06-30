@@ -601,7 +601,7 @@ function PipelineView({
               )}
             </div>
             <div className="p-2 space-y-2 min-h-[100px]">
-              {statusKey === 'nouveau' && prospects.map((p) => (
+              {prospects.filter((p) => p.status === statusKey).map((p) => (
                 <ProspectMiniCard key={p.id} p={p} onStatus={onProspectStatus} onConvert={onConvertProspect} />
               ))}
               {col.map((q) => {
@@ -1060,32 +1060,48 @@ export default function DevisPage() {
         </div>
       ) : view === 'grid' ? (
         <>
-          {(activeStatus === 'Tous' || activeStatus === 'Nouveau') && prospects.length > 0 && (
-            <div className="mb-5">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({prospects.length})</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {prospects.map((p) => (
-                  <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
-                ))}
+          {(() => {
+            const q4 = search.toLowerCase();
+            const visibleProspects = prospects.filter((p) => {
+              const matchStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
+              const matchSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(q4);
+              return matchStatus && matchSearch;
+            });
+            return visibleProspects.length > 0 ? (
+              <div className="mb-5">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({visibleProspects.length})</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {visibleProspects.map((p) => (
+                    <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
           </div>
         </>
       ) : view === 'table' ? (
         <>
-          {(activeStatus === 'Tous' || activeStatus === 'Nouveau') && prospects.length > 0 && (
-            <div className="mb-5">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({prospects.length})</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {prospects.map((p) => (
-                  <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
-                ))}
+          {(() => {
+            const q4 = search.toLowerCase();
+            const visibleProspects = prospects.filter((p) => {
+              const matchStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
+              const matchSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(q4);
+              return matchStatus && matchSearch;
+            });
+            return visibleProspects.length > 0 ? (
+              <div className="mb-5">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({visibleProspects.length})</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {visibleProspects.map((p) => (
+                    <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
           <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
         </>
       ) : (
