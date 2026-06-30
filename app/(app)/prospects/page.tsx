@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, Plus, X, Phone, Mail, MapPin, Calendar, Users2,
   MessageSquare, ChevronDown, FileText, Copy, Check, Link2,
@@ -854,7 +854,7 @@ function ProspectCard({
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
-export default function ProspectsPage() {
+function ProspectsPageInner() {
   const { user } = useAuth();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [prospectQuoteMap, setProspectQuoteMap] = useState<Record<string, string>>({});
@@ -914,6 +914,15 @@ export default function ProspectsPage() {
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const cid = searchParams.get('convert');
+    if (cid && prospects.length) {
+      const p = prospects.find((x) => x.id === cid);
+      if (p) setCreateDevisFor(p);
+    }
+  }, [searchParams, prospects]);
 
   const handleStatusChange = (id: string, status: ProspectStatus) => {
     setProspects((prev) => prev.map((p) => p.id === id ? { ...p, status } : p));
@@ -1153,5 +1162,13 @@ export default function ProspectsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ProspectsPage() {
+  return (
+    <Suspense>
+      <ProspectsPageInner />
+    </Suspense>
   );
 }

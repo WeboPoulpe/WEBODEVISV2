@@ -119,6 +119,37 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Prospect lite (non convertis affichés dans la colonne Nouveau) ────────────
+interface ProspectLite {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  event_type: string | null;
+  event_date: string | null;
+  guest_count: number | null;
+  status: string;
+}
+
+// ── Prospect mini-card (colonne Nouveau + grille/tableau) ─────────────────────
+function ProspectMiniCard({ p, onStatus, onConvert }: { p: ProspectLite; onStatus: (id: string, s: string) => void; onConvert: (id: string) => void }) {
+  return (
+    <div className="bg-white border border-amber-200 rounded-xl p-3">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Prospect</span>
+        <p className="text-xs font-semibold text-gray-900 truncate">{p.first_name} {p.last_name}</p>
+      </div>
+      <p className="text-[10px] text-gray-500 truncate">{p.event_type || '—'}{p.event_date ? ` · ${formatDate(p.event_date)}` : ''}</p>
+      <div className="flex items-center gap-1 mt-2">
+        <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 flex-1">
+          {PIPELINE_ORDER.map((s) => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
+        </select>
+        <button onClick={() => onConvert(p.id)} className="text-[10px] font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded px-2 py-0.5 hover:bg-[#f3e5f5]">Convertir</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Prospect search result type ───────────────────────────────────────────────
 interface ProspectResult {
   id: string;
@@ -512,9 +543,9 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 function PipelineView({
-  quotes, onStatusChange, onOpenSheet, onDuplicate,
+  quotes, prospects, onStatusChange, onOpenSheet, onDuplicate, onProspectStatus, onConvertProspect,
 }: {
-  quotes: Quote[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void;
+  quotes: Quote[]; prospects: ProspectLite[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void; onProspectStatus: (id: string, s: string) => void; onConvertProspect: (id: string) => void;
 }) {
   // useRef for draggingId so async handleDrop always reads the current value
   // (avoids stale closure bug when the React re-render hasn't happened yet on fast drags)
@@ -570,6 +601,9 @@ function PipelineView({
               )}
             </div>
             <div className="p-2 space-y-2 min-h-[100px]">
+              {statusKey === 'nouveau' && prospects.map((p) => (
+                <ProspectMiniCard key={p.id} p={p} onStatus={onProspectStatus} onConvert={onConvertProspect} />
+              ))}
               {col.map((q) => {
                 const Icon = getEventIcon(q.event_type || '');
                 return (
@@ -636,6 +670,7 @@ export default function DevisPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [prospects, setProspects] = useState<ProspectLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('Tous');
@@ -665,9 +700,27 @@ export default function DevisPage() {
         .select('id, name, template, created_at, services, remarks, vat_rate, hide_price')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
-    ]).then(([quotesRes, tplRes]) => {
+    ]).then(async ([quotesRes, tplRes]) => {
       setQuotes(quotesRes.data ?? []);
       setTemplates(tplRes.data ?? []);
+
+      // Prospects non liés à un devis
+      const linkedProspectIds = new Set(
+        (quotesRes.data ?? []).map((q) => q.prospect_id).filter(Boolean)
+      );
+      const { data: tokenRows } = await supabase
+        .from('user_prospect_tokens').select('token').eq('user_id', user.id);
+      const myTokens = (tokenRows ?? []).map((r: { token: string }) => r.token);
+      let pq = supabase
+        .from('prospect_requests')
+        .select('id, first_name, last_name, email, event_type, event_date, guest_count, status')
+        .order('created_at', { ascending: false });
+      pq = myTokens.length > 0
+        ? pq.or(`owner_user_id.eq.${user.id},user_token.in.(${myTokens.join(',')})`)
+        : pq.eq('owner_user_id', user.id);
+      const { data: prospectRows } = await pq;
+      setProspects(((prospectRows ?? []) as ProspectLite[]).filter((p) => !linkedProspectIds.has(p.id)));
+
       setLoading(false);
     });
   }, [user]);
@@ -738,6 +791,15 @@ export default function DevisPage() {
     setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, prospect_id: pid } : q));
     setSheetQuote((prev) => prev?.id === id ? { ...prev, prospect_id: pid } : prev);
   }, []);
+
+  const handleProspectStatus = useCallback(async (id: string, status: string) => {
+    setProspects((prev) => prev.map((p) => p.id === id ? { ...p, status } : p));
+    await createClient().from('prospect_requests').update({ status }).eq('id', id);
+  }, []);
+
+  const handleConvertProspect = useCallback((id: string) => {
+    router.push(`/prospects?convert=${id}`);
+  }, [router]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Supprimer ce devis ? Cette action est irréversible.')) return;
@@ -995,13 +1057,37 @@ export default function DevisPage() {
           {!search && <Link href="/devis/nouveau" className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"><Plus className="h-4 w-4" />Créer un devis</Link>}
         </div>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
-        </div>
+        <>
+          {(activeStatus === 'Tous' || activeStatus === 'Nouveau') && prospects.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({prospects.length})</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {prospects.map((p) => (
+                  <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+          </div>
+        </>
       ) : view === 'table' ? (
-        <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+        <>
+          {(activeStatus === 'Tous' || activeStatus === 'Nouveau') && prospects.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({prospects.length})</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {prospects.map((p) => (
+                  <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
+                ))}
+              </div>
+            </div>
+          )}
+          <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+        </>
       ) : (
-        <PipelineView quotes={filtered} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} />
+        <PipelineView quotes={filtered} prospects={prospects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} />
       )}
 
       {sheetQuote && (
