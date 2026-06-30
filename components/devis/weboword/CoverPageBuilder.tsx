@@ -12,6 +12,7 @@ import { PhotoBuilder } from './PhotoBuilder'
 type Props = {
   config: CoverPageConfig
   onChange: (config: CoverPageConfig) => void
+  backgroundHtml?: string
 }
 
 const CANVAS_W = 794
@@ -32,7 +33,7 @@ const FONT_FAMILIES = [
 const labelCls = 'block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5'
 const inputCls = 'w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400'
 
-export function CoverPageBuilder({ config, onChange }: Props) {
+export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showPhotoBuilder, setShowPhotoBuilder] = useState(false)
   const [addingPhotoId, setAddingPhotoId] = useState<string | null>(null)
@@ -210,6 +211,12 @@ export function CoverPageBuilder({ config, onChange }: Props) {
             background: config.canvasBg ?? '#ffffff',
           }}
         >
+          {backgroundHtml && (
+            <div
+              style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+              dangerouslySetInnerHTML={{ __html: backgroundHtml }}
+            />
+          )}
           {config.customLayout.map(el => (
             <div
               key={el.id}

@@ -2,11 +2,12 @@
 'use client'
 
 import { useState } from 'react'
-import { ImagePlus } from 'lucide-react'
+import { ImagePlus, Type } from 'lucide-react'
 import type { CoverPageConfig } from './weboword.types'
 import { COVER_TEMPLATES } from './CoverPage.templates'
 import { PhotoBuilder } from './PhotoBuilder'
 import { CoverPageBuilder } from './CoverPageBuilder'
+import { buildCoverPageHtml } from './printHelpers'
 
 type Props = {
   config: CoverPageConfig
@@ -15,6 +16,7 @@ type Props = {
 
 export function CoverPage({ config, onChange }: Props) {
   const [showPhotoBuilder, setShowPhotoBuilder] = useState(false)
+  const [editingText, setEditingText] = useState(false)
 
   const templateHtml = COVER_TEMPLATES[config.template](config)
 
@@ -22,12 +24,38 @@ export function CoverPage({ config, onChange }: Props) {
     return <CoverPageBuilder config={config} onChange={onChange} />
   }
 
+  if (editingText) {
+    return (
+      <div>
+        <div className="flex justify-end p-2 bg-gray-50 border-b border-gray-200">
+          <button
+            onClick={() => setEditingText(false)}
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#9c27b0] rounded-lg hover:bg-[#7b1fa2] transition-colors"
+          >
+            Terminer l&apos;édition du texte
+          </button>
+        </div>
+        <CoverPageBuilder config={config} onChange={onChange} backgroundHtml={templateHtml} />
+      </div>
+    )
+  }
+
+  const previewHtml = buildCoverPageHtml(config) || templateHtml
+
   return (
     <div className="relative group">
-      {/* Template preview via dangerouslySetInnerHTML */}
+      {/* Template preview with overlays */}
       <div
-        dangerouslySetInnerHTML={{ __html: templateHtml }}
+        dangerouslySetInnerHTML={{ __html: previewHtml }}
       />
+      {/* Add/edit text overlay button */}
+      <button
+        onClick={() => setEditingText(true)}
+        className="absolute top-4 left-4 z-10 bg-[#9c27b0]/80 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <Type className="w-3.5 h-3.5" />
+        {(config.customLayout && config.customLayout.length > 0) ? 'Modifier le texte' : '+ Ajouter du texte'}
+      </button>
       {/* Photo edit overlay button */}
       {config.photoUrl && (
         <button
