@@ -330,6 +330,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     </p>
   </div>
 
+  <!-- ── Bloc financier (tableau + totaux) — remplaçable indépendamment via [data-webo-financials] ── -->
+  <div data-webo-financials="1">
   <!-- ── Tableau des prestations ── -->
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;">
     <thead>
@@ -373,6 +375,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     </div>
   </div>
   ` : ''}
+  </div>
+  <!-- fin bloc financier -->
 
 </div>
 

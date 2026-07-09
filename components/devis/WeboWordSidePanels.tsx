@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   User, Package, Calendar, Palette, Image as ImageIcon,
   X, Search, Loader2, Check, Plus, Trash2, Wand2, ChevronLeft,
@@ -12,6 +12,7 @@ import type { CoverPageConfig, PhotosPageConfig } from './weboword/weboword.type
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
+import { refreshFinancialsInHtml } from '@/lib/weboFinancials';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -67,6 +68,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
+  // Empreinte des champs qui alimentent le bloc financier, capturée au chargement.
+  // Sert à ne rafraîchir le tableau/totaux du document QUE s'ils ont réellement changé.
+  const initialFinancials = useRef<string>('');
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -198,6 +202,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setTemplate(loadedTemplate);
           setLanguage(loadedLanguage);
           setServices(loadedServices);
+
+          initialFinancials.current = JSON.stringify({
+            services: loadedServices, guestCount: loadedGuestCount, guestAdults: loadedGuestAdults,
+            guestChildren: loadedGuestChildren, vatRate: loadedVatRate, hidePrice: loadedHidePrice,
+            template: loadedTemplate, language: loadedLanguage,
+          });
         }
         setLoading(false);
       });
@@ -287,9 +297,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     }, 0);
     const totalTtc = ht * (1 + vatRate / 100);
 
-    // ⚠️ On NE régénère JAMAIS content_html ici : une modif (ajout de prestation,
-    // nombre de couverts, infos client…) enregistre les données mais préserve le
-    // texte WeboWord déjà mis en forme. La régénération est explicite (bouton dédié).
+    // ⚠️ On NE régénère JAMAIS tout le document WeboWord : le texte mis en forme
+    // (page de garde, carte gastronomique, prose manuelle) est préservé.
     const updatePayload: Record<string, unknown> = {
       client_name: clientName.trim() || '',
       client_first_name: cFirst || null,
@@ -311,6 +320,45 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       language,
       services,
     };
+
+    // Si les données financières ont changé (ajout/suppr/qté/prix d'une prestation,
+    // couverts, TVA…), on met à jour UNIQUEMENT le bloc tableau + totaux du document
+    // existant : la prestation ajoutée apparaît dans le tableau, totaux recalculés,
+    // le reste du texte reste intact.
+    const currentFin = JSON.stringify({
+      services, guestCount, guestAdults, guestChildren, vatRate, hidePrice, template, language,
+    });
+    if (currentFin !== initialFinancials.current) {
+      const { data: cur } = await supabase.from('quotes')
+        .select('content_html, selected_font').eq('id', quoteId).maybeSingle();
+      if (cur?.content_html) {
+        const updated = refreshFinancialsInHtml(
+          cur.content_html as string,
+          {
+            companyName: '',
+            clientName: '',
+            guestCount: parseInt(guestCount) || null,
+            guestCountAdults: parseInt(guestAdults) || null,
+            guestCountChildren: parseInt(guestChildren) || null,
+            services: services.map((s) => ({
+              name: s.name,
+              description: s.description ?? null,
+              quantity: s.quantity,
+              unitPrice: s.unitPrice,
+              childUnitPrice: (s.childUnitPrice as number | null | undefined) ?? null,
+              isFree: s.isFree,
+              isOption: s.isOption,
+              removed: s.removed,
+            })),
+            vatRate,
+            hidePrice,
+            language,
+          },
+          { template, font: (cur.selected_font as string | null) ?? undefined },
+        );
+        if (updated) updatePayload.content_html = updated;
+      }
+    }
 
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
 
