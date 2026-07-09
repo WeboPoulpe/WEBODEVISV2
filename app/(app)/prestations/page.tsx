@@ -6,6 +6,8 @@ import {
   Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { PENDING_STATUSES } from '@/lib/quoteStatus';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -240,7 +242,7 @@ function DevisLinePreview({ name, price, description }: {
               <div className="mt-1 pl-2 border-l-2 border-[#9c27b0]/15">
                 <div
                   className="font-menu text-[9.5px] italic text-gray-500 leading-relaxed description-html"
-                  dangerouslySetInnerHTML={{ __html: description }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(description) }}
                 />
               </div>
             )}
@@ -429,7 +431,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
     supabase
       .from('quotes')
       .select('id, services')
-      .eq('status', 'draft')
+      .in('status', PENDING_STATUSES)
       .then(({ data }) => {
         if (!data) return;
         let count = 0;
@@ -449,8 +451,10 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
     const { data: drafts } = await supabase
       .from('quotes')
       .select('id, services')
-      .eq('status', 'draft');
+      .in('status', PENDING_STATUSES);
     if (!drafts) return;
+    // Prépare les updates puis les exécute en parallèle (au lieu d'un await par devis en série).
+    const updates: PromiseLike<unknown>[] = [];
     for (const draft of drafts) {
       if (!Array.isArray(draft.services)) continue;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -464,9 +468,10 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
         JSON.stringify(s) !== JSON.stringify(draft.services[i])
       );
       if (changed) {
-        await supabase.from('quotes').update({ services: updated }).eq('id', draft.id);
+        updates.push(supabase.from('quotes').update({ services: updated }).eq('id', draft.id));
       }
     }
+    await Promise.all(updates);
   };
 
   const createCategory = async () => {
@@ -811,7 +816,7 @@ function PrestationCard({
           {p.description && (
             <div
               className="text-xs text-gray-500 mt-0.5 line-clamp-2 description-html"
-              dangerouslySetInnerHTML={{ __html: p.description }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(p.description) }}
             />
           )}
         </div>

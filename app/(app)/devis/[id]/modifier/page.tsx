@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { DEFAULT_QUOTE_STATUS } from '@/lib/quoteStatus';
 import type { ServiceLine } from '@/context/DevisContext';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import QuoteInlineEditor from '@/components/devis/QuoteInlineEditor';
@@ -105,6 +106,7 @@ export default async function ModifierPage({
             description:  s.description,
             quantity:     s.quantity,
             unitPrice:    s.unitPrice,
+            childUnitPrice: (s as ServiceLine & { childUnitPrice?: number | null }).childUnitPrice ?? null,
             hideDescOnPdf: (s as ServiceLine & { hideDescOnPdf?: boolean }).hideDescOnPdf,
             isFree:       (s as ServiceLine & { isFree?: boolean }).isFree,
             isOption:     (s as ServiceLine & { isOption?: boolean }).isOption,
@@ -149,7 +151,7 @@ export default async function ModifierPage({
   return (
     <QuoteInlineEditor
       quoteId={quote.id}
-      initialStatus={(quote.status as string) ?? 'draft'}
+      initialStatus={(quote.status as string) ?? DEFAULT_QUOTE_STATUS}
       initialTemplate={(quote.template as string) ?? 'standard'}
       hasContentHtml={!!quote.content_html}
       initialClient={{

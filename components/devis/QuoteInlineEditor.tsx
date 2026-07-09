@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { sanitizeHtml } from '@/lib/sanitize';
 import {
   Save, Loader2, Plus, Trash2, Search, X, Eye,
   User, CalendarDays, ChefHat, Settings2, Scissors, PencilLine, Check, LayoutTemplate,
@@ -21,6 +22,7 @@ export interface ServiceLine {
   description?: string;
   quantity: number;
   unitPrice: number;
+  childUnitPrice?: number | null;
   category?: string;
   isCustom?: boolean;
   isPageBreak?: boolean;
@@ -86,7 +88,7 @@ const TEMPLATES: { key: QuoteTemplate; label: string }[] = [
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors';
 
 // ── Catalog combobox ──────────────────────────────────────────────────────────
-interface CatalogItem { id: string; name: string; unit_price: number; category: string | null; description: string | null; is_option: boolean; }
+interface CatalogItem { id: string; name: string; unit_price: number; child_unit_price?: number | null; category: string | null; description: string | null; is_option: boolean; }
 
 function PrestationSearch({
   value, onNameChange, onSelect,
@@ -106,7 +108,7 @@ function PrestationSearch({
     if (timer.current) clearTimeout(timer.current);
     if (!q.trim()) { setResults([]); setOpen(false); return; }
     timer.current = setTimeout(async () => {
-      const { data } = await createClient().from('prestations').select('id, name, unit_price, category, description, is_option').ilike('name', `%${q}%`).limit(8);
+      const { data } = await createClient().from('prestations').select('id, name, unit_price, child_unit_price, category, description, is_option').ilike('name', `%${q}%`).limit(8);
       if (data?.length) { setResults(data); setOpen(true); } else { setResults([]); setOpen(false); }
     }, 300);
   }, []);
@@ -147,7 +149,7 @@ function PrestationSearch({
 // ── Service row ───────────────────────────────────────────────────────────────
 function ServiceRow({
   service, onUpdate, onRemove,
-}: { service: ServiceLine; onUpdate: (field: string, value: string | number | boolean) => void; onRemove: () => void }) {
+}: { service: ServiceLine; onUpdate: (field: string, value: string | number | boolean | null) => void; onRemove: () => void }) {
   const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description || !!service.isOption || !!service.isFree);
   const base = 'text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors';
 
@@ -186,6 +188,7 @@ function ServiceRow({
             onSelect={(p) => {
               onUpdate('name', p.name);
               onUpdate('unitPrice', p.unit_price);
+              onUpdate('childUnitPrice', p.child_unit_price ?? null);
               onUpdate('category', p.category ?? '');
               onUpdate('description', p.description ?? '');
               if (p.is_option) { onUpdate('isOption', true); onUpdate('isFree', false); }
@@ -194,10 +197,10 @@ function ServiceRow({
           />
         )}
         <input
-          type="number" min={1}
+          type="number" min={0}
           className={`${base} px-2 py-1.5 text-center w-full`}
           value={service.quantity}
-          onChange={(e) => onUpdate('quantity', parseFloat(e.target.value) || 1)}
+          onChange={(e) => { const v = parseFloat(e.target.value); onUpdate('quantity', Number.isFinite(v) ? v : 0); }}
         />
         <input
           type="number" min={0} step={0.01}
@@ -315,6 +318,7 @@ function useLiveHtml(
             description:  s.description,
             quantity:     s.quantity,
             unitPrice:    s.unitPrice,
+            childUnitPrice: s.childUnitPrice ?? null,
             hideDescOnPdf: s.hideDescOnPdf,
             isFree:       s.isFree,
             isOption:     s.isOption,
@@ -364,7 +368,7 @@ export default function QuoteInlineEditor({
     ...prev, { id: crypto.randomUUID(), name: '', quantity: 0, unitPrice: 0, isPageBreak: true },
   ]);
   const removeService = (id: string) => setServices((prev) => prev.filter((s) => s.id !== id));
-  const updateService = (id: string, field: string, value: string | number | boolean) =>
+  const updateService = (id: string, field: string, value: string | number | boolean | null) =>
     setServices((prev) => prev.map((s) => s.id === id ? { ...s, [field]: value } : s));
 
   // ── Totals ───────────────────────────────────────────────────────────────────
@@ -621,13 +625,14 @@ export default function QuoteInlineEditor({
             {services.filter((s) => !s.isPageBreak).length > 0 && (
               <div className="mt-4 ml-auto w-fit min-w-[220px] bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-1.5">
                 <div className="flex justify-between gap-6 text-sm text-gray-600"><span>Sous-total HT</span><span className="tabular-nums">{formatCurrency(ht)}</span></div>
-                {optionHt > 0 && (
-                  <div className="flex justify-between gap-6 text-sm text-amber-600 bg-amber-50 -mx-2 px-2 py-0.5 rounded">
-                    <span>si Options</span><span className="tabular-nums">{formatCurrency(optionHt)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between gap-6 text-sm text-gray-600"><span>TVA ({options.vatRate}%)</span><span className="tabular-nums">{formatCurrency(vatAmt)}</span></div>
                 <div className="border-t border-gray-200 pt-1.5 flex justify-between gap-6 text-sm font-bold text-gray-900"><span>Total TTC</span><span className="tabular-nums">{formatCurrency(ttc)}</span></div>
+                {optionHt > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-amber-200 space-y-1">
+                    <div className="flex justify-between gap-6 text-sm text-amber-600"><span>Options HT</span><span className="tabular-nums">+ {formatCurrency(optionHt)}</span></div>
+                    <div className="flex justify-between gap-6 text-sm font-bold text-amber-700"><span>Total TTC avec options</span><span className="tabular-nums">{formatCurrency((ht + optionHt) * (1 + options.vatRate / 100))}</span></div>
+                  </div>
+                )}
               </div>
             )}
           </Section>
@@ -719,7 +724,7 @@ export default function QuoteInlineEditor({
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
           <div
             style={{ width: '794px', zoom: 0.45, transformOrigin: 'top left' }}
-            dangerouslySetInnerHTML={{ __html: liveHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(liveHtml) }}
           />
         </div>
       </div>
@@ -832,7 +837,7 @@ export default function QuoteInlineEditor({
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
               <div
                 style={{ width: '794px', zoom: 0.42, transformOrigin: 'top left' }}
-                dangerouslySetInnerHTML={{ __html: liveHtml }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(liveHtml) }}
               />
             </div>
           </div>

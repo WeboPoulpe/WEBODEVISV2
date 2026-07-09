@@ -97,17 +97,19 @@ export default function CoursesPage() {
       .select('id, name, service_ingredients(ingredient_id, qty_per_person, ingredient:ingredients(id, name, unit, preferred_supplier_id, volume_unit_price))')
       .in('name', presNames);
 
-    // Aggregate needs per ingredient: total_qty = sum(quantity_per_guest × guest_count) per prestation occurrence
+    // Agrégation par ingrédient : quantité = qty_per_person × nombre de convives.
+    // (Formule unique, alignée sur la page Événement — on NE multiplie PAS par la
+    //  quantité de la ligne de prestation, qui encode déjà souvent le nb de convives.)
     const needsByIng: Record<string, { ingredient_id: string; quantity: number; supplier_id: string | null; unit_price: number }> = {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (prestations || []).forEach((p: any) => {
+      // On ne compte chaque prestation qu'une fois, même si présente plusieurs fois dans le devis.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const presInQuote = q.services.filter((s: any) => s.name === p.name && !s.isPageBreak);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const totalUnits = presInQuote.reduce((sum: number, s: any) => sum + (s.quantity || 1), 0);
+      const isInQuote = q.services.some((s: any) => s.name === p.name && !s.isPageBreak);
+      if (!isInQuote) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (p.service_ingredients || []).forEach((si: any) => {
-        const qty = (si.qty_per_person || 0) * guestCount * totalUnits;
+        const qty = (si.qty_per_person || 0) * guestCount;
         if (qty <= 0) return;
         const ing = si.ingredient;
         if (!ing) return;

@@ -253,6 +253,13 @@ function MovementModal({ ingredient, type, userId, onClose, onDone }: {
 
   const save = async () => {
     if (!userId || !quantity) return;
+    const qty = parseFloat(quantity);
+    if (!(qty > 0)) { alert('La quantité doit être un nombre supérieur à 0.'); return; }
+    // Garde-fou : une sortie ne peut pas dépasser le stock disponible (évite un stock négatif).
+    if (type === 'out' && qty > (ingredient.stock_quantity ?? 0)) {
+      alert(`Stock insuffisant : ${ingredient.stock_quantity ?? 0}${ingredient.unit || ''} disponible(s), sortie de ${qty}${ingredient.unit || ''} demandée.`);
+      return;
+    }
     setSaving(true);
     const supabase = createClient();
     const { error } = await supabase.from('stock_movements').insert({

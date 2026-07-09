@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS devis_templates (
 -- RLS
 ALTER TABLE devis_templates ENABLE ROW LEVEL SECURITY;
 
+-- Idempotent : DROP avant CREATE pour pouvoir rejouer le fichier sans erreur.
+DROP POLICY IF EXISTS "Users can CRUD own devis templates" ON devis_templates;
 CREATE POLICY "Users can CRUD own devis templates" ON devis_templates
   FOR ALL USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);

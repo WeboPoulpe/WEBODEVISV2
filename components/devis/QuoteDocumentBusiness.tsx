@@ -3,10 +3,12 @@
 import type { QuoteDocumentProps } from './QuoteDocument';
 import type { ServiceLine } from '@/context/DevisContext';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function totalHT(services: ServiceLine[]) {
-  return services.filter((s) => !s.isPageBreak).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+  // Exclut sauts de page, lignes gratuites (incluses) et options (facultatives).
+  return services.reduce((sum, s) => sum + (s.isFree || s.isOption || s.isPageBreak ? 0 : s.quantity * s.unitPrice), 0);
 }
 
 function splitByPageBreaks(services: ServiceLine[]): ServiceLine[][] {
@@ -148,7 +150,7 @@ export default function QuoteDocumentBusiness({
                           {s.description && (
                             <div
                               className="text-[8.5px] text-slate-500 mt-0.5 description-html"
-                              dangerouslySetInnerHTML={{ __html: s.description }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.description) }}
                             />
                           )}
                         </div>
@@ -253,7 +255,7 @@ export default function QuoteDocumentBusiness({
           </div>
           <div
             className="text-[9px] text-slate-600 leading-relaxed description-html"
-            dangerouslySetInnerHTML={{ __html: cgv }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgv) }}
           />
         </div>
       )}

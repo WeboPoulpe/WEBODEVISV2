@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { CONFIRMED_STATUSES, PENDING_STATUSES } from '@/lib/quoteStatus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface NavItem {
@@ -147,8 +148,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
     // Fetch devis + events badges
     Promise.all([
-      supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('status', 'sent'),
-      supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('event_date', today).eq('status', 'accepted'),
+      supabase.from('quotes').select('*', { count: 'exact', head: true }).in('status', PENDING_STATUSES),
+      supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('event_date', today).in('status', CONFIRMED_STATUSES),
     ]).then(([{ count: pending }, { count: todayCount }]) => {
       setPendingDevis(pending ?? 0);
       setHasTodayEvent((todayCount ?? 0) > 0);

@@ -1034,7 +1034,7 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
     setGenerating(true);
     const supabase = createClient();
 
-    // 1. Get matching prestations by service names (substring match)
+    // 1. Get matching prestations by service names (exact match, case-insensitive)
     const services = (quote.services ?? []).filter((s) => !s.isPageBreak);
     if (services.length === 0) { setGenerating(false); return; }
 
@@ -1043,14 +1043,15 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
       .select('id, name');
     if (!prestations || prestations.length === 0) { setGenerating(false); return; }
 
-    // Match prestations to quote services by name substring
+    // Correspondance EXACTE nom prestation ↔ nom de ligne du devis.
+    // (Un match par sous-chaîne agrégeait à tort « Menu » avec « Menu enfant ».)
+    const serviceNames = new Set(
+      services.map((s) => s.name.trim().toLowerCase()).filter(Boolean),
+    );
     const matchedIds: string[] = [];
-    for (const svc of services) {
-      for (const p of prestations) {
-        if (p.name.toLowerCase().includes(svc.name.toLowerCase()) ||
-            svc.name.toLowerCase().includes(p.name.toLowerCase())) {
-          if (!matchedIds.includes(p.id)) matchedIds.push(p.id);
-        }
+    for (const p of prestations) {
+      if (serviceNames.has(p.name.trim().toLowerCase()) && !matchedIds.includes(p.id)) {
+        matchedIds.push(p.id);
       }
     }
     if (matchedIds.length === 0) { setGenerating(false); return; }

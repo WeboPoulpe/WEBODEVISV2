@@ -7,6 +7,7 @@ import {
   AlertTriangle, Eye, X, ExternalLink, Loader2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { CONFIRMED_STATUSES, PENDING_STATUSES, REJECTED_STATUSES } from '@/lib/quoteStatus';
 import { formatCurrency } from '@/lib/utils';
 import Sheet from '@/components/ui/Sheet';
 
@@ -44,9 +45,9 @@ const MONTHS_FR  = [
 ];
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
-const CONFIRMED = new Set(['accepted']);
-const PENDING   = new Set(['sent', 'pending', 'draft']);
-const REJECTED  = new Set(['rejected', 'refuse_client', 'refuse_traiteur']);
+const CONFIRMED = new Set<string>(CONFIRMED_STATUSES);
+const PENDING   = new Set<string>(PENDING_STATUSES);
+const REJECTED  = new Set<string>(REJECTED_STATUSES);
 
 function quoteVariant(status: string): 'confirmed' | 'pending' | 'other' {
   if (CONFIRMED.has(status)) return 'confirmed';

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { CONFIRMED_STATUSES, PENDING_STATUSES, isConfirmed } from '@/lib/quoteStatus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UpcomingEvent {
@@ -54,21 +55,21 @@ export default function DashboardPage() {
       const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
 
       const [caRes, covertsRes, enCoursRes, totalRes, upcomingRes, chartRes] = await Promise.all([
-        // CA du mois (accepted)
-        supabase.from('quotes').select('total_amount').eq('status', 'accepted').gte('created_at', startOfMonth),
-        // Couverts à venir (accepted, event_date >= today)
-        supabase.from('quotes').select('guest_count').eq('status', 'accepted').gte('event_date', today),
+        // CA du mois (confirmés)
+        supabase.from('quotes').select('total_amount').in('status', CONFIRMED_STATUSES).gte('created_at', startOfMonth),
+        // Couverts à venir (confirmés, event_date >= today)
+        supabase.from('quotes').select('guest_count').in('status', CONFIRMED_STATUSES).gte('event_date', today),
         // Devis en cours
-        supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', ['draft', 'pending', 'sent']),
+        supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', PENDING_STATUSES),
         // Total pour taux conversion
         supabase.from('quotes').select('id, status', { count: 'exact' }),
         // 5 prochains événements
         supabase.from('quotes')
           .select('id, client_name, event_type, event_date, guest_count, total_amount')
-          .eq('status', 'accepted').gte('event_date', today)
+          .in('status', CONFIRMED_STATUSES).gte('event_date', today)
           .order('event_date', { ascending: true }).limit(5),
-        // CA 6 derniers mois (accepted)
-        supabase.from('quotes').select('total_amount, created_at').eq('status', 'accepted').gte('created_at', sixMonthsAgo),
+        // CA 6 derniers mois (confirmés)
+        supabase.from('quotes').select('total_amount, created_at').in('status', CONFIRMED_STATUSES).gte('created_at', sixMonthsAgo),
       ]);
 
       // CA mensuel
@@ -84,7 +85,7 @@ export default function DashboardPage() {
 
       // Taux de conversion
       const all = totalRes.data ?? [];
-      const accepted = all.filter((q) => q.status === 'accepted').length;
+      const accepted = all.filter((q) => isConfirmed(q.status)).length;
       setTauxConversion(all.length ? Math.round((accepted / all.length) * 100) : 0);
 
       // Upcoming events

@@ -9,6 +9,9 @@ export interface ServiceLine {
   description?: string;
   quantity: number;
   unitPrice: number;
+  /** Prix enfant « au couvert » (facultatif). Si renseigné et l'événement compte
+   *  des enfants → total = adultes×unitPrice + enfants×childUnitPrice. */
+  childUnitPrice?: number | null;
   category?: string;
   /** true = ligne saisie manuellement (pas depuis le catalogue) */
   isCustom?: boolean;
@@ -190,14 +193,19 @@ export function DevisProvider({
     (_: undefined): DevisState => initialState ?? getInitialState(),
   );
 
-  // Persist to sessionStorage — only in create mode to avoid stale edit data
+  // Persist to sessionStorage — only in create mode to avoid stale edit data.
+  // Debounced (250 ms) : évite de sérialiser tout l'état (dont options.images en
+  // base64) à chaque frappe → écritures lourdes / dépassement de quota.
   useEffect(() => {
     if (isEditModeRef.current) return;
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
-    } catch {
-      // Ignore (private mode, storage full, etc.)
-    }
+    const t = setTimeout(() => {
+      try {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+      } catch {
+        // Ignore (private mode, storage full, etc.)
+      }
+    }, 250);
+    return () => clearTimeout(t);
   }, [state]);
 
   // Wrap dispatch to clear sessionStorage on RESET

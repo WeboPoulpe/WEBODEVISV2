@@ -14,7 +14,11 @@ ALTER TABLE quotes DROP CONSTRAINT IF EXISTS quotes_status_check;
 
 -- ── 3) Migrer les anciens statuts devis vers les statuts prospection ───────
 --    On désactive les triggers utilisateur le temps de la migration
---    (le trigger d'historique exige auth.uid() qui est NULL dans l'éditeur SQL)
+--    (le trigger d'historique exige auth.uid() qui est NULL dans l'éditeur SQL).
+--    ⚠️ Enveloppé dans une TRANSACTION : si un UPDATE échoue, le ROLLBACK
+--    restaure aussi le ENABLE TRIGGER (sinon les triggers restaient désactivés
+--    silencieusement en prod).
+BEGIN;
 ALTER TABLE quotes DISABLE TRIGGER USER;
 UPDATE quotes SET status = 'devis_a_faire'  WHERE status IN ('draft', 'pending');
 UPDATE quotes SET status = 'devis_envoye'   WHERE status = 'sent';
@@ -29,6 +33,7 @@ WHERE status IS NULL OR status NOT IN (
   'acompte', 'paye', 'refus_client', 'refus_traiteur'
 );
 ALTER TABLE quotes ENABLE TRIGGER USER;
+COMMIT;
 
 -- ── 4) Recréer la contrainte avec les statuts de prospection ───────────────
 ALTER TABLE quotes ADD CONSTRAINT quotes_status_check CHECK (status IN (

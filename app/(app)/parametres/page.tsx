@@ -126,7 +126,8 @@ export default function ParametresPage() {
     if (!file || !user) return;
     setUploadingLogo(true);
     const supabase = createClient();
-    const path = `logos/${user.id}`;
+    // Chemin préfixé par l'uid (1er segment) → requis par les policies storage par propriétaire.
+    const path = `${user.id}/logo`;
     const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: true });
     if (!error) {
       const { data: urlData } = supabase.storage.from('storage').getPublicUrl(path);
@@ -141,7 +142,7 @@ export default function ParametresPage() {
   const removeLogo = async () => {
     if (!user) return;
     const supabase = createClient();
-    await supabase.storage.from('storage').remove([`logos/${user.id}`]);
+    await supabase.storage.from('storage').remove([`${user.id}/logo`]);
     await supabase.from('profiles').update({ logo_url: null }).eq('id', user.id);
     setProfile((p) => ({ ...p, logo_url: null }));
   };

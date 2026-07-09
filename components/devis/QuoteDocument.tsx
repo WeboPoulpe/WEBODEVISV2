@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { ServiceLine } from '@/context/DevisContext';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 // ── Category sort order ────────────────────────────────────────────────────────
@@ -37,7 +38,8 @@ function groupByCategory(services: ServiceLine[]): Map<string, ServiceLine[]> {
 }
 
 function totalHT(services: ServiceLine[]) {
-  return services.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+  // Exclut les lignes gratuites (incluses), les options (facultatives) et les sauts de page.
+  return services.reduce((sum, s) => sum + (s.isFree || s.isOption || s.isPageBreak ? 0 : s.quantity * s.unitPrice), 0);
 }
 
 /**
@@ -161,7 +163,7 @@ function MenuLine({
         <div className="mt-0.5 pl-2 border-l-2 border-[#9c27b0]/15">
           <div
             className="font-menu text-[9.5px] italic text-gray-500 leading-relaxed description-html"
-            dangerouslySetInnerHTML={{ __html: service.description }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(service.description) }}
           />
         </div>
       )}
@@ -183,13 +185,13 @@ function TvaBreakdown({ gastroHT, logistiqueHT, vatRate, hideLogistique }: {
   gastroHT: number; logistiqueHT: number; vatRate: number; hideLogistique: boolean;
 }) {
   const gastroTva = gastroHT * (vatRate / 100);
-  const logistiqueTva = logistiqueHT * 0.2;
+  const logistiqueTva = logistiqueHT * (vatRate / 100);
   if (hideLogistique || logistiqueHT === 0)
     return <TotalsRow label={`TVA (${vatRate}%)`} value={formatCurrency(gastroTva)} />;
   return (
     <>
       {gastroHT > 0 && <TotalsRow label={`TVA gastronomie (${vatRate}%)`} value={formatCurrency(gastroTva)} small />}
-      <TotalsRow label="TVA services (20%)" value={formatCurrency(logistiqueTva)} small />
+      <TotalsRow label={`TVA services (${vatRate}%)`} value={formatCurrency(logistiqueTva)} small />
     </>
   );
 }
@@ -232,7 +234,7 @@ export default function QuoteDocument({
   const logistiqueHT = totalHT(logistique);
   const ht           = gastroHT + logistiqueHT;
   const gastroTva    = gastroHT * (options.vatRate / 100);
-  const logistiqueTva = logistiqueHT > 0 ? logistiqueHT * 0.2 : 0;
+  const logistiqueTva = logistiqueHT > 0 ? logistiqueHT * (options.vatRate / 100) : 0;
   const ttc          = ht + gastroTva + logistiqueTva;
 
   const displayDate = quoteDate
@@ -492,7 +494,7 @@ export default function QuoteDocument({
           </div>
           <div
             className="text-[9px] text-gray-600 leading-relaxed description-html"
-            dangerouslySetInnerHTML={{ __html: cgv }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgv) }}
           />
         </div>
       )}

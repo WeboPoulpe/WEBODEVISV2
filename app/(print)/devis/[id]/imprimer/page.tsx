@@ -8,6 +8,7 @@ import AutoPrint from '@/components/devis/AutoPrint';
 import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml } from '@/components/devis/weboword/printHelpers';
 import { DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG } from '@/components/devis/weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/weboword/weboword.types';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -83,15 +84,15 @@ export default async function ImprimerPage({ params }: Props) {
             line-height: 0 !important;
           }
         `}</style>
-        {coverHtml && <div dangerouslySetInnerHTML={{ __html: coverHtml }} />}
-        {!coverHtml && logoHtml && <div dangerouslySetInnerHTML={{ __html: logoHtml }} />}
+        {coverHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(coverHtml) }} />}
+        {!coverHtml && logoHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(logoHtml) }} />}
         <div
           className="prose prose-sm max-w-none"
           style={{ padding: '20mm', fontFamily: `'${selectedFont}', Georgia, serif` }}
-          dangerouslySetInnerHTML={{ __html: quote.content_html as string }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(quote.content_html as string) }}
         />
-        {photosHtml && <div dangerouslySetInnerHTML={{ __html: photosHtml }} />}
-        {cgvHtml && <div dangerouslySetInnerHTML={{ __html: cgvHtml }} />}
+        {photosHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(photosHtml) }} />}
+        {cgvHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />}
       </>
     );
   }

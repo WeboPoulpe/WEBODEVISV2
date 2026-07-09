@@ -7,7 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
-  PenLine, History, X, Search, Image as ImageIcon, ImagePlus,
+  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -212,9 +212,15 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
   // Sync activePanel with URL query param (using window to avoid Suspense issue)
   useEffect(() => {
+    // On ne synchronise l'URL → state QUE lorsque le paramètre ?panel change réellement.
+    // Sinon le polling écrasait l'état posé par les boutons toolbar (cover/photos), qui
+    // ne modifient pas l'URL → le panneau se refermait tout seul en ≤300 ms.
+    let lastUrlPanel: string | null | undefined = undefined;
     const update = () => {
       if (typeof window === 'undefined') return;
       const p = new URLSearchParams(window.location.search).get('panel');
+      if (p === lastUrlPanel) return; // URL inchangée → ne pas contrarier l'état local
+      lastUrlPanel = p;
       if (p === 'client' || p === 'services' || p === 'event' || p === 'style' || p === 'images' || p === 'cover' || p === 'photos') {
         setActivePanel(p);
       } else {
@@ -448,6 +454,75 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setToast(`${changed} description${changed > 1 ? 's' : ''} structurée${changed > 1 ? 's' : ''}`);
   }, [structureModal]);
 
+  // ── Régénérer le document depuis les données du devis ───────────────────────
+  // Reconstruit le texte WeboWord à partir des données actuelles (services, client,
+  // couverts, prix enfant…). Explicite et destructif : remplace la mise en forme
+  // manuelle. Aucune autre action ne régénère automatiquement.
+  const regenerateDocument = useCallback(async () => {
+    if (!confirm('Régénérer le document depuis les données du devis ?\n\n⚠️ La mise en forme manuelle actuelle du texte sera remplacée.')) return;
+    setSaving(true);
+    const supabase = createClient();
+    const [{ data: q }, profRes] = await Promise.all([
+      supabase.from('quotes')
+        .select('client_name, client_first_name, client_last_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, vat_rate, hide_price, remarks, template, language')
+        .eq('id', quoteId).single(),
+      user
+        ? supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    if (!q) { setSaving(false); alert('Devis introuvable'); return; }
+
+    const cName = (q.client_first_name && q.client_last_name)
+      ? `${q.client_first_name} ${q.client_last_name}`.trim()
+      : ((q.client_name as string | null) ?? '');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const svcs: any[] = Array.isArray(q.services) ? q.services : [];
+
+    const fresh = generateQuoteHtml(
+      {
+        companyName: (profRes.data as { company_name?: string | null } | null)?.company_name ?? 'Votre entreprise',
+        clientName: cName || 'Client',
+        clientEmail: q.client_email ?? null,
+        clientPhone: q.client_phone ?? null,
+        clientAddress: q.client_address ?? null,
+        eventType: q.event_type ?? null,
+        eventDate: q.event_date ?? null,
+        eventLocation: q.event_location ?? null,
+        guestCount: q.guest_count ?? null,
+        guestCountAdults: q.guest_count_adults ?? null,
+        guestCountChildren: q.guest_count_children ?? null,
+        services: svcs
+          .filter((s) => !s.isPageBreak)
+          .map((s) => ({
+            name: s.name,
+            description: s.description,
+            quantity: s.quantity,
+            unitPrice: s.unitPrice,
+            childUnitPrice: s.childUnitPrice ?? null,
+            hideDescOnPdf: s.hideDescOnPdf,
+            isFree: s.isFree,
+            isOption: s.isOption,
+            removed: s.removed,
+            gastroCardHtml: s.gastroCardHtml,
+            gastroCardHtmlEn: s.gastroCardHtmlEn,
+          })),
+        vatRate: q.vat_rate ?? 20,
+        remarks: q.remarks ?? null,
+        hidePrice: q.hide_price ?? false,
+        cgv: companyAssets.cgv,
+        language: (q.language as 'fr' | 'en') ?? 'fr',
+      },
+      { template: (q.template as 'standard' | 'mariage' | 'business') ?? 'standard', font },
+    );
+
+    if (editorRef.current) editorRef.current.innerHTML = fresh;
+    // Efface le brouillon local pour ne pas restaurer l'ancien texte au rechargement.
+    try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
+    setLocalDraft(null);
+    setSaving(false);
+    setToast('Document régénéré ✓ — pense à sauvegarder');
+  }, [quoteId, user, companyAssets.cgv, font]);
+
   // ── Admin fields: load from database ────────────────────────────────────────
   const openAdminModal = useCallback(async () => {
     const supabase = createClient();
@@ -634,20 +709,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       return { ...s, quantity: edited.quantity, unitPrice: edited.unitPrice, isFree: !!edited.isFree, isOption: !!edited.isOption, removed: !!edited.removed };
     });
 
-    // Debug: what the user changed in the modal vs what we're saving
-    console.log('=== ADMIN SAVE ===');
-    console.log('adminServices (from modal):', adminServices.map((s) => ({ name: s.name.slice(0, 25), qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
-    console.log('origServices names:', origServices.map((s: { name: string }) => s.name?.slice(0, 25)));
-    console.log('svcByName keys:', Array.from(svcByName.keys()).map((k) => k.slice(0, 25)));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    console.log('updatedServices (to save):', updatedServices.map((s: any) => ({ name: s.name?.slice(0, 25), qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })));
-
     // Split name into first/last for the quote
     const nameParts = clientFullName.split(' ');
     const cFirstName = nameParts[0] || '';
     const cLastName = nameParts.slice(1).join(' ') || '';
 
-    // Single update: save everything + reset content_html in ONE call
+    // ⚠️ On préserve content_html : les modifs admin (client, couverts, quantités)
+    // sont enregistrées mais NE régénèrent PAS le texte WeboWord déjà mis en forme.
+    // La régénération est explicite (bouton « Régénérer le document »).
     const { error: saveErr } = await supabase.from('quotes').update({
       client_name: clientFullName || '',
       client_first_name: cFirstName || null,
@@ -660,22 +729,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       event_location: adminFields.eventLocation || '',
       guest_count: parseInt(adminFields.guestCount) || 1,
       services: updatedServices,
-      content_html: null, // Force regeneration on next load
     }).eq('id', quoteId);
-
-    console.log('Save result:', saveErr ? saveErr.message : 'OK');
 
     if (saveErr) {
       alert('Erreur sauvegarde: ' + saveErr.message);
       setAdminModal(false);
       return;
     }
-
-    // Verify save worked
-    const { data: verify } = await supabase.from('quotes').select('services, content_html, client_name, guest_count').eq('id', quoteId).single();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const verifySvcs = Array.isArray(verify?.services) ? verify.services.map((s: any) => ({ name: s.name?.slice(0, 25), qty: s.quantity, free: s.isFree, option: s.isOption, removed: s.removed })) : [];
-    console.log('Verify after save:', { client_name: verify?.client_name, guest_count: verify?.guest_count, content_html: verify?.content_html === null ? 'NULL ✓' : 'HAS HTML ✗', services: verifySvcs });
 
     // Upsert client in customers table
     if (clientFullName && adminFields.clientEmail) {
@@ -1355,6 +1415,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             title="Insérer un bloc photo"
           >
             <ImagePlus className="h-3.5 w-3.5" />
+          </TB>
+          <Sep />
+          <TB
+            onClick={regenerateDocument}
+            title="Régénérer le document depuis les données du devis (remplace la mise en forme manuelle)"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
           </TB>
 
         </div>

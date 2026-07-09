@@ -15,12 +15,15 @@ import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 import ImportDevisModal from '@/components/devis/ImportDevisModal';
 import FinanceSheet from '@/components/devis/FinanceSheet';
+import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
   name: string;
   quantity: number;
   unitPrice: number;
+  childUnitPrice?: number | null;
   isFree?: boolean;
   isOption?: boolean;
   isPageBreak?: boolean;
@@ -32,8 +35,11 @@ interface Quote {
   event_type: string;
   event_date: string | null;
   guest_count: number | null;
+  guest_count_adults?: number | null;
+  guest_count_children?: number | null;
   status: string;
   total_amount: number | null;
+  vat_rate?: number | null;
   created_at: string;
   user_id: string | null;       // null on true V1 devis (old system)
   owner_user_id: string | null;
@@ -49,16 +55,25 @@ interface Quote {
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function computeQuoteTotal(quote: { total_amount: number | null; services: QuoteService[] | null }): number | null {
-  // Calculate from services (excludes free + removed)
+function computeQuoteTotal(quote: {
+  total_amount: number | null;
+  vat_rate?: number | null;
+  guest_count?: number | null;
+  guest_count_adults?: number | null;
+  guest_count_children?: number | null;
+  services: QuoteService[] | null;
+}): number | null {
+  // Calcule depuis les services (exclut gratuits, options et retirés) — montant HORS options,
+  // en tenant compte du prix enfant « au couvert ».
   if (Array.isArray(quote.services) && quote.services.length > 0) {
+    const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const services = quote.services as any[];
     const ht = services.reduce((sum, s) => {
-      if (s.removed || s.isFree || s.isPageBreak) return sum;
-      return sum + (s.quantity || 0) * (s.unitPrice || 0);
+      if (s.removed || s.isFree || s.isOption || s.isPageBreak) return sum;
+      return sum + lineTotalHT(s, adults, children);
     }, 0);
-    if (ht > 0) return ht * 1.2; // TTC = HT × 1.20 (default VAT)
+    if (ht > 0) return ht * (1 + (quote.vat_rate ?? 20) / 100); // TTC au vrai taux de TVA du devis
   }
   // Fallback to total_amount in DB
   return quote.total_amount;
@@ -693,7 +708,7 @@ export default function DevisPage() {
     const supabase = createClient();
     Promise.all([
       supabase.from('quotes')
-        .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
+        .select('id, client_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
         .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false }),
       supabase.from('devis_templates')
@@ -1131,7 +1146,7 @@ export default function DevisPage() {
           if (!user) return;
           createClient()
             .from('quotes')
-            .select('id, client_name, event_type, event_date, guest_count, status, total_amount, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
+            .select('id, client_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
             .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
             .order('created_at', { ascending: false })
             .then(({ data }) => { if (data) setQuotes(data); });
@@ -1160,7 +1175,7 @@ export default function DevisPage() {
               {previewTpl.content_html ? (
                 <div
                   className="bg-white shadow-sm rounded-xl p-6 min-h-full"
-                  dangerouslySetInnerHTML={{ __html: previewTpl.content_html }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewTpl.content_html) }}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm italic">

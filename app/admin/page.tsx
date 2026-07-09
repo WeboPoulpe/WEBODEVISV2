@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Users, FileText, UserCheck, TrendingUp, Loader2, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
+import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export default function AdminDashboard() {
         sb.from('profiles').select('*', { count: 'exact', head: true }).eq('is_active', true),
         sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
         sb.from('quotes').select('*', { count: 'exact', head: true }),
-        sb.from('quotes').select('total_amount').eq('status', 'accepted'),
+        sb.from('quotes').select('total_amount').in('status', CONFIRMED_STATUSES),
         sb.from('prospect_requests').select('*', { count: 'exact', head: true }),
       ]);
 

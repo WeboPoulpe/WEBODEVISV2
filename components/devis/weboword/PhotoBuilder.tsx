@@ -49,8 +49,11 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
   // ── Upload ─────────────────────────────────────────────────────────────────
   async function handleUpload(file: File) {
     setIsUploading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setIsUploading(false); return }
     const ext = file.name.split('.').pop()
-    const path = `cover-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    // Chemin préfixé par l'uid (1er segment) → requis par les policies storage par propriétaire.
+    const path = `${user.id}/cover-photos/${Date.now()}-${crypto.randomUUID()}.${ext}`
     const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: false })
     if (error) { console.error(error); setIsUploading(false); return }
     const { data: { publicUrl } } = supabase.storage.from('storage').getPublicUrl(path)

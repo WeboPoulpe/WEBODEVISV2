@@ -134,7 +134,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
     // Upload new file if selected (replaces existing in edit mode)
     if (file) {
       const ext = file.name.split('.').pop() || 'pdf';
-      const path = `imported-devis/${user.id}/${Date.now()}.${ext}`;
+      const path = `${user.id}/imported-devis/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('storage').upload(path, file);
       if (uploadErr) {
         alert('Erreur upload fichier: ' + uploadErr.message + '\n\nVérifie que le bucket "storage" existe dans Supabase et que les RLS permettent l\'upload.');
@@ -194,7 +194,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
         ...payload,
         user_id: user.id,
         owner_user_id: user.id,
-        status: 'accepted',
+        status: 'valide',
         services: [],
         template: 'standard',
         vat_rate: 20,

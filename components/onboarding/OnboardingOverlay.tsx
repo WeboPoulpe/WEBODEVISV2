@@ -32,7 +32,7 @@ export default function OnboardingOverlay({ userId }: Props) {
         ...(companyName.trim() && { company_name: companyName.trim() }),
         ...(companyAddress.trim() && { company_address: companyAddress.trim() }),
         ...(vatRate && { default_vat_rate: parseInt(vatRate) }),
-        ...(logoUrls[0] && { company_logo_url: logoUrls[0] }),
+        ...(logoUrls[0] && { logo_url: logoUrls[0] }),
       })
       .eq('id', userId);
     await refreshProfile();

@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import { ImagePlus, Type } from 'lucide-react'
+import { sanitizeHtml } from '@/lib/sanitize'
 import type { CoverPageConfig } from './weboword.types'
 import { COVER_TEMPLATES } from './CoverPage.templates'
 import { PhotoBuilder } from './PhotoBuilder'
@@ -46,7 +47,7 @@ export function CoverPage({ config, onChange }: Props) {
     <div className="relative group">
       {/* Template preview with overlays */}
       <div
-        dangerouslySetInnerHTML={{ __html: previewHtml }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
       />
       {/* Add/edit text overlay button */}
       <button

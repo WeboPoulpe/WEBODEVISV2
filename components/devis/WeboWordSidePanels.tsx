@@ -11,6 +11,7 @@ import { DEFAULT_TRANSFORM } from './weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from './weboword/weboword.types';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -66,11 +67,6 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
-  // Snapshot of the data loaded from DB — used to detect changes that require
-  // content_html regeneration. We compare current form state to this snapshot;
-  // if anything that feeds into the rendered HTML has changed, content_html is
-  // reset so the page regenerates with the new data on reload.
-  const [initialSnapshot, setInitialSnapshot] = useState<string>('');
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -202,25 +198,6 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setTemplate(loadedTemplate);
           setLanguage(loadedLanguage);
           setServices(loadedServices);
-
-          setInitialSnapshot(JSON.stringify({
-            clientName: loadedClientName,
-            clientEmail: loadedClientEmail,
-            clientPhone: loadedClientPhone,
-            clientAddress: loadedClientAddress,
-            eventType: loadedEventType,
-            eventDate: loadedEventDate,
-            eventLocation: loadedEventLocation,
-            guestCount: loadedGuestCount,
-            guestAdults: loadedGuestAdults,
-            guestChildren: loadedGuestChildren,
-            remarks: loadedRemarks,
-            vatRate: loadedVatRate,
-            hidePrice: loadedHidePrice,
-            template: loadedTemplate,
-            language: loadedLanguage,
-            services: loadedServices,
-          }));
         }
         setLoading(false);
       });
@@ -251,7 +228,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     setPrestationSearch(q);
     if (!q.trim()) { setPrestationResults([]); setShowPrestationPicker(false); return; }
     const { data } = await supabase.from('prestations')
-      .select('id, name, unit_price, category, description, is_option, gastro_card_html, gastro_card_html_en')
+      .select('id, name, unit_price, child_unit_price, category, description, is_option, gastro_card_html, gastro_card_html_en')
       .ilike('name', `%${q}%`)
       .limit(8);
     setPrestationResults(data || []);
@@ -266,6 +243,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       description: p.description || '',
       quantity: parseInt(guestCount) || 1,
       unitPrice: p.unit_price,
+      childUnitPrice: p.child_unit_price ?? null,
       category: p.category,
       gastroCardHtml: p.gastro_card_html,
       gastroCardHtmlEn: p.gastro_card_html_en,
@@ -295,36 +273,23 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const cFirst = clientParts[0] || '';
     const cLast = clientParts.slice(1).join(' ') || '';
 
-    // Compute total_amount (TTC) from services
+    // Compute total_amount (TTC) from services — HORS options (montant de référence,
+    // cohérent avec l'éditeur et generateQuoteHtml ; les options sont facultatives).
+    // Tient compte du prix enfant « au couvert » via le helper partagé.
+    const { adults, children } = resolveGuestSplit(
+      parseInt(guestCount) || null,
+      parseInt(guestAdults) || null,
+      parseInt(guestChildren) || null,
+    );
     const ht = services.reduce((sum, s) => {
-      if (s.removed || s.isFree || s.isPageBreak) return sum;
-      return sum + (s.quantity || 0) * (s.unitPrice || 0);
+      if (s.removed || s.isFree || s.isOption || s.isPageBreak) return sum;
+      return sum + lineTotalHT(s, adults, children);
     }, 0);
     const totalTtc = ht * (1 + vatRate / 100);
 
-    // Detect if anything that feeds the rendered HTML has changed since load.
-    // If yes → reset content_html so the new data is reflected on next reload.
-    // If no  → preserve content_html (and any manual WeboWord edits with it).
-    const currentSnapshot = JSON.stringify({
-      clientName: clientName.trim(),
-      clientEmail,
-      clientPhone,
-      clientAddress,
-      eventType,
-      eventDate,
-      eventLocation,
-      guestCount,
-      guestAdults,
-      guestChildren,
-      remarks,
-      vatRate,
-      hidePrice,
-      template,
-      language,
-      services,
-    });
-    const dataChanged = currentSnapshot !== initialSnapshot;
-
+    // ⚠️ On NE régénère JAMAIS content_html ici : une modif (ajout de prestation,
+    // nombre de couverts, infos client…) enregistre les données mais préserve le
+    // texte WeboWord déjà mis en forme. La régénération est explicite (bouton dédié).
     const updatePayload: Record<string, unknown> = {
       client_name: clientName.trim() || '',
       client_first_name: cFirst || null,
@@ -346,7 +311,6 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       language,
       services,
     };
-    if (dataChanged) updatePayload.content_html = null;
 
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
 

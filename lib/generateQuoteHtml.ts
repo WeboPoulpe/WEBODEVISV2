@@ -9,6 +9,8 @@
  * Le séparateur `.screen-sep` est visible à l'écran mais caché à l'impression.
  */
 
+import { lineTotalHT, resolveGuestSplit } from './quoteTotals';
+
 export interface QuoteHtmlData {
   companyName: string;
   clientName: string;
@@ -24,6 +26,7 @@ export interface QuoteHtmlData {
     description?: string | null;
     quantity: number;
     unitPrice: number;
+    childUnitPrice?: number | null;
     hideDescOnPdf?: boolean;
     isFree?: boolean;
     isOption?: boolean;
@@ -51,7 +54,10 @@ const money = (n: number, lang: 'fr' | 'en' = 'fr') =>
 const dateFmt = (s?: string | null, lang: 'fr' | 'en' = 'fr') => {
   if (!s) return '';
   try {
-    return new Date(s).toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR', {
+    // Une date nue "YYYY-MM-DD" est sinon interprétée en UTC → affichage à J-1 dans
+    // les fuseaux négatifs. On force minuit LOCAL, cohérent avec le reste de l'app.
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00` : s;
+    return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR', {
       day: '2-digit', month: 'long', year: 'numeric',
     });
   } catch {
@@ -108,9 +114,10 @@ const T = {
     totalHt: 'Total HT',
     aucunePrestation: 'Aucune prestation',
     sousTotalHt: 'Sous-total HT',
-    siOptionsHt: 'si Options HT',
+    siOptionsHt: 'Options HT',
     tva: 'TVA',
     totalTtc: 'Total TTC',
+    totalTtcOptions: 'Total TTC avec options',
     sautPage: '✂  SAUT DE PAGE — Carte Gastronomique ci-dessous',
     eventLabel: (type: string, date: string) => `${(type || 'ÉVÉNEMENT').toUpperCase()}${date ? ` — ${date.toUpperCase()}` : ''}`,
     menuTitle: (eventType: string) => `Menu de votre ${eventType || 'Réception'}`,
@@ -142,9 +149,10 @@ const T = {
     totalHt: 'Total',
     aucunePrestation: 'No service',
     sousTotalHt: 'Subtotal',
-    siOptionsHt: 'incl. Options',
+    siOptionsHt: 'Options (excl. VAT)',
     tva: 'VAT',
     totalTtc: 'Total (incl. VAT)',
+    totalTtcOptions: 'Total with options (incl. VAT)',
     sautPage: '✂  PAGE BREAK — Gastronomic Menu below',
     eventLabel: (type: string, date: string) => `${(type || 'EVENT').toUpperCase()}${date ? ` — ${date.toUpperCase()}` : ''}`,
     menuTitle: (eventType: string) => `${eventType || 'Reception'} Menu`,
@@ -167,11 +175,15 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   const m = (n: number) => money(n, lang);
   const dateFr = (s?: string | null) => dateFmt(s, lang);
   const activeServices = d.services.filter((s) => !s.removed);
-  const htSansOption = activeServices.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
-  const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
-  const ht  = htSansOption + optionHt;
-  const vat = ht * (d.vatRate / 100);
-  const ttc = ht + vat;
+  // Répartition adultes/enfants pour le tarif « au couvert » (prix enfant distinct).
+  const { adults, children } = resolveGuestSplit(d.guestCount, d.guestCountAdults, d.guestCountChildren);
+  const htSansOption = activeServices.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : lineTotalHT(s, adults, children)), 0);
+  const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + lineTotalHT(s, adults, children), 0);
+  // Total de référence = HORS options (les options sont facultatives, présentées à part).
+  const vat = htSansOption * (d.vatRate / 100);
+  const ttc = htSansOption + vat;
+  // Total alternatif = AVEC options (jamais additionné au précédent : ce sont deux montants distincts).
+  const ttcAvecOptions = (htSansOption + optionHt) * (1 + d.vatRate / 100);
   const today = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR');
   // Translate event type if devis is in English
   const eventTypeT = translateEventType(d.eventType || '', lang);
@@ -245,8 +257,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       </td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${isOpt ? 'color:#d97706;' : ''}">${s.quantity}</td>
       ${!d.hidePrice ? `
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.unitPrice)}</td>
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.quantity * s.unitPrice)}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.unitPrice)}${!s.isFree && s.childUnitPrice != null && children > 0 ? `<br><span style="font-size:9px;color:#888;">${lang === 'en' ? 'child' : 'enfant'} ${m(s.childUnitPrice)}</span>` : ''}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(lineTotalHT(s, adults, children))}</td>
       ` : ''}
     </tr>`;
   }).join('');
@@ -342,17 +354,22 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
         <span>${t.sousTotalHt}</span><span>${m(htSansOption)}</span>
       </div>
-      ${optionHt > 0 ? `
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;background:#fffbeb;padding:3px 6px;border-radius:4px;">
-        <span>${t.siOptionsHt}</span><span>${m(optionHt)}</span>
-      </div>
-      ` : ''}
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
         <span>${t.tva} (${d.vatRate}%)</span><span>${m(vat)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;color:${accentColor};">
         <span>${t.totalTtc}</span><span>${m(ttc)}</span>
       </div>
+      ${optionHt > 0 ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${lightBorder};">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;">
+          <span>${t.siOptionsHt}</span><span>+ ${m(optionHt)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;color:#d97706;">
+          <span>${t.totalTtcOptions}</span><span>${m(ttcAvecOptions)}</span>
+        </div>
+      </div>
+      ` : ''}
     </div>
   </div>
   ` : ''}

@@ -7,6 +7,7 @@ import {
   TrendingUp, StickyNote, Save, Loader2, CalendarDays, ChevronRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { isConfirmed } from '@/lib/quoteStatus';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 
@@ -40,8 +41,8 @@ function MiniBarChart({ quotes }: { quotes: QuoteSummary[] }) {
     d.setMonth(d.getMonth() - (5 - i));
     return { label: d.toLocaleDateString('fr-FR', { month: 'short' }), year: d.getFullYear(), month: d.getMonth(), total: 0 };
   });
-  // Only count accepted quotes for real revenue
-  const acceptedQuotes = quotes.filter((q) => q.status === 'accepted');
+  // Only count confirmed quotes for real revenue
+  const acceptedQuotes = quotes.filter((q) => isConfirmed(q.status));
   acceptedQuotes.forEach((q) => {
     if (!q.total_amount) return;
     const d = new Date(q.created_at);

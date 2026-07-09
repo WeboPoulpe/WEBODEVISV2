@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { CoverPageConfig, CoverPageLayoutElement } from './weboword.types'
 import { PhotoBuilder } from './PhotoBuilder'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 type Props = {
   config: CoverPageConfig
@@ -214,7 +215,7 @@ export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
           {backgroundHtml && (
             <div
               style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-              dangerouslySetInnerHTML={{ __html: backgroundHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(backgroundHtml) }}
             />
           )}
           {config.customLayout.map(el => (

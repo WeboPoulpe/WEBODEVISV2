@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, Loader2, Printer, AlertTriangle, RefreshCw, FileEdit
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { DEFAULT_QUOTE_STATUS, isConfirmed } from '@/lib/quoteStatus';
 
 interface Props {
   onBack: () => void;
@@ -20,7 +21,7 @@ export default function StepResume({ onBack }: Props) {
   const [error, setError]     = useState<string | null>(null);
 
   // Status selection for accepted-quote alert (only shown when editing an accepted quote)
-  const [newStatus, setNewStatus] = useState<string>(state.editingQuoteStatus ?? 'draft');
+  const [newStatus, setNewStatus] = useState<string>(state.editingQuoteStatus ?? DEFAULT_QUOTE_STATUS);
 
   const realServices = services.filter((s) => !s.isPageBreak);
   const ht    = totalHT(realServices);
@@ -70,9 +71,9 @@ export default function StepResume({ onBack }: Props) {
     if (state.isEditing && state.editingQuoteId) {
       // ── UPDATE existing quote ──────────────────────────────────────────────
       const finalStatus =
-        state.editingQuoteStatus === 'accepted'
+        isConfirmed(state.editingQuoteStatus)
           ? newStatus
-          : (state.editingQuoteStatus ?? 'draft');
+          : (state.editingQuoteStatus ?? DEFAULT_QUOTE_STATUS);
 
       const { error: err } = await supabase
         .from('quotes')
@@ -114,7 +115,7 @@ export default function StepResume({ onBack }: Props) {
       </h2>
 
       {/* ── Status alert — only shown when editing an accepted quote ───────── */}
-      {state.isEditing && state.editingQuoteStatus === 'accepted' && (
+      {state.isEditing && isConfirmed(state.editingQuoteStatus) && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -127,9 +128,9 @@ export default function StepResume({ onBack }: Props) {
           </div>
           <div className="flex flex-wrap gap-2 pl-8">
             {[
-              { value: 'accepted', label: '✓ Conserver Accepté' },
-              { value: 'sent',     label: 'Repasser en Envoyé' },
-              { value: 'draft',    label: 'Repasser en Brouillon' },
+              { value: 'valide',        label: '✓ Conserver Validé' },
+              { value: 'devis_envoye',  label: 'Repasser en Envoyé' },
+              { value: 'devis_a_faire', label: 'Repasser en Brouillon' },
             ].map((opt) => (
               <button
                 key={opt.value}

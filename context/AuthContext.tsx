@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
@@ -13,12 +13,11 @@ export interface Profile {
   role: 'admin' | 'user';
   is_active: boolean;
   company_name: string | null;
-  company_logo_url: string | null;
+  logo_url: string | null;
   company_phone: string | null;
   company_email: string | null;
   company_address: string | null;
   company_website: string | null;
-  company_cgv: string | null;
   cgv: string | null;
   subscription_type: string | null;
   parent_user_id: string | null;
@@ -50,20 +49,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    // maybeSingle : 0 ligne est un cas légitime (profil pas encore créé) → pas d'erreur.
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
+    if (error) console.error('fetchProfile:', error.message);
     setProfile(data as Profile | null);
   };
+
+  // Mémorise le dernier user pour lequel le profil a été chargé → évite un refetch
+  // à chaque TOKEN_REFRESHED (~horaire) ou refocus qui n'a pas changé d'utilisateur.
+  const loadedProfileFor = useRef<string | null>(null);
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) {
+        loadedProfileFor.current = session.user.id;
+        fetchProfile(session.user.id);
+      }
       setLoading(false);
     });
 
@@ -74,8 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        // Ne refetch le profil que si l'utilisateur a réellement changé.
+        if (loadedProfileFor.current !== session.user.id) {
+          loadedProfileFor.current = session.user.id;
+          fetchProfile(session.user.id);
+        }
       } else {
+        loadedProfileFor.current = null;
         setProfile(null);
       }
     });

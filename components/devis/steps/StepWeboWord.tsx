@@ -53,6 +53,7 @@ export default function StepWeboWord({ onBack }: Props) {
             description:  s.description,
             quantity:     s.quantity,
             unitPrice:    s.unitPrice,
+            childUnitPrice: s.childUnitPrice ?? null,
             hideDescOnPdf: s.hideDescOnPdf,
             isFree:       s.isFree,
             isOption:     s.isOption,
@@ -60,7 +61,7 @@ export default function StepWeboWord({ onBack }: Props) {
         vatRate:   state.options.vatRate,
         remarks:   state.options.remarks,
         hidePrice: state.options.hidePrice,
-        cgv: profile?.cgv ?? profile?.company_cgv ?? null,
+        cgv: profile?.cgv ?? null,
       },
       { template: state.template },
     );

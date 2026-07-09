@@ -101,9 +101,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
+      // On logge le détail côté serveur mais on ne fuit pas le schéma/erreur DB au client.
       console.error('Erreur insertion prospect:', error.message, error.code);
       return NextResponse.json(
-        { error: 'Erreur lors de la création de la demande: ' + error.message },
+        { error: 'Erreur lors de la création de la demande.' },
         { status: 500, headers: corsHeaders },
       );
     }

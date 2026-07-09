@@ -10,6 +10,7 @@ interface Prestation {
   id: string;
   name: string;
   unit_price: number;
+  child_unit_price?: number | null;
   category: string | null;
   description: string | null;
   is_option: boolean;
@@ -127,7 +128,7 @@ function ServiceRow({
   onRemove,
 }: {
   service: ServiceLine;
-  onUpdate: (field: string, value: string | number | boolean) => void;
+  onUpdate: (field: string, value: string | number | boolean | null) => void;
   onRemove: () => void;
 }) {
   // Hooks must be called unconditionally (before any early return)
@@ -157,6 +158,7 @@ function ServiceRow({
   const handleSelect = (p: Prestation) => {
     onUpdate('name', p.name);
     onUpdate('unitPrice', p.unit_price);
+    onUpdate('childUnitPrice', p.child_unit_price ?? null);
     onUpdate('category', p.category ?? '');
     onUpdate('description', p.description ? stripHtml(p.description) : '');
     if (p.gastro_card_html) onUpdate('gastroCardHtml', p.gastro_card_html);
@@ -426,7 +428,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
 
   const removeService = (id: string) => dispatch({ type: 'REMOVE_SERVICE', payload: id });
 
-  const updateService = (id: string, field: string, value: string | number | boolean) =>
+  const updateService = (id: string, field: string, value: string | number | boolean | null) =>
     dispatch({ type: 'UPDATE_SERVICE', payload: { id, updates: { [field]: value } } });
 
   // Exclude page-break markers from financial calculations

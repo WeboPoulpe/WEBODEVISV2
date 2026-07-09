@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Package, Printer, Loader2, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
 
 interface RentalRow {
   material_name: string;
@@ -39,7 +40,7 @@ export default function LocationGlobalePage() {
     const { data: quotesData } = await supabase
       .from('quotes')
       .select('id, event_date, client_name, guest_count')
-      .in('status', ['accepted', 'accepte', 'signed'])
+      .in('status', CONFIRMED_STATUSES)
       .gte('event_date', startDate)
       .lte('event_date', endDate)
       .order('event_date');

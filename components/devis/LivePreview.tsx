@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { Eye, X, ChefHat } from 'lucide-react';
 import { useState } from 'react';
 import { useDevis } from '@/context/DevisContext';
@@ -38,6 +39,7 @@ function useQuoteHtml() {
               description: s.description,
               quantity: s.quantity,
               unitPrice: s.unitPrice,
+              childUnitPrice: s.childUnitPrice ?? null,
               hideDescOnPdf: s.hideDescOnPdf,
               isFree: s.isFree,
               isOption: s.isOption,
@@ -45,7 +47,7 @@ function useQuoteHtml() {
           vatRate: options.vatRate,
           remarks: options.remarks,
           hidePrice: options.hidePrice,
-          cgv: profile?.cgv ?? profile?.company_cgv ?? null,
+          cgv: profile?.cgv ?? null,
         },
         { template: template as 'standard' | 'mariage' | 'business' },
       ),
@@ -71,7 +73,7 @@ export function LivePreview() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
         <div
           style={{ width: '794px', zoom: 0.55, transformOrigin: 'top left' }}
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
         />
       </div>
     </div>
@@ -109,7 +111,7 @@ export function LivePreviewFAB() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
               <div
                 style={{ width: '794px', zoom: 0.42, transformOrigin: 'top left' }}
-                dangerouslySetInnerHTML={{ __html: html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
               />
             </div>
           </div>

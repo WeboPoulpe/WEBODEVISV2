@@ -126,7 +126,8 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
     if (!user) return;
     setCreating(true);
     const supabase = createClient();
-    const token = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    // Token cryptographiquement sûr (non prédictible), contre l'énumération.
+    const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
     const { data } = await supabase
       .from('user_prospect_tokens')
       .insert({ user_id: user.id, token, is_active: true })
@@ -153,7 +154,7 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
   const regenerate = async () => {
     if (!token || !confirm('Régénérer le lien ? L\'ancien lien ne fonctionnera plus.')) return;
     const supabase = createClient();
-    const newToken = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    const newToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
     const { data } = await supabase
       .from('user_prospect_tokens')
       .update({ token: newToken, updated_at: new Date().toISOString() })

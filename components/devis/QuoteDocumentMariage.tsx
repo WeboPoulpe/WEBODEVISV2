@@ -3,10 +3,12 @@
 import type { QuoteDocumentProps } from './QuoteDocument';
 import type { ServiceLine } from '@/context/DevisContext';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function totalHT(services: ServiceLine[]) {
-  return services.filter((s) => !s.isPageBreak).reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+  // Exclut sauts de page, lignes gratuites (incluses) et options (facultatives).
+  return services.reduce((sum, s) => sum + (s.isFree || s.isOption || s.isPageBreak ? 0 : s.quantity * s.unitPrice), 0);
 }
 
 function splitByPageBreaks(services: ServiceLine[]): ServiceLine[][] {
@@ -114,7 +116,7 @@ export default function QuoteDocumentMariage({
                       <div className="mt-0.5 pl-2 border-l border-[#c8956c]/20">
                         <div
                           className="font-menu text-[9px] italic text-[#8b6347]/70 leading-relaxed description-html"
-                          dangerouslySetInnerHTML={{ __html: s.description }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.description) }}
                         />
                       </div>
                     )}
@@ -218,7 +220,7 @@ export default function QuoteDocumentMariage({
           </div>
           <div
             className="font-menu text-[9px] text-[#8b6347]/70 leading-relaxed description-html"
-            dangerouslySetInnerHTML={{ __html: cgv }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgv) }}
           />
         </div>
       )}

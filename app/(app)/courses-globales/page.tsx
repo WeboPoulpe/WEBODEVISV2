@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { ShoppingBasket, Printer, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
 
 interface IngredientRow {
   ingredient_id: string;
@@ -31,7 +32,7 @@ export default function CoursesGlobalesPage() {
     const { data: quotes } = await supabase
       .from('quotes')
       .select('id, event_date, client_name')
-      .in('status', ['accepted', 'accepte', 'signed'])
+      .in('status', CONFIRMED_STATUSES)
       .gte('event_date', startDate)
       .lte('event_date', endDate);
 
