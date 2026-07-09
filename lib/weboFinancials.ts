@@ -1,52 +1,91 @@
 import { generateQuoteHtml, type QuoteHtmlData, type QuoteHtmlOptions } from './generateQuoteHtml';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Rafraîchissement du seul bloc financier (tableau des prestations + totaux)
-// dans un content_html WeboWord déjà mis en forme — SANS régénérer le reste.
+// Mise à jour ciblée d'un content_html WeboWord déjà mis en forme, SANS tout
+// régénérer :
+//   1) le bloc financier (tableau des prestations + totaux) est remplacé par sa
+//      version fraîche (repéré par [data-webo-financials]) ;
+//   2) le bloc TEXTE des prestations nouvellement ajoutées est ajouté à la fin de
+//      la carte gastronomique (conteneur .gastro-menu).
+// Tout le reste (page de garde, textes existants, prose manuelle) est préservé.
 // ═══════════════════════════════════════════════════════════════════════════
-// Utilisé quand on ajoute/modifie une prestation depuis le panneau : la nouvelle
-// ligne apparaît dans le tableau et les totaux sont recalculés, mais la page de
-// garde, la carte gastronomique et tout texte saisi manuellement sont préservés.
-// Le bloc est repéré par l'attribut [data-webo-financials] posé par generateQuoteHtml.
 
-/** Extrait le HTML du bloc [data-webo-financials] d'un document complet. */
-function extractFinancials(html: string): string | null {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  return doc.querySelector('[data-webo-financials]')?.outerHTML ?? null;
+export interface WeboSyncInput {
+  /** Toutes les prestations (sert à régénérer le tableau + totaux). */
+  all: QuoteHtmlData;
+  /** Prestations nouvellement ajoutées (leur bloc texte est ajouté page 2). */
+  added?: QuoteHtmlData['services'];
 }
 
-/**
- * Remplace le bloc financier dans `existingHtml` par une version fraîche générée
- * depuis `data`. Retourne le HTML mis à jour, ou null si l'opération est impossible
- * (pas de DOM, bloc introuvable…) — l'appelant conserve alors le HTML tel quel.
- */
-export function refreshFinancialsInHtml(
+/** Extrait le outerHTML du 1er élément correspondant au sélecteur. */
+function pick(html: string, selector: string): string | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.querySelector(selector)?.outerHTML ?? null;
+}
+
+/** Extrait le innerHTML du 1er élément correspondant au sélecteur. */
+function pickInner(html: string, selector: string): string | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const el = doc.querySelector(selector);
+  return el ? el.innerHTML : null;
+}
+
+export function syncWeboDocument(
   existingHtml: string,
-  data: QuoteHtmlData,
+  input: WeboSyncInput,
   opts: QuoteHtmlOptions = {},
 ): string | null {
   if (!existingHtml || typeof window === 'undefined' || typeof DOMParser === 'undefined') return null;
 
-  const freshBlockHtml = extractFinancials(generateQuoteHtml(data, opts));
-  if (!freshBlockHtml) return null;
-
   const doc = new DOMParser().parseFromString(existingHtml, 'text/html');
-  // Construit le nœud frais DANS le même document (évite les soucis inter-documents).
-  const tmp = doc.createElement('div');
-  tmp.innerHTML = freshBlockHtml;
-  const freshEl = tmp.firstElementChild;
-  if (!freshEl) return null;
+  let changed = false;
 
-  const existing = doc.querySelector('[data-webo-financials]');
-  if (existing) {
-    existing.replaceWith(freshEl);
-  } else {
-    // Ancien document sans balise : on remplace la 1re table + son bloc de totaux.
-    const table = doc.querySelector('table');
-    if (!table) return null;
-    const sib = table.nextElementSibling;
-    if (sib && sib.tagName === 'DIV' && /Total/i.test(sib.textContent || '')) sib.remove();
-    table.replaceWith(freshEl);
+  // ── 1) Bloc financier (tableau + totaux) ────────────────────────────────────
+  const freshFinancials = pick(generateQuoteHtml(input.all, opts), '[data-webo-financials]');
+  if (freshFinancials) {
+    const tmp = doc.createElement('div');
+    tmp.innerHTML = freshFinancials;
+    const freshEl = tmp.firstElementChild;
+    if (freshEl) {
+      const existing = doc.querySelector('[data-webo-financials]');
+      if (existing) {
+        existing.replaceWith(freshEl);
+        changed = true;
+      } else {
+        // Ancien document sans balise : remplace la 1re table + son bloc de totaux.
+        const table = doc.querySelector('table');
+        if (table) {
+          const sib = table.nextElementSibling;
+          if (sib && sib.tagName === 'DIV' && /Total/i.test(sib.textContent || '')) sib.remove();
+          table.replaceWith(freshEl);
+          changed = true;
+        }
+      }
+    }
   }
-  return doc.body.innerHTML;
+
+  // ── 2) Bloc texte des prestations ajoutées → fin de la carte gastronomique ──
+  const added = (input.added ?? []).filter((s) => s.name && s.name.trim());
+  if (added.length > 0) {
+    const menu = doc.querySelector('.gastro-menu');
+    if (menu) {
+      // Génère uniquement les blocs texte des nouvelles prestations.
+      const addedItems = pickInner(
+        generateQuoteHtml({ ...input.all, services: added }, opts),
+        '.gastro-menu',
+      );
+      if (addedItems) {
+        // Retire un éventuel placeholder « menu à compléter » avant d'ajouter.
+        if (menu.children.length === 1 && /menu/i.test(menu.textContent || '') && !menu.querySelector('div')) {
+          menu.innerHTML = '';
+        }
+        const holder = doc.createElement('div');
+        holder.innerHTML = addedItems;
+        while (holder.firstChild) menu.appendChild(holder.firstChild);
+        changed = true;
+      }
+    }
+  }
+
+  return changed ? doc.body.innerHTML : null;
 }

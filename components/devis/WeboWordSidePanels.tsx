@@ -12,7 +12,7 @@ import type { CoverPageConfig, PhotosPageConfig } from './weboword/weboword.type
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
-import { refreshFinancialsInHtml } from '@/lib/weboFinancials';
+import { syncWeboDocument } from '@/lib/weboFinancials';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -71,6 +71,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   // Empreinte des champs qui alimentent le bloc financier, capturée au chargement.
   // Sert à ne rafraîchir le tableau/totaux du document QUE s'ils ont réellement changé.
   const initialFinancials = useRef<string>('');
+  // Ids des prestations présentes au chargement → permet de détecter les AJOUTS
+  // (pour n'ajouter que leur bloc texte à la fin de la carte gastronomique).
+  const initialServiceIds = useRef<Set<string>>(new Set());
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -208,6 +211,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
             guestChildren: loadedGuestChildren, vatRate: loadedVatRate, hidePrice: loadedHidePrice,
             template: loadedTemplate, language: loadedLanguage,
           });
+          initialServiceIds.current = new Set(
+            loadedServices.map((s: Service) => s.id as string | undefined).filter(Boolean) as string[],
+          );
         }
         setLoading(false);
       });
@@ -321,10 +327,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       services,
     };
 
-    // Si les données financières ont changé (ajout/suppr/qté/prix d'une prestation,
-    // couverts, TVA…), on met à jour UNIQUEMENT le bloc tableau + totaux du document
-    // existant : la prestation ajoutée apparaît dans le tableau, totaux recalculés,
-    // le reste du texte reste intact.
+    // Si les données financières ont changé (ajout/suppr/qté/prix, couverts, TVA…),
+    // on met à jour le document existant SANS le régénérer entièrement :
+    //  • le tableau + totaux sont rafraîchis ;
+    //  • le bloc TEXTE des prestations ajoutées est ajouté en fin de carte gastro.
+    // Tout le reste (page de garde, textes existants, prose manuelle) est préservé.
     const currentFin = JSON.stringify({
       services, guestCount, guestAdults, guestChildren, vatRate, hidePrice, template, language,
     });
@@ -332,27 +339,38 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       const { data: cur } = await supabase.from('quotes')
         .select('content_html, selected_font').eq('id', quoteId).maybeSingle();
       if (cur?.content_html) {
-        const updated = refreshFinancialsInHtml(
+        const mapSvc = (s: Service) => ({
+          name: s.name,
+          description: s.description ?? null,
+          quantity: s.quantity,
+          unitPrice: s.unitPrice,
+          childUnitPrice: (s.childUnitPrice as number | null | undefined) ?? null,
+          isFree: s.isFree,
+          isOption: s.isOption,
+          removed: s.removed,
+          gastroCardHtml: (s.gastroCardHtml as string | null | undefined) ?? null,
+          gastroCardHtmlEn: (s.gastroCardHtmlEn as string | null | undefined) ?? null,
+        });
+        // Prestations réellement ajoutées depuis le chargement (nouvel id).
+        const addedServices = services
+          .filter((s) => (s.id as string | undefined) && !initialServiceIds.current.has(s.id as string))
+          .map(mapSvc);
+
+        const updated = syncWeboDocument(
           cur.content_html as string,
           {
-            companyName: '',
-            clientName: '',
-            guestCount: parseInt(guestCount) || null,
-            guestCountAdults: parseInt(guestAdults) || null,
-            guestCountChildren: parseInt(guestChildren) || null,
-            services: services.map((s) => ({
-              name: s.name,
-              description: s.description ?? null,
-              quantity: s.quantity,
-              unitPrice: s.unitPrice,
-              childUnitPrice: (s.childUnitPrice as number | null | undefined) ?? null,
-              isFree: s.isFree,
-              isOption: s.isOption,
-              removed: s.removed,
-            })),
-            vatRate,
-            hidePrice,
-            language,
+            all: {
+              companyName: '',
+              clientName: '',
+              guestCount: parseInt(guestCount) || null,
+              guestCountAdults: parseInt(guestAdults) || null,
+              guestCountChildren: parseInt(guestChildren) || null,
+              services: services.map(mapSvc),
+              vatRate,
+              hidePrice,
+              language,
+            },
+            added: addedServices,
           },
           { template, font: (cur.selected_font as string | null) ?? undefined },
         );
