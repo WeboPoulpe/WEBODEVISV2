@@ -47,6 +47,7 @@ export default function StepResume({ onBack }: Props) {
     client_type:          clientInfo.type,
     company_name:         clientInfo.companyName,
     contact_person_name:  clientInfo.contactName || null,
+    recipient_contact_id:    clientInfo.contactId || null,
     recipient_contact_role:  clientInfo.contactRole || null,
     recipient_contact_email: clientInfo.contactEmail || null,
     recipient_contact_phone: clientInfo.contactPhone || null,

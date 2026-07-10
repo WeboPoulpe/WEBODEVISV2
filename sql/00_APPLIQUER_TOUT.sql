@@ -197,7 +197,9 @@ CREATE INDEX IF NOT EXISTS idx_customer_contacts_customer ON customer_contacts(c
 ALTER TABLE customer_contacts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Owner manages own customer_contacts" ON customer_contacts;
 CREATE POLICY "Owner manages own customer_contacts" ON customer_contacts
-  FOR ALL TO authenticated USING (owner_user_id = auth.uid()) WITH CHECK (owner_user_id = auth.uid());
+  FOR ALL TO authenticated
+  USING (owner_user_id = auth.uid() AND EXISTS (SELECT 1 FROM customers c WHERE c.id = customer_id AND c.owner_user_id = auth.uid()))
+  WITH CHECK (owner_user_id = auth.uid() AND EXISTS (SELECT 1 FROM customers c WHERE c.id = customer_id AND c.owner_user_id = auth.uid()));
 DROP POLICY IF EXISTS "Admins manage customer_contacts" ON customer_contacts;
 CREATE POLICY "Admins manage customer_contacts" ON customer_contacts
   FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
@@ -205,6 +207,7 @@ ALTER TABLE quotes ADD COLUMN IF NOT EXISTS client_siret            text;
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_email text;
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_phone text;
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_role  text;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_id    text;
 INSERT INTO customer_contacts (customer_id, owner_user_id, name, email, phone, is_primary)
 SELECT c.id, c.owner_user_id, c.contact_person_name, c.contact_person_email, c.contact_person_phone, true
 FROM customers c

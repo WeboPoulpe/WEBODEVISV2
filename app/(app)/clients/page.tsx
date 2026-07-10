@@ -149,15 +149,23 @@ function CustomerSheet({
       email: form.email,
       phone: form.phone || null,
     }).eq('id', customer.id);
-    if (!error && form.customer_type === 'entreprise' && user) {
-      await saveContacts(customer.id, user.id, editContacts);
+    if (error) {
+      setSaving(false);
+      alert('Erreur lors de la sauvegarde : ' + error.message);
+      return;
+    }
+    if (form.customer_type === 'entreprise' && user) {
+      const res = await saveContacts(customer.id, user.id, editContacts);
+      if (res.error) {
+        setSaving(false);
+        alert('Erreur lors de la sauvegarde des contacts : ' + res.error);
+        return;
+      }
     }
     setSaving(false);
-    if (!error) {
-      setSaveOk(true);
-      onUpdated({ ...customer, ...form });
-      setTimeout(() => setSaveOk(false), 2000);
-    }
+    setSaveOk(true);
+    onUpdated({ ...customer, ...form });
+    setTimeout(() => setSaveOk(false), 2000);
   };
 
   const handleSaveNotes = async () => {

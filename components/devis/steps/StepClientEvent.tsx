@@ -16,6 +16,7 @@ interface CustomerResult {
   company_name: string | null;
   email: string;
   phone: string | null;
+  siret_number?: string | null;
 }
 
 interface Props {
@@ -53,7 +54,7 @@ function ClientCombobox({
       const supabase = createClient();
       const { data } = await supabase
         .from('customers')
-        .select('id, customer_type, first_name, last_name, company_name, email, phone')
+        .select('id, customer_type, first_name, last_name, company_name, email, phone, siret_number')
         .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`)
         .limit(8);
       setResults(data ?? []);
@@ -268,6 +269,7 @@ export default function StepClientEvent({ onNext }: Props) {
         companyName: c.company_name ?? '',
         email: c.email,
         phone: c.phone ?? '',
+        siret: c.siret_number ?? '',
         contactName: '',
         contactRole: '',
         contactId: '',

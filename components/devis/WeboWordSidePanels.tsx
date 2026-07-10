@@ -63,6 +63,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [clientType, setClientType] = useState<'particulier' | 'entreprise'>('particulier');
   const [clientSiret, setClientSiret] = useState('');
   const [recipientContactId, setRecipientContactId] = useState<string | null>(null);
+  const [recipientContactName, setRecipientContactName] = useState('');
   const [recipientContactRole, setRecipientContactRole] = useState('');
   const [recipientContactEmail, setRecipientContactEmail] = useState('');
   const [recipientContactPhone, setRecipientContactPhone] = useState('');
@@ -178,7 +179,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     if (!activePanel) return;
     setLoading(true);
     supabase.from('quotes')
-      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language, customer_id, client_type, client_siret, recipient_contact_role, recipient_contact_email, recipient_contact_phone')
+      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language, customer_id, client_type, client_siret, contact_person_name, recipient_contact_id, recipient_contact_role, recipient_contact_email, recipient_contact_phone')
       .eq('id', quoteId).single()
       .then(({ data }) => {
         if (data) {
@@ -189,6 +190,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           const loadedCustomerId = data.customer_id || null;
           const loadedClientType = (data.client_type as 'particulier' | 'entreprise') || 'particulier';
           const loadedClientSiret = data.client_siret || '';
+          const loadedContactPersonName = data.contact_person_name || '';
+          const loadedRecipientContactId = data.recipient_contact_id || null;
           const loadedRecipientContactRole = data.recipient_contact_role || '';
           const loadedRecipientContactEmail = data.recipient_contact_email || '';
           const loadedRecipientContactPhone = data.recipient_contact_phone || '';
@@ -212,10 +215,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setCustomerId(loadedCustomerId);
           setClientType(loadedClientType);
           setClientSiret(loadedClientSiret);
+          setRecipientContactName(loadedContactPersonName);
           setRecipientContactRole(loadedRecipientContactRole);
           setRecipientContactEmail(loadedRecipientContactEmail);
           setRecipientContactPhone(loadedRecipientContactPhone);
-          setRecipientContactId(null);
+          setRecipientContactId(loadedRecipientContactId);
           setEventType(loadedEventType);
           setEventDate(loadedEventDate);
           setEventLocation(loadedEventLocation);
@@ -335,6 +339,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       client_email: clientEmail || null,
       client_phone: clientPhone || null,
       client_address: clientAddress || null,
+      contact_person_name: recipientContactName || null,
+      recipient_contact_id: recipientContactId || null,
       recipient_contact_role: recipientContactRole || null,
       recipient_contact_email: recipientContactEmail || null,
       recipient_contact_phone: recipientContactPhone || null,
@@ -491,6 +497,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         valueContactId={recipientContactId}
                         onPick={(c) => {
                           setRecipientContactId(c?.id ?? null);
+                          setRecipientContactName(c?.name ?? '');
                           setRecipientContactRole(c?.role ?? '');
                           setRecipientContactEmail(c?.email ?? '');
                           setRecipientContactPhone(c?.phone ?? '');
