@@ -41,6 +41,13 @@ export interface QuoteHtmlData {
   language?: 'fr' | 'en';
   guestCountAdults?: number | null;
   guestCountChildren?: number | null;
+  clientType?: 'particulier' | 'entreprise';
+  clientCompanyName?: string | null;
+  clientSiret?: string | null;
+  contactName?: string | null;
+  contactRole?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
 }
 
 export interface QuoteHtmlOptions {
@@ -307,9 +314,13 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   <div style="display:flex;gap:14px;margin-top:18px;margin-bottom:16px;">
     <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.client}</p>
-      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${d.clientName || t.aCompleter}</p>
-      ${d.clientEmail   ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientEmail}</p>` : ''}
-      ${d.clientPhone   ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientPhone}</p>` : ''}
+      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${
+        (d.clientType === 'entreprise' && d.clientCompanyName) ? d.clientCompanyName : (d.clientName || t.aCompleter)
+      }</p>
+      ${d.clientType === 'entreprise' && d.clientSiret ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">SIRET : ${d.clientSiret}</p>` : ''}
+      ${d.clientType === 'entreprise' && d.contactName ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${lang === 'en' ? 'Attn' : 'À l\'attention de'} : ${d.contactName}${d.contactRole ? ` — ${d.contactRole}` : ''}</p>` : ''}
+      ${(d.clientType === 'entreprise' ? d.contactEmail : d.clientEmail) ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactEmail : d.clientEmail}</p>` : ''}
+      ${(d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone) ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone}</p>` : ''}
       ${d.clientAddress ? `<p style="color:#555;margin:0;font-size:11px;">${d.clientAddress}</p>` : ''}
     </div>
     <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">

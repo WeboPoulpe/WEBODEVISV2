@@ -62,6 +62,13 @@ export default function StepWeboWord({ onBack }: Props) {
         remarks:   state.options.remarks,
         hidePrice: state.options.hidePrice,
         cgv: profile?.cgv ?? null,
+        clientType:        state.clientInfo.type,
+        clientCompanyName: state.clientInfo.companyName || null,
+        clientSiret:       state.clientInfo.siret || null,
+        contactName:       state.clientInfo.contactName || null,
+        contactRole:       state.clientInfo.contactRole || null,
+        contactEmail:      state.clientInfo.contactEmail || null,
+        contactPhone:      state.clientInfo.contactPhone || null,
       },
       { template: state.template },
     );

@@ -119,6 +119,13 @@ export default async function ModifierPage({
         hidePrice:  quote.hide_price ?? false,
         cgv:        profileData?.cgv ?? null,
         language:   (quote.language as 'fr' | 'en') ?? 'fr',
+        clientType:        (quote.client_type as 'particulier' | 'entreprise') ?? 'particulier',
+        clientCompanyName: quote.company_name ?? null,
+        clientSiret:       (quote as { client_siret?: string | null }).client_siret ?? null,
+        contactName:       quote.contact_person_name ?? null,
+        contactRole:       (quote as { recipient_contact_role?: string | null }).recipient_contact_role ?? null,
+        contactEmail:      (quote as { recipient_contact_email?: string | null }).recipient_contact_email ?? null,
+        contactPhone:      (quote as { recipient_contact_phone?: string | null }).recipient_contact_phone ?? null,
       },
       {
         template: (quote.template as 'standard' | 'mariage' | 'business') ?? 'standard',

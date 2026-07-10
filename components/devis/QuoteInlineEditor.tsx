@@ -40,6 +40,10 @@ interface ClientInfo {
   address: string;
   companyName: string;
   contactName: string;
+  siret?: string;
+  contactRole?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 interface EventInfo {
@@ -327,6 +331,13 @@ function useLiveHtml(
         remarks:   options.remarks   || null,
         hidePrice: options.hidePrice,
         cgv: profile?.cgv ?? null,
+        clientType:        client.type,
+        clientCompanyName: client.companyName || null,
+        clientSiret:       client.siret || null,
+        contactName:       client.contactName || null,
+        contactRole:       client.contactRole || null,
+        contactEmail:      client.contactEmail || null,
+        contactPhone:      client.contactPhone || null,
       },
       { template },
     ),
