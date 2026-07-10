@@ -10,6 +10,9 @@ import { createClient } from '@/lib/supabase/client';
 import { isConfirmed } from '@/lib/quoteStatus';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
+import { useAuth } from '@/context/AuthContext';
+import ContactsEditor from '@/components/clients/ContactsEditor';
+import { listContacts, saveContacts, type ContactDraft } from '@/lib/customerContacts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Customer {
@@ -100,6 +103,7 @@ function CustomerSheet({
 }: {
   customer: Customer; onClose: () => void; onUpdated: (c: Customer) => void;
 }) {
+  const { user } = useAuth();
   const [tab, setTab] = useState<'infos' | 'notes' | 'historique'>('infos');
   const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
@@ -108,6 +112,7 @@ function CustomerSheet({
   const [saveOk, setSaveOk] = useState(false);
   const [notes, setNotes] = useState(customer.notes ?? '');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [editContacts, setEditContacts] = useState<ContactDraft[]>([]);
 
   const name = customer.customer_type === 'entreprise'
     ? customer.company_name
@@ -124,6 +129,16 @@ function CustomerSheet({
       .then(({ data }) => { setQuotes(data ?? []); setLoadingQuotes(false); });
   }, [tab, customer.email, quotes.length]);
 
+  useEffect(() => {
+    if (customer.customer_type !== 'entreprise') return;
+    listContacts(customer.id).then((rows) =>
+      setEditContacts(rows.map((r) => ({
+        id: r.id, name: r.name, role: r.role ?? '', email: r.email ?? '',
+        phone: r.phone ?? '', notes: r.notes ?? '', is_primary: r.is_primary,
+      }))),
+    );
+  }, [customer.id, customer.customer_type]);
+
   const handleSaveInfos = async () => {
     setSaving(true);
     const { error } = await createClient().from('customers').update({
@@ -134,6 +149,9 @@ function CustomerSheet({
       email: form.email,
       phone: form.phone || null,
     }).eq('id', customer.id);
+    if (!error && form.customer_type === 'entreprise' && user) {
+      await saveContacts(customer.id, user.id, editContacts);
+    }
     setSaving(false);
     if (!error) {
       setSaveOk(true);
@@ -174,6 +192,13 @@ function CustomerSheet({
           )}
           <SField label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
           <SField label="Téléphone" value={form.phone ?? ''} onChange={(v) => setForm({ ...form, phone: v })} />
+          {form.customer_type === 'entreprise' && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Contacts</h3>
+              <p className="text-xs text-gray-400 mb-3">Ajoutez les interlocuteurs (décideur, comptabilité…). Le contact principal alimente les champs de contact par défaut.</p>
+              <ContactsEditor value={editContacts} onChange={setEditContacts} />
+            </div>
+          )}
           <button onClick={handleSaveInfos} disabled={saving}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
