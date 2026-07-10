@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import ContactsEditor from '@/components/clients/ContactsEditor';
+import { saveContacts, type ContactDraft } from '@/lib/customerContacts';
 
 type ClientType = 'particulier' | 'entreprise';
 
@@ -44,6 +46,7 @@ export default function ClientForm() {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<ContactDraft[]>([]);
 
   const set = (field: keyof FormState, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -57,7 +60,7 @@ export default function ClientForm() {
 
     const supabase = createClient();
 
-    const { error: err } = await supabase.from('customers').insert([
+    const { data: created, error: err } = await supabase.from('customers').insert([
       {
         owner_user_id: user.id,
         customer_type: form.type,
@@ -73,15 +76,21 @@ export default function ClientForm() {
         address: form.address || null,
         service_address: form.serviceAddress || null,
       },
-    ]);
+    ]).select('id').single();
+
+    if (err || !created) {
+      setLoading(false);
+      setError(err?.message ?? 'Erreur lors de la création du client.');
+      return;
+    }
+
+    if (form.type === 'entreprise' && contacts.some((c) => c.name.trim())) {
+      const res = await saveContacts(created.id, user.id, contacts);
+      if (res.error) { setLoading(false); setError(res.error); return; }
+    }
 
     setLoading(false);
-
-    if (err) {
-      setError(err.message);
-    } else {
-      router.push('/clients');
-    }
+    router.push('/clients');
   };
 
   return (
@@ -203,6 +212,14 @@ export default function ClientForm() {
           </div>
         </div>
       </section>
+
+      {form.type === 'entreprise' && (
+        <section>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Contacts</h3>
+          <p className="text-xs text-gray-400 mb-3">Ajoutez les interlocuteurs (décideur, comptabilité…). Le contact principal alimente les champs de contact par défaut.</p>
+          <ContactsEditor value={contacts} onChange={setContacts} />
+        </section>
+      )}
 
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
