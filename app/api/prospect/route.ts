@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
       event_type:      body.event_type || null,
       event_date:      body.event_date || null,
       guest_count:     parseInt(body.guest_count) || null,
+      guest_count_children: parseInt(body.guest_count_children) || null,
       message:         body.message?.trim() || null,
       user_token:      apiToken,
       owner_user_id:   tokenData.user_id,

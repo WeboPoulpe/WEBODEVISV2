@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Check, Building2, Upload, X, FileText } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { fileToWebp } from '@/lib/imageToWebp';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 
@@ -128,7 +129,8 @@ export default function ParametresPage() {
     const supabase = createClient();
     // Chemin préfixé par l'uid (1er segment) → requis par les policies storage par propriétaire.
     const path = `${user.id}/logo`;
-    const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: true });
+    const webpFile = await fileToWebp(file);
+    const { error } = await supabase.storage.from('storage').upload(path, webpFile, { upsert: true });
     if (!error) {
       const { data: urlData } = supabase.storage.from('storage').getPublicUrl(path);
       const url = `${urlData.publicUrl}?t=${Date.now()}`;

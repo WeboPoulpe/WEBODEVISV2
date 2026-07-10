@@ -7,7 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
-  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw,
+  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw, ScrollText,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -141,7 +141,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18];
+const FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
 const LINE_HEIGHTS = [
   { label: '1.0', value: '1' },
   { label: '1.2', value: '1.2' },
@@ -802,6 +802,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const applyColor = (color: string) => exec('foreColor', color);
   const applyBg    = (color: string) => exec('hiliteColor', color);
 
+  // Insère le bloc CGV (balisé data-webo-cgv) en fin de document s'il est absent.
+  // La balise évite le doublon à l'impression/PDF (détection déjà en place).
+  const insertCgv = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    if (!companyAssets.cgv) { setToast('Aucune CGV enregistrée — ajoute-les dans Paramètres → CGV.'); return; }
+    if (el.innerHTML.includes('data-webo-cgv') || (companyAssets.cgv && el.innerHTML.includes(companyAssets.cgv))) {
+      setToast('Les CGV sont déjà présentes dans le document.');
+      return;
+    }
+    const block = `<div data-webo-cgv="1" style="page-break-before:always;break-before:page;margin-top:24px;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;"><div style="flex:1;height:1px;background:#e0e0e0;"></div><p style="font-size:9px;font-weight:bold;color:#9c27b0;text-transform:uppercase;letter-spacing:2px;margin:0;">Conditions Générales de Vente</p><div style="flex:1;height:1px;background:#e0e0e0;"></div></div><div style="font-size:10px;color:#555;line-height:1.6;">${companyAssets.cgv}</div></div>`;
+    el.insertAdjacentHTML('beforeend', block);
+    setToast('CGV ajoutées en fin de document ✓ — pense à sauvegarder');
+  }, [companyAssets.cgv]);
+
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     const html = editorRef.current?.innerHTML ?? '';
@@ -1453,6 +1468,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             <ImagePlus className="h-3.5 w-3.5" />
           </TB>
           <Sep />
+          <TB
+            onClick={insertCgv}
+            title="Ajouter les CGV en fin de document"
+          >
+            <ScrollText className="h-3.5 w-3.5" />
+          </TB>
           <TB
             onClick={regenerateDocument}
             title="Régénérer le document depuis les données du devis (remplace la mise en forme manuelle)"

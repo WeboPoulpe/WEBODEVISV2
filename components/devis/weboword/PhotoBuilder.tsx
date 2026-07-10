@@ -4,6 +4,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { X, RotateCw, ZoomIn, ZoomOut, Upload, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { fileToWebp } from '@/lib/imageToWebp'
 import type { PhotoItem, PhotoTransform } from './weboword.types'
 import { DEFAULT_TRANSFORM } from './weboword.types'
 
@@ -47,10 +48,11 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
   }, [])
 
   // ── Upload ─────────────────────────────────────────────────────────────────
-  async function handleUpload(file: File) {
+  async function handleUpload(original: File) {
     setIsUploading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setIsUploading(false); return }
+    const file = await fileToWebp(original)
     const ext = file.name.split('.').pop()
     // Chemin préfixé par l'uid (1er segment) → requis par les policies storage par propriétaire.
     const path = `${user.id}/cover-photos/${Date.now()}-${crypto.randomUUID()}.${ext}`

@@ -689,6 +689,7 @@ export default function DevisPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('Tous');
+  const [sort, setSort] = useState<'recent' | 'event' | 'amount' | 'client'>('recent');
   const [view, setView] = useState<ViewMode>('grid');
   const [sheetQuote, setSheetQuote] = useState<Quote | null>(null);
   const [dupModal, setDupModal] = useState<{ open: boolean; quoteId: string | null; saving: boolean; templateName: string }>({ open: false, quoteId: null, saving: false, templateName: '' });
@@ -837,7 +838,7 @@ export default function DevisPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from('quotes')
-      .select('services, event_type, event_date, event_location, guest_count, remarks, vat_rate, hide_price, template, images, content_html, selected_font, selected_font_size')
+      .select('services, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, remarks, vat_rate, hide_price, template, images, content_html, selected_font, selected_font_size, client_name, client_first_name, client_last_name, client_email, client_phone, client_address, client_type, company_name, contact_person_name, customer_id')
       .eq('id', dupModal.quoteId)
       .single();
     if (!data) { setDupModal((m) => ({ ...m, saving: false })); return; }
@@ -862,8 +863,18 @@ export default function DevisPage() {
     const dupPayload = {
       user_id: user.id,
       owner_user_id: user.id,
-      client_name: '',
       status: 'devis_a_faire',
+      // Client repris à l'identique (duplication simple = même client).
+      client_name: data.client_name || '',
+      client_first_name: data.client_first_name || null,
+      client_last_name: data.client_last_name || null,
+      client_email: data.client_email || null,
+      client_phone: data.client_phone || null,
+      client_address: data.client_address || null,
+      client_type: data.client_type || 'particulier',
+      company_name: data.company_name || null,
+      contact_person_name: data.contact_person_name || null,
+      customer_id: data.customer_id || null,
       services: data.services || [],
       content_html: data.content_html || null,
       selected_font: data.selected_font || null,
@@ -873,6 +884,8 @@ export default function DevisPage() {
       event_date: data.event_date || new Date().toISOString().slice(0, 10),
       event_location: data.event_location || '',
       guest_count: data.guest_count || 1,
+      guest_count_adults: data.guest_count_adults ?? null,
+      guest_count_children: data.guest_count_children ?? null,
       remarks: data.remarks || null,
       vat_rate: data.vat_rate ?? 20,
       hide_price: data.hide_price ?? false,
@@ -904,6 +917,16 @@ export default function DevisPage() {
     if (isRefused && activeStatus !== 'Refus client' && activeStatus !== 'Refus traiteur') return false;
     const matchStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
     return matchSearch && matchStatus;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sort) {
+      case 'recent': return (b.created_at || '').localeCompare(a.created_at || '');
+      case 'event':  return (a.event_date || '9999').localeCompare(b.event_date || '9999');
+      case 'amount': return (computeQuoteTotal(b) ?? 0) - (computeQuoteTotal(a) ?? 0);
+      case 'client': return (a.client_name || '').localeCompare(b.client_name || '');
+      default: return 0;
+    }
   });
 
   const VIEW_BUTTONS: { mode: ViewMode; Icon: React.ElementType; label: string }[] = [
@@ -1053,12 +1076,24 @@ export default function DevisPage() {
               </button>
             ))}
           </div>
+          {/* Tri */}
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            title="Trier"
+            className="flex-shrink-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 cursor-pointer"
+          >
+            <option value="recent">Plus récents</option>
+            <option value="event">Date d’événement</option>
+            <option value="amount">Montant</option>
+            <option value="client">Client A-Z</option>
+          </select>
         </div>
       )}
       {view === 'pipeline' && (
-        <div className="relative mb-5 max-w-xs">
+        <div className="relative mb-5">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrer par client…"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par client ou événement…"
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors" />
         </div>
       )}
@@ -1094,7 +1129,7 @@ export default function DevisPage() {
             ) : null;
           })()}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+            {sorted.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
           </div>
         </>
       ) : view === 'table' ? (
@@ -1117,7 +1152,7 @@ export default function DevisPage() {
               </div>
             ) : null;
           })()}
-          <TableView quotes={filtered} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+          <TableView quotes={sorted} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
         </>
       ) : (
         <PipelineView quotes={filtered} prospects={prospects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} />

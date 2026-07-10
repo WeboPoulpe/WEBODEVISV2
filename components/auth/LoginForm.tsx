@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginForm() {
   const { signIn } = useAuth();
@@ -14,6 +15,20 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const handleForgot = async () => {
+    setError(null); setInfo(null);
+    if (!email.trim()) { setError('Entrez votre adresse email ci-dessus, puis cliquez sur « Mot de passe oublié ».'); return; }
+    setResetting(true);
+    const { error: err } = await createClient().auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetting(false);
+    if (err) { setError(err.message); return; }
+    setInfo('Si un compte existe pour cet email, un lien de réinitialisation vient d’être envoyé (pensez aux spams).');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,10 +96,27 @@ export default function LoginForm() {
         </div>
       </div>
 
-      {/* Error */}
+      {/* Mot de passe oublié */}
+      <div className="flex justify-end -mt-1">
+        <button
+          type="button"
+          onClick={handleForgot}
+          disabled={resetting}
+          className="text-xs text-[#9c27b0] hover:underline font-medium disabled:opacity-60"
+        >
+          {resetting ? 'Envoi…' : 'Mot de passe oublié ?'}
+        </button>
+      </div>
+
+      {/* Error / Info */}
       {error && (
         <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
           {error}
+        </p>
+      )}
+      {info && (
+        <p className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
+          {info}
         </p>
       )}
 

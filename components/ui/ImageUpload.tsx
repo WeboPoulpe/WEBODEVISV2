@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { fileToWebp } from '@/lib/imageToWebp';
 
 interface Props {
   images: string[];
@@ -30,7 +31,8 @@ export default function ImageUpload({ images, onChange, userId, max = 5, bucket 
     const supabase = createClient();
     const newUrls: string[] = [];
 
-    for (const file of Array.from(files).slice(0, remaining)) {
+    for (const original of Array.from(files).slice(0, remaining)) {
+      const file = await fileToWebp(original);
       const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
       const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
       if (error) {

@@ -55,6 +55,7 @@ export default function ProspectFormPage() {
   const [eventType, setEventType]       = useState('');
   const [eventDate, setEventDate]       = useState('');
   const [guestCount, setGuestCount]     = useState('');
+  const [guestChildren, setGuestChildren] = useState('');
   const [message, setMessage]           = useState('');
 
   // Validate token
@@ -96,6 +97,7 @@ export default function ProspectFormPage() {
       event_type:      eventType || null,
       event_date:      eventDate || null,
       guest_count:     parseInt(guestCount) || null,
+      guest_count_children: parseInt(guestChildren) || null,
       message:         message.trim() || null,
       user_token:      token,
       owner_user_id:   tokenData?.user_id ?? null,
@@ -288,6 +290,19 @@ export default function ProspectFormPage() {
                       onChange={(e) => setGuestCount(e.target.value)}
                       placeholder="50"
                       min="1"
+                      className={inputCls + ' pl-10'}
+                    />
+                  </div>
+                </Field>
+                <Field label="Dont enfants">
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="number"
+                      value={guestChildren}
+                      onChange={(e) => setGuestChildren(e.target.value)}
+                      placeholder="0"
+                      min="0"
                       className={inputCls + ' pl-10'}
                     />
                   </div>

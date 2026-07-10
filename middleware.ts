@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
-  const isPublicRoute = pathname.startsWith('/embed') || pathname.startsWith('/api') || pathname.startsWith('/p/');
+  const isPublicRoute = pathname.startsWith('/embed') || pathname.startsWith('/api') || pathname.startsWith('/p/') || pathname.startsWith('/reset-password');
 
   // Public routes — no auth required
   if (isPublicRoute) return supabaseResponse;
