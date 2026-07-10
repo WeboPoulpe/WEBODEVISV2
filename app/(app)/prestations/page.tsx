@@ -292,14 +292,15 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
   const addLink = async () => {
     if (!selected) return;
     setSaving(true);
-    const { data } = await createClient()
+    const { data, error } = await createClient()
       .from('service_ingredients')
       .insert({ prestation_id: prestationId, ingredient_id: selected.id, qty_per_person: parseFloat(qty) || 1, unit: selected.unit || null, user_id: userId })
       .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
       .single();
+    setSaving(false);
+    if (error) { alert('Impossible de lier l’ingrédient : ' + error.message); return; }
     if (data) setLinks((p) => [...p, data as unknown as IngredientLink]);
     setSelected(null); setSearch(''); setQty('1'); setShowAdd(false);
-    setSaving(false);
   };
 
   const removeLink = async (id: string) => {
@@ -630,9 +631,9 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                       onChange={(e) => setNewCatName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') createCategory(); if (e.key === 'Escape') setCreatingCat(false); }}
                       placeholder="Nom de la catégorie…"
-                      className="flex-1 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
+                      className="flex-1 min-w-0 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
                     />
-                    <button type="button" onClick={createCategory} className="px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
+                    <button type="button" onClick={createCategory} className="flex-shrink-0 px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
                       <Check className="h-4 w-4" />
                     </button>
                   </div>
@@ -676,9 +677,9 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                       onChange={(e) => setNewSubCatName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') createSubCategory(); if (e.key === 'Escape') setCreatingSubCat(false); }}
                       placeholder="Nom de la sous-catégorie…"
-                      className="flex-1 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
+                      className="flex-1 min-w-0 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
                     />
-                    <button type="button" onClick={createSubCategory} className="px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
+                    <button type="button" onClick={createSubCategory} className="flex-shrink-0 px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
                       <Check className="h-4 w-4" />
                     </button>
                   </div>
@@ -906,7 +907,7 @@ export default function PrestationsPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from('prestations')
-      .select('id, name, unit_price, category, sub_category, category_id, sub_category_id, description, is_option')
+      .select('id, name, unit_price, cost_price, child_unit_price, category, sub_category, category_id, sub_category_id, description, is_option')
       .order('category')
       .order('name');
     setItems(data ?? []);
@@ -974,19 +975,24 @@ export default function PrestationsPage() {
     // Fetch full prestation data including gastro_card_html and cost_price
     const { data: full } = await supabase.from('prestations').select('*').eq('id', p.id).single();
     if (!full) return;
-    const { data, error } = await supabase.from('prestations').insert([{
+    const { error } = await supabase.from('prestations').insert([{
       user_id: user.id,
       name: `${full.name} (copie)`,
       unit_price: full.unit_price,
       cost_price: full.cost_price,
+      child_unit_price: full.child_unit_price,
       category: full.category,
       sub_category: full.sub_category,
+      category_id: full.category_id,
+      sub_category_id: full.sub_category_id,
       description: full.description,
       is_option: full.is_option,
       gastro_card_html: full.gastro_card_html,
+      gastro_card_html_en: full.gastro_card_html_en,
     }]).select().single();
     if (error) { alert('Erreur: ' + error.message); return; }
-    if (data) setItems((prev) => [data, ...prev]);
+    // Refetch pour que la copie apparaisse tout de suite, au bon endroit (tri/groupes).
+    await load();
   };
 
   const filtered = items.filter((p) => {

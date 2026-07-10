@@ -769,6 +769,36 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     document.execCommand(cmd, false, value ?? undefined);
   }, []);
 
+  // Titres / paragraphe : formatBlock seul ne « prend » pas visuellement car le
+  // document a des font-size INLINE sur chaque élément (qui écrasent le rendu h1/h2/h3).
+  // On applique donc explicitement taille/graisse en inline sur le bloc obtenu, et on
+  // neutralise les font-size inline des enfants pour qu'ils héritent du titre.
+  const applyHeading = useCallback((tag: 'H1' | 'H2' | 'H3' | 'P') => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    document.execCommand('formatBlock', false, `<${tag.toLowerCase()}>`);
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    let node: Node | null = sel.getRangeAt(0).startContainer;
+    while (node && node !== el) {
+      if (node instanceof HTMLElement && /^(H1|H2|H3|P)$/.test(node.tagName)) break;
+      node = node.parentNode;
+    }
+    if (!(node instanceof HTMLElement)) return;
+    const spec: Record<string, [string, string, string]> = {
+      H1: ['1.9em', '700', '14px 0 8px'],
+      H2: ['1.5em', '700', '12px 0 6px'],
+      H3: ['1.2em', '600', '10px 0 5px'],
+      P:  ['1em',   '400', '0 0 8px'],
+    };
+    const [size, weight, margin] = spec[node.tagName];
+    node.style.fontSize = size;
+    node.style.fontWeight = weight;
+    node.style.margin = margin;
+    node.querySelectorAll<HTMLElement>('[style*="font-size"]').forEach((c) => { c.style.fontSize = 'inherit'; });
+  }, []);
+
   const applyColor = (color: string) => exec('foreColor', color);
   const applyBg    = (color: string) => exec('hiliteColor', color);
 
@@ -873,6 +903,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     tr { page-break-inside: avoid; }
     thead { display: table-header-group; }
     p, li { orphans: 2; widows: 2; }
+    ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
+    ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
+    li { display: list-item; }
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
 </head>
@@ -881,7 +914,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   ${coverHtml ? '' : logoHtml}
   <div style="padding:20mm;">${content}</div>
   ${photosHtml}
-  ${cgvHtml}
+  ${(content.includes('data-webo-cgv') || (companyAssets.cgv && content.includes(companyAssets.cgv))) ? '' : cgvHtml}
   <script>
     var els = document.querySelectorAll('[style]');
     var sep = false;
@@ -954,6 +987,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     tr { page-break-inside: avoid; }
     thead { display: table-header-group; }
     p, li { orphans: 2; widows: 2; }
+    ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
+    ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
+    li { display: list-item; }
 
     ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
   </style>
@@ -963,7 +999,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   ${coverHtml ? '' : logoHtml}
   <div class="pdf-wrap">${content}</div>
   ${photosHtml}
-  ${cgvHtml}
+  ${(content.includes('data-webo-cgv') || (companyAssets.cgv && content.includes(companyAssets.cgv))) ? '' : cgvHtml}
   <script>
     window.onload = function() {
       var els = document.querySelectorAll('[style]');
@@ -1219,13 +1255,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           {(['H1', 'H2', 'H3'] as const).map((tag) => (
             <TB
               key={tag}
-              onClick={() => exec('formatBlock', tag)}
+              onClick={() => applyHeading(tag)}
               title={`Titre ${tag}`}
             >
               <span className="font-bold text-xs leading-none">{tag}</span>
             </TB>
           ))}
-          <TB onClick={() => exec('formatBlock', 'P')} title="Paragraphe normal">
+          <TB onClick={() => applyHeading('P')} title="Paragraphe normal">
             <span className="text-xs leading-none">¶</span>
           </TB>
 
@@ -1486,6 +1522,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             #weboword-sheet th {
               line-height: ${lineHeight} !important;
             }
+            /* Restaure les puces/numéros (Tailwind preflight les supprime) */
+            #weboword-sheet ul { list-style: disc outside !important; padding-left: 1.6em !important; margin: 6px 0 !important; }
+            #weboword-sheet ol { list-style: decimal outside !important; padding-left: 1.6em !important; margin: 6px 0 !important; }
+            #weboword-sheet li { display: list-item !important; }
+            #weboword-sheet h1, #weboword-sheet h2, #weboword-sheet h3 { line-height: 1.25 !important; }
             @media print {
               .no-print { display: none !important; }
               #weboword-sheet {

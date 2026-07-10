@@ -99,7 +99,7 @@ export default function OnboardingOverlay({ userId }: Props) {
             {/* Logo */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Logo de l&apos;entreprise</label>
-              <ImageUpload images={logoUrls} onChange={setLogoUrls} userId={userId} max={1} bucket="uploads" />
+              <ImageUpload images={logoUrls} onChange={setLogoUrls} userId={userId} max={1} bucket="storage" />
             </div>
 
             <div>

@@ -434,7 +434,7 @@ ${d.remarks ? `
 
 ${d.cgv ? `
 <!-- ═══════════════════════ CONDITIONS GÉNÉRALES DE VENTE ═══════════════════════ -->
-<div style="page-break-before:always;break-before:page;margin-top:24px;">
+<div data-webo-cgv="1" style="page-break-before:always;break-before:page;margin-top:24px;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
     <div style="flex:1;height:1px;background:#e0e0e0;"></div>
     <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:2px;margin:0;">${t.cgv}</p>

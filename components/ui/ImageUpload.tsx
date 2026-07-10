@@ -10,11 +10,11 @@ interface Props {
   userId: string;
   /** Max number of images (default 5) */
   max?: number;
-  /** Supabase storage bucket name (default 'uploads') */
+  /** Supabase storage bucket name (default 'storage') */
   bucket?: string;
 }
 
-export default function ImageUpload({ images, onChange, userId, max = 5, bucket = 'uploads' }: Props) {
+export default function ImageUpload({ images, onChange, userId, max = 5, bucket = 'storage' }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 

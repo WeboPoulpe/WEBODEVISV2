@@ -12,6 +12,7 @@ interface TokenData {
   token: string;
   is_active: boolean;
   brochure_url: string | null;
+  user_id: string | null;
 }
 
 const EVENT_TYPES = ['Mariage', 'Anniversaire', 'Cocktail', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
@@ -62,7 +63,7 @@ export default function ProspectFormPage() {
     const supabase = createClient();
     supabase
       .from('user_prospect_tokens')
-      .select('token, is_active, brochure_url')
+      .select('token, is_active, brochure_url, user_id')
       .eq('token', token)
       .single()
       .then(({ data }) => {
@@ -97,6 +98,7 @@ export default function ProspectFormPage() {
       guest_count:     parseInt(guestCount) || null,
       message:         message.trim() || null,
       user_token:      token,
+      owner_user_id:   tokenData?.user_id ?? null,
       status:          'nouveau',
     });
 

@@ -25,7 +25,14 @@ export default function LoginForm() {
     const { error } = await signIn(email, password);
 
     if (error) {
-      setError('Email ou mot de passe incorrect');
+      const msg = error.toLowerCase();
+      if (msg.includes('not confirmed') || msg.includes('confirm')) {
+        setError("Votre compte n'est pas encore confirmé. Ouvrez l'email de validation reçu lors de l'inscription (pensez à vérifier les spams), puis reconnectez-vous.");
+      } else if (msg.includes('invalid login') || msg.includes('credentials')) {
+        setError('Email ou mot de passe incorrect.');
+      } else {
+        setError(error);
+      }
       setLoading(false);
       return;
     }

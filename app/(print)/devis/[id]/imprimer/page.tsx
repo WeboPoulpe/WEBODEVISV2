@@ -70,6 +70,9 @@ export default async function ImprimerPage({ params }: Props) {
             print-color-adjust: exact !important;
           }
           body { margin: 0; padding: 0; font-family: '${selectedFont}', Georgia, serif; }
+          ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
+          ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
+          li { display: list-item; }
           .screen-sep {
             page-break-after: always !important;
             break-after: page !important;
@@ -92,7 +95,15 @@ export default async function ImprimerPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(quote.content_html as string) }}
         />
         {photosHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(photosHtml) }} />}
-        {cgvHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />}
+        {/* Les CGV sont déjà incluses dans content_html (générées par generateQuoteHtml).
+            On ne les ré-ajoute QUE si le document ne les contient pas déjà (évite le doublon
+            + le saut de page vide entre signature et CGV). */}
+        {cgvHtml
+          && !(quote.content_html as string).includes('data-webo-cgv')
+          && !(profile?.cgv && (quote.content_html as string).includes(profile.cgv as string))
+          && (
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />
+          )}
       </>
     );
   }

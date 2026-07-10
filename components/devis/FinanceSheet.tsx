@@ -29,12 +29,15 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
     if (!open || !quoteId) return;
     setLoading(true);
     const sb = createClient();
-    sb.from('quotes').select('services, vat_rate').eq('id', quoteId).single()
+    sb.from('quotes').select('services, vat_rate, extra_costs').eq('id', quoteId).single()
       .then(async ({ data }) => {
         if (!data) { setLoading(false); return; }
         const svcs = Array.isArray(data.services) ? data.services as Service[] : [];
         setServices(svcs.filter((s) => !s.isPageBreak && s.name));
         setVatRate(data.vat_rate ?? 20);
+        setExtraCosts(Array.isArray(data.extra_costs)
+          ? (data.extra_costs as { id: string; label: string; amount: number }[])
+          : []);
 
         const { data: prestations } = await sb.from('prestations').select('id, name, cost_price');
         const map: Record<string, number> = {};
@@ -51,6 +54,15 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
         setLoading(false);
       });
   }, [open, quoteId]);
+
+  // Persiste les frais additionnels (débounce) — ils n'étaient jamais enregistrés.
+  useEffect(() => {
+    if (loading || !open || !quoteId) return;
+    const t = setTimeout(() => {
+      createClient().from('quotes').update({ extra_costs: extraCosts }).eq('id', quoteId);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [extraCosts, loading, open, quoteId]);
 
   const keyOf = (name: string) => (name || '').trim().toLowerCase();
   const costFor = (name: string) => costMap[keyOf(name)] || 0;
