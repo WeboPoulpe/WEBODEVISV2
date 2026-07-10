@@ -7,7 +7,7 @@ import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet,
+  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -17,6 +17,40 @@ import ImportDevisModal from '@/components/devis/ImportDevisModal';
 import FinanceSheet from '@/components/devis/FinanceSheet';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES } from '@/lib/quoteStatus';
+
+// ── Section repliable (accordéon) ───────────────────────────────────────────
+function AccordionSection({
+  title, count, tone, open, onToggle, children,
+}: {
+  title: string; count: number; tone: 'amber' | 'purple' | 'emerald' | 'gray';
+  open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  const toneCls = {
+    amber:   'text-amber-700',
+    purple:  'text-[#9c27b0]',
+    emerald: 'text-emerald-700',
+    gray:    'text-gray-500',
+  }[tone];
+  return (
+    <section className="border border-gray-200 rounded-2xl overflow-hidden bg-white">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+      >
+        <span className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide ${toneCls}`}>
+          {title}
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{count}</span>
+        </span>
+        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && count > 0 && <div className="px-4 pb-4 pt-1">{children}</div>}
+      {open && count === 0 && (
+        <p className="px-4 pb-4 pt-1 text-xs text-gray-400 italic">Aucun élément dans cette section.</p>
+      )}
+    </section>
+  );
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -691,6 +725,9 @@ export default function DevisPage() {
   const [activeStatus, setActiveStatus] = useState('Tous');
   const [sort, setSort] = useState<'recent' | 'event' | 'amount' | 'client'>('recent');
   const [view, setView] = useState<ViewMode>('grid');
+  // Sections repliables de la vue grille (Prospection collapsée par défaut, En cours ouverte)
+  const [sec, setSec] = useState({ prospection: false, encours: true, confirmes: false, refuses: false });
+  const toggleSec = (k: keyof typeof sec) => setSec((s) => ({ ...s, [k]: !s[k] }));
   const [sheetQuote, setSheetQuote] = useState<Quote | null>(null);
   const [dupModal, setDupModal] = useState<{ open: boolean; quoteId: string | null; saving: boolean; templateName: string }>({ open: false, quoteId: null, saving: false, templateName: '' });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -919,7 +956,7 @@ export default function DevisPage() {
     return matchSearch && matchStatus;
   });
 
-  const sorted = [...filtered].sort((a, b) => {
+  const sortFn = (a: Quote, b: Quote) => {
     switch (sort) {
       case 'recent': return (b.created_at || '').localeCompare(a.created_at || '');
       case 'event':  return (a.event_date || '9999').localeCompare(b.event_date || '9999');
@@ -927,7 +964,31 @@ export default function DevisPage() {
       case 'client': return (a.client_name || '').localeCompare(b.client_name || '');
       default: return 0;
     }
+  };
+  const sorted = [...filtered].sort(sortFn);
+
+  // ── Sections de la vue grille (inclut les refusés, rangés dans leur section) ──
+  const secMatch = (q: Quote) => {
+    const hay = [q.client_name, q.client_first_name, q.client_last_name, q.client_email, q.event_type]
+      .filter(Boolean).join(' ').toLowerCase();
+    const okSearch = !search || hay.includes(search.toLowerCase());
+    const okStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
+    return okSearch && okStatus;
+  };
+  const secSorted = [...quotes].filter(secMatch).sort(sortFn);
+  const secEncours   = secSorted.filter((q) => (PENDING_STATUSES as string[]).includes(q.status));
+  const secConfirmes = secSorted.filter((q) => (CONFIRMED_STATUSES as string[]).includes(q.status));
+  const secRefuses   = secSorted.filter((q) => (REJECTED_STATUSES as string[]).includes(q.status));
+
+  const gridProspects = prospects.filter((p) => {
+    const okStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
+    const okSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(search.toLowerCase());
+    return okStatus && okSearch;
   });
+
+  const showEmpty =
+    (view === 'grid' && gridProspects.length === 0 && secSorted.length === 0) ||
+    (view === 'table' && filtered.length === 0);
 
   const VIEW_BUTTONS: { mode: ViewMode; Icon: React.ElementType; label: string }[] = [
     { mode: 'grid', Icon: LayoutGrid, label: 'Grille' },
@@ -1101,7 +1162,7 @@ export default function DevisPage() {
       {/* Content */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
-      ) : filtered.length === 0 && view !== 'pipeline' ? (
+      ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4"><CalendarDays className="h-8 w-8 text-gray-400" /></div>
           <p className="text-gray-500 font-medium mb-1">Aucun devis trouvé</p>
@@ -1109,29 +1170,33 @@ export default function DevisPage() {
           {!search && <Link href="/devis/nouveau" className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"><Plus className="h-4 w-4" />Créer un devis</Link>}
         </div>
       ) : view === 'grid' ? (
-        <>
-          {(() => {
-            const q4 = search.toLowerCase();
-            const visibleProspects = prospects.filter((p) => {
-              const matchStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
-              const matchSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(q4);
-              return matchStatus && matchSearch;
-            });
-            return visibleProspects.length > 0 ? (
-              <div className="mb-5">
-                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({visibleProspects.length})</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {visibleProspects.map((p) => (
-                    <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
-                  ))}
-                </div>
-              </div>
-            ) : null;
-          })()}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {sorted.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
-          </div>
-        </>
+        <div className="space-y-3">
+          <AccordionSection title="Prospection" count={gridProspects.length} tone="amber" open={sec.prospection} onToggle={() => toggleSec('prospection')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {gridProspects.map((p) => (
+                <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
+              ))}
+            </div>
+          </AccordionSection>
+
+          <AccordionSection title="Devis en cours" count={secEncours.length} tone="purple" open={sec.encours} onToggle={() => toggleSec('encours')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {secEncours.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+            </div>
+          </AccordionSection>
+
+          <AccordionSection title="Confirmés / Événements" count={secConfirmes.length} tone="emerald" open={sec.confirmes} onToggle={() => toggleSec('confirmes')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {secConfirmes.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+            </div>
+          </AccordionSection>
+
+          <AccordionSection title="Archivés / Refusés" count={secRefuses.length} tone="gray" open={sec.refuses} onToggle={() => toggleSec('refuses')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {secRefuses.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+            </div>
+          </AccordionSection>
+        </div>
       ) : view === 'table' ? (
         <>
           {(() => {
