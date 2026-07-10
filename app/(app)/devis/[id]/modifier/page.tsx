@@ -170,6 +170,10 @@ export default async function ModifierPage({
         address:     quote.client_address      ?? '',
         companyName: quote.company_name        ?? '',
         contactName: quote.contact_person_name ?? '',
+        siret:        (quote as { client_siret?: string | null }).client_siret ?? '',
+        contactRole:  (quote as { recipient_contact_role?: string | null }).recipient_contact_role ?? '',
+        contactEmail: (quote as { recipient_contact_email?: string | null }).recipient_contact_email ?? '',
+        contactPhone: (quote as { recipient_contact_phone?: string | null }).recipient_contact_phone ?? '',
       }}
       initialEvent={{
         eventType:     quote.event_type     ?? '',
