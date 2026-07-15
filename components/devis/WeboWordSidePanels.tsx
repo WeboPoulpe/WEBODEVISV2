@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 import { syncWeboDocument } from '@/lib/weboFinancials';
+import RecipientPicker from '@/components/devis/RecipientPicker';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -56,6 +57,16 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  // Destinataire (client entreprise) — customer_id/client_type figés au save du devis (wizard),
+  // et snapshot du contact choisi (recipient_contact_*) + SIRET client.
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [clientType, setClientType] = useState<'particulier' | 'entreprise'>('particulier');
+  const [clientSiret, setClientSiret] = useState('');
+  const [recipientContactId, setRecipientContactId] = useState<string | null>(null);
+  const [recipientContactName, setRecipientContactName] = useState('');
+  const [recipientContactRole, setRecipientContactRole] = useState('');
+  const [recipientContactEmail, setRecipientContactEmail] = useState('');
+  const [recipientContactPhone, setRecipientContactPhone] = useState('');
   const [eventType, setEventType] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventLocation, setEventLocation] = useState('');
@@ -168,7 +179,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     if (!activePanel) return;
     setLoading(true);
     supabase.from('quotes')
-      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language')
+      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language, customer_id, client_type, client_siret, contact_person_name, recipient_contact_id, recipient_contact_role, recipient_contact_email, recipient_contact_phone')
       .eq('id', quoteId).single()
       .then(({ data }) => {
         if (data) {
@@ -176,6 +187,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           const loadedClientEmail = data.client_email || '';
           const loadedClientPhone = data.client_phone || '';
           const loadedClientAddress = data.client_address || '';
+          const loadedCustomerId = data.customer_id || null;
+          const loadedClientType = (data.client_type as 'particulier' | 'entreprise') || 'particulier';
+          const loadedClientSiret = data.client_siret || '';
+          const loadedContactPersonName = data.contact_person_name || '';
+          const loadedRecipientContactId = data.recipient_contact_id || null;
+          const loadedRecipientContactRole = data.recipient_contact_role || '';
+          const loadedRecipientContactEmail = data.recipient_contact_email || '';
+          const loadedRecipientContactPhone = data.recipient_contact_phone || '';
           const loadedEventType = data.event_type || '';
           const loadedEventDate = data.event_date || '';
           const loadedEventLocation = data.event_location || '';
@@ -193,6 +212,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setClientEmail(loadedClientEmail);
           setClientPhone(loadedClientPhone);
           setClientAddress(loadedClientAddress);
+          setCustomerId(loadedCustomerId);
+          setClientType(loadedClientType);
+          setClientSiret(loadedClientSiret);
+          setRecipientContactName(loadedContactPersonName);
+          setRecipientContactRole(loadedRecipientContactRole);
+          setRecipientContactEmail(loadedRecipientContactEmail);
+          setRecipientContactPhone(loadedRecipientContactPhone);
+          setRecipientContactId(loadedRecipientContactId);
           setEventType(loadedEventType);
           setEventDate(loadedEventDate);
           setEventLocation(loadedEventLocation);
@@ -312,6 +339,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       client_email: clientEmail || null,
       client_phone: clientPhone || null,
       client_address: clientAddress || null,
+      contact_person_name: recipientContactName || null,
+      recipient_contact_id: recipientContactId || null,
+      recipient_contact_role: recipientContactRole || null,
+      recipient_contact_email: recipientContactEmail || null,
+      recipient_contact_phone: recipientContactPhone || null,
+      client_siret: clientSiret || null,
       event_type: eventType || '',
       event_date: eventDate || new Date().toISOString().slice(0, 10),
       event_location: eventLocation || '',
@@ -456,6 +489,22 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                     <div><label className={labelCls}>Téléphone</label><input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className={inputCls} placeholder="06 12 34 56 78" /></div>
                     <div><label className={labelCls}>Adresse</label><input value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} className={inputCls} placeholder="12 rue des Lilas" /></div>
                   </div>
+
+                  {customerId && clientType === 'entreprise' && (
+                    <div className="border-t border-gray-100 pt-3">
+                      <RecipientPicker
+                        customerId={customerId}
+                        valueContactId={recipientContactId}
+                        onPick={(c) => {
+                          setRecipientContactId(c?.id ?? null);
+                          setRecipientContactName(c?.name ?? '');
+                          setRecipientContactRole(c?.role ?? '');
+                          setRecipientContactEmail(c?.email ?? '');
+                          setRecipientContactPhone(c?.phone ?? '');
+                        }}
+                      />
+                    </div>
+                  )}
                 </>
               )}
 

@@ -53,6 +53,8 @@ export interface DevisState {
     companyName: string;
     siret: string;
     contactName: string;
+    contactRole: string;
+    contactId: string;
     contactEmail: string;
     contactPhone: string;
   };
@@ -103,6 +105,8 @@ const DEFAULT: DevisState = {
     companyName: '',
     siret: '',
     contactName: '',
+    contactRole: '',
+    contactId: '',
     contactEmail: '',
     contactPhone: '',
   },

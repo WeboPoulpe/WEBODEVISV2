@@ -5,6 +5,7 @@ import { useDevis } from '@/context/DevisContext';
 import { ArrowRight, Search, X, Plus, User, Building2, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Sheet from '@/components/ui/Sheet';
+import RecipientPicker from '@/components/devis/RecipientPicker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CustomerResult {
@@ -15,6 +16,7 @@ interface CustomerResult {
   company_name: string | null;
   email: string;
   phone: string | null;
+  siret_number?: string | null;
 }
 
 interface Props {
@@ -52,7 +54,7 @@ function ClientCombobox({
       const supabase = createClient();
       const { data } = await supabase
         .from('customers')
-        .select('id, customer_type, first_name, last_name, company_name, email, phone')
+        .select('id, customer_type, first_name, last_name, company_name, email, phone, siret_number')
         .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`)
         .limit(8);
       setResults(data ?? []);
@@ -267,7 +269,12 @@ export default function StepClientEvent({ onNext }: Props) {
         companyName: c.company_name ?? '',
         email: c.email,
         phone: c.phone ?? '',
+        siret: c.siret_number ?? '',
         contactName: '',
+        contactRole: '',
+        contactId: '',
+        contactEmail: '',
+        contactPhone: '',
       },
     });
   };
@@ -277,7 +284,10 @@ export default function StepClientEvent({ onNext }: Props) {
     setMode('search');
     dispatch({
       type: 'UPDATE_CLIENT',
-      payload: { firstName: '', lastName: '', companyName: '', email: '', phone: '', contactName: '' },
+      payload: {
+        firstName: '', lastName: '', companyName: '', email: '', phone: '',
+        contactName: '', contactRole: '', contactId: '', contactEmail: '', contactPhone: '',
+      },
     });
   };
 
@@ -300,7 +310,27 @@ export default function StepClientEvent({ onNext }: Props) {
 
         {/* ── Mode: selected ── */}
         {mode === 'selected' && selectedCustomer && (
-          <SelectedClientCard customer={selectedCustomer} onClear={handleClear} />
+          <div className="space-y-3">
+            <SelectedClientCard customer={selectedCustomer} onClear={handleClear} />
+            {selectedCustomer.customer_type === 'entreprise' && (
+              <RecipientPicker
+                customerId={selectedCustomer.id}
+                valueContactId={clientInfo.contactId || null}
+                onPick={(c) => {
+                  dispatch({
+                    type: 'UPDATE_CLIENT',
+                    payload: {
+                      contactId: c?.id ?? '',
+                      contactName: c?.name ?? '',
+                      contactRole: c?.role ?? '',
+                      contactEmail: c?.email ?? '',
+                      contactPhone: c?.phone ?? '',
+                    },
+                  });
+                }}
+              />
+            )}
+          </div>
         )}
 
         {/* ── Mode: search ── */}

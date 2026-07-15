@@ -178,6 +178,43 @@ CREATE POLICY "Admins manage prospect_requests" ON prospect_requests
 ALTER TABLE prospect_requests ADD COLUMN IF NOT EXISTS guest_count_children INTEGER;
 
 
+-- ┌─────────────────────────────────────────────────────────────────────────┐
+-- ║ 5) lot_c_customer_contacts.sql                                          ║
+-- └─────────────────────────────────────────────────────────────────────────┘
+CREATE TABLE IF NOT EXISTS customer_contacts (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id   uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  owner_user_id uuid NOT NULL,
+  name          text NOT NULL,
+  role          text,
+  email         text,
+  phone         text,
+  notes         text,
+  is_primary    boolean NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_customer_contacts_customer ON customer_contacts(customer_id);
+ALTER TABLE customer_contacts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Owner manages own customer_contacts" ON customer_contacts;
+CREATE POLICY "Owner manages own customer_contacts" ON customer_contacts
+  FOR ALL TO authenticated
+  USING (owner_user_id = auth.uid() AND EXISTS (SELECT 1 FROM customers c WHERE c.id = customer_id AND c.owner_user_id = auth.uid()))
+  WITH CHECK (owner_user_id = auth.uid() AND EXISTS (SELECT 1 FROM customers c WHERE c.id = customer_id AND c.owner_user_id = auth.uid()));
+DROP POLICY IF EXISTS "Admins manage customer_contacts" ON customer_contacts;
+CREATE POLICY "Admins manage customer_contacts" ON customer_contacts
+  FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS client_siret            text;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_email text;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_phone text;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_role  text;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS recipient_contact_id    text;
+INSERT INTO customer_contacts (customer_id, owner_user_id, name, email, phone, is_primary)
+SELECT c.id, c.owner_user_id, c.contact_person_name, c.contact_person_email, c.contact_person_phone, true
+FROM customers c
+WHERE c.customer_type = 'entreprise' AND c.contact_person_name IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id);
+
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ✅ Terminé. Vérification rapide (optionnel) :
 -- SELECT proname FROM pg_proc WHERE proname IN ('is_admin','enforce_profile_role');
