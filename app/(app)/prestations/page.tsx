@@ -268,7 +268,7 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
     const { data } = await createClient()
       .from('service_ingredients')
       .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
-      .eq('prestation_id', prestationId);
+      .eq('service_id', prestationId);
     setLinks((data ?? []) as unknown as IngredientLink[]);
     setLoadingLinks(false);
   }, [prestationId]);
@@ -294,7 +294,7 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
     setSaving(true);
     const { data, error } = await createClient()
       .from('service_ingredients')
-      .insert({ prestation_id: prestationId, ingredient_id: selected.id, qty_per_person: parseFloat(qty) || 1, unit: selected.unit || null, user_id: userId })
+      .insert({ service_id: prestationId, ingredient_id: selected.id, qty_per_person: parseFloat(qty) || 1, unit: selected.unit || null, user_id: userId })
       .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
       .single();
     setSaving(false);

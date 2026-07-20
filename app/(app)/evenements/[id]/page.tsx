@@ -1060,7 +1060,7 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
     const { data: svcIngredients } = await supabase
       .from('service_ingredients')
       .select('ingredient_id, qty_per_person, unit')
-      .in('prestation_id', matchedIds);
+      .in('service_id', matchedIds);
     if (!svcIngredients || svcIngredients.length === 0) { setGenerating(false); return; }
 
     // 3. Aggregate by ingredient_id (sum qty × guest_count)
