@@ -104,7 +104,9 @@ CREATE TRIGGER trg_enforce_profile_role
   EXECUTE FUNCTION public.enforce_profile_role();
 
 -- Storage : écritures limitées au propriétaire (préfixe de dossier = uid)
+-- (on drop l'ancien ET le nouveau nom de policy → idempotent même après un run partiel)
 DROP POLICY IF EXISTS "Authenticated users can upload" ON storage.objects;
+DROP POLICY IF EXISTS "Owner can upload" ON storage.objects;
 CREATE POLICY "Owner can upload"
 ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (bucket_id = 'storage' AND (storage.foldername(name))[1] = auth.uid()::text);
@@ -115,11 +117,13 @@ ON storage.objects FOR SELECT TO public
 USING (bucket_id = 'storage');
 
 DROP POLICY IF EXISTS "Authenticated users can update" ON storage.objects;
+DROP POLICY IF EXISTS "Owner can update" ON storage.objects;
 CREATE POLICY "Owner can update"
 ON storage.objects FOR UPDATE TO authenticated
 USING (bucket_id = 'storage' AND (storage.foldername(name))[1] = auth.uid()::text);
 
 DROP POLICY IF EXISTS "Authenticated users can delete" ON storage.objects;
+DROP POLICY IF EXISTS "Owner can delete" ON storage.objects;
 CREATE POLICY "Owner can delete"
 ON storage.objects FOR DELETE TO authenticated
 USING (bucket_id = 'storage' AND (storage.foldername(name))[1] = auth.uid()::text);

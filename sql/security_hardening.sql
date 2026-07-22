@@ -64,7 +64,9 @@ CREATE TRIGGER trg_enforce_profile_role
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- INSERT : uniquement dans son propre dossier
+-- (on drop l'ancien ET le nouveau nom → idempotent même après un run partiel)
 DROP POLICY IF EXISTS "Authenticated users can upload" ON storage.objects;
+DROP POLICY IF EXISTS "Owner can upload" ON storage.objects;
 CREATE POLICY "Owner can upload"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -82,6 +84,7 @@ USING (bucket_id = 'storage');
 
 -- UPDATE : seulement ses propres fichiers
 DROP POLICY IF EXISTS "Authenticated users can update" ON storage.objects;
+DROP POLICY IF EXISTS "Owner can update" ON storage.objects;
 CREATE POLICY "Owner can update"
 ON storage.objects FOR UPDATE
 TO authenticated
@@ -92,6 +95,7 @@ USING (
 
 -- DELETE : seulement ses propres fichiers
 DROP POLICY IF EXISTS "Authenticated users can delete" ON storage.objects;
+DROP POLICY IF EXISTS "Owner can delete" ON storage.objects;
 CREATE POLICY "Owner can delete"
 ON storage.objects FOR DELETE
 TO authenticated
