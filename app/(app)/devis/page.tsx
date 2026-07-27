@@ -66,6 +66,8 @@ interface QuoteService {
 interface Quote {
   id: string;
   client_name: string;
+  /** Nom interne du devis (visible uniquement par le traiteur). Fallback = client_name. */
+  internal_name?: string | null;
   event_type: string;
   event_date: string | null;
   guest_count: number | null;
@@ -89,6 +91,11 @@ interface Quote {
 type ViewMode = 'grid' | 'table' | 'pipeline';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+/** Nom affiché du devis côté traiteur : nom interne s'il existe, sinon nom du client. */
+function quoteDisplayName(q: { internal_name?: string | null; client_name?: string | null }): string {
+  return (q.internal_name && q.internal_name.trim()) || q.client_name || '—';
+}
+
 function computeQuoteTotal(quote: {
   total_amount: number | null;
   vat_rate?: number | null;
@@ -211,13 +218,25 @@ interface ProspectResult {
 
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked,
+  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked, onRenamed,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [internalName, setInternalName] = useState(quote.internal_name ?? '');
+  const [savingName, setSavingName] = useState(false);
+
+  const saveInternalName = async () => {
+    const value = internalName.trim() || null;
+    if (value === (quote.internal_name ?? null)) return; // rien changé
+    setSavingName(true);
+    const { error } = await createClient().from('quotes').update({ internal_name: value }).eq('id', quote.id);
+    setSavingName(false);
+    if (error) { alert('Erreur : ' + error.message); return; }
+    onRenamed(quote.id, value);
+  };
   const [status, setStatus] = useState(quote.status);
   const [savingStatus, setSavingStatus] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -266,7 +285,7 @@ function DevisSheet({
   };
 
   return (
-    <Sheet open onClose={onClose} title={quote.client_name || 'Devis'} subtitle={quote.event_type} width="w-[480px]">
+    <Sheet open onClose={onClose} title={quoteDisplayName(quote)} subtitle={quote.event_type} width="w-[480px]">
       <SheetTabs tabs={[{ key: 'apercu', label: 'Aperçu' }, { key: 'suivi', label: 'Suivi commercial' }]}
         active={tab} onChange={(k) => setTab(k as typeof tab)} />
 
@@ -283,6 +302,22 @@ function DevisSheet({
                 {quote.guest_count && <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{quote.guest_count} couverts</span>}
               </div>
             </div>
+          </div>
+          {/* Nom interne du devis (visible uniquement par le traiteur) */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nom du devis (interne)</p>
+            <div className="relative">
+              <input
+                value={internalName}
+                onChange={(e) => setInternalName(e.target.value)}
+                onBlur={saveInternalName}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                placeholder={quote.client_name || 'Nom du client'}
+                className="w-full px-3 py-2 pr-16 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              />
+              {savingName && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-[#9c27b0]" />}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Non visible sur le devis client. Vide = nom du client par défaut.</p>
           </div>
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -468,7 +503,7 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
             <Icon className="h-5 w-5 text-[#9c27b0] group-hover:text-white transition-colors" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{quote.client_name || '—'}</p>
+            <p className="font-semibold text-gray-900 truncate">{quoteDisplayName(quote)}</p>
             <p className="text-sm text-gray-500 capitalize truncate">{quote.event_type || 'Événement'}</p>
           </div>
         </div>
@@ -561,7 +596,7 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
         <tbody>
           {quotes.map((q) => (
             <tr key={q.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-              <td className="px-4 py-3 font-medium text-gray-900">{q.client_name || '—'}</td>
+              <td className="px-4 py-3 font-medium text-gray-900">{quoteDisplayName(q)}</td>
               <td className="px-4 py-3 text-gray-600 capitalize">{q.event_type || '—'}</td>
               <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{q.event_date ? formatDate(q.event_date) : '—'}</td>
               <td className="px-4 py-3">
@@ -666,7 +701,7 @@ function PipelineView({
                         <Icon className="h-3.5 w-3.5 text-[#9c27b0]" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-gray-900 truncate">{q.client_name || '—'}</p>
+                        <p className="text-xs font-semibold text-gray-900 truncate">{quoteDisplayName(q)}</p>
                         <p className="text-[10px] text-gray-500 capitalize truncate">{q.event_type || '—'}</p>
                       </div>
                     </div>
@@ -746,7 +781,7 @@ export default function DevisPage() {
     const supabase = createClient();
     Promise.all([
       supabase.from('quotes')
-        .select('id, client_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
+        .select('id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
         .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false }),
       supabase.from('devis_templates')
@@ -1224,7 +1259,11 @@ export default function DevisPage() {
       )}
 
       {sheetQuote && (
-        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked} />
+        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked}
+          onRenamed={(id, name) => {
+            setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, internal_name: name } : q));
+            setSheetQuote((prev) => prev && prev.id === id ? { ...prev, internal_name: name } : prev);
+          }} />
       )}
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}
@@ -1246,7 +1285,7 @@ export default function DevisPage() {
           if (!user) return;
           createClient()
             .from('quotes')
-            .select('id, client_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
+            .select('id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
             .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
             .order('created_at', { ascending: false })
             .then(({ data }) => { if (data) setQuotes(data); });

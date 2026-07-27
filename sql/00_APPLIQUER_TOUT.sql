@@ -219,6 +219,13 @@ WHERE c.customer_type = 'entreprise' AND c.contact_person_name IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM customer_contacts cc WHERE cc.customer_id = c.id);
 
 
+-- ┌─────────────────────────────────────────────────────────────────────────┐
+-- ║ 6) lot_d_internal_name.sql                                              ║
+-- └─────────────────────────────────────────────────────────────────────────┘
+-- Nom interne du devis (visible uniquement par le traiteur ; fallback = client_name)
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS internal_name text;
+
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ✅ Terminé. Vérification rapide (optionnel) :
 -- SELECT proname FROM pg_proc WHERE proname IN ('is_admin','enforce_profile_role');
