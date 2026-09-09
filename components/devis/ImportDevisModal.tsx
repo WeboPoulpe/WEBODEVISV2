@@ -11,6 +11,8 @@ interface Props {
   onCreated: () => void;
   /** If provided, the modal opens in EDIT mode and updates this quote */
   editQuoteId?: string | null;
+  /** Dossier d'arrivée du devis importé (null = racine) */
+  folderId?: string | null;
 }
 
 const EVENT_TYPES = ['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
@@ -24,7 +26,7 @@ type CustomerResult = {
   address: string | null;
 };
 
-export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId = null }: Props) {
+export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId = null, folderId = null }: Props) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -201,6 +203,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
         hide_price: false,
         imported: true,
         customer_id: customerId,
+        folder_id: folderId,
       });
       error = res.error;
     }

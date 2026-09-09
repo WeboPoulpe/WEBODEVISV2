@@ -6,6 +6,9 @@
 --   2) security_hardening.sql        (anti-escalade role + storage par propriétaire)
 --   3) lot_a_fixes.sql               (frais extra_costs + RLS prospect_requests / 403)
 --   4) lot_b_fixes.sql               (nb d'enfants prospect)
+--   5) lot_c_customer_contacts.sql   (contacts entreprise + destinataire/SIRET)
+--   6) lot_d_internal_name.sql       (nom interne du devis)
+--   7) lot_e_quote_folders.sql       (dossiers de devis imbriqués)
 --
 -- Idempotent : peut être relancé sans effet de bord.
 -- ⚠️ Fichier GÉNÉRÉ à partir des fichiers sources — pour toute modif, éditer les
@@ -224,6 +227,48 @@ WHERE c.customer_type = 'entreprise' AND c.contact_person_name IS NOT NULL
 -- └─────────────────────────────────────────────────────────────────────────┘
 -- Nom interne du devis (visible uniquement par le traiteur ; fallback = client_name)
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS internal_name text;
+
+
+-- ┌─────────────────────────────────────────────────────────────────────────┐
+-- ║ 7) lot_e_quote_folders.sql                                              ║
+-- └─────────────────────────────────────────────────────────────────────────┘
+-- Dossiers de devis imbriqués (couleur + icône), rattachement quotes.folder_id
+CREATE TABLE IF NOT EXISTS quote_folders (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id uuid NOT NULL,
+  parent_id     uuid REFERENCES quote_folders(id) ON DELETE CASCADE,
+  name          text NOT NULL,
+  color         text NOT NULL DEFAULT 'purple',
+  icon          text NOT NULL DEFAULT 'folder',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_quote_folders_owner  ON quote_folders(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_quote_folders_parent ON quote_folders(parent_id);
+ALTER TABLE quote_folders ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT 'purple';
+ALTER TABLE quote_folders ADD COLUMN IF NOT EXISTS icon  text NOT NULL DEFAULT 'folder';
+
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS folder_id uuid;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'quotes_folder_id_fkey') THEN
+    ALTER TABLE quotes
+      ADD CONSTRAINT quotes_folder_id_fkey
+      FOREIGN KEY (folder_id) REFERENCES quote_folders(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_quotes_folder ON quotes(folder_id);
+
+ALTER TABLE quote_folders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Owner manages own quote_folders" ON quote_folders;
+CREATE POLICY "Owner manages own quote_folders" ON quote_folders
+  FOR ALL TO authenticated
+  USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+DROP POLICY IF EXISTS "Admins manage quote_folders" ON quote_folders;
+CREATE POLICY "Admins manage quote_folders" ON quote_folders
+  FOR ALL TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 
 -- ═══════════════════════════════════════════════════════════════════════════

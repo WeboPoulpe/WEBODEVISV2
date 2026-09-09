@@ -116,10 +116,14 @@ export default function NouveauDevisOnboarding() {
       }
     }
 
+    // Dossier d'arrivée : celui ouvert dans la liste des devis (/devis/nouveau?dossier=…)
+    const folderId = new URLSearchParams(window.location.search).get('dossier');
+
     const { data, error } = await supabase.from('quotes').insert({
       user_id: user.id,
       owner_user_id: user.id,
       customer_id: customerId,
+      folder_id: folderId,
       client_name: clientName.trim(),
       client_first_name: cFirst || null,
       client_last_name: cLast || null,

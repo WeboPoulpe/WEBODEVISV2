@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown,
+  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatCurrency } from '@/lib/utils';
@@ -18,6 +18,9 @@ import FinanceSheet from '@/components/devis/FinanceSheet';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES } from '@/lib/quoteStatus';
+import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
+import FolderBar, { DragItem } from '@/components/devis/FolderBar';
+import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
 
 // ── Section repliable (accordéon) ───────────────────────────────────────────
 function AccordionSection({
@@ -87,8 +90,31 @@ interface Quote {
   client_first_name?: string | null;
   client_last_name?: string | null;
   client_email?: string | null;
+  /** Dossier de rangement (null = racine) */
+  folder_id?: string | null;
 }
 type ViewMode = 'grid' | 'table' | 'pipeline';
+
+/** Colonnes chargées pour la liste des devis (une seule source de vérité). */
+// ⚠️ Doit rester UN littéral d'une seule pièce : supabase-js infère le type des lignes
+// depuis la chaîne elle-même (une concaténation casse l'inférence).
+const QUOTE_COLUMNS = 'id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id';
+/** Mêmes colonnes sans folder_id — utilisé tant que la migration lot E n'est pas appliquée. */
+const QUOTE_COLUMNS_LEGACY = 'id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email';
+
+/**
+ * Charge les devis de l'utilisateur. Si la colonne `folder_id` n'existe pas encore
+ * (migration lot E non appliquée), on retombe sur l'ancienne sélection au lieu de
+ * casser toute la page.
+ */
+async function loadQuotes(supabase: ReturnType<typeof createClient>, userId: string): Promise<Quote[]> {
+  const filter = `user_id.eq.${userId},owner_user_id.eq.${userId}`;
+  const res = await supabase.from('quotes').select(QUOTE_COLUMNS).or(filter).order('created_at', { ascending: false });
+  if (!res.error) return (res.data ?? []) as unknown as Quote[];
+  console.warn('[devis] Dossiers indisponibles (migration lot E à appliquer ?) :', res.error.message);
+  const legacy = await supabase.from('quotes').select(QUOTE_COLUMNS_LEGACY).or(filter).order('created_at', { ascending: false });
+  return (legacy.data ?? []) as unknown as Quote[];
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 /** Nom affiché du devis côté traiteur : nom interne s'il existe, sinon nom du client. */
@@ -218,9 +244,9 @@ interface ProspectResult {
 
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked, onRenamed,
+  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked, onRenamed, folderLabel, onMoveFolder,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
   const [notes, setNotes] = useState('');
@@ -318,6 +344,18 @@ function DevisSheet({
               {savingName && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-[#9c27b0]" />}
             </div>
             <p className="text-[10px] text-gray-400 mt-1">Non visible sur le devis client. Vide = nom du client par défaut.</p>
+          </div>
+          {/* Dossier de rangement */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dossier</p>
+            <button
+              onClick={onMoveFolder}
+              className="w-full flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] transition-colors"
+            >
+              <FolderInput className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <span className="flex-1 text-left truncate">{folderLabel || 'Aucun dossier (racine)'}</span>
+              <span className="text-[10px] text-gray-400 flex-shrink-0">Déplacer…</span>
+            </button>
           </div>
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -493,10 +531,16 @@ function DevisSheet({
 }
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
-function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, onEditImport }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onOpenFinance: (id: string) => void; onEditImport: (id: string) => void }) {
+function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, onEditImport, onMove, onDragStart, onDragEnd, dragging, folderLabel }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onOpenFinance: (id: string) => void; onEditImport: (id: string) => void; onMove: (q: Quote) => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; dragging: boolean; folderLabel: string }) {
   const Icon = getEventIcon(quote.event_type || '');
   return (
-    <div className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200">
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', quote.id); onDragStart({ type: 'quote', id: quote.id }); }}
+      onDragEnd={onDragEnd}
+      title="Glissez la carte sur un dossier pour la ranger"
+      className={['group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200', dragging ? 'opacity-40' : ''].join(' ')}
+    >
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-[#f3e5f5] flex items-center justify-center flex-shrink-0 group-hover:bg-[#9c27b0] transition-colors">
@@ -505,6 +549,11 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 truncate">{quoteDisplayName(quote)}</p>
             <p className="text-sm text-gray-500 capitalize truncate">{quote.event_type || 'Événement'}</p>
+            {folderLabel && (
+              <p className="flex items-center gap-1 text-[10px] text-gray-400 truncate mt-0.5" title={folderLabel}>
+                <Folder className="h-2.5 w-2.5 flex-shrink-0" />{folderLabel}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex-shrink-0 flex items-center gap-1">
@@ -549,6 +598,10 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
             className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
             <Wallet className="h-3.5 w-3.5" />
           </button>
+          <button onClick={() => onMove(quote)} title="Déplacer vers un dossier"
+            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+            <FolderInput className="h-3.5 w-3.5" />
+          </button>
           {quote.imported && quote.imported_file_url ? (
             <a href={quote.imported_file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir le document importé"
               className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
@@ -579,7 +632,7 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
 }
 
 // ── Table view ────────────────────────────────────────────────────────────────
-function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void }) {
+function TableView({ quotes, onOpenSheet, onDelete, onDuplicate, onMove, onDragStart, onDragEnd, folderLabelOf }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onMove: (q: Quote) => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; folderLabelOf: (q: Quote) => string }) {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
@@ -595,8 +648,18 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
         </thead>
         <tbody>
           {quotes.map((q) => (
-            <tr key={q.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-              <td className="px-4 py-3 font-medium text-gray-900">{quoteDisplayName(q)}</td>
+            <tr key={q.id} draggable
+              onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', q.id); onDragStart({ type: 'quote', id: q.id }); }}
+              onDragEnd={onDragEnd}
+              className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+              <td className="px-4 py-3 font-medium text-gray-900">
+                {quoteDisplayName(q)}
+                {folderLabelOf(q) && (
+                  <span className="flex items-center gap-1 text-[10px] font-normal text-gray-400 mt-0.5">
+                    <Folder className="h-2.5 w-2.5 flex-shrink-0" />{folderLabelOf(q)}
+                  </span>
+                )}
+              </td>
               <td className="px-4 py-3 text-gray-600 capitalize">{q.event_type || '—'}</td>
               <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{q.event_date ? formatDate(q.event_date) : '—'}</td>
               <td className="px-4 py-3">
@@ -608,6 +671,7 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
               <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{(() => { const t = computeQuoteTotal(q); return t ? formatCurrency(t) : '—'; })()}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 justify-end">
+                  <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><FolderInput className="h-3.5 w-3.5" /></button>
                   <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
                   {['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(q.status) && (
                     <button onClick={() => onDelete(q.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -627,9 +691,9 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate }: { quotes: Quo
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 function PipelineView({
-  quotes, prospects, onStatusChange, onOpenSheet, onDuplicate, onProspectStatus, onConvertProspect,
+  quotes, prospects, onStatusChange, onOpenSheet, onDuplicate, onProspectStatus, onConvertProspect, onMove,
 }: {
-  quotes: Quote[]; prospects: ProspectLite[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void; onProspectStatus: (id: string, s: string) => void; onConvertProspect: (id: string) => void;
+  quotes: Quote[]; prospects: ProspectLite[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void; onProspectStatus: (id: string, s: string) => void; onConvertProspect: (id: string) => void; onMove: (q: Quote) => void;
 }) {
   // useRef for draggingId so async handleDrop always reads the current value
   // (avoids stale closure bug when the React re-render hasn't happened yet on fast drags)
@@ -712,6 +776,7 @@ function PipelineView({
                         <button onClick={() => onOpenSheet(q)} title="Aperçu" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Eye className="h-3 w-3" /></button>
                         <Link href={`/devis/${q.id}/imprimer`} target="_blank" title="PDF" className="p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"><Printer className="h-3 w-3" /></Link>
                         <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Copy className="h-3 w-3" /></button>
+                        <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><FolderInput className="h-3 w-3" /></button>
                         <Link href={`/devis/${q.id}/modifier?mode=weboword`} title="Éditer" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Pencil className="h-3 w-3" /></Link>
                       </div>
                     </div>
@@ -776,26 +841,61 @@ export default function DevisPage() {
   const [editImportId, setEditImportId] = useState<string | null>(null);
   const [financeQuoteId, setFinanceQuoteId] = useState<string | null>(null);
 
+  // ── Dossiers ───────────────────────────────────────────────────────────────
+  const [folders, setFolders] = useState<QuoteFolder[]>([]);
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  const [moveQuote, setMoveQuote] = useState<Quote | null>(null);
+  // useRef pour que les handlers de drop lisent toujours la valeur courante
+  const dragItemRef = useRef<DragItem>(null);
+  const [dragItem, setDragItem] = useState<DragItem>(null);
+
+  const startDrag = useCallback((item: DragItem) => { dragItemRef.current = item; setDragItem(item); }, []);
+  const endDrag = useCallback(() => { dragItemRef.current = null; setDragItem(null); }, []);
+
+  // Dossier courant dans l'URL (?dossier=…) — survit au rafraîchissement et au retour arrière
+  useEffect(() => {
+    const read = () => setCurrentFolder(new URLSearchParams(window.location.search).get('dossier'));
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, []);
+
+  const navigateFolder = useCallback((id: string | null) => {
+    setCurrentFolder(id);
+    window.history.pushState({}, '', id ? `/devis?dossier=${id}` : '/devis');
+  }, []);
+
+  // Lien périmé (?dossier=… supprimé entre-temps) → retour à la racine
+  useEffect(() => {
+    if (loading || !currentFolder) return;
+    if (folders.some((f) => f.id === currentFolder)) return;
+    setCurrentFolder(null);
+    window.history.replaceState({}, '', '/devis');
+  }, [loading, folders, currentFolder]);
+
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
     Promise.all([
-      supabase.from('quotes')
-        .select('id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
-        .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
-        .order('created_at', { ascending: false }),
+      loadQuotes(supabase, user.id),
       supabase.from('devis_templates')
         .select('id, name, template, created_at, services, remarks, vat_rate, hide_price')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
-    ]).then(async ([quotesRes, tplRes]) => {
+      supabase.from('quote_folders')
+        .select('id, name, parent_id, color, icon, created_at')
+        .eq('owner_user_id', user.id)
+        .order('name', { ascending: true }),
+    ]).then(async ([quoteRows, tplRes, foldersRes]) => {
       try {
-        setQuotes(quotesRes.data ?? []);
+        setQuotes(quoteRows);
         setTemplates(tplRes.data ?? []);
+        // Table absente (migration lot E non appliquée) → liste vide, la page reste utilisable
+        setFolders((foldersRes.data ?? []) as unknown as QuoteFolder[]);
 
         // Prospects non liés à un devis
         const linkedProspectIds = new Set(
-          (quotesRes.data ?? []).map((q) => q.prospect_id).filter(Boolean)
+          quoteRows.map((q) => q.prospect_id).filter(Boolean)
         );
         const { data: tokenRows } = await supabase
           .from('user_prospect_tokens').select('token').eq('user_id', user.id);
@@ -842,6 +942,7 @@ export default function DevisPage() {
       event_date: new Date().toISOString().slice(0, 10),
       event_location: '',
       guest_count: 1,
+      folder_id: currentFolder, // créé dans le dossier ouvert
     };
 
     const res = await supabase.from('quotes').insert(payload).select('id').single();
@@ -851,7 +952,7 @@ export default function DevisPage() {
     }
     setCreatingFromTpl(null);
     if (res.data) router.push(`/devis/${res.data.id}/modifier?mode=weboword`);
-  }, [user, router]);
+  }, [user, router, currentFolder]);
 
   const deleteTemplate = useCallback(async (id: string) => {
     if (!confirm('Supprimer ce modèle ?')) return;
@@ -910,7 +1011,7 @@ export default function DevisPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from('quotes')
-      .select('services, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, remarks, vat_rate, hide_price, template, images, content_html, selected_font, selected_font_size, client_name, client_first_name, client_last_name, client_email, client_phone, client_address, client_type, company_name, contact_person_name, customer_id')
+      .select('services, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, remarks, vat_rate, hide_price, template, images, content_html, selected_font, selected_font_size, client_name, client_first_name, client_last_name, client_email, client_phone, client_address, client_type, company_name, contact_person_name, customer_id, folder_id')
       .eq('id', dupModal.quoteId)
       .single();
     if (!data) { setDupModal((m) => ({ ...m, saving: false })); return; }
@@ -962,6 +1063,7 @@ export default function DevisPage() {
       vat_rate: data.vat_rate ?? 20,
       hide_price: data.hide_price ?? false,
       images: data.images || [],
+      folder_id: data.folder_id ?? null, // la copie reste dans le dossier de l'original
     };
     const res = await supabase.from('quotes').insert(dupPayload).select('id').single();
     if (res.error) {
@@ -978,7 +1080,92 @@ export default function DevisPage() {
     }
   }, [dupModal.quoteId, dupModal.templateName, user, router]);
 
+  // ── Actions sur les dossiers ───────────────────────────────────────────────
+  const createFolder = useCallback(async ({ name, color, icon, parentId }: { name: string; color: string; icon: string; parentId: string | null }) => {
+    if (!user) return;
+    const { data, error } = await createClient()
+      .from('quote_folders')
+      .insert({ owner_user_id: user.id, name, color, icon, parent_id: parentId })
+      .select('id, name, parent_id, color, icon, created_at')
+      .single();
+    if (error) { alert('Impossible de créer le dossier : ' + error.message); return; }
+    if (data) setFolders((prev) => [...prev, data as QuoteFolder]);
+  }, [user]);
+
+  const updateFolder = useCallback(async (id: string, patch: { name: string; color: string; icon: string }) => {
+    const { error } = await createClient().from('quote_folders').update(patch).eq('id', id);
+    if (error) { alert('Impossible de modifier le dossier : ' + error.message); return; }
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }, []);
+
+  /** Supprime un dossier SANS supprimer son contenu : devis et sous-dossiers remontent au parent. */
+  const deleteFolder = useCallback(async (id: string) => {
+    const supabase = createClient();
+    const parentId = folders.find((f) => f.id === id)?.parent_id ?? null;
+    const [subRes, quoteRes] = await Promise.all([
+      supabase.from('quote_folders').update({ parent_id: parentId }).eq('parent_id', id),
+      supabase.from('quotes').update({ folder_id: parentId }).eq('folder_id', id),
+    ]);
+    if (subRes.error || quoteRes.error) {
+      alert('Impossible de vider le dossier : ' + (subRes.error?.message || quoteRes.error?.message));
+      return;
+    }
+    const { error } = await supabase.from('quote_folders').delete().eq('id', id);
+    if (error) { alert('Impossible de supprimer le dossier : ' + error.message); return; }
+    setFolders((prev) => prev.filter((f) => f.id !== id).map((f) => (f.parent_id === id ? { ...f, parent_id: parentId } : f)));
+    setQuotes((prev) => prev.map((q) => (q.folder_id === id ? { ...q, folder_id: parentId } : q)));
+    if (currentFolder === id) navigateFolder(parentId);
+  }, [folders, currentFolder, navigateFolder]);
+
+  const moveQuoteToFolder = useCallback(async (quoteId: string, folderId: string | null) => {
+    const previous = quotes.find((q) => q.id === quoteId)?.folder_id ?? null;
+    if (previous === folderId) return;
+    setQuotes((prev) => prev.map((q) => (q.id === quoteId ? { ...q, folder_id: folderId } : q)));
+    setSheetQuote((prev) => (prev && prev.id === quoteId ? { ...prev, folder_id: folderId } : prev));
+    const { error } = await createClient().from('quotes').update({ folder_id: folderId }).eq('id', quoteId);
+    if (error) {
+      setQuotes((prev) => prev.map((q) => (q.id === quoteId ? { ...q, folder_id: previous } : q)));
+      alert('Impossible de déplacer le devis : ' + error.message);
+    }
+  }, [quotes]);
+
+  const moveFolderTo = useCallback(async (folderId: string, targetId: string | null) => {
+    // Garde-fou : jamais dans soi-même ni dans sa propre descendance
+    if (targetId && descendantIds(folders, folderId).has(targetId)) return;
+    const previous = folders.find((f) => f.id === folderId)?.parent_id ?? null;
+    if (previous === targetId) return;
+    setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, parent_id: targetId } : f)));
+    const { error } = await createClient().from('quote_folders').update({ parent_id: targetId }).eq('id', folderId);
+    if (error) {
+      setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, parent_id: previous } : f)));
+      alert('Impossible de déplacer le dossier : ' + error.message);
+    }
+  }, [folders]);
+
+  const handleDropInto = useCallback((target: string | null) => {
+    const item = dragItemRef.current;
+    endDrag();
+    if (!item) return;
+    if (item.type === 'quote') moveQuoteToFolder(item.id, target);
+    else moveFolderTo(item.id, target);
+  }, [endDrag, moveQuoteToFolder, moveFolderTo]);
+
+  // ── Portée du dossier courant ──────────────────────────────────────────────
+  const searching = search.trim().length > 0;
+  const scopeIds = useMemo(() => descendantIds(folders, currentFolder), [folders, currentFolder]);
+  const folderCountMap = useMemo(() => folderCounts(folders, quotes.map((q) => q.folder_id)), [folders, quotes]);
+  /** La recherche est volontairement globale : elle traverse tous les dossiers. */
+  const inFolderScope = useCallback(
+    (q: Quote) => searching || !currentFolder || (q.folder_id ? scopeIds.has(q.folder_id) : false),
+    [searching, currentFolder, scopeIds],
+  );
+  const folderLabelOf = useCallback(
+    (q: Quote) => folderPathLabel(folders, q.folder_id ?? null),
+    [folders],
+  );
+
   const filtered = quotes.filter((q) => {
+    if (!inFolderScope(q)) return false;
     const q4 = search.toLowerCase();
     const haystack = [
       q.client_name, q.client_first_name, q.client_last_name,
@@ -1004,6 +1191,7 @@ export default function DevisPage() {
 
   // ── Sections de la vue grille (inclut les refusés, rangés dans leur section) ──
   const secMatch = (q: Quote) => {
+    if (!inFolderScope(q)) return false;
     const hay = [q.client_name, q.client_first_name, q.client_last_name, q.client_email, q.event_type]
       .filter(Boolean).join(' ').toLowerCase();
     const okSearch = !search || hay.includes(search.toLowerCase());
@@ -1015,7 +1203,10 @@ export default function DevisPage() {
   const secConfirmes = secSorted.filter((q) => (CONFIRMED_STATUSES as string[]).includes(q.status));
   const secRefuses   = secSorted.filter((q) => (REJECTED_STATUSES as string[]).includes(q.status));
 
-  const gridProspects = prospects.filter((p) => {
+  // Les prospects ne sont pas rangeables en dossier : on ne les montre qu'à la racine
+  const scopedProspects = currentFolder && !searching ? [] : prospects;
+
+  const gridProspects = scopedProspects.filter((p) => {
     const okStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
     const okSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(search.toLowerCase());
     return okStatus && okSearch;
@@ -1058,7 +1249,8 @@ export default function DevisPage() {
             <UploadCloud className="h-4 w-4" />
             <span className="hidden sm:inline">Importer</span>
           </button>
-          <Link href="/devis/nouveau"
+          <Link href={currentFolder ? `/devis/nouveau?dossier=${currentFolder}` : '/devis/nouveau'}
+            title={currentFolder ? 'Le devis sera créé dans le dossier ouvert' : undefined}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors">
             <Plus className="h-4 w-4" />Nouveau
           </Link>
@@ -1154,6 +1346,30 @@ export default function DevisPage() {
         </div>
       )}
 
+      {/* ── Dossiers ───────────────────────────────────────────────────── */}
+      {!loading && <FolderBar
+        folders={folders}
+        currentId={currentFolder}
+        counts={folderCountMap}
+        totalCount={quotes.length}
+        dragItem={dragItem}
+        onNavigate={navigateFolder}
+        onCreate={createFolder}
+        onUpdate={updateFolder}
+        onDelete={deleteFolder}
+        onDropInto={handleDropInto}
+        onDragStart={startDrag}
+        onDragEnd={endDrag}
+      />}
+
+      {/* La recherche traverse tous les dossiers : on le dit clairement */}
+      {searching && currentFolder && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          <Search className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>La recherche porte sur <strong>tous les dossiers</strong>, pas seulement le dossier ouvert.</span>
+        </div>
+      )}
+
       {/* Search + filter */}
       {view !== 'pipeline' && (
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -1199,9 +1415,17 @@ export default function DevisPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
       ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4"><CalendarDays className="h-8 w-8 text-gray-400" /></div>
-          <p className="text-gray-500 font-medium mb-1">Aucun devis trouvé</p>
-          <p className="text-sm text-gray-400 mb-4">{search ? 'Essayez avec d\'autres termes.' : 'Créez votre premier devis pour commencer.'}</p>
+          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+            {currentFolder && !search ? <Folder className="h-8 w-8 text-gray-400" /> : <CalendarDays className="h-8 w-8 text-gray-400" />}
+          </div>
+          <p className="text-gray-500 font-medium mb-1">{currentFolder && !search ? 'Ce dossier est vide' : 'Aucun devis trouvé'}</p>
+          <p className="text-sm text-gray-400 mb-4">
+            {search
+              ? 'Essayez avec d\'autres termes.'
+              : currentFolder
+                ? 'Glissez-y des devis depuis « Mes devis », ou utilisez « Déplacer vers… ».'
+                : 'Créez votre premier devis pour commencer.'}
+          </p>
           {!search && <Link href="/devis/nouveau" className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"><Plus className="h-4 w-4" />Créer un devis</Link>}
         </div>
       ) : view === 'grid' ? (
@@ -1216,19 +1440,19 @@ export default function DevisPage() {
 
           <AccordionSection title="Devis en cours" count={secEncours.length} tone="purple" open={sec.encours} onToggle={() => toggleSec('encours')}>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {secEncours.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+              {secEncours.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
             </div>
           </AccordionSection>
 
           <AccordionSection title="Confirmés / Événements" count={secConfirmes.length} tone="emerald" open={sec.confirmes} onToggle={() => toggleSec('confirmes')}>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {secConfirmes.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+              {secConfirmes.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
             </div>
           </AccordionSection>
 
           <AccordionSection title="Archivés / Refusés" count={secRefuses.length} tone="gray" open={sec.refuses} onToggle={() => toggleSec('refuses')}>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {secRefuses.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} />)}
+              {secRefuses.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
             </div>
           </AccordionSection>
         </div>
@@ -1236,7 +1460,7 @@ export default function DevisPage() {
         <>
           {(() => {
             const q4 = search.toLowerCase();
-            const visibleProspects = prospects.filter((p) => {
+            const visibleProspects = scopedProspects.filter((p) => {
               const matchStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
               const matchSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(q4);
               return matchStatus && matchSearch;
@@ -1252,19 +1476,32 @@ export default function DevisPage() {
               </div>
             ) : null;
           })()}
-          <TableView quotes={sorted} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+          <TableView quotes={sorted} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate}
+            onMove={(q) => setMoveQuote(q)} onDragStart={startDrag} onDragEnd={endDrag} folderLabelOf={folderLabelOf} />
         </>
       ) : (
-        <PipelineView quotes={filtered} prospects={prospects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} />
+        <PipelineView quotes={filtered} prospects={scopedProspects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} onMove={(q) => setMoveQuote(q)} />
       )}
 
       {sheetQuote && (
         <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked}
+          folderLabel={folderLabelOf(sheetQuote)}
+          onMoveFolder={() => setMoveQuote(sheetQuote)}
           onRenamed={(id, name) => {
             setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, internal_name: name } : q));
             setSheetQuote((prev) => prev && prev.id === id ? { ...prev, internal_name: name } : prev);
           }} />
       )}
+
+      {/* ── Déplacer un devis vers un dossier ─────────────────────────── */}
+      <MoveToFolderModal
+        open={moveQuote !== null}
+        folders={folders}
+        currentFolderId={moveQuote?.folder_id ?? null}
+        quoteName={moveQuote ? quoteDisplayName(moveQuote) : ''}
+        onClose={() => setMoveQuote(null)}
+        onMove={(folderId) => { if (moveQuote) return moveQuoteToFolder(moveQuote.id, folderId); }}
+      />
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}
       {/* ── Template preview sheet ─────────────────────────────────────── */}
@@ -1279,16 +1516,12 @@ export default function DevisPage() {
       <ImportDevisModal
         open={importModal || editImportId !== null}
         editQuoteId={editImportId}
+        folderId={currentFolder}
         onClose={() => { setImportModal(false); setEditImportId(null); }}
         onCreated={() => {
           // Reload quotes
           if (!user) return;
-          createClient()
-            .from('quotes')
-            .select('id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email')
-            .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
-            .order('created_at', { ascending: false })
-            .then(({ data }) => { if (data) setQuotes(data); });
+          loadQuotes(createClient(), user.id).then(setQuotes);
         }}
       />
 
