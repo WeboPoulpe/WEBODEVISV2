@@ -85,6 +85,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   // Ids des prestations présentes au chargement → permet de détecter les AJOUTS
   // (pour n'ajouter que leur bloc texte à la fin de la carte gastronomique).
   const initialServiceIds = useRef<Set<string>>(new Set());
+  // Empreinte des champs qui alimentent les cartes Client / Événement du document.
+  const initialParties = useRef<string>('');
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -241,6 +243,15 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           initialServiceIds.current = new Set(
             loadedServices.map((s: Service) => s.id as string | undefined).filter(Boolean) as string[],
           );
+          initialParties.current = JSON.stringify({
+            clientName: loadedClientName, clientEmail: loadedClientEmail, clientPhone: loadedClientPhone,
+            clientAddress: loadedClientAddress, clientType: loadedClientType, clientSiret: loadedClientSiret,
+            contactName: loadedContactPersonName, contactRole: loadedRecipientContactRole,
+            contactEmail: loadedRecipientContactEmail, contactPhone: loadedRecipientContactPhone,
+            eventType: loadedEventType, eventDate: loadedEventDate, eventLocation: loadedEventLocation,
+            guestCount: loadedGuestCount, guestAdults: loadedGuestAdults, guestChildren: loadedGuestChildren,
+            language: loadedLanguage,
+          });
         }
         setLoading(false);
       });
@@ -368,7 +379,19 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const currentFin = JSON.stringify({
       services, guestCount, guestAdults, guestChildren, vatRate, hidePrice, template, language,
     });
-    if (currentFin !== initialFinancials.current) {
+    // Idem pour les cartes Client / Événement (même ordre de clés qu'au chargement).
+    const currentParties = JSON.stringify({
+      clientName, clientEmail, clientPhone, clientAddress, clientType, clientSiret,
+      contactName: recipientContactName, contactRole: recipientContactRole,
+      contactEmail: recipientContactEmail, contactPhone: recipientContactPhone,
+      eventType, eventDate, eventLocation, guestCount, guestAdults, guestChildren, language,
+    });
+    const finChanged = currentFin !== initialFinancials.current;
+    // Valider depuis le panneau Client ou Événement resynchronise toujours les cartes :
+    // rattrape aussi les devis dont la base a déjà les bonnes valeurs mais pas le document.
+    const partiesChanged = currentParties !== initialParties.current
+      || activePanel === 'client' || activePanel === 'event';
+    if (finChanged || partiesChanged) {
       const { data: cur } = await supabase.from('quotes')
         .select('content_html, selected_font').eq('id', quoteId).maybeSingle();
       if (cur?.content_html) {
@@ -394,7 +417,19 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           {
             all: {
               companyName: '',
-              clientName: '',
+              clientName: clientName.trim(),
+              clientEmail: clientEmail || null,
+              clientPhone: clientPhone || null,
+              clientAddress: clientAddress || null,
+              clientType,
+              clientSiret: clientSiret || null,
+              contactName: recipientContactName || null,
+              contactRole: recipientContactRole || null,
+              contactEmail: recipientContactEmail || null,
+              contactPhone: recipientContactPhone || null,
+              eventType: eventType || null,
+              eventDate: eventDate || null,
+              eventLocation: eventLocation || null,
               guestCount: parseInt(guestCount) || null,
               guestCountAdults: parseInt(guestAdults) || null,
               guestCountChildren: parseInt(guestChildren) || null,
@@ -404,6 +439,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
               language,
             },
             added: addedServices,
+            financials: finChanged,
+            // Répercute client / événement dans le document (cartes + intro/en-tête si non retouchés).
+            parties: partiesChanged,
           },
           { template, font: (cur.selected_font as string | null) ?? undefined },
         );

@@ -176,6 +176,19 @@ const T = {
   },
 };
 
+/**
+ * Fragments FIXES (hors données) de l'intro et du titre de carte, tels que produits
+ * par le générateur. Sert à reconnaître un texte encore « tel que généré » — donc
+ * remplaçable sans risque — d'un texte réécrit à la main par le traiteur.
+ */
+export function generatedTextFragments(lang: 'fr' | 'en' = 'fr'): { intro: string[]; menuTitle: string[] } {
+  const S = ''; // sentinelle à la place des données
+  const t = T[lang];
+  const chunks = (s: string) =>
+    s.replace(/<br\s*\/?>/gi, '').split(S).map((c) => c.replace(/\s+/g, ' ').trim()).filter((c) => c.length > 3);
+  return { intro: chunks(t.intro(S, S, S, S)), menuTitle: chunks(t.menuTitle(S)) };
+}
+
 export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
   const lang: 'fr' | 'en' = d.language === 'en' ? 'en' : 'fr';
   const t = T[lang];
@@ -310,9 +323,9 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     </div>
   </div>
 
-  <!-- ── Client + Événement ── -->
+  <!-- ── Client + Événement — remplaçables via [data-webo-client] / [data-webo-event] ── -->
   <div style="display:flex;gap:14px;margin-top:18px;margin-bottom:16px;">
-    <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
+    <div data-webo-client="1" style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.client}</p>
       <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${
         (d.clientType === 'entreprise' && d.clientCompanyName) ? d.clientCompanyName : (d.clientName || t.aCompleter)
@@ -323,7 +336,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       ${(d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone) ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone}</p>` : ''}
       ${d.clientAddress ? `<p style="color:#555;margin:0;font-size:11px;">${d.clientAddress}</p>` : ''}
     </div>
-    <div style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
+    <div data-webo-event="1" style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
       <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${eventTypeT || t.aPreciser}</p>
       ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">📅 ${dateFr(d.eventDate)}</p>` : ''}
@@ -334,8 +347,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     </div>
   </div>
 
-  <!-- ── Intro ── -->
-  <div style="margin-bottom:16px;padding:11px 14px;border-left:4px solid ${accentColor};background:#fafafa;border-radius:0 5px 5px 0;">
+  <!-- ── Intro — [data-webo-intro] : mise à jour seulement si non retouchée à la main ── -->
+  <div data-webo-intro="1" style="margin-bottom:16px;padding:11px 14px;border-left:4px solid ${accentColor};background:#fafafa;border-radius:0 5px 5px 0;">
     <p style="margin:0;font-style:italic;color:#555;font-size:12px;">
       ${t.intro(d.clientName || '', eventTypeT, d.eventDate ? dateFr(d.eventDate) : '', d.eventLocation || '')}
     </p>
