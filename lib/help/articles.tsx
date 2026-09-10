@@ -5,6 +5,9 @@ import {
   ChevronDown, Bell, ArrowRight, Eye, Wallet, Heart,
   LayoutDashboard, UserCheck, ShoppingBasket, Carrot, Truck, FolderTree,
   LayoutTemplate, Wrench, Building2, Shield, CalendarDays, Users2,
+  FolderInput, Folder, Image as ImageIcon, Palette, User, Package as PackageIcon,
+  CheckSquare, ShoppingCart, UtensilsCrossed, TrendingUp, TrendingDown, UploadCloud,
+  Columns3, LayoutGrid, List, Library, FileSpreadsheet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -29,7 +32,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   { id: 'devis',      label: 'Devis',               icon: FileText,      gradient: 'from-violet-500 to-indigo-600' },
   { id: 'clients',    label: 'Clients & Prospects', icon: Users,         gradient: 'from-blue-500 to-cyan-600' },
   { id: 'evenements', label: 'Événements',          icon: CalendarRange, gradient: 'from-emerald-500 to-teal-600' },
-  { id: 'stock',      label: 'Stock & Ingrédients', icon: Boxes,         gradient: 'from-amber-500 to-orange-600' },
+  { id: 'stock',      label: 'Stock & achats', icon: Boxes,         gradient: 'from-amber-500 to-orange-600' },
   { id: 'catalogue',  label: 'Catalogue',           icon: Package,       gradient: 'from-rose-500 to-pink-600' },
   { id: 'compte',     label: 'Compte & Paramètres', icon: Settings,      gradient: 'from-slate-500 to-gray-600' },
 ];
@@ -134,14 +137,6 @@ const Bullets = ({ items }: { items: React.ReactNode[] }) => (
   <ul className="text-sm text-gray-700 space-y-1.5 pl-5 list-disc marker:text-[#9c27b0]">
     {items.map((it, i) => <li key={i}>{it}</li>)}
   </ul>
-);
-
-const Stat = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
-  <div className="flex flex-col items-center justify-center gap-1 p-3 bg-white border border-gray-200 rounded-lg">
-    <span className="text-xl">{icon}</span>
-    <span className="text-base font-bold text-gray-900">{value}</span>
-    <span className="text-[10px] uppercase tracking-wider text-gray-500">{label}</span>
-  </div>
 );
 
 const StatusPill = ({ color, label }: { color: 'gray' | 'amber' | 'blue' | 'green' | 'red'; label: string }) => {
@@ -274,27 +269,16 @@ const GoTo = ({ href, label = 'Aller à cette page' }: { href: string; label?: s
   </Link>
 );
 
-/** Annotates an element with a numbered callout (visual pointer) */
-const Pointer = ({ n, label, children }: { n: number; label: string; children: React.ReactNode }) => (
-  <div className="flex items-start gap-3">
-    <div className="flex-shrink-0">{children}</div>
-    <div className="flex items-start gap-2 pt-1">
-      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{n}</span>
-      <p className="text-xs text-gray-700 leading-snug">{label}</p>
-    </div>
-  </div>
-);
-
 /** Quote card mockup — fidèle à la vraie carte de la page Devis */
 const QuoteCardMockup = ({ name, eventType = 'Mariage', status, amount, date, guests = 100, highlightAction }: {
   name: string;
   eventType?: string;
-  status: { color: 'gray'|'amber'|'blue'|'green'|'red'; label: string };
+  status: string;
   amount: string;
   date: string;
   guests?: number;
   /** Optionally pulse one action button to indicate "click here" */
-  highlightAction?: 'apercu' | 'pdf' | 'duplicate' | 'finance' | 'weboword' | 'delete';
+  highlightAction?: 'apercu' | 'pdf' | 'duplicate' | 'finance' | 'move' | 'weboword' | 'delete';
 }) => (
   <div className="bg-white border border-gray-200 rounded-2xl p-4 max-w-sm">
     {/* Header: icon + name + event type */}
@@ -317,7 +301,7 @@ const QuoteCardMockup = ({ name, eventType = 'Mariage', status, amount, date, gu
     {/* Amount + status */}
     <div className="pt-3 border-t border-gray-100 flex items-center justify-between mb-2.5">
       <p className="font-bold text-gray-900 text-sm">{amount}<span className="text-[10px] font-normal text-gray-400 ml-1">TTC</span></p>
-      <StatusPill color={status.color} label={status.label} />
+      <QS k={status} />
     </div>
 
     {/* Action row : Aperçu + 5 icônes */}
@@ -328,32 +312,95 @@ const QuoteCardMockup = ({ name, eventType = 'Mariage', status, amount, date, gu
       <div className={`p-1.5 text-gray-400 ${highlightAction === 'pdf' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse' : ''}`}><Printer className="h-3 w-3" /></div>
       <div className={`p-1.5 text-gray-400 ${highlightAction === 'duplicate' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-[#9c27b0]' : ''}`}><Copy className="h-3 w-3" /></div>
       <div className={`p-1.5 text-gray-400 ${highlightAction === 'finance' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-emerald-600' : ''}`}><Wallet className="h-3 w-3" /></div>
+      <div className={`p-1.5 text-gray-400 ${highlightAction === 'move' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-[#9c27b0]' : ''}`}><FolderInput className="h-3 w-3" /></div>
       <div className={`p-1.5 text-[#9c27b0]/50 ${highlightAction === 'weboword' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-[#9c27b0]' : ''}`}><LayoutTemplate className="h-3 w-3" /></div>
       <div className={`p-1.5 text-gray-300 ${highlightAction === 'delete' ? 'ring-2 ring-rose-400 ring-offset-1 rounded-lg animate-pulse text-rose-500' : ''}`}><Trash2 className="h-3 w-3" /></div>
     </div>
   </div>
 );
 
-/** Légende des 6 actions disponibles sur une carte devis */
+/** Légende des actions disponibles sur une carte devis */
 const QuoteCardActionsLegend = () => (
   <div className="grid grid-cols-2 gap-2 text-xs">
-    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"><Eye className="h-3.5 w-3.5 text-gray-500" /> <span><strong>Aperçu</strong> — sheet latérale</span></div>
-    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"><Printer className="h-3.5 w-3.5 text-gray-500" /> <span><strong>PDF</strong> — imprimer</span></div>
+    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"><Eye className="h-3.5 w-3.5 text-gray-500" /> <span><strong>Aperçu</strong> — fiche latérale</span></div>
+    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"><Printer className="h-3.5 w-3.5 text-gray-500" /> <span><strong>Imprimer / PDF</strong></span></div>
     <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><Copy className="h-3.5 w-3.5 text-[#9c27b0]" /> <span><strong>Dupliquer</strong></span></div>
-    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg"><Wallet className="h-3.5 w-3.5 text-emerald-600" /> <span><strong>Finance</strong></span></div>
+    <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg"><Wallet className="h-3.5 w-3.5 text-emerald-600" /> <span><strong>Gestion financière</strong></span></div>
+    <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><FolderInput className="h-3.5 w-3.5 text-[#9c27b0]" /> <span><strong>Déplacer</strong> vers un dossier</span></div>
     <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg"><LayoutTemplate className="h-3.5 w-3.5 text-[#9c27b0]" /> <span><strong>WeboWord</strong> — éditer</span></div>
-    <div className="flex items-center gap-2 p-2 bg-rose-50 rounded-lg"><Trash2 className="h-3.5 w-3.5 text-rose-500" /> <span><strong>Supprimer</strong> (brouillons)</span></div>
+    <div className="flex items-center gap-2 p-2 bg-rose-50 rounded-lg"><Trash2 className="h-3.5 w-3.5 text-rose-500" /> <span><strong>Supprimer</strong> — devis non engagés</span></div>
   </div>
 );
 
-/** WeboWord editor sidebar mockup (the 5 panels) */
-const WeboSidebarMockup = ({ activePanel }: { activePanel?: 'client' | 'services' | 'event' | 'style' | 'images' }) => {
+/** Les 12 statuts réels d'un devis (mêmes libellés et couleurs que la page Devis). */
+const QUOTE_STATUSES: { key: string; label: string; badge: string; dot: string; group: 'cours' | 'confirme' | 'refus' }[] = [
+  { key: 'nouveau',         label: 'Nouveau',          badge: 'bg-sky-50 text-sky-700',         dot: 'bg-sky-400',     group: 'cours'    },
+  { key: 'broch_envoyee',   label: 'Brochure envoyée', badge: 'bg-slate-100 text-slate-600',    dot: 'bg-slate-400',   group: 'cours'    },
+  { key: 'devis_a_faire',   label: 'Devis à faire',    badge: 'bg-yellow-50 text-yellow-700',   dot: 'bg-yellow-400',  group: 'cours'    },
+  { key: 'devis_envoye',    label: 'Devis envoyé',     badge: 'bg-amber-50 text-amber-700',     dot: 'bg-amber-400',   group: 'cours'    },
+  { key: 'rdv_deg_a_venir', label: 'RDV/Dég à venir',  badge: 'bg-violet-50 text-violet-700',   dot: 'bg-violet-400',  group: 'cours'    },
+  { key: 'rdv_deg_fait',    label: 'RDV/Dég fait',     badge: 'bg-purple-50 text-purple-700',   dot: 'bg-purple-400',  group: 'cours'    },
+  { key: 'devis_final',     label: 'Devis final',      badge: 'bg-orange-50 text-orange-700',   dot: 'bg-orange-400',  group: 'cours'    },
+  { key: 'valide',          label: 'Validé',           badge: 'bg-teal-50 text-teal-700',       dot: 'bg-teal-400',    group: 'confirme' },
+  { key: 'acompte',         label: 'Acompte reçu',     badge: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-400', group: 'confirme' },
+  { key: 'paye',            label: 'Payé',             badge: 'bg-green-50 text-green-700',     dot: 'bg-green-500',   group: 'confirme' },
+  { key: 'refus_client',    label: 'Refus client',     badge: 'bg-red-50 text-red-600',         dot: 'bg-red-300',     group: 'refus'    },
+  { key: 'refus_traiteur',  label: 'Refus traiteur',   badge: 'bg-rose-50 text-rose-700',       dot: 'bg-rose-400',    group: 'refus'    },
+];
+
+/** Pastille de statut identique à celle de la page Devis. */
+const QS = ({ k }: { k: string }) => {
+  const st = QUOTE_STATUSES.find((x) => x.key === k) ?? QUOTE_STATUSES[0];
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${st.badge} mx-0.5 align-middle`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}
+    </span>
+  );
+};
+
+/** Récapitulatif des statuts d'un groupe, avec leur signification. */
+const StatusTable = ({ group, rows }: { group: 'cours' | 'confirme' | 'refus'; rows: Record<string, string> }) => (
+  <div className="space-y-1.5">
+    {QUOTE_STATUSES.filter((s) => s.group === group).map((s) => (
+      <div key={s.key} className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
+        <span className="flex-shrink-0"><QS k={s.key} /></span>
+        <p className="text-xs text-gray-600 flex-1 pt-0.5">{rows[s.key]}</p>
+      </div>
+    ))}
+  </div>
+);
+
+/** Tuile de dossier de devis, telle qu'elle apparaît au-dessus de la liste. */
+const FolderTile = ({ name, count, sub, color = 'purple' }: { name: string; count: number; sub?: number; color?: 'purple' | 'blue' | 'emerald' | 'amber' }) => {
+  const tones: Record<string, string> = {
+    purple:  'bg-[#faf5ff] border-[#e9d5ff] text-[#9c27b0]',
+    blue:    'bg-sky-50/60 border-sky-200 text-sky-600',
+    emerald: 'bg-emerald-50/60 border-emerald-200 text-emerald-600',
+    amber:   'bg-amber-50/60 border-amber-200 text-amber-600',
+  };
+  return (
+    <div className={`flex items-center gap-2.5 p-3 rounded-xl border ${tones[color]}`}>
+      <span className="w-9 h-9 rounded-xl bg-white/70 flex items-center justify-center flex-shrink-0">
+        <Folder className="h-[18px] w-[18px]" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
+        <p className="text-[11px] text-gray-400">{count} devis{sub ? ` · ${sub} sous-dossier${sub > 1 ? 's' : ''}` : ''}</p>
+      </div>
+    </div>
+  );
+};
+
+/** WeboWord editor sidebar mockup — les 7 panneaux réels de l'éditeur */
+const WeboSidebarMockup = ({ activePanel }: { activePanel?: 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos' }) => {
   const items = [
-    { key: 'client',   icon: Users,         label: 'Client' },
-    { key: 'services', icon: Package,       label: 'Prestations' },
+    { key: 'client',   icon: User,          label: 'Client' },
+    { key: 'services', icon: PackageIcon,   label: 'Prestations' },
     { key: 'event',    icon: CalendarDays,  label: 'Événement' },
-    { key: 'style',    icon: Settings,      label: 'Style' },
-    { key: 'images',   icon: FileText,      label: 'Images' },
+    { key: 'style',    icon: Palette,       label: 'Style' },
+    { key: 'images',   icon: ImageIcon,     label: 'Images' },
+    { key: 'cover',    icon: LayoutTemplate, label: 'Page de garde' },
+    { key: 'photos',   icon: ImageIcon,     label: 'Page photos' },
   ];
   return (
     <SidebarMockup
@@ -364,6 +411,10 @@ const WeboSidebarMockup = ({ activePanel }: { activePanel?: 'client' | 'services
 };
 
 // ── Articles ────────────────────────────────────────────────────────────────
+// ⚠️ Cette aide décrit le logiciel TEL QU'IL EST. Avant d'ajouter ou de modifier
+//    un article, vérifie le comportement dans le code (pages app/(app)/…) plutôt
+//    que de décrire une intention : une aide qui décrit des boutons inexistants
+//    fait perdre confiance dans tout le reste.
 export const HELP_ARTICLES: HelpArticle[] = [
   // ════════════════════════════════════════════════════════════════════════
   // DÉMARRER
@@ -372,22 +423,21 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'tour-app',
     category: 'demarrer',
     title: 'Visite guidée de WeboDevis',
-    description: 'Comprendre l\'organisation de l\'app en 5 minutes',
+    description: "Comprendre l'organisation de l'app en 5 minutes",
     keywords: ['début', 'sidebar', 'navigation', 'menu', 'tour', 'organisation'],
     body: (
       <div className="space-y-4">
-        <Lead>WeboDevis est ton poste de pilotage métier : devis, clients, événements, stock et catalogue, dans une seule interface.</Lead>
+        <Lead>WeboDevis couvre toute ta chaîne : prospection, devis, événement, courses, stock et achats. Tout est rangé dans 5 groupes de la barre latérale.</Lead>
 
-        <Section icon="🗺️" title="Les 5 grandes sections de la sidebar">
-          <P>Voici à quoi ressemblent les sections principales (à gauche dans l'app) :</P>
+        <Section icon="🗺️" title="Les 5 groupes de la sidebar">
           <div className="grid grid-cols-2 gap-3">
             <SidebarMockup
               sectionLabel="Commerce"
               items={[
                 { icon: LayoutDashboard, label: 'Tableau de bord' },
-                { icon: FileText,        label: 'Devis', badge: 2 },
+                { icon: FileText,        label: 'Devis', badge: 4 },
                 { icon: Users,           label: 'Clients' },
-                { icon: UserCheck,       label: 'Prospects', badge: 9 },
+                { icon: UserCheck,       label: 'Prospects', badge: 2 },
               ]}
             />
             <SidebarMockup
@@ -400,40 +450,46 @@ export const HELP_ARTICLES: HelpArticle[] = [
             />
             <SidebarMockup
               sectionLabel="Stock"
-              items={[
-                { icon: Boxes, label: 'Stock', badge: 3 },
-              ]}
+              items={[{ icon: Boxes, label: 'Stock', badge: 3 }]}
             />
             <SidebarMockup
               sectionLabel="Catalogue ▼"
               items={[
                 { icon: Package,        label: 'Prestations' },
                 { icon: Carrot,         label: 'Ingrédients' },
+                { icon: Users2,         label: 'Extras' },
+                { icon: Boxes,          label: 'Location' },
+                { icon: ShoppingBasket, label: 'Courses globales' },
                 { icon: Truck,          label: 'Fournisseurs' },
               ]}
             />
           </div>
-          <P>La 5ᵉ section <strong>Paramètres</strong> contient catégories, profil entreprise, modèles de devis (et l'espace admin si tu y as accès).</P>
+          <P>Le 5ᵉ groupe <strong>Paramètres</strong> contient : Catégories, Profil entreprise, Modèles de devis, Templates location — et <strong>Espace admin</strong> si ton compte a ce rôle.</P>
+          <Note><strong>Catalogue</strong> et <strong>Paramètres</strong> sont des groupes dépliables : ils s&apos;ouvrent tout seuls quand tu es sur une de leurs pages.</Note>
         </Section>
 
-        <Section icon="🔔" title="Comprendre les badges de la sidebar">
+        <Section icon="🔔" title="Ce que veulent dire les badges">
           <Bullets items={[
-            <>Sur <strong>Devis</strong> : nombre de devis <StatusPill color="blue" label="Envoyé" /> en attente de réponse client.</>,
-            <>Sur <strong>Prospects</strong> : nombre de demandes <StatusPill color="blue" label="Nouveau" /> non traitées.</>,
-            <>Sur <strong>Stock</strong> : nombre d'ingrédients sous le seuil d'alerte (badge rouge).</>,
-            <>Point rouge sur <strong>Calendrier</strong> : un événement est prévu aujourd'hui.</>,
+            <>Sur <strong>Devis</strong> : le nombre de devis <strong>en cours</strong>, c&apos;est-à-dire dans un des 7 statuts de prospection (de <QS k="nouveau" /> à <QS k="devis_final" />).</>,
+            <>Sur <strong>Prospects</strong> : le nombre de demandes au statut <QS k="nouveau" /> pas encore traitées.</>,
+            <>Sur <strong>Stock</strong> : le nombre d&apos;ingrédients passés sous leur seuil d&apos;alerte.</>,
+            <>Point rouge sur <strong>Calendrier</strong> : un événement <strong>confirmé</strong> a lieu aujourd&apos;hui.</>,
           ]} />
         </Section>
 
-        <Section icon="⌨️" title="Raccourcis utiles">
+        <Section icon="📱" title="Sur mobile">
+          <P>La sidebar laisse place à une barre d&apos;onglets en bas de l&apos;écran : Accueil, Devis, Clients, Calendrier, Événements, Paramètres.</P>
+        </Section>
+
+        <Section icon="⌨️" title="Repères utiles">
           <Bullets items={[
-            <>Bouton <Code>?</Code> violet en bas à droite : ouvre ce centre d'aide à tout moment, peut être déplacé/redimensionné, reste ouvert quand tu changes de page.</>,
-            <>Bouton <RealBtn variant="ghost" label="Réduire" /> en bas de la sidebar : la rétrécit à 64px (icônes seules).</>,
-            <>Icône <Bell className="inline h-3.5 w-3.5 text-gray-600" /> dans le header : centralise toutes les notifications (stock bas, prospects, etc.).</>,
+            <>Bouton <Code>?</Code> violet en bas à droite : ouvre ce centre d&apos;aide. Il se déplace, se redimensionne, et reste ouvert quand tu changes de page.</>,
+            <>Bouton <RealBtn variant="ghost" label="Réduire" /> en bas de la sidebar : la rétrécit à 64 px (icônes seules).</>,
+            <>Icône <Bell className="inline h-3.5 w-3.5 text-gray-600" /> dans le header : centre de notifications.</>,
           ]} />
         </Section>
 
-        <Tip>Si tu débutes, commence par <strong>Compléter ton profil entreprise</strong>, puis <strong>Créer 2-3 prestations</strong>, enfin <strong>Faire ton premier devis</strong>. ↓</Tip>
+        <Tip>Ordre conseillé pour démarrer : <strong>1.</strong> profil entreprise → <strong>2.</strong> quelques prestations → <strong>3.</strong> ton premier devis.</Tip>
 
         <div className="flex flex-wrap gap-2">
           <GoTo href="/parametres" label="Profil entreprise" />
@@ -447,26 +503,25 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'premier-devis',
     category: 'demarrer',
     title: 'Créer mon premier devis (parcours complet)',
-    description: 'De zéro à un devis envoyé en moins de 5 minutes',
+    description: 'De la page vide au PDF imprimé',
     keywords: ['premier', 'commencer', 'starter', 'tutoriel', 'guide'],
     body: (
       <div className="space-y-4">
-        <Lead>Voici le chemin recommandé pour ton tout premier devis. Suis dans l'ordre, ça prend 5 min max.</Lead>
+        <Lead>Le chemin complet, dans l&apos;ordre. Compte 10 minutes la première fois, 2 minutes les suivantes.</Lead>
 
-        <Section icon="📋" title="Pré-requis (5 min, une seule fois)">
-          <Step n={1} title="Compléter ton profil entreprise">
-            <P>Nom commercial, SIRET, adresse, téléphone, logo. Ces infos s'imprimeront en haut de tous tes devis.</P>
+        <Section icon="📋" title="À faire une seule fois">
+          <Step n={1} title="Compléter le profil entreprise">
+            <P>Nom de l&apos;entreprise, adresse, téléphone, SIRET et logo. Ces informations s&apos;impriment en tête de tous tes devis.</P>
             <GoTo href="/parametres" label="Aller aux paramètres" />
           </Step>
-          <Step n={2} title="(Optionnel) Créer 2-3 prestations dans ton catalogue">
-            <P>Si tu veux pouvoir piocher dedans, sinon tu peux toujours créer des lignes libres directement dans le devis.</P>
+          <Step n={2} title="(Recommandé) Créer quelques prestations">
+            <P>Tu pourras piocher dedans par autocomplétion. Sans catalogue, tu peux quand même saisir des lignes libres dans le devis.</P>
             <GoTo href="/prestations" label="Aller aux prestations" />
           </Step>
         </Section>
 
-        <Section icon="✏️" title="Création du devis">
-          <Step n={1} title="Démarre depuis la page Devis">
-            <P>Dans le header de la page Devis, clique sur ce bouton :</P>
+        <Section icon="✏️" title="Créer le devis">
+          <Step n={1} title="Page Devis → Nouveau">
             <Frame title="Page Devis — header">
               <RealHeader
                 title="Mes devis"
@@ -476,61 +531,49 @@ export const HELP_ARTICLES: HelpArticle[] = [
             </Frame>
             <GoTo href="/devis" label="Aller à la page Devis" />
           </Step>
-
-          <Step n={2} title="Renseigne l'événement (onboarding 4 étapes)">
-            <P>Type (mariage, anniversaire, baptême, séminaire, autre), date, lieu, nombre de couverts (adultes + enfants).</P>
+          <Step n={2} title="Renseigner le client et l'événement">
+            <P>L&apos;écran de démarrage demande : le client (existant ou nouveau), le type d&apos;événement, la date, le lieu, le nombre de convives, le modèle de document et la langue.</P>
+            <Note>Un client saisi avec un email est enregistré dans ton carnet Clients au passage — pas de double saisie.</Note>
           </Step>
-
-          <Step n={3} title="Ajoute tes prestations">
-            <P>Une fois dans l'éditeur, ouvre le panneau <strong>Prestations</strong> dans la sidebar gauche :</P>
+          <Step n={3} title="Ajouter les prestations">
+            <P>Tu arrives directement dans l&apos;éditeur WeboWord. Ouvre le panneau <strong>Prestations</strong> :</P>
             <WeboSidebarMockup activePanel="services" />
-            <P>Tu y trouves deux options :</P>
-            <ul className="text-sm text-gray-700 space-y-1.5 pl-5 list-disc marker:text-[#9c27b0]">
-              <li><strong>Catalogue</strong> — autocomplete sur le nom (icône ⭐ pour tes prestations perso).</li>
-              <li>
-                <RealBtn icon={Plus} label="Ligne personnalisée" variant="secondary" /> — pour une prestation unique non répertoriée.
-              </li>
-            </ul>
-            <P>La TVA et le total TTC se calculent en bas, en temps réel.</P>
+            <Bullets items={[
+              <>Autocomplétion sur ton catalogue.</>,
+              <>Ou <RealBtn icon={Plus} label="Ligne personnalisée" variant="secondary" /> pour une ligne unique.</>,
+              <>Prix enfant, ligne offerte, ligne en option, saut de page : tout se règle sur la ligne.</>,
+            ]} />
           </Step>
-
-          <Step n={4} title="(Optionnel) Personnalise le visuel">
-            <P>Panneau <strong>Style</strong> (police, couleurs, taille), panneau <strong>Images</strong> (photos ambiance), panneau <strong>Événement</strong> (ajustements).</P>
+          <Step n={4} title="(Optionnel) Soigner le document">
+            <P>Panneaux <strong>Style</strong>, <strong>Images</strong>, <strong>Page de garde</strong> et <strong>Page photos</strong>.</P>
           </Step>
-
-          <Step n={5} title="Envoie au client">
-            <P>En bas à gauche dans la barre d'actions :</P>
-            <div className="flex gap-2 flex-wrap">
+          <Step n={5} title="Enregistrer, puis sortir le document">
+            <P>En bas de la barre latérale de l&apos;éditeur, bloc <strong>Actions</strong> :</P>
+            <div className="flex gap-2 flex-wrap p-3 bg-gradient-to-br from-purple-900/95 to-purple-950 rounded-lg">
               <RealBtn icon={Save} label="Enregistrer" variant="primary" />
               <RealBtn icon={Download} label="Enregistrer PDF" variant="secondary" />
               <RealBtn icon={Printer} label="Imprimer" variant="secondary" />
-              <RealBtn icon={Send} label="Envoyer" variant="success" />
             </div>
-            <Bullets items={[
-              <><strong>Lien sécurisé</strong> à transmettre par email/SMS — le client voit le devis dans son navigateur, peut accepter/refuser/poser une question.</>,
-              <><strong>PDF téléchargeable</strong> à joindre manuellement à un mail.</>,
-            ]} />
+            <Warning>Il n&apos;y a <strong>pas de sauvegarde automatique</strong> dans l&apos;éditeur : clique <strong>Enregistrer</strong> avant de quitter la page.</Warning>
           </Step>
         </Section>
 
-        <Note>Le devis est sauvegardé automatiquement à chaque modification — tu ne perds jamais ton travail, même si tu fermes l'onglet.</Note>
-
-        <Section icon="🎯" title="Après l'envoi">
-          <P>Tu retrouves ton devis sous cette forme dans la liste — la rangée du bas contient 6 actions :</P>
+        <Section icon="🎯" title="Après coup">
+          <P>Ton devis apparaît dans la liste sous cette forme :</P>
           <QuoteCardMockup
             name="M. et Mme MARTIN"
             eventType="Mariage"
-            status={{ color: 'blue', label: 'Envoyé' }}
+            status="devis_a_faire"
             amount="11 540 €"
             date="29 mai 2027"
           />
           <Bullets items={[
-            <>Quand le client accepte → passe en <StatusPill color="green" label="Accepté" />, devient un événement visible dans le calendrier.</>,
-            <>Tu peux dupliquer ce devis pour un client similaire avec l'icône <Copy className="inline h-3 w-3 text-[#9c27b0]" /> sur la carte.</>,
+            <>Le statut de départ est <QS k="devis_a_faire" />. Tu le fais avancer à la main au fil de ta relation client.</>,
+            <>Quand il passe en <QS k="valide" />, <QS k="acompte" /> ou <QS k="paye" />, il devient un événement de production (calendrier, courses, staffing).</>,
           ]} />
         </Section>
 
-        <Tip>Pour aller encore plus vite, sauvegarde ton devis comme <strong>modèle</strong> au moment de la duplication (case à cocher dans la modal). Tu pourras le réutiliser via le bandeau "Mes modèles" en haut de la page Devis.</Tip>
+        <Tip>Pour aller plus vite ensuite : duplique un devis existant, ou enregistre-le comme <strong>modèle</strong> réutilisable.</Tip>
       </div>
     ),
   },
@@ -542,28 +585,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ['barre', 'menu', 'collapse', 'badges'],
     body: (
       <div className="space-y-4">
-        <Lead>La sidebar s'adapte à ton usage : tu peux la rétrécir et plier les sections rarement utilisées.</Lead>
+        <Lead>La sidebar s&apos;adapte : tu peux la rétrécir et replier les groupes que tu utilises rarement.</Lead>
 
         <Section icon="📐" title="Réduire la sidebar">
-          <P>Bouton <Btn color="gray">Réduire</Btn> tout en bas. La sidebar passe de 240px à 64px : seules les icônes restent. Survole une icône pour voir le label.</P>
-          <P>Idéal sur les écrans étroits ou quand tu as une grosse table de devis ouverte.</P>
+          <P>Bouton <Btn color="gray">Réduire</Btn> tout en bas : elle passe de 240 px à 64 px, seules les icônes restent. Survole une icône pour voir son libellé.</P>
         </Section>
 
-        <Section icon="📁" title="Sections dépliables">
-          <P>Deux sections sont des dropdowns :</P>
-          <Bullets items={[
-            <><strong>Catalogue</strong> — prestations, ingrédients, extras, location, fournisseurs (utilisé surtout pour la maintenance du catalogue).</>,
-            <><strong>Paramètres</strong> — catégories, profil, modèles, espace admin (si applicable).</>,
-          ]} />
-          <P>Clique sur le titre d'une section pour la déplier/replier. Si tu navigues sur une page interne (ex : <Code>/prestations</Code>), la section s'ouvre automatiquement.</P>
+        <Section icon="📁" title="Groupes dépliables">
+          <P>Deux groupes se plient : <strong>Catalogue</strong> (prestations, ingrédients, extras, location, courses globales, fournisseurs) et <strong>Paramètres</strong> (catégories, profil, modèles, templates location).</P>
+          <P>Si tu navigues vers une page interne (ex. <Code>/prestations</Code>), le groupe s&apos;ouvre automatiquement.</P>
         </Section>
 
-        <Section icon="🔔" title="Comprendre les badges">
+        <Section icon="🔔" title="Les badges, en détail">
           <Bullets items={[
-            <><Btn>2</Btn> sur <strong>Devis</strong> : nombre de devis avec statut <StatusPill color="amber" label="Envoyé" /> en attente de réponse.</>,
-            <><Btn>9+</Btn> sur <strong>Prospects</strong> : prospects au statut <StatusPill color="blue" label="Nouveau" /> non encore traités.</>,
-            <><Btn color="red">3</Btn> sur <strong>Stock</strong> : ingrédients sous le seuil d'alerte.</>,
-            <>Point rouge sur <strong>Calendrier</strong> : un événement est prévu aujourd'hui.</>,
+            <><Btn>4</Btn> sur <strong>Devis</strong> — devis en cours de prospection : <QS k="nouveau" /> <QS k="broch_envoyee" /> <QS k="devis_a_faire" /> <QS k="devis_envoye" /> <QS k="rdv_deg_a_venir" /> <QS k="rdv_deg_fait" /> <QS k="devis_final" />.</>,
+            <><Btn>2</Btn> sur <strong>Prospects</strong> — demandes au statut <QS k="nouveau" />.</>,
+            <><Btn color="red">3</Btn> sur <strong>Stock</strong> — ingrédients sous le seuil d&apos;alerte.</>,
+            <>Point rouge sur <strong>Calendrier</strong> — un événement confirmé a lieu aujourd&apos;hui.</>,
           ]} />
         </Section>
       </div>
@@ -574,71 +612,347 @@ export const HELP_ARTICLES: HelpArticle[] = [
   // DEVIS
   // ════════════════════════════════════════════════════════════════════════
   {
-    id: 'creer-devis',
+    id: 'liste-devis',
     category: 'devis',
-    title: 'Créer un devis (toutes les options)',
-    description: 'Anatomie de l\'éditeur de devis et de ses 5 panneaux',
-    keywords: ['nouveau devis', 'créer', 'ajouter', 'éditeur'],
+    title: 'La page Devis : 3 vues, 4 sections',
+    description: 'Grille, tableau, pipeline, recherche, filtres et tri',
+    keywords: ['liste', 'vue', 'grille', 'tableau', 'pipeline', 'filtre', 'tri', 'recherche'],
     body: (
       <div className="space-y-4">
-        <Lead>L'éditeur de devis (mode WeboWord) est divisé en 5 panneaux dans la sidebar gauche.</Lead>
+        <Lead>Toute ta activité commerciale tient sur cette page. Trois façons de la regarder, selon ce que tu cherches.</Lead>
 
-        <Section icon="🚀" title="Démarrer un nouveau devis">
-          <P>Sur la page Devis, le bouton principal :</P>
-          <Frame title="Page Devis">
-            <RealHeader
-              title="Mes devis"
-              count="0 devis au total"
-              action={<RealBtn icon={Plus} label="Nouveau" variant="primary" />}
-            />
+        <GoTo href="/devis" label="Aller à la page Devis" />
+
+        <Section icon="🔭" title="Changer de vue">
+          <Frame>
+            <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white bg-[#9c27b0] rounded shadow-sm"><LayoutGrid className="h-3 w-3" />Grille</span>
+              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-gray-500 rounded"><List className="h-3 w-3" />Tableau</span>
+              <span className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-gray-500 rounded"><Columns3 className="h-3 w-3" />Pipeline</span>
+            </div>
           </Frame>
-          <GoTo href="/devis" label="Aller à la page Devis" />
-          <P className="mt-2">Onboarding rapide en 4 étapes : type d'événement, date, lieu, nombre de couverts (adultes + enfants).</P>
-          <Note>Tu peux passer toutes les étapes à blanc et les renseigner plus tard depuis le panneau "Événement".</Note>
+          <Bullets items={[
+            <><strong>Grille</strong> — les cartes, rangées en 4 sections repliables. La vue de travail au quotidien.</>,
+            <><strong>Tableau</strong> — une ligne par devis (client, événement, date, statut, montant TTC). Pour balayer vite.</>,
+            <><strong>Pipeline</strong> — un kanban à 12 colonnes, une par statut, avec glisser-déposer.</>,
+          ]} />
         </Section>
 
-        <Section icon="🧭" title="Les 5 panneaux de l'éditeur (sidebar gauche)">
-          <P>Une fois le devis créé, voici la sidebar de l'éditeur :</P>
+        <Section icon="🗂️" title="Les 4 sections de la vue Grille">
+          <Bullets items={[
+            <><strong>Prospection</strong> — les demandes reçues via ton formulaire qui n&apos;ont pas encore de devis.</>,
+            <><strong>Devis en cours</strong> — les 7 statuts de prospection. Ouverte par défaut.</>,
+            <><strong>Confirmés / Événements</strong> — <QS k="valide" /> <QS k="acompte" /> <QS k="paye" />.</>,
+            <><strong>Archivés / Refusés</strong> — <QS k="refus_client" /> <QS k="refus_traiteur" />.</>,
+          ]} />
+          <P>Clique sur l&apos;en-tête d&apos;une section pour la replier. Le compteur reste visible.</P>
+        </Section>
+
+        <Section icon="🔍" title="Rechercher, filtrer, trier">
+          <Bullets items={[
+            <><strong>Recherche</strong> — sur le nom du client, son prénom/nom, son email et le type d&apos;événement.</>,
+            <><strong>Filtres de statut</strong> — un bouton par statut, plus « Tous ». Les refus n&apos;apparaissent que si tu sélectionnes explicitement un filtre de refus.</>,
+            <><strong>Tri</strong> — Plus récents, Date d&apos;événement, Montant, Client A-Z.</>,
+          ]} />
+        </Section>
+
+        <Section icon="🎛️" title="Les actions d'une carte">
+          <QuoteCardMockup
+            name="RICHARD"
+            eventType="Mariage"
+            status="devis_envoye"
+            amount="13 848,00 €"
+            date="29 mai 2027"
+            guests={100}
+          />
+          <QuoteCardActionsLegend />
+          <Note>Le bouton <strong>Supprimer</strong> n&apos;apparaît que sur les devis non engagés (<QS k="nouveau" />, <QS k="devis_a_faire" />, <QS k="broch_envoyee" />) ou importés — pour éviter d&apos;effacer un dossier en cours.</Note>
+        </Section>
+
+        <Section icon="🧮" title="Comment le montant est calculé">
+          <P>Le montant affiché est recalculé depuis les lignes du devis, pas figé en base :</P>
+          <Bullets items={[
+            <>Les lignes <strong>offertes</strong>, <strong>en option</strong> et les sauts de page sont exclus.</>,
+            <>Le prix enfant est appliqué au nombre d&apos;enfants quand il est renseigné.</>,
+            <>Le total est affiché <strong>TTC</strong>, au taux de TVA propre au devis.</>,
+          ]} />
+        </Section>
+      </div>
+    ),
+  },
+  {
+    id: 'dossiers-devis',
+    category: 'devis',
+    title: 'Ranger mes devis dans des dossiers',
+    description: 'Dossiers et sous-dossiers, couleurs, icônes, glisser-déposer',
+    keywords: ['dossier', 'ranger', 'classer', 'organiser', 'sous-dossier', 'arborescence'],
+    body: (
+      <div className="space-y-4">
+        <Lead>Au-dessus de la liste des devis, une barre de dossiers permet de classer tes devis comme des fichiers : par saison, par type d&apos;événement, par lieu… avec autant de niveaux que tu veux.</Lead>
+
+        <GoTo href="/devis" label="Aller à la page Devis" />
+
+        <Section icon="📁" title="Créer un dossier">
+          <Step n={1} title="Bouton « Nouveau dossier »">À droite du fil d&apos;Ariane, en haut de la liste.</Step>
+          <Step n={2} title="Nomme-le, choisis une couleur et une icône">
+            <P>8 couleurs et 16 icônes (mariage, entreprise, saison, lieu, archives…) pour repérer un dossier d&apos;un coup d&apos;œil.</P>
+            <div className="grid grid-cols-2 gap-2">
+              <FolderTile name="Mariages 2026" count={12} sub={2} color="purple" />
+              <FolderTile name="Entreprises" count={7} color="blue" />
+            </div>
+          </Step>
+          <Step n={3} title="Entre dedans pour créer des sous-dossiers">
+            <P>Un dossier créé pendant que tu es <em>dans</em> un dossier devient son sous-dossier. Le fil d&apos;Ariane <Code>Mes devis › Mariages › 2026</Code> te dit toujours où tu es.</P>
+          </Step>
+        </Section>
+
+        <Section icon="🖐️" title="Ranger un devis">
+          <Bullets items={[
+            <><strong>Glisser-déposer</strong> — attrape une carte (ou une ligne du tableau) et lâche-la sur une tuile de dossier. Lâche-la sur un segment du fil d&apos;Ariane pour la faire remonter d&apos;un niveau.</>,
+            <><strong>Bouton <FolderInput className="inline h-3.5 w-3.5 text-[#9c27b0]" /> Déplacer</strong> — sur la carte, la ligne du tableau, la carte du pipeline et dans la fiche du devis. Plus pratique sur mobile.</>,
+            <>Un <strong>dossier</strong> se glisse aussi dans un autre dossier. Impossible de le déposer dans l&apos;un de ses propres sous-dossiers.</>,
+          ]} />
+        </Section>
+
+        <Section icon="👁️" title="Ce que tu vois dans un dossier">
+          <Bullets items={[
+            <>Le dossier ouvert filtre les <strong>trois vues</strong> (grille, tableau, pipeline), <strong>sous-dossiers compris</strong>.</>,
+            <>Le compteur d&apos;une tuile inclut les devis de ses sous-dossiers.</>,
+            <>Un devis créé, importé ou dupliqué depuis un dossier y atterrit directement.</>,
+            <>L&apos;adresse de la page retient le dossier ouvert : le rafraîchissement et le bouton Retour te ramènent au bon endroit.</>,
+          ]} />
+        </Section>
+
+        <Section icon="🔎" title="La recherche traverse les dossiers">
+          <P>Dès que tu tapes dans la barre de recherche, WeboDevis cherche dans <strong>tous</strong> les dossiers, pas seulement celui ouvert. Un bandeau te le rappelle, et le chemin du dossier s&apos;affiche sous chaque résultat.</P>
+        </Section>
+
+        <Section icon="🗑️" title="Supprimer un dossier">
+          <P>Supprimer un dossier ne supprime <strong>aucun devis</strong> : ses devis et ses sous-dossiers remontent dans le dossier parent. Une confirmation te le rappelle avant.</P>
+        </Section>
+      </div>
+    ),
+  },
+  {
+    id: 'nom-interne',
+    category: 'devis',
+    title: 'Nommer un devis pour s’y retrouver',
+    description: 'Le nom interne, visible par toi seul',
+    keywords: ['nom', 'renommer', 'titre', 'interne', 'libellé'],
+    body: (
+      <div className="space-y-4">
+        <Lead>Quand tu as trois devis pour le même client, le nom du client ne suffit plus. Le <strong>nom interne</strong> te permet de les distinguer sans rien changer au document du client.</Lead>
+
+        <Section icon="✏️" title="Où le saisir">
+          <Step n={1} title="Ouvre la fiche du devis">Carte du devis → <RealBtn icon={Eye} label="Aperçu" variant="secondary" />.</Step>
+          <Step n={2} title="Champ « Nom du devis (interne) »">Juste sous l&apos;encart de l&apos;événement. Il s&apos;enregistre dès que tu sors du champ.</Step>
+        </Section>
+
+        <Section icon="👁️" title="Ce que ça change">
+          <Bullets items={[
+            <>Ce nom remplace le nom du client <strong>dans tes listes</strong> (grille, tableau, pipeline, dossiers).</>,
+            <>Il n&apos;apparaît <strong>jamais</strong> sur le devis imprimé ou en PDF.</>,
+            <>Laissé vide, l&apos;affichage retombe sur le nom du client.</>,
+          ]} />
+        </Section>
+
+        <Tip>Utile pour les versions : « MARTIN — option 120 couverts », « MARTIN — version cocktail ».</Tip>
+      </div>
+    ),
+  },
+  {
+    id: 'creer-devis',
+    category: 'devis',
+    title: "L'éditeur de devis",
+    description: 'WeboWord, ses 7 panneaux, et le mode assistant',
+    keywords: ['nouveau devis', 'créer', 'ajouter', 'éditeur', 'weboword', 'wizard'],
+    body: (
+      <div className="space-y-4">
+        <Lead>WeboDevis propose deux éditeurs pour le même devis : <strong>WeboWord</strong>, une page façon traitement de texte, et un <strong>assistant</strong> plus guidé.</Lead>
+
+        <Section icon="🧭" title="Les 7 panneaux de WeboWord">
           <WeboSidebarMockup activePanel="services" />
           <Step n={1} title="Client">
-            Sélectionne dans la liste de tes clients existants ou crée-en un à la volée. Champs : nom, email, téléphone, adresse complète.
+            Recherche dans ton carnet ou saisie directe : nom, email, téléphone, adresse. Pour un client entreprise, tu choisis aussi le contact destinataire.
           </Step>
-          <Step n={2} title="Prestations (le cœur du devis)">
+          <Step n={2} title="Prestations">
             <Bullets items={[
-              <>Autocomplete sur ton catalogue (icône ⭐ pour tes prestas perso).</>,
-              <>Création de <RealBtn icon={Plus} label="Ligne personnalisée" variant="secondary" /> pour une prestation unique non répertoriée.</>,
-              <>Saut de page <Code>Shift + Entrée</Code> pour structurer un long menu sur plusieurs pages PDF.</>,
+              <>Autocomplétion sur ton catalogue de prestations.</>,
+              <><RealBtn icon={Plus} label="Ligne personnalisée" variant="secondary" /> pour une ligne libre.</>,
+              <>Par ligne : quantité, prix unitaire, <strong>prix enfant</strong>, ligne <strong>offerte</strong>, ligne <strong>en option</strong> (affichée mais hors total), <strong>saut de page</strong>.</>,
             ]} />
           </Step>
           <Step n={3} title="Événement">
-            Type, date, heure, lieu, couverts (adultes + enfants). Ces infos remontent dans le calendrier et dans la fiche événement.
+            Type, date, lieu, nombre de convives (adultes + enfants). Ces informations alimentent le calendrier et la fiche événement.
           </Step>
           <Step n={4} title="Style">
-            Police (12 polices type traiteur), taille du texte, couleurs d'accent, masquer les prix individuels (mode "menu sans prix").
+            Police, taille, interligne, couleur du texte, alignement, et masquage des prix pour un rendu « menu ».
           </Step>
           <Step n={5} title="Images">
-            Photos d'ambiance, portrait, plats — uploadées et insérées dans le PDF aux endroits prévus du template.
+            Photos insérées dans le corps du document.
+          </Step>
+          <Step n={6} title="Page de garde">
+            Couverture du document : modèle Standard, Mariage ou Business, nom du client, lieu, date, titre et sous-titre.
+          </Step>
+          <Step n={7} title="Page photos">
+            Une page dédiée aux visuels, composée par blocs.
           </Step>
         </Section>
 
-        <Section icon="💾" title="Sauvegarde & actions de sortie">
-          <P>Tout en bas de la sidebar gauche, dans le bloc "Actions" :</P>
+        <Section icon="🔀" title="Les deux éditeurs">
+          <Bullets items={[
+            <><strong>WeboWord</strong> — <Code>/devis/[id]/modifier?mode=weboword</Code>. C&apos;est ce qui s&apos;ouvre depuis l&apos;icône <LayoutTemplate className="inline h-3.5 w-3.5 text-[#9c27b0]" /> de la carte, et par défaut dès qu&apos;un devis a une mise en page enregistrée.</>,
+            <><strong>Assistant</strong> — <Code>?mode=wizard</Code>. Formulaire plus classique (client, prestations, options) pour saisir vite sans se soucier de la mise en page.</>,
+          ]} />
+        </Section>
+
+        <Section icon="💾" title="Enregistrer son travail">
+          <P>Le bloc <strong>Actions</strong>, en bas de la barre latérale de l&apos;éditeur :</P>
           <div className="flex gap-2 flex-wrap p-3 bg-gradient-to-br from-purple-900/95 to-purple-950 rounded-lg">
             <RealBtn icon={Save} label="Enregistrer" variant="primary" />
             <RealBtn icon={Download} label="Enregistrer PDF" variant="secondary" />
             <RealBtn icon={Printer} label="Imprimer" variant="secondary" />
-            <RealBtn icon={Send} label="Envoyer" variant="success" />
           </div>
           <Bullets items={[
-            <><strong>Auto-save</strong> à chaque modification — pas besoin de cliquer "Enregistrer" pour ne pas perdre ton travail.</>,
-            <><strong>Enregistrer</strong> force une sauvegarde immédiate.</>,
-            <><strong>Enregistrer PDF</strong> génère et télécharge le PDF.</>,
-            <><strong>Imprimer</strong> ouvre l'aperçu d'impression du navigateur.</>,
-            <><strong>Envoyer</strong> produit le lien sécurisé pour le client.</>,
+            <><strong>Enregistrer</strong> — sauvegarde le contenu, la mise en page, la police et les pages de garde/photos.</>,
+            <><strong>Enregistrer PDF</strong> — produit le fichier à envoyer au client.</>,
+            <><strong>Imprimer</strong> — ouvre la fenêtre d&apos;impression du navigateur.</>,
+          ]} />
+          <Warning>L&apos;éditeur ne sauvegarde <strong>pas tout seul</strong>. Prends le réflexe de cliquer <strong>Enregistrer</strong> avant de changer de page ou de fermer l&apos;onglet — la même règle vaut pour le mode assistant.</Warning>
+        </Section>
+      </div>
+    ),
+  },
+  {
+    id: 'imprimer-devis',
+    category: 'devis',
+    title: 'Imprimer ou transmettre un devis',
+    description: 'Page d’impression, PDF, envoi au client',
+    keywords: ['imprimer', 'pdf', 'envoyer', 'transmettre', 'partager', 'mail'],
+    body: (
+      <div className="space-y-4">
+        <Lead>Le devis se transmet sous forme de document : tu l&apos;imprimes ou tu l&apos;enregistres en PDF, puis tu l&apos;envoies par tes propres moyens (email, messagerie, remise en main propre).</Lead>
+
+        <Section icon="🖨️" title="Sortir le document">
+          <Step n={1} title="Depuis l'éditeur">
+            <P>Bloc <strong>Actions</strong> de la barre latérale : <RealBtn icon={Download} label="Enregistrer PDF" variant="secondary" /> pour le fichier, <RealBtn icon={Printer} label="Imprimer" variant="secondary" /> pour l&apos;impression directe. Pense à <RealBtn icon={Save} label="Enregistrer" variant="primary" /> avant.</P>
+          </Step>
+          <Step n={2} title="Ou depuis la liste des devis">
+            <P>L&apos;icône imprimante de la carte ouvre la page d&apos;impression dans un nouvel onglet, mise en page finale comprise.</P>
+            <QuoteCardMockup
+              name="RICHARD"
+              eventType="Mariage"
+              status="devis_final"
+              amount="13 848,00 €"
+              date="29 mai 2027"
+              highlightAction="pdf"
+            />
+          </Step>
+          <Step n={3} title="Ctrl + P">
+            <P>Puis <em>Enregistrer au format PDF</em> pour un fichier à joindre à un mail, ou choisis ton imprimante pour un rendez-vous en présentiel.</P>
+          </Step>
+        </Section>
+
+        <Section icon="📎" title="Ce que contient le document">
+          <Bullets items={[
+            <>L&apos;en-tête de ton entreprise (nom, adresse, téléphone, SIRET, logo) depuis ton profil.</>,
+            <>La page de garde et la page photos si tu les as activées.</>,
+            <>Le détail des prestations, les options, les totaux HT/TVA/TTC.</>,
+            <>Tes <strong>CGV</strong> en fin de document.</>,
           ]} />
         </Section>
 
-        <Tip>Tu peux à tout moment revenir à la liste des devis via "← Retour aux devis" en haut de la sidebar gauche — ton devis est déjà sauvegardé.</Tip>
+        <Section icon="🔄" title="Après l'envoi, mets le statut à jour">
+          <P>WeboDevis ne sait pas que tu as envoyé le mail : c&apos;est toi qui fais avancer le statut, à la main ou par glisser-déposer dans le pipeline.</P>
+          <Bullets items={[
+            <>Devis parti au client → <QS k="devis_envoye" />.</>,
+            <>Version définitive envoyée → <QS k="devis_final" />.</>,
+            <>Accord du client → <QS k="valide" />, puis <QS k="acompte" /> et <QS k="paye" />.</>,
+          ]} />
+        </Section>
+
+        <Note>Le client n&apos;a pas d&apos;espace en ligne pour accepter ou refuser un devis : la validation se fait hors application, et tu la traduis par le statut.</Note>
+      </div>
+    ),
+  },
+  {
+    id: 'pipeline-statuts',
+    category: 'devis',
+    title: 'Les 12 statuts et le pipeline',
+    description: 'Suivre chaque affaire de la demande au paiement',
+    keywords: ['kanban', 'statut', 'workflow', 'crm', 'avancement', 'pipeline'],
+    body: (
+      <div className="space-y-4">
+        <Lead>Un devis porte un statut qui dit où en est l&apos;affaire. Ils se répartissent en trois familles : en cours, confirmés, refusés.</Lead>
+
+        <GoTo href="/devis" label="Aller à la page Devis" />
+
+        <Section icon="🕐" title="En cours (7 statuts)">
+          <StatusTable
+            group="cours"
+            rows={{
+              nouveau: 'Demande tout juste arrivée, rien n’a encore été fait.',
+              broch_envoyee: 'Tu as envoyé ta brochure ou ta plaquette commerciale.',
+              devis_a_faire: 'À chiffrer. C’est le statut par défaut d’un devis créé.',
+              devis_envoye: 'Le devis est parti chez le client, tu attends son retour.',
+              rdv_deg_a_venir: 'Un rendez-vous ou une dégustation est planifié.',
+              rdv_deg_fait: 'Le rendez-vous a eu lieu, décision en attente.',
+              devis_final: 'Version définitive envoyée après ajustements.',
+            }}
+          />
+          <Note>Ce sont ces 7 statuts qui alimentent le badge <strong>Devis</strong> de la sidebar.</Note>
+        </Section>
+
+        <Section icon="✅" title="Confirmés (3 statuts)">
+          <StatusTable
+            group="confirme"
+            rows={{
+              valide: 'Le client a dit oui. Le devis devient un événement de production.',
+              acompte: 'L’acompte est encaissé.',
+              paye: 'Le solde est réglé.',
+            }}
+          />
+          <P>Ces trois statuts alimentent la section <strong>Confirmés / Événements</strong>, le calendrier et les listes de courses.</P>
+        </Section>
+
+        <Section icon="❌" title="Refusés (2 statuts)">
+          <StatusTable
+            group="refus"
+            rows={{
+              refus_client: 'Le client n’a pas donné suite ou a choisi ailleurs.',
+              refus_traiteur: 'Tu as décliné : date prise, hors zone, non rentable.',
+            }}
+          />
+        </Section>
+
+        <Section icon="📊" title="Vue Pipeline">
+          <P>Une colonne par statut, dans l&apos;ordre du cycle de vente. Chaque colonne affiche son nombre de devis et son total TTC cumulé.</P>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="p-2 bg-yellow-50/40 border border-yellow-200 rounded-lg space-y-1.5">
+              <div className="flex items-center justify-between"><QS k="devis_a_faire" /><span className="text-[9px] text-gray-400 font-bold">2</span></div>
+              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">M. DURAND</div>
+              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">Mme PETIT</div>
+            </div>
+            <div className="p-2 bg-amber-50/40 border border-amber-200 rounded-lg space-y-1.5">
+              <div className="flex items-center justify-between"><QS k="devis_envoye" /><span className="text-[9px] text-amber-500 font-bold">1</span></div>
+              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">M. MARTIN</div>
+            </div>
+            <div className="p-2 bg-teal-50/40 border border-teal-200 rounded-lg space-y-1.5">
+              <div className="flex items-center justify-between"><QS k="valide" /><span className="text-[9px] text-teal-500 font-bold">3</span></div>
+              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">RICHARD</div>
+              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">+2</div>
+            </div>
+          </div>
+          <Bullets items={[
+            <><strong>Glisser-déposer</strong> une carte d&apos;une colonne à l&apos;autre change son statut immédiatement.</>,
+            <>Les prospects non convertis apparaissent aussi dans la colonne de leur statut, avec un badge « Prospect ».</>,
+          ]} />
+        </Section>
+
+        <Section icon="🔄" title="Changer un statut sans glisser">
+          <P>Ouvre la fiche du devis (bouton <RealBtn icon={Eye} label="Aperçu" variant="secondary" />) : la section <strong>Statut</strong> propose les 12 boutons. Plus confortable sur mobile.</P>
+          <Note>Si le devis est rattaché à une prospection, changer son statut met aussi à jour celui du prospect — les deux restent synchronisés.</Note>
+        </Section>
       </div>
     ),
   },
@@ -646,54 +960,56 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'dupliquer-devis',
     category: 'devis',
     title: 'Dupliquer un devis ou créer un modèle',
-    description: 'Repartir d\'un existant pour gagner du temps',
+    description: 'Repartir d’un existant pour gagner du temps',
     keywords: ['copier', 'duplication', 'cloner', 'modèle', 'template'],
     body: (
       <div className="space-y-4">
-        <Lead>Plutôt que de tout refaire à la main, dupliquer ou modéliser un devis existant fait gagner ~80% du temps sur des devis similaires.</Lead>
+        <Lead>Deux façons de ne pas repartir de zéro : la duplication ponctuelle, et le modèle réutilisable.</Lead>
 
-        <Section icon="📋" title="Dupliquer un devis (one-shot)">
-          <P>Sur la liste des devis, en bas de chaque carte tu as une rangée de 6 boutons d'action. Le bouton <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> est dédié à la duplication :</P>
+        <Section icon="📋" title="Dupliquer">
+          <P>Icône <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> sur la carte du devis (ou la ligne du tableau) :</P>
           <QuoteCardMockup
             name="RICHARD"
             eventType="Mariage"
-            status={{ color: 'gray', label: 'En attente' }}
+            status="valide"
             amount="13 848,00 €"
             date="29 mai 2027"
             guests={100}
             highlightAction="duplicate"
           />
-          <Note>Les 6 actions de la carte (de gauche à droite) :</Note>
-          <QuoteCardActionsLegend />
-          <P>Une fois <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> cliqué, une copie est créée immédiatement avec :</P>
+          <P>Une fenêtre propose deux options. <strong>Duplication simple</strong> crée une copie qui reprend :</P>
           <Bullets items={[
-            <>Toutes les prestations, prix, remarques, style et images.</>,
-            <>Le statut <StatusPill color="gray" label="Brouillon" />.</>,
-            <>Le client <strong>vide</strong> (à toi de l'assigner).</>,
-            <>Une date d'événement à <strong>aujourd'hui</strong> (à modifier).</>,
+            <>Les prestations, prix, remarques, TVA, style et mise en page WeboWord.</>,
+            <>Le <strong>client à l&apos;identique</strong> (c&apos;est une copie, pas un nouveau client).</>,
+            <>Le <strong>dossier</strong> du devis d&apos;origine.</>,
+            <>Le statut <QS k="devis_a_faire" />.</>,
           ]} />
-          <GoTo href="/devis" label="Aller à la page Devis" />
+          <P>Tu es envoyé directement dans l&apos;éditeur de la copie.</P>
         </Section>
 
-        <Section icon="📚" title="Créer un modèle réutilisable">
-          <P>Si tu vends souvent la même structure (ex : "Mariage 100 couverts standard"), tu peux la sauvegarder comme modèle au moment où tu duplique :</P>
-          <Step n={1} title="Clique sur Dupliquer (icône Copy)">Sur la carte du devis source.</Step>
-          <Step n={2} title="Dans la modal qui s'ouvre, coche « Sauvegarder aussi comme modèle »">Renseigne un nom parlant (ex : <Code>Mariage 100p Premium</Code>).</Step>
-          <Step n={3} title="Réutilise-le">
-            <P>Sur la page Devis, juste sous le titre, tu vois <RealBtn label="Mes modèles (3)" variant="secondary" />. Clique → tu vois la liste de tes modèles → choisis-en un → nouveau devis créé avec sa structure complète.</P>
+        <Section icon="📚" title="Dupliquer + enregistrer comme modèle">
+          <P>Dans la même fenêtre, la seconde option demande un nom (ex. <Code>Mariage 100p Premium</Code>) et enregistre la structure dans ta bibliothèque de modèles, en plus de créer la copie.</P>
+          <Step n={1} title="Retrouve tes modèles">
+            <P>En haut de la page Devis : <RealBtn icon={Library} label="Mes modèles (3)" variant="secondary" />.</P>
+          </Step>
+          <Step n={2} title="Utilise-en un">
+            <P>Bouton <Btn>Utiliser</Btn> sur la vignette : un nouveau devis est créé avec la structure du modèle, prêt à recevoir client et date.</P>
+          </Step>
+          <Step n={3} title="Gère la bibliothèque">
+            <P>Sur chaque vignette : aperçu au clic, ✏️ pour renommer, 🗑️ pour supprimer.</P>
           </Step>
         </Section>
 
-        <Section icon="⚖️" title="Dupliquer vs Modèle — lequel choisir ?">
+        <Section icon="⚖️" title="Lequel choisir ?">
           <Mockup>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="font-bold text-gray-900 mb-1">📋 Dupliquer</p>
-                <p>Pour un client similaire, événement <strong>unique</strong>. Action ponctuelle.</p>
+                <p>Un événement similaire, une fois. Action ponctuelle.</p>
               </div>
               <div>
                 <p className="font-bold text-gray-900 mb-1">📚 Modèle</p>
-                <p>Pour un type de devis que tu vendras <strong>souvent</strong>. Investissement initial.</p>
+                <p>Une structure que tu revends souvent. Investissement qui se rentabilise.</p>
               </div>
             </div>
           </Mockup>
@@ -702,143 +1018,85 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ),
   },
   {
-    id: 'pipeline-statuts',
+    id: 'importer-devis',
     category: 'devis',
-    title: 'Statuts, pipeline et drag-and-drop',
-    description: 'Suivre l\'avancement de tes devis comme un CRM',
-    keywords: ['kanban', 'statut', 'workflow', 'crm', 'avancement'],
+    title: 'Importer un devis fait ailleurs',
+    description: 'Reprendre l’historique venu d’un autre logiciel',
+    keywords: ['import', 'reprise', 'ancien', 'pdf', 'migration', 'historique'],
     body: (
       <div className="space-y-4">
-        <Lead>Chaque devis a un statut qui reflète où il en est dans ton cycle de vente. La vue Pipeline transforme tes devis en kanban draggable.</Lead>
+        <Lead>Tu as des devis déjà signés sous Word, Excel ou un autre logiciel ? Importe-les pour que ton calendrier, tes courses et ton chiffre d&apos;affaires soient complets, sans les ressaisir.</Lead>
 
-        <GoTo href="/devis" label="Aller à la page Devis" />
-
-        <Section icon="🎯" title="Les 5 statuts">
-          <div className="space-y-2">
-            <div className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
-              <StatusPill color="gray" label="Brouillon" />
-              <p className="text-xs text-gray-600 flex-1">Devis en cours de rédaction, pas encore envoyé. C'est le statut par défaut.</p>
-            </div>
-            <div className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
-              <StatusPill color="amber" label="En attente" />
-              <p className="text-xs text-gray-600 flex-1">Tu attends une info ou une décision interne avant d'envoyer.</p>
-            </div>
-            <div className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
-              <StatusPill color="blue" label="Envoyé" />
-              <p className="text-xs text-gray-600 flex-1">Devis transmis au client, en attente de sa réponse. Compté dans le badge sidebar.</p>
-            </div>
-            <div className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
-              <StatusPill color="green" label="Accepté" />
-              <p className="text-xs text-gray-600 flex-1">Le client a dit oui. Le devis devient un événement automatiquement (visible dans le calendrier).</p>
-            </div>
-            <div className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
-              <StatusPill color="red" label="Refusé" />
-              <p className="text-xs text-gray-600 flex-1">Tu peux préciser : <strong>refus client</strong> (le client a dit non) ou <strong>refus traiteur</strong> (toi qui as décliné).</p>
-            </div>
-          </div>
+        <Section icon="📥" title="Comment importer">
+          <Step n={1} title="Bouton Importer">
+            <P>En haut de la page Devis, à côté de « Nouveau » : <RealBtn icon={UploadCloud} label="Importer" variant="secondary" />.</P>
+            <GoTo href="/devis" label="Aller à la page Devis" />
+          </Step>
+          <Step n={2} title="Renseigne le client">
+            <P>Recherche dans ton carnet, ou saisis prénom, nom, email, téléphone et adresse.</P>
+          </Step>
+          <Step n={3} title="Renseigne l'événement">
+            <P>Type, date, lieu, nombre de convives, et le <strong>montant total</strong> du devis d&apos;origine.</P>
+          </Step>
+          <Step n={4} title="Joins le document original">
+            <P>Le fichier est stocké et reste accessible depuis la carte du devis (bandeau ambre <FileText className="inline h-3 w-3 text-amber-700" /> et bouton de téléchargement).</P>
+          </Step>
         </Section>
 
-        <Section icon="📊" title="Vue Pipeline (kanban)">
-          <P>En haut de la liste des devis, switcher de vue :</P>
-          <Frame>
-            <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
-              <span className="px-3 py-1 text-xs font-semibold text-gray-500 rounded">Grille</span>
-              <span className="px-3 py-1 text-xs font-semibold text-gray-500 rounded">Tableau</span>
-              <span className="px-3 py-1 text-xs font-semibold text-white bg-[#9c27b0] rounded shadow-sm">Pipeline</span>
-            </div>
-          </Frame>
-          <P>Tu obtiens 5 colonnes (1 par statut) avec les devis sous forme de cartes draggables :</P>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="p-2 bg-gray-50 border border-gray-200 rounded-lg space-y-1.5">
-              <div className="flex items-center justify-between"><StatusPill color="gray" label="Brouillon" /><span className="text-[9px] text-gray-400 font-bold">2</span></div>
-              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">M. DURAND</div>
-              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">Mme PETIT</div>
-            </div>
-            <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg space-y-1.5">
-              <div className="flex items-center justify-between"><StatusPill color="blue" label="Envoyé" /><span className="text-[9px] text-blue-400 font-bold">1</span></div>
-              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">M. MARTIN</div>
-            </div>
-            <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-lg space-y-1.5">
-              <div className="flex items-center justify-between"><StatusPill color="green" label="Accepté" /><span className="text-[9px] text-emerald-400 font-bold">3</span></div>
-              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">RICHARD</div>
-              <div className="bg-white border border-gray-200 rounded p-1.5 text-[10px] font-medium text-gray-700">+2</div>
-            </div>
-          </div>
+        <Section icon="🏷️" title="Ce que devient un devis importé">
           <Bullets items={[
-            <><strong>Drag & drop</strong> : glisse une carte d'une colonne à l'autre pour changer son statut instantanément.</>,
-            <><strong>Compteurs</strong> en haut de chaque colonne : nombre de devis + total TTC cumulé.</>,
-            <><strong>Onglet "Refusé"</strong> en haut filtre uniquement les refus pour analyse rétrospective.</>,
+            <>Il porte un badge <strong>Importé</strong> dans les listes.</>,
+            <>Son statut de départ est <QS k="valide" /> : il compte donc comme événement confirmé.</>,
+            <>Il n&apos;a pas de lignes de prestations détaillées — juste le montant. Les listes de courses ne peuvent donc pas être calculées pour lui.</>,
+            <>Il reste modifiable : icône ✏️ ambre sur la carte pour corriger prix, fichier ou informations.</>,
+            <>Il atterrit dans le dossier ouvert au moment de l&apos;import.</>,
           ]} />
         </Section>
 
-        <Section icon="🔄" title="Changer un statut sans drag">
-          <P>Sur la fiche d'un devis (Sheet sur le côté), section <strong>Statut</strong> : sélecteur direct avec les 5 options. Idéal sur mobile où le drag est moins pratique.</P>
-        </Section>
-
-        <Note>Les devis <strong>Refusés</strong> (refus client + refus traiteur) sont <strong>masqués du calendrier</strong> automatiquement, pour ne pas polluer ta vue de production.</Note>
+        <Tip>Importe au moins les événements à venir : ils apparaîtront dans ton calendrier et dans ta charge de production.</Tip>
       </div>
     ),
   },
   {
-    id: 'envoyer-devis',
+    id: 'finance-devis',
     category: 'devis',
-    title: 'Envoyer un devis au client',
-    description: 'Lien sécurisé, PDF, signature électronique',
-    keywords: ['envoi', 'mail', 'partager', 'lien', 'signature'],
+    title: 'Gestion financière d’un devis',
+    description: 'Marge et rentabilité, prestation par prestation',
+    keywords: ['marge', 'coût', 'finance', 'rentabilité', 'bénéfice'],
     body: (
       <div className="space-y-4">
-        <Lead>WeboDevis te donne deux options d'envoi, à utiliser selon ton process.</Lead>
+        <Lead>Le panneau <strong>Gestion financière</strong> répond à une question : est-ce que ce devis est rentable ?</Lead>
 
-        <Section icon="🔗" title="Option 1 : Lien sécurisé (recommandé)">
-          <P>Dans l'éditeur de devis, tout en bas de la sidebar gauche dans le bloc "Actions" :</P>
-          <RealBtn icon={Send} label="Envoyer" variant="success" />
-          <P className="mt-2">Le système génère un lien unique et chiffré du type <Code>/c/abc123xyz</Code>.</P>
-          <P>Quand le client clique :</P>
-          <Bullets items={[
-            <>Il visualise le devis directement dans son navigateur (sans télécharger).</>,
-            <>Il peut <strong>accepter</strong> ou <strong>refuser</strong> en un clic.</>,
-            <>Il peut laisser une <strong>question</strong> ou un message.</>,
-            <>Le statut du devis se met à jour automatiquement de ton côté.</>,
-          ]} />
-          <Tip>Le lien expire si tu changes le devis après envoi → renvoie un nouveau lien dans ce cas.</Tip>
+        <Section icon="📍" title="Où le trouver">
+          <P>Icône <Wallet className="inline h-3.5 w-3.5 text-emerald-600" /> sur la carte du devis.</P>
+          <QuoteCardMockup
+            name="M. et Mme MARTIN"
+            eventType="Mariage"
+            status="valide"
+            amount="11 540 €"
+            date="29 mai 2027"
+            highlightAction="finance"
+          />
         </Section>
 
-        <Section icon="📄" title="Option 2 : PDF manuel">
-          <RealBtn icon={Download} label="Enregistrer PDF" variant="secondary" />
-          <P className="mt-2">Fichier téléchargé sur ton ordinateur. À toi de l'envoyer par mail manuellement, l'imprimer, ou le partager autrement.</P>
-          <Note>Avec cette option, le statut ne se met pas à jour automatiquement — tu dois le passer en "Envoyé" à la main.</Note>
+        <Section icon="📊" title="Ce que tu y vois">
+          <Step n={1} title="Détail par prestation">
+            <P>Pour chaque ligne du devis : le prix de <strong>vente</strong>, le <strong>coût</strong> de revient et la <strong>marge</strong> qui en découle.</P>
+          </Step>
+          <Step n={2} title="Frais additionnels">
+            <P>Ajoute les coûts qui ne sont pas dans les prestations : personnel extra, transport, location, imprévus.</P>
+          </Step>
+          <Step n={3} title="Synthèse">
+            <P>Chiffre d&apos;affaires HT, coût des prestations, frais additionnels, et <strong>marge brute estimée</strong>.</P>
+          </Step>
         </Section>
 
-        <Section icon="🖨️" title="Imprimer">
-          <RealBtn icon={Printer} label="Imprimer" variant="secondary" />
-          <P className="mt-2">Ouvre l'aperçu d'impression du navigateur. Idéal pour un rendez-vous physique avec le client.</P>
-        </Section>
-      </div>
-    ),
-  },
-  {
-    id: 'modifier-apres-envoi',
-    category: 'devis',
-    title: 'Modifier un devis après envoi',
-    description: 'Comment gérer les changements de dernière minute',
-    keywords: ['modifier', 'changer', 'révision', 'ajustement'],
-    body: (
-      <div className="space-y-4">
-        <Lead>Le client veut ajouter 10 couverts, changer une prestation, négocier un prix ? Pas de souci, le devis reste éditable même après envoi.</Lead>
-
-        <Section icon="✏️" title="Comment modifier">
-          <Step n={1} title="Ouvre le devis">Page Devis → clique sur le devis → Sheet s'ouvre → bouton <Btn color="gray">Modifier</Btn>.</Step>
-          <Step n={2} title="Fais tes changements">L'éditeur s'ouvre, tout est modifiable.</Step>
-          <Step n={3} title="Renvoie au client">Bouton <Btn color="green">Envoyer</Btn> → un nouveau lien est généré (l'ancien est invalidé).</Step>
-        </Section>
-
-        <Warning>Si le client a déjà accepté le devis (statut <StatusPill color="green" label="Accepté" />), une modification fait perdre la trace de ce qu'il a vu/signé. Préfère créer un <strong>avenant</strong> (nouveau devis avec mention "avenant").</Warning>
-
-        <Section icon="🔁" title="Avenants (bonne pratique)">
-          <P>Pour un changement après acceptation officielle :</P>
-          <Step n={1} title="Duplique le devis original">Icône <Copy className="inline h-3.5 w-3.5 text-[#9c27b0]" /> sur la carte.</Step>
-          <Step n={2} title="Renomme-le « [Nom client] - Avenant 1 »">Pour la traçabilité.</Step>
-          <Step n={3} title="Applique les modifications et envoie">Le client a alors les 2 documents : original + avenant.</Step>
+        <Section icon="🎯" title="Pour que les coûts soient justes">
+          <P>Le coût de revient d&apos;une prestation vient de ses <strong>ingrédients liés</strong> et de leur prix unitaire. Plus ton catalogue est renseigné, plus la marge affichée est fiable.</P>
+          <div className="flex flex-wrap gap-2">
+            <GoTo href="/prestations" label="Mes prestations" />
+            <GoTo href="/ingredients" label="Mes ingrédients" />
+          </div>
         </Section>
       </div>
     ),
@@ -851,110 +1109,117 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'creer-client',
     category: 'clients',
     title: 'Créer et gérer mes clients',
-    description: 'Fiche client, historique, recherche',
-    keywords: ['contact', 'fiche', 'ajouter client', 'carnet adresse'],
+    description: 'Particuliers, entreprises, historique',
+    keywords: ['contact', 'fiche', 'ajouter client', 'carnet adresse', 'particulier', 'entreprise'],
     body: (
       <div className="space-y-4">
-        <Lead>Le carnet client centralise toutes les personnes pour qui tu as déjà fait un devis ou un événement.</Lead>
+        <Lead>Le carnet clients centralise les personnes et les sociétés pour qui tu travailles. Deux natures de fiche : <strong>particulier</strong> et <strong>entreprise</strong>.</Lead>
 
         <GoTo href="/clients" label="Aller à la page Clients" />
 
         <Section icon="➕" title="Créer un client">
-          <P>Deux moyens :</P>
           <Bullets items={[
-            <><strong>Avant le devis</strong> : page Clients, bouton <RealBtn icon={Plus} label="Nouveau" variant="primary" /></>,
-            <><strong>Pendant le devis</strong> : panneau "Client" dans l'éditeur → bouton <RealBtn icon={Plus} label="Nouveau client" variant="secondary" />.</>,
+            <><strong>Depuis la page Clients</strong> — bouton <RealBtn icon={Plus} label="Nouveau" variant="primary" />, puis choix Particulier / Entreprise.</>,
+            <><strong>Pendant un devis</strong> — le client saisi avec un email dans l&apos;écran de création est enregistré automatiquement dans le carnet.</>,
           ]} />
-          <P>Champs disponibles : nom (obligatoire), email, téléphone, adresse complète, note interne. Tu peux laisser vide ce que tu n'as pas — la fiche se complète au fil du temps.</P>
+          <P><strong>Particulier</strong> : prénom, nom, email, téléphone, adresse, notes.</P>
+          <P><strong>Entreprise</strong> : raison sociale, SIRET, adresse de facturation, plus une liste de contacts (voir l&apos;article dédié).</P>
         </Section>
 
         <Section icon="🔍" title="Retrouver un client">
-          <P>Page Clients :</P>
           <Bullets items={[
-            <>Barre de recherche en haut — cherche par nom, email, téléphone.</>,
-            <>Tri par date de création (plus récent en premier par défaut).</>,
-            <>Clique sur une ligne → sheet latérale avec tout l'historique de ses devis.</>,
+            <>Barre de recherche : nom, société, email, téléphone.</>,
+            <>Clique une ligne pour ouvrir sa fiche latérale.</>,
+            <>La couleur du libellé distingue les entreprises (bleu) des particuliers (violet).</>,
           ]} />
         </Section>
 
-        <Section icon="📜" title="Historique d'un client">
-          <P>Sur la fiche client, tu vois :</P>
-          <Bullets items={[
-            <>Tous ses devis passés (avec statut et montant).</>,
-            <>Total cumulé du chiffre d'affaires.</>,
-            <>Notes internes que tu as prises sur lui.</>,
-          ]} />
-          <P>Bouton <Btn>+ Nouveau devis</Btn> directement depuis sa fiche pour aller plus vite.</P>
+        <Section icon="📜" title="La fiche client">
+          <P>Onglets de la fiche : informations, contacts (entreprises) et historique de ses devis avec statut et montant.</P>
         </Section>
 
-        <Tip>Renseigne l'adresse complète : elle est automatiquement utilisée pour ouvrir Google Maps depuis la fiche événement le jour J.</Tip>
+        <Tip>Renseigne l&apos;adresse complète : elle sert de lien vers la carte depuis la fiche événement le jour J.</Tip>
+      </div>
+    ),
+  },
+  {
+    id: 'clients-entreprise',
+    category: 'clients',
+    title: 'Clients entreprise : contacts et destinataire',
+    description: 'Plusieurs interlocuteurs, un seul destinataire du devis',
+    keywords: ['entreprise', 'société', 'contact', 'siret', 'facturation', 'destinataire'],
+    body: (
+      <div className="space-y-4">
+        <Lead>Une entreprise, c&apos;est rarement une seule personne : l&apos;assistante qui demande, le responsable qui valide, la compta qui paie. WeboDevis gère plusieurs contacts par société.</Lead>
+
+        <GoTo href="/clients" label="Aller à la page Clients" />
+
+        <Section icon="🏢" title="La fiche entreprise">
+          <Bullets items={[
+            <><strong>Raison sociale</strong> — c&apos;est elle qui s&apos;affiche dans les listes.</>,
+            <><strong>SIRET</strong> — repris sur le devis pour la facturation.</>,
+            <><strong>Adresse</strong> de facturation, email et téléphone généraux.</>,
+          ]} />
+        </Section>
+
+        <Section icon="👥" title="Les contacts">
+          <P>Onglet <strong>Contacts</strong> de la fiche : ajoute autant d&apos;interlocuteurs que nécessaire, avec nom, rôle, email, téléphone et notes. L&apos;un d&apos;eux peut être marqué comme contact principal.</P>
+        </Section>
+
+        <Section icon="✉️" title="Le destinataire du devis">
+          <P>Dans l&apos;éditeur, panneau <strong>Client</strong> : après avoir choisi l&apos;entreprise, tu choisis <strong>quel contact</strong> reçoit le devis. Ses coordonnées et son rôle sont recopiés sur le document au moment de la sélection.</P>
+          <Note>Ce choix est mémorisé sur le devis : modifier la fiche du contact plus tard ne réécrit pas un devis déjà établi.</Note>
+        </Section>
       </div>
     ),
   },
   {
     id: 'prospects',
     category: 'clients',
-    title: 'Gérer mes prospects entrants',
-    description: 'Demandes de devis automatiques via formulaire public',
-    keywords: ['lead', 'demande', 'formulaire', 'inbound', 'prospect'],
+    title: 'Prospects et formulaire public',
+    description: 'Recevoir les demandes de devis automatiquement',
+    keywords: ['lead', 'demande', 'formulaire', 'inbound', 'prospect', 'iframe', 'site web'],
     body: (
       <div className="space-y-4">
-        <Lead>Les prospects sont des personnes qui ont rempli ton formulaire public. Toutes leurs demandes atterrissent dans la page Prospects — à toi de les qualifier et de les transformer en clients.</Lead>
+        <Lead>Le formulaire public transforme ton site, ta bio Instagram ou un QR code en source de demandes qui arrivent directement dans WeboDevis.</Lead>
 
         <GoTo href="/prospects" label="Aller aux prospects" />
 
-        <Section icon="📨" title="D'où viennent les prospects ?">
-          <P>Tu as un <strong>formulaire public</strong> avec un lien unique. Tu peux :</P>
+        <Section icon="🔗" title="Ton lien de formulaire">
+          <P>En haut de la page Prospects, encart <strong>Lien de formulaire</strong> : un lien partageable qui t&apos;est propre. Tu peux :</P>
           <Bullets items={[
-            <>Le partager directement (Insta bio, signature mail).</>,
-            <>L'embarquer sur ton site web via une iframe.</>,
-            <>Le coller dans un QR code pour tes flyers.</>,
+            <>Le partager tel quel (bio, signature de mail, QR code).</>,
+            <>L&apos;<strong>intégrer à ton site</strong> en iframe — une version <Code>/embed/…</Code> du formulaire s&apos;adapte à tes couleurs (couleur d&apos;accent, fond, texte, arrondi, police, titre).</>,
+            <>Y associer une <strong>URL de brochure</strong> : elle est proposée au prospect juste après l&apos;envoi de sa demande.</>,
           ]} />
         </Section>
 
-        <Section icon="🏷️" title="Les 6 statuts prospect">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3"><StatusPill color="blue" label="Nouveau" /><span className="text-xs text-gray-600">Vient d'arriver, jamais traité.</span></div>
-            <div className="flex items-center gap-3"><StatusPill color="amber" label="RDV dégustation à venir" /><span className="text-xs text-gray-600">Tu as planifié une dégustation.</span></div>
-            <div className="flex items-center gap-3"><StatusPill color="amber" label="Brochure envoyée" /><span className="text-xs text-gray-600">Premier envoi de doc commerciale.</span></div>
-            <div className="flex items-center gap-3"><StatusPill color="green" label="Devis envoyé" /><span className="text-xs text-gray-600">Tu as transformé en devis.</span></div>
-            <div className="flex items-center gap-3"><StatusPill color="red" label="Refus client" /><span className="text-xs text-gray-600">Le client n'a pas donné suite.</span></div>
-            <div className="flex items-center gap-3"><StatusPill color="red" label="Refus traiteur" /><span className="text-xs text-gray-600">Toi qui as décliné (date prise, hors zone, etc.).</span></div>
+        <Section icon="📨" title="Ce que remplit le prospect">
+          <P>Prénom, nom, email, téléphone, type d&apos;événement, date, nombre de convives, lieu et message libre. La demande apparaît immédiatement dans ta liste et déclenche une notification.</P>
+        </Section>
+
+        <Section icon="🏷️" title="Statuts et suivi">
+          <P>Les prospects utilisent <strong>exactement les mêmes 12 statuts que les devis</strong>, ce qui permet de suivre une affaire de la demande au paiement sans changer de vocabulaire.</P>
+          <div className="flex flex-wrap gap-1">
+            <QS k="nouveau" /><QS k="broch_envoyee" /><QS k="devis_a_faire" /><QS k="devis_envoye" />
+            <QS k="rdv_deg_a_venir" /><QS k="rdv_deg_fait" /><QS k="devis_final" /><QS k="valide" />
+            <QS k="acompte" /><QS k="paye" /><QS k="refus_client" /><QS k="refus_traiteur" />
           </div>
         </Section>
 
-        <Section icon="🔄" title="Workflow type">
-          <Step n={1} title="Le prospect arrive">Statut <StatusPill color="blue" label="Nouveau" />, badge sidebar +1.</Step>
-          <Step n={2} title="Tu le contactes">Passe en <StatusPill color="amber" label="Brochure envoyée" /> ou <StatusPill color="amber" label="RDV dégustation" />.</Step>
-          <Step n={3} title="Tu fais un devis">Bouton <Btn>Créer un devis depuis ce prospect</Btn> → toutes les infos sont pré-remplies.</Step>
-          <Step n={4} title="Suivi long terme">Si pas de retour après X semaines, passe en <StatusPill color="red" label="Refus client" /> pour nettoyer ta liste.</Step>
+        <Section icon="🔄" title="Transformer un prospect en devis">
+          <Step n={1} title="Ouvre la demande">Clique la ligne du prospect.</Step>
+          <Step n={2} title="Bouton « Créer un devis »">Les informations client et événement sont reprises.</Step>
+          <Step n={3} title="Les deux restent liés">
+            <P>Une fois le devis créé, <strong>les statuts se synchronisent</strong> dans les deux sens : tu ne mets à jour qu&apos;un seul endroit.</P>
+          </Step>
         </Section>
 
-        <Tip>Le badge <Btn>9+</Btn> sur "Prospects" dans la sidebar compte uniquement les <StatusPill color="blue" label="Nouveau" /> — c'est ta to-do du jour.</Tip>
-      </div>
-    ),
-  },
-  {
-    id: 'masquer-refus',
-    category: 'clients',
-    title: 'Masquer les refus de la vue principale',
-    description: 'Garder l\'écran propre tout en conservant l\'historique',
-    keywords: ['filtrer', 'cacher', 'archive', 'refus'],
-    body: (
-      <div className="space-y-4">
-        <Lead>Les refus restent en base (pour ton archive) mais sont masqués des vues actives par défaut.</Lead>
-
-        <Section icon="📑" title="Devis refusés">
-          <P>Sur la page Devis, par défaut, l'onglet "Tous" exclut les refus. Pour les voir, clique sur l'onglet <Btn color="gray">Refusé</Btn>.</P>
+        <Section icon="🔎" title="Filtres">
+          <P>La liste se filtre par statut, par type d&apos;événement et par année.</P>
         </Section>
 
-        <Section icon="📅" title="Calendrier">
-          <P>Les événements de devis refusés <strong>n'apparaissent jamais</strong> dans le calendrier — peu importe le filtre. C'est volontaire pour ne pas surcharger.</P>
-        </Section>
-
-        <Section icon="👥" title="Prospects refusés">
-          <P>Les prospects en <StatusPill color="red" label="Refus client" /> ou <StatusPill color="red" label="Refus traiteur" /> sont visibles via le filtre dédié en haut de la liste.</P>
-        </Section>
+        <Note>Les prospects non encore convertis apparaissent aussi sur la page Devis, dans la section <strong>Prospection</strong> et dans les colonnes du pipeline.</Note>
       </div>
     ),
   },
@@ -965,45 +1230,35 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'evenement-fiche',
     category: 'evenements',
-    title: 'Anatomie de la fiche événement',
-    description: 'Tout ce qu\'on peut faire après acceptation d\'un devis',
-    keywords: ['fiche', 'préparation', 'event', 'production'],
+    title: 'La fiche événement et ses 5 onglets',
+    description: 'Tout ce qui se passe après la validation du devis',
+    keywords: ['fiche', 'préparation', 'event', 'production', 'onglets'],
     body: (
       <div className="space-y-4">
-        <Lead>Quand un devis passe en <StatusPill color="green" label="Accepté" />, il devient un événement à part entière, avec sa propre fiche de production.</Lead>
+        <Lead>Dès qu&apos;un devis passe en <QS k="valide" />, <QS k="acompte" /> ou <QS k="paye" />, il devient un événement avec sa propre fiche de production.</Lead>
 
         <GoTo href="/evenements" label="Voir mes événements" />
 
-        <Section icon="🎬" title="Boutons en haut de la fiche">
-          <div className="flex gap-2 flex-wrap">
-            <RealBtn icon={Eye} label="Voir le devis" variant="secondary" />
-            <RealBtn icon={Wallet} label="Finance" variant="primary" />
-            <RealBtn icon={ShoppingBasket} label="Liste de courses" variant="secondary" />
-          </div>
-        </Section>
-
-        <Section icon="📋" title="Les 4 zones de la fiche événement">
-          <Step n={1} title="En-tête">
-            <P>Client, date, lieu (avec lien Google Maps cliquable), nombre de couverts, total TTC. Boutons <Btn color="gray">Voir le devis</Btn> et <Btn>Finance</Btn>.</P>
+        <Section icon="🗂️" title="Les 5 onglets">
+          <Step n={1} title="Checklist">
+            <P>Ta liste de tâches libre pour cet événement : ajoute, coche, supprime. Parfait pour le « ne pas oublier » (glace, cadeaux invités, matériel emprunté).</P>
           </Step>
-          <Step n={2} title="Liste de courses 🛒">
-            <P>Calculée automatiquement depuis les ingrédients liés à chaque prestation × le nombre de couverts. Cochable au fur et à mesure des achats. Voir l'article dédié.</P>
+          <Step n={2} title="Matériel">
+            <P>Le matériel à louer pour l&apos;événement, à partir de tes <strong>templates de location</strong> (quantité par convive) ou ajouté à la main. Tu peux marquer une ligne comme commandée séparément et éditer un <strong>bon de commande location</strong> à imprimer.</P>
           </Step>
-          <Step n={3} title="Sheet financier 💰">
-            <P>Coûts <strong>prévisionnels</strong> (depuis le devis) vs <strong>réels</strong> (saisis par toi après l'événement). Marge brute en temps réel. Voir l'article dédié.</P>
+          <Step n={3} title="Courses">
+            <P>La liste d&apos;achats calculée automatiquement depuis les ingrédients des prestations du devis × le nombre de convives. Cochable au fur et à mesure.</P>
           </Step>
-          <Step n={4} title="Notes & checklist">
-            <P>Espace libre pour noter ce qui n'est pas dans le devis : remarques jour J, contacts utiles, plan de table, etc.</P>
+          <Step n={4} title="Prépa & Achats">
+            <P>Le complément manuel : ajoute des ingrédients qui ne viennent pas des prestations, avec quantité et fournisseur, et génère un <strong>bon de commande</strong>.</P>
+          </Step>
+          <Step n={5} title="Extras">
+            <P>Le staffing : qui travaille, à quelle heure, avec quelles consignes. Voir l&apos;article dédié.</P>
           </Step>
         </Section>
 
-        <Section icon="🗓️" title="Vue Calendrier">
-          <P>Les événements apparaissent automatiquement dans <Code>/calendrier</Code> à leur date :</P>
-          <Bullets items={[
-            <><strong>Pastille violette pleine</strong> = accepté/confirmé.</>,
-            <><strong>Contour violet</strong> = en attente / brouillon (devient une opportunité à confirmer).</>,
-            <><strong>Cellule rouge</strong> = capacité dépassée (300+ couverts cumulés sur la journée).</>,
-          ]} />
+        <Section icon="🧭" title="En-tête de la fiche">
+          <P>Client, date, lieu, nombre de convives et montant, avec accès direct au devis d&apos;origine.</P>
         </Section>
       </div>
     ),
@@ -1011,74 +1266,77 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'liste-courses',
     category: 'evenements',
-    title: 'Liste de courses automatique',
-    description: 'Générer la liste d\'achats depuis les prestations',
-    keywords: ['ingrédients', 'achat', 'recette', 'production'],
+    title: 'Listes de courses',
+    description: 'Par événement, ou groupées sur une période',
+    keywords: ['ingrédients', 'achat', 'recette', 'production', 'courses'],
     body: (
       <div className="space-y-4">
-        <Lead>WeboDevis calcule automatiquement la liste de courses d'un événement à partir des ingrédients liés à chaque prestation.</Lead>
+        <Lead>La liste de courses se calcule toute seule à partir des ingrédients liés à tes prestations.</Lead>
 
-        <Section icon="⚙️" title="Comment ça fonctionne">
-          <Step n={1} title="Tu lies des ingrédients à tes prestations">
-            <P>Dans la fiche d'une prestation, section "Ingrédients" : ajoute chaque ingrédient avec sa quantité <strong>par couvert</strong>.</P>
+        <Section icon="⚙️" title="Le mécanisme">
+          <Step n={1} title="Lier des ingrédients à une prestation">
+            <P>Sur la fiche d&apos;une prestation, section <strong>Ingrédients (par personne)</strong> : chaque ingrédient avec sa quantité <strong>par convive</strong>.</P>
             <Mockup title="Exemple — prestation « Entrée saumon »">
               <Bullets items={[
-                <>Saumon fumé : 80g / couvert</>,
-                <>Aneth frais : 2g / couvert</>,
-                <>Citron : 0.1 unité / couvert</>,
+                <>Saumon fumé : 80 g / personne</>,
+                <>Aneth frais : 2 g / personne</>,
+                <>Citron : 0,1 unité / personne</>,
               ]} />
             </Mockup>
           </Step>
           <Step n={2} title="L'événement multiplie">
-            <P>Pour un événement de 100 couverts avec cette prestation : saumon 8kg, aneth 200g, citron 10 unités. Tout est cumulé si plusieurs prestations utilisent le même ingrédient.</P>
+            <P>Pour 100 convives : 8 kg de saumon, 200 g d&apos;aneth, 10 citrons. Les prestations qui partagent un ingrédient sont cumulées.</P>
           </Step>
-          <Step n={3} title="Tu coches au fur et à mesure">
-            <P>Sur la page Courses de l'événement, coche les lignes pour suivre tes achats. État sauvegardé.</P>
+          <Step n={3} title="Tu coches en faisant tes achats">
+            <P>Onglet <strong>Courses</strong> de la fiche événement. L&apos;état des cases est conservé.</P>
           </Step>
         </Section>
 
-        <Section icon="🛒" title="Courses globales (multi-événements)">
-          <P>Page <Path items={['Catalogue', 'Courses globales']} /> : agrège les ingrédients nécessaires pour <strong>tous les événements à venir</strong> dans une plage de dates.</P>
-          <P>Pratique pour faire <strong>une seule grosse commande hebdomadaire</strong> couvrant tous les événements de la semaine.</P>
+        <Section icon="🛒" title="Courses globales">
+          <P>Page <Path items={['Catalogue', 'Courses globales']} /> : choisis une <strong>date de début</strong> et une <strong>date de fin</strong>, et l&apos;app agrège les ingrédients de tous les événements de la période, avec le détail des événements concernés pour chaque ligne.</P>
+          <GoTo href="/courses-globales" label="Ouvrir les courses globales" />
+          <Tip>C&apos;est la vue qui permet de faire <strong>une seule grosse commande hebdomadaire</strong> au lieu d&apos;une par événement.</Tip>
         </Section>
 
-        <Tip>Renseigne le <strong>fournisseur préféré</strong> de chaque ingrédient → la liste de courses peut être groupée par fournisseur, prête à être convertie en commande.</Tip>
+        <Note>Un devis <strong>importé</strong> n&apos;a pas de prestations détaillées : il ne génère donc aucune ligne de courses.</Note>
       </div>
     ),
   },
   {
-    id: 'finance-event',
+    id: 'staffing-extras',
     category: 'evenements',
-    title: 'Sheet financier d\'un événement',
-    description: 'Comparer prévisionnel vs réel pour calculer ta marge',
-    keywords: ['marge', 'coût', 'finance', 'rentabilité', 'compta'],
+    title: 'Staffing : assigner des extras',
+    description: 'Équipe, heures d’arrivée et fiches mission',
+    keywords: ['extra', 'personnel', 'équipe', 'serveur', 'mission', 'staffing'],
     body: (
       <div className="space-y-4">
-        <Lead>Le sheet financier te montre, en un coup d'œil, si l'événement a été rentable.</Lead>
+        <Lead>Les extras sont ton vivier de personnel. Tu les crées une fois, puis tu les assignes aux événements qui en ont besoin.</Lead>
 
-        <Section icon="📊" title="Structure du sheet">
-          <Step n={1} title="Colonne Prévisionnel">
-            <P>Calculée automatiquement depuis le devis : prix de vente HT/TTC, coûts d'ingrédients estimés (depuis ton catalogue), marge théorique.</P>
-          </Step>
-          <Step n={2} title="Colonne Réel">
-            <P>À toi de saisir après l'événement : coûts réels d'ingrédients, frais de personnel, location de matériel, transport, etc.</P>
-          </Step>
-          <Step n={3} title="Calcul automatique">
-            <P>Marge brute = Vente HT − Coûts réels. Marge en € et en %. Comparaison vs prévisionnel.</P>
-          </Step>
+        <Section icon="👥" title="1. Constituer le vivier">
+          <P>Page <Path items={['Catalogue', 'Extras']} /> : crée chaque personne avec son <strong>rôle</strong> (Cuisinier, Sous-chef, Serveur, Barman, Aide, Autre) et ses coordonnées.</P>
+          <GoTo href="/extras" label="Gérer mes extras" />
         </Section>
 
-        <Section icon="🎯" title="Quand le remplir ?">
-          <P>Idéalement dans les 7 jours après l'événement, pendant que les chiffres sont frais. Tu peux y revenir autant que tu veux.</P>
-        </Section>
-
-        <Section icon="📈" title="Utilité business">
+        <Section icon="📆" title="2. Assigner à un événement">
+          <P>Depuis la fiche événement, onglet <strong>Extras</strong>, ou depuis la page Extras (bouton « Assigner à un événement ») :</P>
           <Bullets items={[
-            <>Identifier les types d'événements les plus rentables.</>,
-            <>Repérer les prestations sous-tarifées.</>,
-            <>Argumenter une hausse de prix avec des chiffres.</>,
-            <>Calculer ton CA effectif pour la compta.</>,
+            <>Choix de l&apos;extra et de l&apos;événement.</>,
+            <><strong>Heure d&apos;arrivée</strong> attendue.</>,
+            <><strong>Notes de mission</strong> : tenue, consignes, personne à contacter sur place.</>,
+            <>Option <strong>mission courses</strong> : l&apos;extra est aussi chargé des achats.</>,
           ]} />
+        </Section>
+
+        <Section icon="🏷️" title="3. Suivre les confirmations">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3"><StatusPill color="amber" label="À solliciter" /><span className="text-xs text-gray-600">Tu ne l&apos;as pas encore contacté.</span></div>
+            <div className="flex items-center gap-3"><StatusPill color="blue" label="Confirmé" /><span className="text-xs text-gray-600">Il a dit oui, la date est bloquée.</span></div>
+            <div className="flex items-center gap-3"><StatusPill color="green" label="Présent" /><span className="text-xs text-gray-600">Il était bien là le jour J.</span></div>
+          </div>
+        </Section>
+
+        <Section icon="📄" title="4. Fiches mission">
+          <P>Depuis l&apos;onglet Extras, tu peux éditer les <strong>fiches mission</strong> : un récapitulatif par personne avec l&apos;événement, l&apos;adresse, l&apos;heure d&apos;arrivée et les consignes — à imprimer ou à transmettre.</P>
         </Section>
       </div>
     ),
@@ -1086,74 +1344,75 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'calendrier-lecture',
     category: 'evenements',
-    title: 'Lire et utiliser le calendrier',
+    title: 'Lire le calendrier',
     description: 'Couleurs, capacité, filtres, navigation',
     keywords: ['agenda', 'planning', 'mois', 'capacité'],
     body: (
       <div className="space-y-4">
-        <Lead>Le calendrier est ta vue mensuelle de production : qui mange où, combien sont-ils, et est-ce que tu n'es pas en surchauffe.</Lead>
+        <Lead>Le calendrier est ta vue de charge : qui mange, où, combien, et à quel moment tu satures.</Lead>
 
         <GoTo href="/calendrier" label="Ouvrir mon calendrier" />
 
-        <Section icon="🎨" title="Code couleurs des événements">
+        <Section icon="🎨" title="Code couleur">
           <Bullets items={[
-            <><strong>Violet plein</strong> — événement accepté, confirmé.</>,
-            <><strong>Contour violet</strong> — brouillon, en attente, ou envoyé (opportunité non confirmée).</>,
-            <><strong>Cellule en surbrillance rouge</strong> — capacité dépassée (300+ couverts cumulés sur la journée), avec icône ⚠️.</>,
+            <><strong>Violet plein</strong> — événement confirmé (<QS k="valide" /> <QS k="acompte" /> <QS k="paye" />).</>,
+            <><strong>Contour violet</strong> — affaire en cours, non confirmée : une opportunité à relancer.</>,
+            <><strong>Journée en rouge</strong> — capacité dépassée : plus de <strong>300 couverts cumulés</strong> sur la même journée.</>,
           ]} />
         </Section>
 
-        <Section icon="🔍" title="Filtres & navigation">
+        <Section icon="🔍" title="Navigation et filtres">
           <Bullets items={[
-            <>Flèches <Code>‹</Code> <Code>›</Code> pour changer de mois.</>,
-            <>Bouton <Btn color="gray">Aujourd'hui</Btn> pour revenir au mois courant.</>,
-            <>Toggle <Btn color="gray">Validés uniquement</Btn> pour masquer les non-confirmés.</>,
-            <>Stats en haut : nombre de confirmés, nombre en attente, total couverts du mois.</>,
+            <>Flèches <Code>‹</Code> <Code>›</Code> pour changer de mois, bouton <Btn color="gray">Aujourd&apos;hui</Btn> pour revenir.</>,
+            <>Filtre pour n&apos;afficher que les événements confirmés.</>,
+            <>Statistiques du mois en haut : confirmés, en attente, total des couverts.</>,
           ]} />
         </Section>
 
-        <Section icon="👆" title="Cliquer sur un événement">
-          <P>Une sheet latérale s'ouvre avec : statut, couverts, date complète, adresse (avec lien Maps), prestations à préparer, total TTC, et boutons <Btn>Gérer l'événement</Btn> / <Btn color="gray">Accéder au devis</Btn>.</P>
+        <Section icon="👆" title="Cliquer un événement">
+          <P>Une fiche latérale s&apos;ouvre : statut, couverts, date, adresse (avec lien vers la carte), prestations et montant, plus l&apos;accès à la fiche événement et au devis.</P>
         </Section>
 
-        <Note>Les devis refusés (refus client / refus traiteur) sont automatiquement masqués du calendrier, peu importe le filtre actif.</Note>
+        <Note>Les devis refusés n&apos;apparaissent jamais dans le calendrier, quel que soit le filtre.</Note>
       </div>
     ),
   },
 
   // ════════════════════════════════════════════════════════════════════════
-  // STOCK & INGRÉDIENTS
+  // STOCK & ACHATS
   // ════════════════════════════════════════════════════════════════════════
   {
     id: 'gerer-ingredients',
     category: 'stock',
     title: 'Créer et gérer mes ingrédients',
-    description: 'Anatomie d\'une fiche ingrédient',
-    keywords: ['inventaire', 'fiche', 'matière première'],
+    description: 'Fiche, unités, seuils, import CSV',
+    keywords: ['inventaire', 'fiche', 'matière première', 'csv', 'import'],
     body: (
       <div className="space-y-4">
-        <Lead>Chaque ingrédient a sa fiche avec unité, prix, fournisseur, stock et seuil d'alerte.</Lead>
+        <Lead>Chaque ingrédient porte son unité, son prix, son fournisseur, son stock et son seuil d&apos;alerte. C&apos;est la base des courses, des coûts et des alertes.</Lead>
 
         <GoTo href="/ingredients" label="Aller aux ingrédients" />
 
         <Section icon="➕" title="Créer un ingrédient">
-          <Path items={['Catalogue', 'Ingrédients', '+ Nouveau']} />
-          <P>Champs principaux :</P>
           <Bullets items={[
-            <><strong>Nom</strong> (obligatoire) — ex : "Saumon fumé", "Champagne brut".</>,
-            <><strong>Unité</strong> — kg, g, L, mL, unité, botte... Choisis ce qui correspond à comment tu l'achètes.</>,
-            <><strong>Prix unitaire HT</strong> — pour le calcul des coûts dans le sheet financier.</>,
-            <><strong>Fournisseur préféré</strong> — pour grouper les commandes.</>,
-            <><strong>Stock actuel</strong> — quantité en réserve à ce jour.</>,
-            <><strong>Seuil d'alerte</strong> — quand passer en alerte.</>,
+            <><strong>Nom</strong> (obligatoire).</>,
+            <><strong>Catégorie</strong> — pour filtrer la liste.</>,
+            <><strong>Unité</strong> — celle dans laquelle tu achètes (kg, g, L, unité…).</>,
+            <><strong>Prix unitaire</strong> — sert au calcul des coûts et des marges.</>,
+            <><strong>Fournisseur</strong> — sert au regroupement des commandes.</>,
+            <><strong>Stock</strong> et <strong>seuil d&apos;alerte</strong> — « alerte si stock ≤ ce seuil ».</>,
+            <><strong>Photo</strong> — tu peux la récupérer automatiquement depuis Open Food Facts.</>,
           ]} />
         </Section>
 
-        <Section icon="🔁" title="Catégories d'ingrédients">
-          <P>Les ingrédients peuvent être classés par catégorie (ex : "Viandes", "Boissons", "Légumes") pour filtrer la liste.</P>
+        <Section icon="📥" title="Aller plus vite">
+          <Bullets items={[
+            <><strong>Import CSV</strong> <FileSpreadsheet className="inline h-3.5 w-3.5 text-gray-500" /> — crée des dizaines d&apos;ingrédients d&apos;un coup. Les doublons ne sont pas réimportés.</>,
+            <><strong>Bibliothèque globale</strong> — pioche dans une base d&apos;ingrédients communs plutôt que de tout saisir.</>,
+          ]} />
         </Section>
 
-        <Tip>Crée d'abord les <strong>30-40 ingrédients principaux</strong> que tu utilises souvent. Tu pourras compléter ponctuellement quand tu créeras d'autres prestations.</Tip>
+        <Tip>Commence par les 30 à 40 ingrédients que tu utilises vraiment souvent. Le reste se complète au fil des prestations.</Tip>
       </div>
     ),
   },
@@ -1161,43 +1420,45 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'gerer-stock',
     category: 'stock',
     title: 'Mouvements de stock',
-    description: 'Entrée, sortie, ajustement — comment et quand',
+    description: 'Entrée, sortie, ajustement',
     keywords: ['mouvement', 'entrée', 'sortie', 'inventaire', 'achat'],
     body: (
       <div className="space-y-4">
-        <Lead>Le stock se met à jour via des <strong>mouvements</strong>. C'est un journal qui garde trace de tout.</Lead>
+        <Lead>Le stock évolue par <strong>mouvements</strong> : un journal daté qui garde la trace de tout.</Lead>
 
         <GoTo href="/stock" label="Aller à mon stock" />
 
         <Section icon="🔄" title="Les 3 types de mouvement">
           <div className="space-y-2">
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <p className="font-bold text-emerald-900 text-sm">⬆️ Entrée</p>
-              <p className="text-xs text-emerald-800 mt-1">Tu reçois une livraison fournisseur. Augmente le stock. Saisis quantité + prix d'achat (optionnel).</p>
+              <p className="font-bold text-emerald-900 text-sm flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" />Entrée</p>
+              <p className="text-xs text-emerald-800 mt-1">Une livraison arrive. Le stock augmente.</p>
             </div>
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="font-bold text-amber-900 text-sm">⬇️ Sortie</p>
-              <p className="text-xs text-amber-800 mt-1">Tu consommes pour un événement, tu casses, tu jettes. Diminue le stock. Précise la raison (événement X, perte, etc.).</p>
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg">
+              <p className="font-bold text-rose-900 text-sm flex items-center gap-1.5"><TrendingDown className="h-3.5 w-3.5" />Sortie</p>
+              <p className="text-xs text-rose-800 mt-1">Consommation pour un événement, casse, perte. Le stock diminue.</p>
             </div>
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="font-bold text-blue-900 text-sm">🔧 Ajustement</p>
-              <p className="text-xs text-blue-800 mt-1">Inventaire physique : tu comptes, ça ne correspond pas. Force la valeur exacte. Le système enregistre la différence.</p>
+              <p className="text-xs text-blue-800 mt-1">Inventaire physique : tu forces la valeur réelle et l&apos;écart est enregistré.</p>
             </div>
           </div>
+          <Note>Une sortie ne peut pas dépasser le stock disponible : le stock ne peut jamais devenir négatif.</Note>
         </Section>
 
-        <Section icon="📝" title="Comment saisir un mouvement">
-          <Step n={1} title="Va sur la page Stock">
-            <Path items={['Stock']} />
-          </Step>
-          <Step n={2} title="Sur la ligne d'un ingrédient, clique « + Mouvement »">Modal qui s'ouvre.</Step>
-          <Step n={3} title="Choisis le type, saisis la quantité">+ note libre si tu veux.</Step>
-          <Step n={4} title="Valide">Le stock se met à jour immédiatement, et l'historique garde la trace.</Step>
+        <Section icon="📝" title="Saisir un mouvement">
+          <Step n={1} title="Page Stock"><Path items={['Stock']} /></Step>
+          <Step n={2} title="Sur la ligne d'un ingrédient, choisis Entrée ou Sortie">Une fenêtre s&apos;ouvre.</Step>
+          <Step n={3} title="Quantité + raison (optionnelle)">La raison t&apos;aidera à relire l&apos;historique dans six mois.</Step>
+          <Step n={4} title="Valide">Stock mis à jour immédiatement, mouvement ajouté au journal.</Step>
         </Section>
 
-        <Section icon="📜" title="Historique des mouvements">
-          <P>Sur la fiche d'un ingrédient, onglet "Mouvements" : journal complet daté avec quantité, type et note.</P>
-          <P>Utile pour auditer les pertes ou retrouver une livraison.</P>
+        <Section icon="📜" title="Historique">
+          <P>Chaque ingrédient a son journal : date, type, quantité (+ / − / =) et note. Utile pour auditer les pertes ou retrouver une livraison.</P>
+        </Section>
+
+        <Section icon="📌" title="Repères de la page Stock">
+          <P>En haut : le nombre total d&apos;ingrédients suivis, ceux en alerte et ceux <strong>épuisés</strong> (stock à zéro).</P>
         </Section>
       </div>
     ),
@@ -1205,75 +1466,68 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'alertes-stock',
     category: 'stock',
-    title: 'Alertes stock bas (seuil + notifications)',
-    description: 'Ne plus jamais être en rupture',
+    title: 'Alertes de stock bas',
+    description: 'Seuils et notifications',
     keywords: ['notification', 'badge', 'seuil', 'alerte', 'rupture'],
     body: (
       <div className="space-y-4">
-        <Lead>Le système surveille en continu tes niveaux de stock et te prévient avant la rupture.</Lead>
+        <Lead>Chaque ingrédient a un seuil. En dessous, WeboDevis te prévient avant que ça devienne un problème.</Lead>
 
         <Section icon="🎯" title="Définir un seuil">
-          <P>Sur la fiche d'un ingrédient, champ <strong>Seuil d'alerte</strong> : quantité en-dessous de laquelle tu veux être prévenu.</P>
+          <P>Sur la fiche de l&apos;ingrédient : <strong>« Alerte si stock ≤ ce seuil »</strong>.</P>
           <Mockup title="Exemple — Saumon fumé">
             <Bullets items={[
-              <>Stock actuel : 12 kg.</>,
-              <>Seuil d'alerte : 5 kg.</>,
-              <>Tant que stock {'>'} 5 → OK.</>,
-              <>Dès que stock ≤ 5 → alerte automatique.</>,
+              <>Stock : 12 kg — Seuil : 5 kg.</>,
+              <>Tant que le stock reste au-dessus de 5 kg, rien ne se passe.</>,
+              <>Dès qu&apos;il tombe à 5 kg ou moins, l&apos;alerte se déclenche.</>,
             ]} />
           </Mockup>
         </Section>
 
-        <Section icon="🔔" title="Comment l'alerte se déclenche">
-          <P>Automatique à chaque <strong>mouvement de sortie</strong> qui fait passer le stock sous le seuil :</P>
+        <Section icon="🔔" title="Ce qui se passe alors">
           <Bullets items={[
-            <><strong>Notification</strong> créée dans <Code>/notifications</Code>.</>,
-            <><strong>Badge rouge</strong> sur l'item Stock dans la sidebar (= nombre d'ingrédients en alerte).</>,
-            <>Pas de doublon : si une alerte non lue existe déjà, pas de re-création.</>,
+            <>Une <strong>notification</strong> est créée dans le centre de notifications.</>,
+            <>Un <strong>badge rouge</strong> apparaît sur <strong>Stock</strong> dans la sidebar : c&apos;est le nombre d&apos;ingrédients en alerte.</>,
+            <>Pas de doublon : si une alerte non lue existe déjà pour cet ingrédient, elle n&apos;est pas recréée.</>,
           ]} />
+          <GoTo href="/notifications" label="Voir mes notifications" />
         </Section>
 
-        <Section icon="✅" title="Acquitter une alerte">
-          <P>Page Notifications → marque comme lue (icône ✓). Le badge baisse. La notification reste dans l'historique.</P>
-        </Section>
-
-        <Tip>Définis tes seuils en pensant à ton <strong>délai de réappro fournisseur</strong>. Si ton fournisseur livre sous 48h, ton seuil doit couvrir au moins 48h de consommation.</Tip>
+        <Tip>Cale ton seuil sur le <strong>délai de livraison</strong> de ton fournisseur : s&apos;il livre en 48 h, le seuil doit couvrir 48 h de consommation.</Tip>
       </div>
     ),
   },
   {
     id: 'commandes-fournisseurs',
     category: 'stock',
-    title: 'Générer une commande fournisseur',
-    description: 'À partir d\'un événement ou en mode global',
-    keywords: ['achat', 'commande', 'fournisseur', 'order'],
+    title: 'Commandes fournisseurs',
+    description: 'Suivre ce qui est commandé, envoyé, reçu',
+    keywords: ['achat', 'commande', 'fournisseur', 'bon de commande'],
     body: (
       <div className="space-y-4">
-        <Lead>WeboDevis peut générer des bons de commande groupés par fournisseur, à partir de la liste de courses d'un événement.</Lead>
+        <Lead>Les bons de commande se créent depuis les besoins d&apos;un événement, puis se suivent sur la page Commandes.</Lead>
 
         <GoTo href="/commandes" label="Voir mes commandes" />
 
-        <Section icon="📦" title="Pré-requis">
+        <Section icon="📦" title="Pour que ça marche">
           <Bullets items={[
-            <>Tes ingrédients doivent avoir un <strong>fournisseur préféré</strong> renseigné.</>,
-            <>Tes prestations doivent avoir des <strong>ingrédients liés</strong> avec quantité par couvert.</>,
+            <>Tes ingrédients ont un <strong>fournisseur</strong> renseigné.</>,
+            <>Tes prestations ont des <strong>ingrédients liés</strong> avec une quantité par personne.</>,
           ]} />
         </Section>
 
-        <Section icon="🛒" title="Depuis un événement">
-          <Step n={1} title="Ouvre la fiche événement">Page <Code>/evenements/[id]</Code>.</Step>
-          <Step n={2} title="Onglet « Liste de courses »">Tu vois tous les ingrédients agrégés.</Step>
-          <Step n={3} title="Clique « Générer commandes »">Le système crée un bon par fournisseur, regroupant les ingrédients de ce fournisseur.</Step>
+        <Section icon="🛒" title="Créer une commande">
+          <P>Depuis la fiche événement, onglet <strong>Prépa & Achats</strong> : tu constitues la liste des ingrédients à acheter (avec fournisseur et quantité) et tu génères le <strong>bon de commande</strong>. L&apos;onglet <strong>Matériel</strong> produit de la même façon un bon de commande de location.</P>
         </Section>
 
-        <Section icon="🌐" title="Mode global (plusieurs événements)">
-          <P>Page <Path items={['Catalogue', 'Courses globales']} /> :</P>
-          <P>Sélectionne une plage de dates → l'app agrège les besoins de tous les événements à venir → tu génères <strong>une commande hebdo</strong> couvrant tout le périmètre.</P>
-        </Section>
-
-        <Section icon="📋" title="Suivi des commandes">
-          <P>Page <Path items={['Production', 'Commandes']} /> : toutes tes commandes avec statut (à envoyer / envoyée / livrée / payée). À toi de mettre à jour quand tu reçois.</P>
-          <P>Une commande "livrée" peut générer automatiquement les <strong>mouvements de stock entrée</strong> (un clic).</P>
+        <Section icon="🏷️" title="Les 4 statuts d'une commande">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3"><StatusPill color="gray" label="Brouillon" /><span className="text-xs text-gray-600">En préparation, pas encore transmise.</span></div>
+            <div className="flex items-center gap-3"><StatusPill color="blue" label="Envoyée" /><span className="text-xs text-gray-600">Transmise au fournisseur.</span></div>
+            <div className="flex items-center gap-3"><StatusPill color="green" label="Reçue" /><span className="text-xs text-gray-600">Marchandise livrée.</span></div>
+            <div className="flex items-center gap-3"><StatusPill color="red" label="Annulée" /><span className="text-xs text-gray-600">Commande abandonnée.</span></div>
+          </div>
+          <P>La page affiche les montants cumulés à commander et déjà envoyés, et se filtre par statut.</P>
         </Section>
       </div>
     ),
@@ -1285,124 +1539,86 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'creer-prestation',
     category: 'catalogue',
-    title: 'Créer une prestation complète',
-    description: 'Avec catégorie, prix, ingrédients, carte gastronomique',
-    keywords: ['service', 'plat', 'menu', 'item'],
+    title: 'Créer une prestation',
+    description: 'Prix, prix enfant, options, ingrédients, carte',
+    keywords: ['service', 'plat', 'menu', 'item', 'prestation'],
     body: (
       <div className="space-y-4">
-        <Lead>Une prestation est une "ligne vendable" : une entrée, un cocktail dînatoire, un service, un buffet… Bien créée, elle te fait gagner un temps fou sur les devis.</Lead>
+        <Lead>Une prestation, c&apos;est une ligne vendable : une entrée, un buffet, un service. Bien renseignée, elle nourrit tes devis, tes courses et tes marges.</Lead>
 
         <GoTo href="/prestations" label="Aller à mes prestations" />
 
-        <Section icon="🚀" title="Bouton de création">
-          <P>Sur la page Prestations, en haut à droite :</P>
-          <Frame>
-            <RealHeader
-              title="Mes prestations"
-              count="0 prestation"
-              action={<RealBtn icon={Plus} label="Nouveau" variant="primary" />}
-            />
-          </Frame>
-        </Section>
-
         <Section icon="🎯" title="Anatomie d'une prestation">
-          <Step n={1} title="Identité">
-            <P>Nom, description, catégorie + sous-catégorie, photo de couverture.</P>
-          </Step>
+          <Step n={1} title="Identité">Nom, description, catégorie et sous-catégorie, photo.</Step>
           <Step n={2} title="Prix">
-            <P>Prix unitaire HT (par couvert ou unité). Tu peux avoir un <strong>prix enfant</strong> distinct.</P>
+            <P>Prix unitaire HT, et un <strong>prix enfant</strong> distinct si tu en pratiques un. Une prestation peut aussi être marquée <strong>Option</strong> : elle apparaît sur le devis sans entrer dans le total.</P>
           </Step>
-          <Step n={3} title="Ingrédients liés">
-            <P>Chaque ingrédient avec sa quantité <strong>par couvert</strong>. Permet le calcul auto de la liste de courses + du coût matière.</P>
+          <Step n={3} title="Ingrédients (par personne)">
+            <P>Chaque ingrédient avec sa quantité par convive. C&apos;est ce qui alimente la liste de courses et le coût de revient.</P>
           </Step>
-          <Step n={4} title="Carte gastronomique (HTML riche)">
-            <P>Édition visuelle (mode WeboWord) : description riche, mise en forme typographique premium, bilingue FR/EN. C'est ce qui s'imprime sur la 2ème page du PDF de devis.</P>
+          <Step n={4} title="Extrait du devis">
+            <P>Le texte enrichi qui décrit la prestation sur le document client — mis en page dans l&apos;éditeur WeboWord dédié.</P>
           </Step>
         </Section>
 
-        <Section icon="🚀" title="Créer une prestation">
-          <Step n={1} title="Va sur Prestations">
-            <Path items={['Catalogue', 'Prestations']} />
-          </Step>
-          <Step n={2} title="Bouton « + Nouveau » en haut à droite">
-            <P>Modal de création.</P>
-          </Step>
-          <Step n={3} title="Renseigne au minimum">Nom + prix HT.</Step>
-          <Step n={4} title="(Recommandé) Ajoute la catégorie">Pour pouvoir filtrer ton catalogue plus tard.</Step>
-          <Step n={5} title="(Recommandé) Lie les ingrédients">Pour activer la liste de courses auto.</Step>
+        <Section icon="📥" title="Import CSV">
+          <P>Bouton <RealBtn icon={FileSpreadsheet} label="Import CSV" variant="secondary" /> pour créer ton catalogue en masse. Les doublons ne sont pas importés.</P>
         </Section>
 
-        <Section icon="🎨" title="Carte gastronomique premium">
-          <P>Sur une prestation existante, bouton <Btn color="gray">Éditer la carte</Btn> → ouvre l'éditeur WeboWord (sidebar gauche dédiée).</P>
-          <P>Tu peux : changer la police, les couleurs, ajouter des sections, des images, des séparateurs élégants. Édition bilingue avec traduction auto FR ↔ EN.</P>
-        </Section>
-
-        <Tip>Investis 30 min à fond pour créer 10 prestations bien faites. Tes 50 prochains devis prendront 2 min chacun.</Tip>
+        <Tip>Trente minutes pour créer dix prestations bien faites, et tes cinquante prochains devis se montent en deux minutes.</Tip>
       </div>
     ),
   },
   {
     id: 'categories-perso',
     category: 'catalogue',
-    title: 'Catégories personnelles vs globales',
-    description: 'Organiser le catalogue à ta façon, sans perdre les standards',
+    title: 'Catégories personnelles et globales',
+    description: 'Organiser le catalogue à ta façon',
     keywords: ['rangement', 'sous-catégorie', 'organiser', 'globale'],
     body: (
       <div className="space-y-4">
-        <Lead>Tu disposes de catégories <strong>globales</strong> (fournies, standards du métier) + de tes catégories <strong>personnelles</strong> (les tiennes).</Lead>
+        <Lead>Tu disposes de catégories <strong>globales</strong> fournies avec l&apos;app, et de tes propres catégories <strong>personnelles</strong>.</Lead>
 
         <GoTo href="/parametres/categories" label="Gérer mes catégories" />
 
         <Section icon="🌐" title="Globales (lecture seule)">
-          <P>Catégories standards type traiteur (Apéritif, Entrée, Plat, Dessert, Cocktail, Buffet…). Visibles et utilisables par tout le monde, mais tu ne peux ni les renommer ni les supprimer.</P>
-          <P>Reconnaissables au badge <Code>🌐 Globale</Code>.</P>
+          <P>Les standards du métier, visibles par tous, que tu ne peux ni renommer ni supprimer. Elles portent un badge <Code>Globale</Code>.</P>
         </Section>
 
-        <Section icon="⭐" title="Perso (totalement modifiables)">
-          <P>Pour ajouter ta propre logique : "Cocktails signature", "Menus végétariens", "Service haut-de-gamme"... Modifiables, supprimables.</P>
+        <Section icon="⭐" title="Personnelles">
+          <P>Les tiennes : « Cocktails signature », « Menus végétariens »… Modifiables et supprimables à volonté, avec des <strong>sous-catégories</strong>.</P>
         </Section>
 
-        <Section icon="✏️" title="Gérer mes catégories perso">
+        <Section icon="✏️" title="Les gérer">
           <Path items={['Paramètres', 'Catégories']} />
-          <Step n={1} title="Bouton « + Catégorie »">En haut à droite.</Step>
-          <Step n={2} title="Renseigne le nom">Ex : "Menus signature".</Step>
-          <Step n={3} title="Déplie la catégorie">Pour ajouter des <strong>sous-catégories</strong> dedans (Ex : "Menu Tradition", "Menu Prestige").</Step>
-          <Step n={4} title="Édition inline">Clique sur l'icône ✏️ pour renommer, 🗑️ pour supprimer.</Step>
+          <Step n={1} title="Créer une catégorie">Bouton en haut de la page.</Step>
+          <Step n={2} title="Déplier pour ajouter des sous-catégories">Ex. « Menu Tradition », « Menu Prestige ».</Step>
+          <Step n={3} title="Renommer / supprimer">Icônes ✏️ et 🗑️ sur chaque ligne.</Step>
         </Section>
 
-        <Warning>Supprimer une catégorie supprime aussi ses sous-catégories. Les prestations qui l'utilisaient ne sont pas supprimées, mais perdent leur catégorie (à réassigner).</Warning>
-
-        <Section icon="🔍" title="Comment l'utiliser dans une prestation">
-          <P>Sur la fiche prestation, sélecteur "Catégorie" : tu vois <strong>tes catégories perso (⭐)</strong> mélangées aux <strong>globales (🌐)</strong>. Choisis ce qui te convient.</P>
-        </Section>
+        <Warning>Supprimer une catégorie supprime ses sous-catégories. Les prestations concernées ne sont pas supprimées, mais perdent leur classement.</Warning>
       </div>
     ),
   },
   {
     id: 'fournisseurs',
     category: 'catalogue',
-    title: 'Gérer mes fournisseurs',
-    description: 'Carnet d\'adresses + lien aux ingrédients',
+    title: 'Mes fournisseurs',
+    description: 'Carnet d’adresses et regroupement des achats',
     keywords: ['supplier', 'achat', 'commande', 'fournisseur'],
     body: (
       <div className="space-y-4">
-        <Lead>Tes fournisseurs sont centralisés avec leurs coordonnées et liés à tes ingrédients pour grouper les commandes.</Lead>
+        <Lead>Les fournisseurs servent à deux choses : garder leurs coordonnées, et regrouper tes achats par fournisseur.</Lead>
 
         <GoTo href="/fournisseurs" label="Voir mes fournisseurs" />
 
         <Section icon="➕" title="Créer un fournisseur">
-          <Path items={['Catalogue', 'Fournisseurs', '+ Nouveau']} />
-          <P>Champs : nom, contact, email, téléphone, adresse, conditions de commande, délai de livraison standard, notes.</P>
+          <Path items={['Catalogue', 'Fournisseurs']} />
+          <P>Champs : nom, téléphone, email, adresse, notes.</P>
         </Section>
 
         <Section icon="🔗" title="Lier à un ingrédient">
-          <P>Sur la fiche d'un ingrédient, sélecteur "Fournisseur préféré". Quand tu génères une commande, l'ingrédient va automatiquement sur le bon de ce fournisseur.</P>
-          <Tip>Un ingrédient peut avoir plusieurs fournisseurs possibles, mais un seul "préféré" pour l'auto-routing des commandes.</Tip>
-        </Section>
-
-        <Section icon="📦" title="Bons de commande">
-          <P>Les commandes générées (depuis événement ou courses globales) sont consultables dans <Path items={['Production', 'Commandes']} />, groupées par fournisseur.</P>
-          <P>Tu peux les exporter en PDF pour les envoyer.</P>
+          <P>Sur la fiche d&apos;un ingrédient, champ <strong>Fournisseur</strong>. Les lignes d&apos;achat se regroupent ensuite par fournisseur au moment du bon de commande.</P>
         </Section>
       </div>
     ),
@@ -1411,35 +1627,56 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'extras-location',
     category: 'catalogue',
     title: 'Extras et matériel en location',
-    description: 'Tables, chaises, vaisselle, personnel additionnel',
-    keywords: ['matériel', 'mobilier', 'rental', 'location', 'extra'],
+    description: 'Personnel additionnel, mobilier, vaisselle',
+    keywords: ['matériel', 'mobilier', 'rental', 'location', 'extra', 'personnel'],
     body: (
       <div className="space-y-4">
-        <Lead>Tu peux ajouter à un devis non seulement des prestations culinaires mais aussi du matériel en location et du personnel extra.</Lead>
+        <Lead>Au-delà de la cuisine, tu gères aussi le personnel additionnel et le matériel loué pour tes événements.</Lead>
 
         <div className="flex gap-2 flex-wrap">
-          <GoTo href="/location-globale" label="Location" />
           <GoTo href="/extras" label="Extras (personnel)" />
+          <GoTo href="/location-globale" label="Location globale" />
           <GoTo href="/location-templates" label="Templates location" />
         </div>
 
-        <Section icon="🪑" title="Location (Catalogue → Location)">
-          <P>Crée tes articles louables avec : nom, prix unitaire (par jour ou forfait), photo, quantité disponible.</P>
-          <P>Exemples : nappes blanches, mange-debout, vaisselle premium, sono, chauffage de terrasse.</P>
+        <Section icon="👥" title="Extras">
+          <P>Ton vivier de personnel avec son rôle : Cuisinier, Sous-chef, Serveur, Barman, Aide, Autre. Ils s&apos;assignent ensuite aux événements (voir <strong>Staffing</strong>).</P>
         </Section>
 
-        <Section icon="👥" title="Extras (Catalogue → Extras)">
-          <P>Personnel additionnel facturable : maître d'hôtel, serveurs, plongeurs, chef supplémentaire. Avec taux horaire ou forfait.</P>
-        </Section>
-
-        <Section icon="📦" title="Templates de location">
-          <Path items={['Catalogue', 'Templates location']} />
-          <P>Tu peux créer des "packages" de matériel (ex : "Pack mariage 100p" = 100 chaises + 10 tables + nappes...) à insérer en un clic dans un devis.</P>
+        <Section icon="🪑" title="Templates de location">
+          <P>Le catalogue du matériel louable : nom, <strong>quantité par convive</strong>, unité, fournisseur par défaut et prix unitaire HT.</P>
+          <Note>La quantité par convive permet de proposer automatiquement le bon nombre d&apos;articles selon la taille de l&apos;événement (ex. 1 assiette / personne, 0,2 nappe / personne).</Note>
         </Section>
 
         <Section icon="🌐" title="Location globale">
-          <Path items={['Catalogue', 'Location']} />
-          <P>Vue agrégée du matériel mobilisé par tes événements à venir. Permet de vérifier que tu as bien assez de stock disponible aux dates concernées.</P>
+          <P>Vue agrégée sur une période : pour chaque article, la <strong>quantité totale</strong> mobilisée, le <strong>coût</strong> et le <strong>détail des événements</strong> concernés. C&apos;est la vue qui évite de louer deux fois ou de manquer le jour J.</P>
+        </Section>
+      </div>
+    ),
+  },
+  {
+    id: 'modeles-devis',
+    category: 'catalogue',
+    title: 'Modèles de devis',
+    description: 'Le style par défaut de tes documents',
+    keywords: ['modèle', 'template', 'style', 'mise en page', 'défaut'],
+    body: (
+      <div className="space-y-4">
+        <Lead>La page Modèles règle l&apos;allure de tes documents : quel style s&apos;applique par défaut aux nouveaux devis.</Lead>
+
+        <GoTo href="/modeles" label="Voir mes modèles" />
+
+        <Section icon="🎨" title="Les modèles fournis">
+          <Bullets items={[
+            <><strong>Standard</strong> — sobre, violet, tous usages.</>,
+            <><strong>Mariage</strong> — plus chaleureux, tons dorés.</>,
+            <><strong>Business</strong> — sombre et sec, pour les clients entreprise.</>,
+          ]} />
+          <P>Un aperçu permet de comparer avant de choisir ton <strong>modèle par défaut</strong>.</P>
+        </Section>
+
+        <Section icon="📚" title="À ne pas confondre">
+          <P>Ce sont des <strong>styles de document</strong>. Les modèles de <strong>contenu</strong> (structure de prestations réutilisable) se créent depuis la duplication d&apos;un devis et se retrouvent dans « Mes modèles » sur la page Devis.</P>
         </Section>
       </div>
     ),
@@ -1451,108 +1688,91 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'profil-entreprise',
     category: 'compte',
-    title: 'Compléter mon profil entreprise',
-    description: 'Logo, SIRET, coordonnées, défaut TVA',
-    keywords: ['identité', 'siret', 'logo', 'cgv', 'tva', 'profil'],
+    title: 'Mon profil entreprise',
+    description: 'Ce qui s’imprime en tête de tes devis',
+    keywords: ['identité', 'siret', 'logo', 'profil', 'entreprise'],
     body: (
       <div className="space-y-4">
-        <Lead>Ces informations apparaissent en en-tête de tous tes devis. À compléter avant le tout premier envoi.</Lead>
+        <Lead>Ces informations apparaissent sur tous tes devis. À compléter avant le premier envoi.</Lead>
 
         <GoTo href="/parametres" label="Aller au profil entreprise" />
 
         <Section icon="🏢" title="Identité de l'entreprise">
-          <Path items={['Paramètres', 'Profil entreprise']} />
           <Bullets items={[
-            <><strong>Nom commercial</strong> — apparaît en grand en haut du devis.</>,
-            <><strong>SIRET</strong> — obligatoire légalement.</>,
-            <><strong>Adresse complète</strong> — siège social.</>,
-            <><strong>Téléphone</strong> + <strong>email</strong> de contact.</>,
-            <><strong>Site web</strong> (optionnel).</>,
+            <><strong>Nom de l&apos;entreprise</strong> — en tête du document.</>,
+            <><strong>Adresse</strong> — siège social.</>,
+            <><strong>Téléphone</strong>.</>,
+            <><strong>SIRET</strong> — mention obligatoire sur un devis professionnel.</>,
           ]} />
         </Section>
 
         <Section icon="🖼️" title="Logo">
-          <P>Upload PNG ou JPG. Idéalement <strong>carré ou format 1:1</strong>, fond transparent (PNG). Apparaît en haut à gauche du PDF.</P>
+          <P>Envoie un PNG ou un JPG. Un format carré avec fond transparent rend le mieux. Le logo apparaît en haut du document.</P>
         </Section>
 
-        <Section icon="📊" title="TVA par défaut">
-          <P>Champ <strong>Taux de TVA par défaut</strong> : valeur appliquée automatiquement à chaque nouveau devis (10% pour la restauration en France, 20% pour la location de matériel...). Tu peux toujours surcharger au cas par cas.</P>
+        <Section icon="📊" title="Et la TVA ?">
+          <P>Le taux de TVA se règle <strong>devis par devis</strong> (20 % par défaut), pas dans le profil : la restauration, les boissons et la location ne relèvent pas toujours du même taux.</P>
         </Section>
 
-        <Section icon="📜" title="CGV (Conditions Générales de Vente)">
-          <P>Voir l'article dédié — éditeur riche, multilingue FR/EN, ajout automatique en fin de devis.</P>
-        </Section>
-
-        <Tip>Imprime un devis test après avoir tout rempli pour vérifier que ton en-tête est bien rendu.</Tip>
+        <Tip>Imprime un devis de test une fois le profil rempli, pour vérifier l&apos;en-tête en conditions réelles.</Tip>
       </div>
     ),
   },
   {
     id: 'cgv',
     category: 'compte',
-    title: 'Personnaliser mes CGV',
-    description: 'Conditions Générales de Vente — éditeur riche bilingue',
-    keywords: ['conditions', 'légal', 'mentions', 'contrat'],
+    title: 'Mes conditions générales de vente',
+    description: 'Ajoutées automatiquement à tes devis',
+    keywords: ['conditions', 'légal', 'mentions', 'contrat', 'cgv'],
     body: (
       <div className="space-y-4">
-        <Lead>Les CGV s'impriment automatiquement à la fin de chaque devis envoyé, pour cadrer la relation commerciale.</Lead>
+        <Lead>Tes CGV sont ajoutées en <strong>page 2</strong> de tous tes devis PDF. Elles cadrent la relation commerciale.</Lead>
 
         <GoTo href="/parametres" label="Aller aux paramètres" />
 
         <Section icon="📍" title="Où les éditer">
-          <Path items={['Paramètres', 'Profil entreprise', 'CGV']} />
-          <P>Éditeur riche type Word :</P>
-          <Bullets items={[
-            <>Titres (H2, H3), gras, italique.</>,
-            <>Listes numérotées et à puces.</>,
-            <>Liens hypertexte.</>,
-            <>Couleurs et alignement.</>,
-          ]} />
+          <Path items={['Paramètres', 'Conditions Générales de Vente']} />
+          <P>Éditeur de texte enrichi : titres, gras, italique, listes, liens, couleurs et alignement.</P>
         </Section>
 
-        <Section icon="🌍" title="Bilingue FR / EN">
-          <P>Toggle <Code>FR / EN</Code> en haut de l'éditeur. Bouton <Btn color="gray">Traduire automatiquement</Btn> si tu écris en FR et veux la version EN auto-générée.</P>
-          <Note>La traduction auto est un point de départ — relis et corrige les nuances juridiques importantes.</Note>
-        </Section>
-
-        <Section icon="✅" title="Ce qu'il faut mettre">
+        <Section icon="✅" title="Ce qu'on y met en général">
           <Bullets items={[
-            <>Conditions de réservation et acompte.</>,
-            <>Politique d'annulation (délais, frais).</>,
-            <>Modalités de paiement.</>,
-            <>Limites de responsabilité (allergènes, accidents…).</>,
-            <>RGPD si tu collectes des données client.</>,
+            <>Conditions de réservation et montant de l&apos;acompte.</>,
+            <>Politique d&apos;annulation (délais, frais retenus).</>,
+            <>Modalités et délais de paiement.</>,
+            <>Limites de responsabilité (allergènes, matériel, retards).</>,
+            <>Traitement des données personnelles.</>,
             <>Juridiction compétente.</>,
           ]} />
         </Section>
 
-        <Warning>Fais relire tes CGV par un avocat ou juriste — c'est un document légalement contraignant.</Warning>
+        <Warning>Un document contractuel : fais-le relire par un professionnel du droit avant de l&apos;utiliser.</Warning>
       </div>
     ),
   },
   {
     id: 'mot-de-passe',
     category: 'compte',
-    title: 'Sécurité du compte (mot de passe)',
-    description: 'Changer, récupérer, sécuriser',
+    title: 'Sécurité du compte',
+    description: 'Changer ou récupérer son mot de passe',
     keywords: ['password', 'sécurité', 'oubli', 'connexion'],
     body: (
       <div className="space-y-4">
-        <Lead>Toutes tes données client sont sensibles — sécurise ton mot de passe.</Lead>
+        <Lead>Ton compte donne accès à des données clients : soigne ton mot de passe.</Lead>
 
-        <Section icon="🔁" title="Changer mon mot de passe">
-          <P>Pour l'instant, le changement passe par la procédure "Mot de passe oublié" :</P>
-          <Step n={1} title="Déconnecte-toi">Sidebar → Déconnexion.</Step>
-          <Step n={2} title="Sur l'écran de login, clique « Mot de passe oublié »">Saisis ton email.</Step>
-          <Step n={3} title="Tu reçois un email avec un lien">Valable 1h.</Step>
-          <Step n={4} title="Clique le lien et définis un nouveau mot de passe">Au moins 8 caractères, mix lettres + chiffres + symboles.</Step>
+        <Section icon="🔁" title="Changer de mot de passe">
+          <P>Le changement passe par la procédure « mot de passe oublié » :</P>
+          <Step n={1} title="Déconnecte-toi">Depuis la sidebar.</Step>
+          <Step n={2} title="Sur l'écran de connexion, clique « Mot de passe oublié »">Saisis ton email.</Step>
+          <Step n={3} title="Ouvre le lien reçu par email">Tu arrives sur la page de réinitialisation.</Step>
+          <Step n={4} title="Choisis un nouveau mot de passe">Long, unique, et différent de celui de ta boîte mail.</Step>
         </Section>
 
         <Section icon="🛡️" title="Bonnes pratiques">
           <Bullets items={[
-            <>N'utilise pas le même mot de passe que ta boîte mail.</>,
-            <>Privilégie un gestionnaire de mots de passe (Bitwarden, 1Password, KeePass).</>,
-            <>Si tu partages ton compte avec un employé, crée-lui plutôt son propre compte (à venir : multi-utilisateurs par entreprise).</>,
+            <>Un gestionnaire de mots de passe (Bitwarden, 1Password, KeePass) plutôt qu&apos;un pense-bête.</>,
+            <>Un mot de passe unique pour WeboDevis.</>,
+            <>Chaque compte est individuel : un employé doit avoir le sien.</>,
           ]} />
         </Section>
       </div>
@@ -1562,34 +1782,30 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: 'notifications-centre',
     category: 'compte',
     title: 'Centre de notifications',
-    description: 'Tout ce que l\'app a à te dire',
+    description: 'Ce que l’app te signale',
     keywords: ['notification', 'alerte', 'badge', 'rappel'],
     body: (
       <div className="space-y-4">
-        <Lead>Toutes les alertes du système (stock bas, nouveaux prospects, devis acceptés…) atterrissent dans le centre de notifications.</Lead>
+        <Lead>Les signalements du système sont regroupés dans le centre de notifications.</Lead>
 
         <GoTo href="/notifications" label="Voir mes notifications" />
 
         <Section icon="📍" title="Y accéder">
-          <P>Icône 🔔 en haut à droite du header → un compteur indique les non-lues.</P>
-          <P>Ou directement <Path items={['/notifications']} />.</P>
+          <P>Icône <Bell className="inline h-3.5 w-3.5 text-gray-600" /> dans le header, avec le compteur de non-lues.</P>
         </Section>
 
-        <Section icon="🏷️" title="Types de notifications">
+        <Section icon="🏷️" title="Les types de notification">
           <Bullets items={[
-            <><strong>Stock bas</strong> — un ingrédient est passé sous son seuil d'alerte.</>,
-            <><strong>Nouveau prospect</strong> — quelqu'un a rempli ton formulaire public.</>,
-            <><strong>Devis accepté</strong> — un client a accepté ton devis via le lien sécurisé.</>,
-            <><strong>Devis refusé</strong> — pareil mais en négatif.</>,
-            <><strong>Question client</strong> — un client a posté un message sur son lien.</>,
+            <><strong>Nouvelle demande</strong> — quelqu&apos;un a rempli ton formulaire public.</>,
+            <><strong>Événement à venir</strong> — un événement approche.</>,
+            <><strong>Stock bas</strong> — un ingrédient est passé sous son seuil.</>,
+            <><strong>Échéance de facturation</strong> — un règlement arrive à échéance.</>,
+            <><strong>Rappel de tâche</strong>, <strong>ticket de support</strong> et <strong>mise à jour</strong> du logiciel.</>,
           ]} />
         </Section>
 
-        <Section icon="✅" title="Gérer les notifs">
-          <Bullets items={[
-            <>Cliquer une notif → marquée comme lue + redirige vers le contenu concerné.</>,
-            <>Bouton <Btn color="gray">Tout marquer comme lu</Btn> en haut à droite.</>,
-          ]} />
+        <Section icon="✅" title="Les traiter">
+          <P>Cliquer une notification la marque comme lue et t&apos;emmène vers l&apos;élément concerné. Un bouton permet de tout marquer comme lu.</P>
         </Section>
       </div>
     ),
@@ -1597,30 +1813,30 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: 'admin-espace',
     category: 'compte',
-    title: 'Espace admin (réservé)',
-    description: 'Pour les utilisateurs avec rôle admin',
+    title: 'Espace admin',
+    description: 'Réservé aux comptes administrateurs',
     keywords: ['admin', 'rôle', 'utilisateurs', 'modération'],
     body: (
       <div className="space-y-4">
-        <Lead>Si ton compte a le rôle <strong>admin</strong>, un lien "Espace admin" apparaît en bas du groupe Paramètres dans la sidebar.</Lead>
+        <Lead>Si ton compte a le rôle <strong>admin</strong>, un lien « Espace admin » apparaît en bas du groupe Paramètres.</Lead>
 
         <GoTo href="/admin" label="Aller à l'espace admin" />
 
-        <Section icon="🛡️" title="Ce que tu peux y faire">
+        <Section icon="🛡️" title="Ce qu'on y fait">
           <Bullets items={[
-            <><strong>Dashboard global</strong> — KPIs cross-comptes (nb traiteurs, devis, CA cumulé).</>,
-            <><strong>Gestion utilisateurs</strong> — voir tous les comptes, activer/désactiver, promouvoir admin.</>,
-            <><strong>Catégories globales</strong> — créer/modifier les catégories standards visibles par tous.</>,
+            <><strong>Vue d&apos;ensemble</strong> — indicateurs sur l&apos;ensemble des comptes.</>,
+            <><strong>Utilisateurs</strong> — consulter et administrer les comptes.</>,
+            <><strong>Catégories globales</strong> — gérer les catégories standards proposées à tous.</>,
           ]} />
         </Section>
 
-        <Note>Le rôle admin n'enlève rien à ton compte traiteur normal — tu peux gérer tes propres devis ET la plateforme.</Note>
+        <Note>Le rôle admin s&apos;ajoute à ton compte traiteur : tu continues à gérer tes propres devis normalement.</Note>
       </div>
     ),
   },
 
   // ════════════════════════════════════════════════════════════════════════
-  // FAQ TRANSVERSE (catégorie démarrer)
+  // FAQ TRANSVERSE
   // ════════════════════════════════════════════════════════════════════════
   {
     id: 'faq-generale',
@@ -1630,34 +1846,38 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ['faq', 'questions', 'aide', 'problème'],
     body: (
       <div className="space-y-3">
-        <Lead>Réponses rapides aux questions les plus courantes.</Lead>
+        <Lead>Réponses courtes aux questions les plus fréquentes.</Lead>
 
-        <FAQ q="Mes données sont-elles sauvegardées automatiquement ?">
-          <P>Oui, à chaque modification dans l'éditeur de devis, sur les fiches client, prestation, événement, etc. Tu peux fermer l'onglet sans risque.</P>
+        <FAQ q="Mon travail est-il sauvegardé automatiquement ?">
+          <P>Pas dans l&apos;éditeur de devis : il faut cliquer <strong>Enregistrer</strong> dans le bloc Actions avant de quitter la page.</P>
+          <P>En revanche, les actions faites depuis les listes et les fiches sont enregistrées immédiatement : changement de statut, nom interne, déplacement dans un dossier, cases de la checklist et des courses.</P>
         </FAQ>
-        <FAQ q="Est-ce que je peux exporter mes données ?">
-          <P>Pour l'instant, les devis sont exportables en PDF un par un. Un export CSV/Excel global de toute la base est en projet pour la compta.</P>
+        <FAQ q="Comment le client reçoit-il son devis ?">
+          <P>Tu ouvres la page d&apos;impression du devis, tu l&apos;enregistres en PDF (Ctrl + P), et tu l&apos;envoies par tes propres moyens. Il n&apos;y a pas d&apos;envoi automatique ni d&apos;espace client en ligne : c&apos;est toi qui fais ensuite avancer le statut.</P>
+        </FAQ>
+        <FAQ q="Pourquoi mon devis n'apparaît-il pas dans le calendrier ?">
+          <P>Seuls les devis confirmés y figurent : <QS k="valide" />, <QS k="acompte" />, <QS k="paye" />. Les refus n&apos;y apparaissent jamais.</P>
+        </FAQ>
+        <FAQ q="Pourquoi je ne vois pas tous mes devis ?">
+          <P>Trois causes possibles : un <strong>dossier</strong> est ouvert (le fil d&apos;Ariane le montre — reviens à « Mes devis »), un <strong>filtre de statut</strong> est actif, ou une <strong>recherche</strong> est en cours. Les devis refusés ne s&apos;affichent que si tu sélectionnes un filtre de refus.</P>
+        </FAQ>
+        <FAQ q="Puis-je supprimer n'importe quel devis ?">
+          <P>Non : le bouton de suppression n&apos;apparaît que sur les devis non engagés (<QS k="nouveau" />, <QS k="devis_a_faire" />, <QS k="broch_envoyee" />) et sur les devis importés. Pour les autres, passe-les en refus afin de garder l&apos;historique.</P>
+        </FAQ>
+        <FAQ q="Supprimer un dossier supprime-t-il mes devis ?">
+          <P>Non. Les devis et les sous-dossiers remontent dans le dossier parent.</P>
+        </FAQ>
+        <FAQ q="Pourquoi mes listes de courses sont-elles vides ?">
+          <P>Elles se calculent depuis les <strong>ingrédients liés aux prestations</strong> du devis. Sans ingrédients renseignés — ou pour un devis importé, qui n&apos;a pas de lignes détaillées — il n&apos;y a rien à calculer.</P>
         </FAQ>
         <FAQ q="Puis-je travailler à plusieurs sur le même compte ?">
-          <P>Pas encore — chaque compte est individuel. Le multi-utilisateurs par entreprise (équipe avec rôles) est en roadmap.</P>
+          <P>Chaque compte est individuel : tes données ne sont visibles que par toi. Pour une équipe, crée un compte par personne.</P>
         </FAQ>
-        <FAQ q="Que se passe-t-il si je supprime un devis accepté ?">
-          <P>Le devis est définitivement supprimé. L'événement associé est aussi supprimé. Action irréversible — préfère passer en "Refusé" pour conserver l'historique.</P>
+        <FAQ q="Comment changer le taux de TVA ?">
+          <P>Sur le devis lui-même. Le taux est propre à chaque devis (20 % par défaut) et sert au calcul du montant TTC affiché dans les listes.</P>
         </FAQ>
-        <FAQ q="Pourquoi je vois 0 devis alors que j'en ai créés ?">
-          <P>Le filtre actif (statut "Refusé" sélectionné, recherche en cours, etc.) peut masquer des éléments. Reset les filtres avec l'onglet "Tous" + barre de recherche vide.</P>
-        </FAQ>
-        <FAQ q="Comment changer la couleur principale (violet) ?">
-          <P>Pour l'instant la couleur de marque (violet WeboDevis) n'est pas personnalisable. Le branding par traiteur est prévu pour une version premium.</P>
-        </FAQ>
-        <FAQ q="Le client peut-il signer électroniquement le devis ?">
-          <P>Le client peut "Accepter" via le lien sécurisé, ce qui vaut acceptation contractuelle (avec horodatage). Une vraie signature certifiée (eIDAS) est en projet.</P>
-        </FAQ>
-        <FAQ q="Puis-je avoir plusieurs entreprises dans le même compte ?">
-          <P>Non — un compte = une entreprise. Si tu as plusieurs structures, crée plusieurs comptes avec des emails différents.</P>
-        </FAQ>
-        <FAQ q="Est-ce que mes données sont chiffrées ?">
-          <P>Oui, toutes les communications avec le serveur sont en HTTPS, et la base est chiffrée au repos (AES-256). Hébergé en UE.</P>
+        <FAQ q="À quoi sert le nom interne d'un devis ?">
+          <P>À distinguer plusieurs devis d&apos;un même client dans tes listes. Il n&apos;apparaît jamais sur le document remis au client.</P>
         </FAQ>
       </div>
     ),
