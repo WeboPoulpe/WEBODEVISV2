@@ -15,7 +15,9 @@ import ContactsEditor from '@/components/clients/ContactsEditor';
 import { listContacts, saveContacts, type ContactDraft } from '@/lib/customerContacts';
 import { cn } from '@/lib/utils';
 import { FilePlus2 } from 'lucide-react';
-import { btnPrimary, cardCls, iconBtn, inputCls, pill } from '@/components/ui/kit';
+import { btnPrimary, btnSecondary, cardCls, iconBtn, inputCls, pill } from '@/components/ui/kit';
+import { Upload } from 'lucide-react';
+import ImportClientsModal from '@/components/clients/ImportClientsModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Customer {
@@ -323,6 +325,8 @@ export default function ClientsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Tous');
   const [sheetCustomer, setSheetCustomer] = useState<Customer | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState<number | null>(null);
 
   const loadCustomers = useCallback(async () => {
     const supabase = createClient();
@@ -364,10 +368,21 @@ export default function ClientsPage() {
             {loading ? ' ' : `${customers.length} client${customers.length !== 1 ? 's' : ''}${habitualsCount > 0 ? `, dont ${habitualsCount} habitué${habitualsCount > 1 ? 's' : ''}` : ''}`}
           </p>
         </div>
-        <Link href="/clients/nouveau" className={btnPrimary}>
-          <Plus className="h-4 w-4" />Nouveau client
-        </Link>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button onClick={() => setImporting(true)} className={cn(btnSecondary, 'whitespace-nowrap')}>
+            <Upload className="h-4 w-4" />Importer
+          </button>
+          <Link href="/clients/nouveau" className={cn(btnPrimary, 'flex-1 sm:flex-none whitespace-nowrap')}>
+            <Plus className="h-4 w-4" />Nouveau client
+          </Link>
+        </div>
       </div>
+
+      {importedCount !== null && (
+        <p role="status" className="text-sm text-sage bg-sage-100 rounded-xl px-4 py-3 mb-4">
+          {importedCount} client{importedCount > 1 ? 's' : ''} ajouté{importedCount > 1 ? 's' : ''}.
+        </p>
+      )}
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
         <div className="relative flex-1">
@@ -407,6 +422,14 @@ export default function ClientsPage() {
         <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
           {filtered.map((c) => <CustomerRow key={c.id} c={c} onOpen={() => setSheetCustomer(c)} />)}
         </ul>
+      )}
+
+      {importing && (
+        <ImportClientsModal
+          existingEmails={customers.map((c) => c.email)}
+          onClose={() => setImporting(false)}
+          onImported={(count) => { setImportedCount(count); loadCustomers(); }}
+        />
       )}
 
       {sheetCustomer && (

@@ -154,4 +154,43 @@ test.describe('administration', () => {
       await context.close();
     }
   });
+
+  test('import de clients : collage depuis un tableur, doublons et lignes sans email laissés de côté', async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+    const email = `e2e-import-${Date.now()}@test.webodevis.local`;
+    const [user] = await sql<{ id: string }>(`insert into public.users (email, password_hash) values ($1, 'x') returning id`, [email]);
+    await sql(`insert into public.profiles (id, email, first_name, role, is_active, has_completed_onboarding) values ($1, $2, 'Import', 'user', true, true)`, [user.id, email]);
+    const token = await encode({ token: { sub: user.id, email }, secret: envLocal('NEXTAUTH_SECRET') });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
+    await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
+    const page = await context.newPage();
+    try {
+      await page.goto('/clients');
+      await page.getByRole('button', { name: 'Importer' }).click();
+      await page.locator('#import-clients').fill([
+        'Prénom	Nom	Entreprise	Email	Téléphone',
+        'Claire	Martin		claire.martin@exemple.fr	06 12 34 56 78',
+        'Anne	Lenoir	Atelier Lenoir	contact@lenoir.exemple.fr	',
+        'Sans	Email			',
+        'Claire	Bis		CLAIRE.MARTIN@exemple.fr	',
+      ].join('\n'));
+      await expect(page.getByText('2 clients prêts à importer')).toBeVisible();
+      await expect(page.getByText('Pas d’adresse email')).toBeVisible();
+      await expect(page.getByText('Déjà dans vos clients')).toBeVisible();
+      await page.getByRole('button', { name: 'Importer 2 clients' }).click();
+      await expect(page.getByText('2 clients ajoutés.')).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText('Atelier Lenoir')).toBeVisible();
+
+      const rows = await sql<{ customer_type: string; first_name: string | null; company_name: string | null; contact_person_name: string | null; email: string; phone: string | null }>(
+        `select customer_type, first_name, company_name, contact_person_name, email, phone from public.customers where owner_user_id = $1 order by email`, [user.id]);
+      expect(rows).toEqual([
+        { customer_type: 'particulier', first_name: 'Claire', company_name: null, contact_person_name: null, email: 'claire.martin@exemple.fr', phone: '06 12 34 56 78' },
+        { customer_type: 'entreprise', first_name: 'Anne', company_name: 'Atelier Lenoir', contact_person_name: 'Anne Lenoir', email: 'contact@lenoir.exemple.fr', phone: null },
+      ]);
+    } finally {
+      await sql(`delete from public.customers where owner_user_id = $1`, [user.id]);
+      await sql(`delete from public.users where id = $1`, [user.id]);
+      await context.close();
+    }
+  });
 });
