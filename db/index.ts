@@ -5,7 +5,7 @@ import * as schema from './schema';
 // Une seule réserve de connexions par processus (le rechargement à chaud de Next recrée les modules).
 const globalForDb = globalThis as unknown as { pgPool?: Pool };
 
-const pool =
+export const pool =
   globalForDb.pgPool ??
   new Pool({
     // URL poolée en priorité : adaptée aux fonctions serverless de Vercel.

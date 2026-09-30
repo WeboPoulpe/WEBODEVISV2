@@ -1,7 +1,8 @@
 import path from 'node:path';
 import type { Page, TestInfo } from '@playwright/test';
 
-export const hasTestAccount = !!process.env.TEST_EMAIL && !!process.env.TEST_PASSWORD;
+// La session de test est toujours disponible : compte fourni, ou session signée localement (voir auth.setup.ts).
+export const hasTestAccount = true;
 
 /** Capture pleine page rangée par viewport : e2e/screenshots/<mobile|tablet|desktop>/<nom>.png */
 export async function shot(page: Page, testInfo: TestInfo, name: string) {

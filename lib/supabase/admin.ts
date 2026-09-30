@@ -1,11 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import 'server-only';
+import { QueryBuilder } from '@/lib/compat/builder';
+import { executeQuery } from '@/server/compat/execute';
 
 /**
- * Supabase admin client (service role) — bypasses RLS.
- * ONLY use server-side (Server Components, Route Handlers).
- * Never import this in client components.
+ * Accès serveur sans filtre par utilisateur (remplace la clé service-role de Supabase).
+ * À n'utiliser que côté serveur, pour les pages publiques à jeton qui valident elles-mêmes l'accès.
  */
-export const adminSupabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+export const adminSupabase = {
+  from: (table: string) => new QueryBuilder((d) => executeQuery(d, { uid: null, bypass: true }), table),
+};

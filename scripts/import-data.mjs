@@ -42,7 +42,11 @@ const tables = (await dst.query(
   `select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1`,
 )).rows.map((r) => r.table_name);
 const OWN_TABLES = ['users', 'password_reset_tokens'];
-const copied = tables.filter((t) => !OWN_TABLES.includes(t));
+// Seules les tables présentes des deux côtés sont copiées (Neon en a quelques-unes en plus).
+const sourceTables = new Set((await src.query(
+  `select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'`,
+)).rows.map((r) => r.table_name));
+const copied = tables.filter((t) => !OWN_TABLES.includes(t) && sourceTables.has(t));
 
 const fks = (await dst.query(
   `select conrelid::regclass::text as t, conname, pg_get_constraintdef(oid) as def

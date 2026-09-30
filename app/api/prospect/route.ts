@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { QueryBuilder } from '@/lib/compat/builder';
+import { executeQuery } from '@/server/compat/execute';
 
 // ── CORS helper ──────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -13,12 +14,11 @@ export function OPTIONS() {
   return NextResponse.json(null, { status: 204, headers: corsHeaders });
 }
 
-// ── Supabase client (anon key) ───────────────────────────────────────────────
+// ── Accès base sans utilisateur connecté : seules les règles « publiques » s'appliquent ──
 function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  return {
+    from: (table: string) => new QueryBuilder((d) => executeQuery(d, { uid: null }), table),
+  };
 }
 
 // ── POST /api/prospect ───────────────────────────────────────────────────────

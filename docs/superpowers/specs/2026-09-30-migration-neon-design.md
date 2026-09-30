@@ -68,6 +68,8 @@ scripts/
 
 ### Accès aux données
 
+**Mise en œuvre retenue (2026-09-30) : une couche de compatibilité d'abord.** Plutôt que de réécrire les 273 appels un par un, `createClient()` garde sa syntaxe (`.from(...).select(...).eq(...)`) mais ne parle plus à Supabase : chaque requête est décrite côté navigateur (`lib/compat/builder.ts`), envoyée à une fonction serveur unique (`server/compat/action.ts`) et exécutée sur Neon (`server/compat/execute.ts`). Les règles d'accès par table (`server/compat/rules.ts`) reprennent les règles RLS exportées, sans les accès publics trop larges de la production (toutes les demandes prospects et tous les extras étaient lisibles par n'importe qui). Les pages n'ont pas changé ; toute l'app tourne sur Neon. Les fonctions serveur par domaine décrites ci-dessous remplacent cette couche au fil des refontes, en commençant par Événements.
+
 - Chaque domaine expose des fonctions serveur (`'use server'`) : `listQuotes()`, `updateQuote(id, patch)`, etc.
 - Chaque fonction commence par `requireUser()` et filtre sur l'identifiant de l'utilisateur connecté. C'est ce qui remplace les règles RLS : **aucune fonction ne fait confiance à un identifiant de propriétaire envoyé par le navigateur**.
 - Les fonctions renvoient `{ data }` ou `{ error }` ; l'interface affiche l'erreur (aujourd'hui les échecs sont silencieux sur la plupart des pages).
