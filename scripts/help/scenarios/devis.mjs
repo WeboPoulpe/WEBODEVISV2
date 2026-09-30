@@ -1,8 +1,8 @@
 // Scénarios des vidéos de la rubrique « Devis ». Un scénario par guide, même identifiant.
 //
-// Le compte de démonstration n'enregistre rien : chaque vidéo tient dans une seule page et s'arrête
-// avant les boutons qui rechargent ou changent de page après une écriture (« Dupliquer », « Utiliser »…)
-// et avant ceux qui sont fermés dans la démonstration (« Envoyer », « Importer le devis »).
+// Le compte de démonstration n'enregistre rien : chaque vidéo s'arrête avant les boutons qui ouvrent un devis
+// tout juste créé (« Créer la copie », « Créer le devis ») et avant ceux qui sont fermés dans la démonstration
+// (« Envoyer », « Importer le devis »). Les écritures qui restent sur la page (statut, dossier) vont jusqu'au bout.
 
 /** Bouton « ⋯ » d'un devis de la liste. */
 const menuOf = (page, name) => page.getByRole('button', { name: `Actions pour ${name}`, exact: true });
@@ -68,6 +68,31 @@ async function drag(page, act, from, to) {
   await act.pause(500);
   await page.mouse.up();
   await act.pause(900);
+}
+
+/** Ouvre un devis dans l'éditeur depuis son menu « ⋯ » et attend que le document et le menu de gauche soient prêts. */
+async function openEditor(page, act, name, { phone = false } = {}) {
+  await act.click(menuOf(page, name));
+  await act.pause(400);
+  await act.click(page.getByRole('dialog').getByRole('link', { name: 'Modifier le devis' }));
+  await page.waitForURL(/\/modifier/);
+  await page.locator('#weboword-sheet').waitFor({ timeout: 45_000 });
+  // Sur téléphone, le statut n'est affiché qu'à l'ouverture du menu du bas.
+  if (!phone) await page.getByLabel('Statut du devis').first().waitFor({ timeout: 45_000 }).catch(() => {});
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await act.pause(1500);
+}
+
+/** Place le point d'insertion à la fin d'un élément du document (le clic tombe au milieu du texte). */
+async function caretAtEnd(el) {
+  await el.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
 }
 
 export default {
@@ -250,36 +275,156 @@ export default {
     },
   },
 
-  // Dupliquer un devis, et en faire un modèle (la vidéo s'arrête avant la copie, qui ouvre un nouveau devis).
+  // Dupliquer pour un autre client, une autre date, d'autres couverts (la vidéo s'arrête avant « Créer la copie »,
+  // qui ouvre le nouveau devis : il n'existe pas en base dans la démonstration).
   'dupliquer-devis': {
     start: '/devis',
     async run({ page, act }) {
       await act.click(menuOf(page, 'Mariage Sophie et Arnaud'));
       await act.pause(400);
       await act.click(action(page, 'Dupliquer'));
+      const win = page.getByRole('dialog', { name: 'Dupliquer le devis' });
+      await win.getByLabel('Couverts').waitFor();
       await act.pause(900);
-      await pointAt(page, act, page.getByRole('button', { name: /Duplication simple/ }));
-      await act.pause(1200);
-      await act.type(page.getByPlaceholder(/^Nom du modèle/), 'Mariage champêtre 140 couverts');
-      await pointAt(page, act, page.getByRole('button', { name: 'Dupliquer + enregistrer modèle' }));
-      await act.pause(1200);
+      await act.click(win.getByRole('tab', { name: 'Autre client' }));
+      await act.type(win.getByLabel('Rechercher un client'), 'rous');
+      await act.pause(600);
+      await act.click(win.getByRole('button', { name: /Antoine Rousselot/ }));
+      await act.pause(500);
+      await put(act, win.getByLabel('Date'), '2027-09-18');
+      await act.click(win.getByLabel('Couverts'));
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('110', { delay: 120 });
+      await act.pause(500);
+      await act.click(win.getByLabel('Garder aussi ce devis comme modèle'));
+      await act.type(win.getByLabel('Nom du modèle'), 'Mariage champêtre');
+      await pointAt(page, act, win.getByRole('button', { name: 'Créer la copie' }));
+      await act.pause(1300);
     },
   },
 
-  // Partir d'un modèle enregistré (la vidéo s'arrête avant « Utiliser », qui ouvre un nouveau devis).
+  // Partir d'un modèle : « Utiliser » ouvre la création guidée, le modèle est repris à l'étape Style.
+  // La vidéo s'arrête avant « Créer le devis » (le devis créé n'est pas enregistré dans la démonstration).
   'modeles-devis': {
     start: '/devis',
     async run({ page, act }) {
       await act.click(page.getByRole('button', { name: 'Partir d’un modèle' }));
+      const card = page.getByRole('dialog', { name: 'Partir d’un modèle' }).locator('li').filter({ hasText: 'Mariage, dîner assis 100 couverts' });
+      await card.waitFor();
       await act.pause(1200);
-      await act.click(page.getByRole('button', { name: 'Renommer Déjeuner de séminaire' }));
-      const name = page.getByLabel('Nom du modèle');
-      await name.fill('');
-      await page.keyboard.type('Séminaire, déjeuner assis', { delay: 55 });
-      await act.press('Enter');
+      await act.click(card.getByRole('button', { name: 'Utiliser' }));
+      await page.waitForURL(/\/devis\/nouveau/);
+      await page.getByRole('button', { name: 'Mariage', exact: true }).waitFor({ timeout: 30_000 });
+      await act.pause(700);
+      await act.click(page.getByRole('button', { name: 'Mariage', exact: true }));
+      await put(act, page.getByLabel('Date', { exact: true }), '2027-06-19');
+      await act.type(page.getByLabel('Couverts'), '80');
+      await act.click(page.getByRole('button', { name: 'Continuer' }));
+      await act.pause(500);
+      await act.type(page.getByLabel('Rechercher un client'), 'tess');
+      await act.click(page.getByRole('button', { name: /Margaux Tessier/ }));
       await act.pause(600);
-      await pointAt(page, act, page.getByRole('button', { name: 'Utiliser' }).first());
-      await act.pause(1400);
+      await act.click(page.getByRole('button', { name: 'Continuer' }));
+      await act.pause(700);
+      await act.hover(page.getByLabel('Contenu de départ'));
+      await act.pause(1500);
+      await pointAt(page, act, page.getByRole('button', { name: 'Créer le devis' }));
+      await act.pause(1300);
+    },
+  },
+
+  // Cocher plusieurs devis : changer leur statut, les ranger dans un dossier, les supprimer (sans confirmer).
+  'devis-selection': {
+    start: '/devis',
+    async run({ page, act }) {
+      const boxes = page.getByRole('checkbox', { name: /^Sélectionner / });
+      await act.click(boxes.nth(0));
+      await act.click(boxes.nth(1));
+      await act.pause(600);
+      await choose(act, page.getByLabel('Changer le statut des devis sélectionnés'), 'Devis envoyé');
+      await act.pause(700);
+      await act.click(boxes.nth(2));
+      await act.click(boxes.nth(3));
+      await act.pause(400);
+      await act.click(page.getByRole('toolbar', { name: 'Actions sur la sélection' }).getByRole('button', { name: 'Déplacer' }));
+      await act.pause(600);
+      await act.click(page.getByRole('button', { name: 'Entreprises', exact: true }));
+      await act.pause(900);
+      await act.click(boxes.nth(0));
+      await act.click(page.getByRole('toolbar', { name: 'Actions sur la sélection' }).getByRole('button', { name: 'Supprimer' }));
+      await act.pause(900);
+      await pointAt(page, act, page.getByRole('dialog').getByRole('button', { name: /^Supprimer 1 devis/ }));
+      await act.pause(1300);
+    },
+  },
+
+  // Saut de page : après l'introduction, la suite commence sur une nouvelle page.
+  'saut-de-page': {
+    start: '/devis',
+    async run({ page, act }) {
+      await openEditor(page, act, 'Soirée de fin de vendanges');
+      const intro = page.getByText('Nous vous remercions de votre confiance');
+      await act.click(intro);
+      await caretAtEnd(intro);
+      await act.pause(500);
+      await act.click(page.getByTitle('Saut de page : la suite commence sur une nouvelle page'));
+      await act.pause(600);
+      await act.hover(page.locator('#weboword-sheet .screen-sep', { hasText: 'Saut de page' }).first());
+      await act.pause(1500);
+      await pointAt(page, act, page.getByTitle('Enregistrer', { exact: true }));
+      await act.pause(1200);
+    },
+  },
+
+  // Les actions du devis dans le menu de gauche de l'éditeur : statut, envoi, copie, événement.
+  // Les fenêtres d'envoi et de copie sont ouvertes puis refermées (l'envoi est fermé dans la démonstration).
+  'editeur-actions': {
+    start: '/devis',
+    async run({ page, act }) {
+      await openEditor(page, act, 'Journée des associés');
+      const status = page.getByLabel('Statut du devis').first();
+      await choose(act, status, 'Validé');
+      await act.pause(500);
+      await pointAt(page, act, page.getByRole('link', { name: 'Préparer l’événement' }).first());
+      await act.pause(1000);
+      await act.click(page.getByRole('button', { name: 'Envoyer au client' }).first());
+      const send = page.getByRole('dialog', { name: 'Envoyer le devis au client' });
+      await send.waitFor({ timeout: 30_000 });
+      await act.pause(1600);
+      await act.click(send.getByRole('button', { name: 'Annuler' }));
+      await act.pause(400);
+      await act.click(page.getByRole('button', { name: 'Dupliquer' }).first());
+      const copy = page.getByRole('dialog', { name: 'Dupliquer le devis' });
+      await copy.getByLabel('Couverts').waitFor({ timeout: 30_000 });
+      await act.pause(1600);
+      await act.click(copy.getByRole('button', { name: 'Annuler' }));
+      await act.pause(600);
+    },
+  },
+
+  // L'éditeur sur téléphone : page entière ou taille réelle, outils repliés, menu du bas.
+  'editeur-telephone': {
+    start: '/devis',
+    mobile: true,
+    async run({ page, act }) {
+      await openEditor(page, act, 'Soirée de fin de vendanges', { phone: true });
+      await act.pause(600);
+      await act.click(page.getByRole('button', { name: 'Taille réelle' }));
+      await act.pause(1300);
+      await act.click(page.getByRole('button', { name: 'Page entière' }));
+      await act.pause(900);
+      await act.click(page.getByRole('button', { name: 'Plus d’outils' }));
+      await act.pause(1500);
+      await act.click(page.getByRole('button', { name: 'Moins', exact: true }));
+      await act.pause(600);
+      await act.click(page.getByRole('navigation', { name: 'Actions du document' }).getByRole('button', { name: 'Menu' }));
+      await act.pause(1200);
+      await act.hover(page.getByLabel('Statut du devis').last());
+      await act.pause(700);
+      await act.hover(page.getByRole('button', { name: 'Envoyer au client' }).last());
+      await act.pause(700);
+      await act.hover(page.getByRole('button', { name: 'Dupliquer' }).last());
+      await act.pause(1300);
     },
   },
 

@@ -66,7 +66,7 @@ export const evenements: HelpGuide[] = [
     steps: [
       { title: 'Ouvrez l’onglet « Matériel » de l’événement', text: 'La partie « À préparer » liste ce que vous emportez.' },
       { title: 'Cliquez sur « Choisir dans ma liste »', text: 'La fenêtre « Ma liste de matériel » réunit ce que vous emportez d’habitude. Cochez les articles utiles, ajustez les quantités, puis cliquez sur le bouton « Ajouter » en bas de la fenêtre.' },
-      { title: 'Complétez votre liste', text: 'Sous « Ajouter à ma liste », saisissez un article, sa quantité et son unité. Cochez « Cette quantité est par couvert » pour qu’elle suive le nombre de couverts.' },
+      { title: 'Complétez votre liste', text: 'Sous « Ajouter à ma liste », saisissez un article, sa quantité et choisissez son unité, puis cliquez sur le bouton « + ». Cochez « Cette quantité est par couvert » pour qu’elle suive le nombre de couverts.' },
       { title: 'Ajoutez un article ponctuel', text: 'Saisissez-le dans « Matériel à emporter », puis cliquez sur « Ajouter ». Il rejoint aussi votre liste pour les prochaines fois.' },
       { title: 'Cochez ce qui est prêt', text: 'La ligne cochée est barrée. La corbeille retire l’article de l’événement.' },
       { title: 'Vérifiez les lignes marquées « du devis »', text: 'Le matériel et le personnel vendus dans le devis s’ajoutent d’eux-mêmes, avec leur quantité. Vous pouvez les cocher, pas les supprimer.' },
@@ -74,6 +74,7 @@ export const evenements: HelpGuide[] = [
     notes: [
       'Une ligne du devis apparaît ici quand sa catégorie est « Matériel » ou « Personnel ».',
       'Un article déjà présent dans l’événement porte la mention « Déjà ajouté » dans votre liste.',
+      'Votre liste se prépare aussi, d’un coup, dans la page « Matériel » du menu « Catalogue ».',
       'La vaisselle et le mobilier à louer se gèrent plus bas, dans la partie « Location » du même onglet.',
     ],
   },
@@ -170,6 +171,24 @@ export const evenements: HelpGuide[] = [
     notes: [
       'Les devis refusés n’apparaissent pas dans le calendrier.',
       'Un devis sans date n’apparaît pas non plus.',
+      'Un jour choisi, « Créer un devis pour ce jour » (ou « Autre devis ce jour-là ») démarre un devis à cette date.',
+    ],
+  },
+  {
+    id: 'devis-jour-calendrier',
+    category: 'evenements',
+    title: 'Créer un devis pour un jour du calendrier',
+    summary: 'Une date libre au calendrier ? Le devis démarre avec cette date déjà remplie.',
+    keywords: ['calendrier', 'date', 'jour', 'nouveau devis', 'disponibilité', 'réserver', 'créer un devis', 'prérempli', 'raccourci', 'agenda'],
+    href: '/calendrier',
+    steps: [
+      { title: 'Cliquez sur le jour dans le calendrier', text: 'Le panneau de droite montre ce qui est déjà prévu ce jour-là.' },
+      { title: 'Cliquez sur « Créer un devis pour ce jour »', text: 'Si le jour a déjà un événement, le lien s’appelle « Autre devis ce jour-là », sous la liste.' },
+      { title: 'Complétez l’événement', text: 'La date est remplie. Choisissez le type et le nombre de couverts, puis « Continuer ».' },
+      { title: 'Choisissez le client et le style, puis « Créer le devis »', text: 'Le devis s’ouvre dans l’éditeur.' },
+    ],
+    notes: [
+      'Le nouveau devis apparaît ensuite dans le calendrier, encadré, comme tout devis en cours.',
     ],
   },
   {

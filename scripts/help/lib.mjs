@@ -14,6 +14,10 @@ export const BASE = process.env.HELP_BASE_URL ?? 'http://localhost:3001';
 const DEMO_USER_ID = '0d3e0000-0000-4000-8000-000000000001';
 const DEMO_EMAIL = 'demo@webodevis.fr';
 const SIZE = { width: 1280, height: 800 };
+// Scénario « téléphone » : écran d'iPhone (la vidéo du navigateur garde la taille de l'écran), posé au centre d'une image 1280×800,
+// pour que la vidéo garde le même cadre que les autres dans le centre d'aide.
+const PHONE = { width: 390, height: 844 };
+const PHONE_BACKDROP = '0xE6DFD3';
 
 export function envLocal(name) {
   const line = fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
@@ -52,8 +56,8 @@ const CURSOR = `(() => {
 })();`;
 
 /** Gestes lents et lisibles : la souris se déplace, marque un temps, clique. */
-function actions(page) {
-  let pos = { x: SIZE.width / 2, y: SIZE.height / 2 };
+function actions(page, size = SIZE) {
+  let pos = { x: size.width / 2, y: size.height / 2 };
   const pause = (ms) => page.waitForTimeout(ms);
   const loc = (target) => (typeof target === 'string' ? page.locator(target).first() : target);
 
@@ -114,17 +118,21 @@ function ffmpeg(args) {
 
 /**
  * Joue un scénario et produit <id>.mp4 (H.264, lisible partout) et <id>.jpg (image d'attente).
- * @param scenario { start: '/page', run: async ({ page, act }) => {} }
+ * @param scenario { start: '/page', mobile?: true, run: async ({ page, act }) => {} }
  */
 export async function record(id, scenario) {
   fs.mkdirSync(OUT, { recursive: true });
   const tmp = path.join(OUT, `.tmp-${id}`);
   fs.rmSync(tmp, { recursive: true, force: true });
 
+  const mobile = !!scenario.mobile;
+  const viewport = mobile ? PHONE : SIZE;
   const browser = await chromium.launch();
   const context = await browser.newContext({
-    viewport: SIZE, deviceScaleFactor: 1, locale: 'fr-FR', timezoneId: 'Europe/Paris',
-    recordVideo: { dir: tmp, size: SIZE },
+    viewport, locale: 'fr-FR', timezoneId: 'Europe/Paris',
+    ...(mobile
+      ? { deviceScaleFactor: 2, isMobile: true, hasTouch: true, recordVideo: { dir: tmp, size: PHONE } }
+      : { deviceScaleFactor: 1, recordVideo: { dir: tmp, size: SIZE } }),
   });
   const token = await encode({ token: { sub: DEMO_USER_ID, email: DEMO_EMAIL }, secret: envLocal('NEXTAUTH_SECRET') });
   await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: new URL(BASE).hostname, path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
@@ -133,7 +141,7 @@ export async function record(id, scenario) {
   const startedAt = Date.now();
   const page = await context.newPage();
   page.on('dialog', (d) => d.accept());
-  const act = actions(page);
+  const act = actions(page, viewport);
   let trim = 0;
   let failure = null;
   try {
@@ -155,7 +163,10 @@ export async function record(id, scenario) {
   const webm = await video.path();
   const mp4 = path.join(OUT, `${id}.mp4`);
   const jpg = path.join(OUT, `${id}.jpg`);
-  ffmpeg(['-ss', trim.toFixed(2), '-i', webm, '-an', '-vf', 'fps=25,format=yuv420p', '-c:v', 'libx264', '-preset', 'slow', '-crf', '27', '-movflags', '+faststart', mp4]);
+  const frame = mobile
+    ? `scale=-2:${SIZE.height - 40}:flags=lanczos,pad=${SIZE.width}:${SIZE.height}:(ow-iw)/2:(oh-ih)/2:color=${PHONE_BACKDROP},`
+    : '';
+  ffmpeg(['-ss', trim.toFixed(2), '-i', webm, '-an', '-vf', `${frame}fps=25,format=yuv420p`, '-c:v', 'libx264', '-preset', 'slow', '-crf', '27', '-movflags', '+faststart', mp4]);
   ffmpeg(['-ss', '0.6', '-i', mp4, '-frames:v', '1', '-q:v', '4', jpg]);
   fs.rmSync(tmp, { recursive: true, force: true });
 

@@ -54,6 +54,10 @@ export default {
       await act.pause(500);
       await act.click(page.getByRole('button', { name: /^Mariage/ }));
       await act.pause(500);
+      await act.hover(page.getByLabel('Contenu de départ'));
+      await act.pause(900);
+      await act.hover(page.getByRole('tab', { name: 'Français' }));
+      await act.pause(400);
       await pointAt(page, act, page.getByRole('button', { name: 'Créer le devis' }));
       await act.pause(1300);
     },

@@ -1,5 +1,6 @@
 // Scénarios des vidéos de la rubrique « Compte ». Un scénario par guide, même identifiant.
-// Le guide « mot-de-passe » est écrit, sans vidéo : le parcours passe par la page de connexion et par un email.
+// Les guides « mot-de-passe » et « mot-de-passe-oublie » sont écrits, sans vidéo : dans la démonstration, la section
+// « Mot de passe » des paramètres est fermée, et le mot de passe oublié passe par la page de connexion et par un email.
 // L'envoi du logo est fermé dans la démonstration : la vidéo montre la zone d'envoi sans cliquer dessus.
 
 // ── Outils locaux ─────────────────────────────────────────────────────────────

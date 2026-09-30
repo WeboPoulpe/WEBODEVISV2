@@ -114,7 +114,7 @@ export default {
       const list = page.getByRole('dialog');
       await act.type(list.getByLabel('Nom du matériel'), 'Rampe de chargement');
       await retype(act, page, list.getByLabel('Quantité', { exact: true }), '2');
-      await act.type(list.getByLabel('Unité'), 'pièces');
+      await choose(act, list.getByLabel('Unité'), 'pièce');
       await act.click(list.getByRole('button', { name: 'Ajouter à ma liste' }));
       await act.hover(list.getByRole('checkbox', { name: 'Rampe de chargement' }));
       await act.pause(900);
@@ -238,6 +238,29 @@ export default {
       await act.pause(900);
       await act.hover(page.getByRole('button', { name: 'Aujourd’hui' }));
       await act.pause(500);
+    },
+  },
+
+  // Un jour libre du calendrier : le devis démarre à cette date (la vidéo s'arrête à l'étape du client).
+  'devis-jour-calendrier': {
+    start: '/calendrier',
+    async run({ page, act }) {
+      await act.click(page.getByRole('button', { name: 'Mois suivant' }));
+      await act.pause(700);
+      // Un jour sans événement, pris dans la troisième semaine du mois.
+      const free = page.locator('main button[aria-pressed][aria-label$=", 0 événement"]');
+      await act.click(free.nth(14));
+      await act.pause(900);
+      await act.click(page.getByRole('link', { name: 'Créer un devis pour ce jour' }));
+      await page.waitForURL(/\/devis\/nouveau/);
+      await page.getByRole('button', { name: 'Anniversaire', exact: true }).waitFor({ timeout: 30_000 });
+      await act.pause(900);
+      await act.hover(page.getByLabel('Date', { exact: true }));
+      await act.pause(1200);
+      await act.click(page.getByRole('button', { name: 'Anniversaire', exact: true }));
+      await act.type(page.getByLabel('Couverts'), '45');
+      await act.click(page.getByRole('button', { name: 'Continuer' }));
+      await act.pause(1200);
     },
   },
 

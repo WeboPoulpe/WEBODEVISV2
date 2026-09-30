@@ -20,18 +20,20 @@ export const demarrer: HelpGuide[] = [
     category: 'demarrer',
     title: 'Créer votre premier devis',
     summary: 'La création guidée pose l’essentiel en trois écrans : l’événement, le client, le style.',
-    keywords: ['nouveau devis', 'créer', 'création', 'premier', 'commencer', 'débuter', 'proposition', 'mariage', 'couverts', 'client', 'style'],
+    keywords: ['nouveau devis', 'créer', 'création', 'premier', 'commencer', 'débuter', 'proposition', 'mariage', 'couverts', 'client', 'style', 'contenu de départ', 'modèle'],
     href: '/devis/nouveau',
     steps: [
       { title: 'Cliquez sur « Nouveau devis »', text: 'Le bouton est en haut à droite de chaque page.' },
-      { title: 'Décrivez l’événement', text: 'Choisissez le type, la date et le nombre de couverts. Le lieu est facultatif.' },
+      { title: 'Décrivez l’événement', text: 'Choisissez le type, la date et le nombre de couverts, puis « Continuer ». Le lieu est facultatif.' },
       { title: 'Choisissez le client', text: 'Cherchez-le par son nom, son email ou son entreprise. Pour une nouvelle personne, passez sur « Nouveau client ».' },
-      { title: 'Choisissez le style', text: '« Standard », « Mariage » ou « Business », puis la langue du devis.' },
+      { title: 'Choisissez le style', text: '« Classique », « Violet », « Mariage » ou « Business ». Le style retenu dans « Styles de devis » est déjà sélectionné.' },
+      { title: 'Choisissez le contenu de départ et la langue', text: '« Contenu de départ » propose « Document vierge » ou l’un de vos modèles. Il n’apparaît qu’une fois un modèle enregistré.' },
       { title: 'Cliquez sur « Créer le devis »', text: 'Le devis s’ouvre dans l’éditeur.' },
     ],
     notes: [
       'Le nouveau devis apparaît dans la page Devis avec le statut « Devis à faire ».',
       'Un nouveau client saisi avec son email est ajouté à vos clients.',
+      'Depuis la fiche d’un client ou un jour du calendrier, le devis démarre avec le client ou la date déjà remplis.',
     ],
   },
   {

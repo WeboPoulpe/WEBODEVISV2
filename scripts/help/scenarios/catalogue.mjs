@@ -2,6 +2,8 @@
 // Rappel : le compte de démonstration n'enregistre rien. Quand la page relit ses données après l'écriture
 // (catégories) ou part vers une autre page (nouvelle prestation), la vidéo s'arrête
 // sur le bouton de validation, sans cliquer dessus.
+// Les ajouts de la liste de base, les prix et les actions groupées sont écrits puis annulés : la page garde le résultat
+// à l'écran, la vidéo peut donc aller jusqu'au bout.
 // Pas de vidéo pour « modeles-presentation » (page Modèles de devis) : la création d'un modèle y échoue
 // et le modèle choisi n'est pas repris par le nouveau devis. Le guide est écrit, avec ce qui marche.
 
@@ -54,7 +56,7 @@ export default {
   'prestation-ingredients': {
     start: '/prestations',
     async run({ page, act }) {
-      await act.click(page.getByRole('tab', { name: 'Dîner' }));
+      await act.click(page.getByRole('tab', { name: 'Dîner', exact: true }));
       await act.pause(500);
       await act.click(page.getByRole('button', { name: /^Risotto aux champignons/ }));
       const win = windowOf(page, 'Modifier la prestation');
@@ -123,26 +125,126 @@ export default {
   'modeles-location': {
     start: '/location-templates',
     async run({ page, act }) {
-      // L'article est ajouté à un modèle existant : un modèle créé dans la démonstration n'existe pas en base,
-      // il ne pourrait donc pas recevoir d'article. La création d'un modèle vient ensuite.
-      await act.click(page.getByRole('tab', { name: /^Cocktail/ }));
-      await act.pause(700);
-      await act.click(page.getByRole('button', { name: 'Ajouter un article' }));
-      const item = page.getByRole('dialog', { name: 'Nouvel article' });
-      await act.type(item.getByLabel('Article'), 'Tasse à café');
-      await retype(act, page, item.getByLabel('Quantité par couvert'), '0.5');
-      await act.type(item.getByLabel('Unité'), 'pièce');
-      await retype(act, page, item.getByLabel('Prix unitaire HT'), '0.2');
-      await choose(act, item.getByLabel('Fournisseur habituel'), 'Loca-Réception');
-      await act.click(item.getByRole('button', { name: 'Enregistrer' }));
-      await act.hover(page.getByText('Tasse à café', { exact: true }));
-      await act.pause(900);
-      await act.click(page.getByRole('button', { name: 'Nouveau modèle' }));
+      // Un modèle neuf : la liste de base s'ouvre d'office. Le modèle créé dans la démonstration n'existe pas en base :
+      // on montre la liste, puis on la referme sans ajouter.
+      await act.click(page.getByRole('button', { name: 'Nouveau modèle' }).first());
       const model = page.getByRole('dialog', { name: 'Nouveau modèle de location' });
       await act.type(model.getByLabel('Nom du modèle'), 'Séminaire');
       await act.click(model.getByRole('button', { name: 'Créer le modèle' }));
-      await act.hover(page.getByRole('heading', { name: 'Séminaire' }));
+      const base = page.getByRole('dialog', { name: 'Ajouter à « Séminaire »' });
+      await base.waitFor();
+      await act.pause(700);
+      await act.click(base.getByRole('checkbox', { name: 'Assiette plate 27 cm' }));
+      await act.click(base.getByRole('checkbox', { name: 'Fourchette de table' }));
+      await act.click(base.getByRole('checkbox', { name: 'Couteau de table' }));
+      await act.pause(500);
+      await act.hover(base.getByRole('button', { name: /^Ajouter 3 articles/ }));
       await act.pause(900);
+      await act.click(base.getByRole('button', { name: 'Fermer' }).last());
+      // Les articles sont ajoutés à un modèle déjà enregistré.
+      await act.click(page.getByRole('tab', { name: /^Cocktail/ }));
+      await act.pause(600);
+      await act.click(page.getByRole('button', { name: 'Depuis la liste' }));
+      const list = page.getByRole('dialog', { name: 'Ajouter à « Cocktail »' });
+      await act.click(list.getByRole('checkbox', { name: 'Serviette en tissu' }));
+      await act.click(list.getByRole('checkbox', { name: 'Verre à eau' }));
+      await retype(act, page, list.getByLabel('Quantité par couvert, Verre à eau'), '0.5');
+      await act.click(list.getByRole('button', { name: /^Ajouter 2 articles/ }));
+      await act.hover(page.getByText('Verre à eau', { exact: true }));
+      await act.pause(900);
+      // Un article saisi à la main : un nom connu remplit l'unité et la quantité.
+      await act.click(page.getByRole('button', { name: 'Ajouter un article' }));
+      const item = page.getByRole('dialog', { name: 'Nouvel article' });
+      await act.type(item.getByLabel('Article'), 'Tasse et sous-tasse à café');
+      await act.hover(item.getByLabel('Unité'));
+      await act.pause(700);
+      await retype(act, page, item.getByLabel('Prix unitaire HT'), '0.35');
+      await choose(act, item.getByLabel('Fournisseur habituel'), 'Loca-Réception');
+      await act.click(item.getByRole('button', { name: 'Enregistrer' }));
+      await act.hover(page.getByText('Tasse et sous-tasse à café', { exact: true }));
+      await act.pause(900);
+    },
+  },
+
+  materiel: {
+    start: '/materiel',
+    async run({ page, act }) {
+      await act.hover(page.getByText('Chafing dish', { exact: true }));
+      await act.pause(600);
+      await act.click(page.getByRole('button', { name: 'Depuis la liste' }));
+      const base = page.getByRole('dialog', { name: 'Liste de base' });
+      await act.click(base.getByRole('checkbox', { name: 'Plaque à induction' }));
+      await act.click(base.getByRole('checkbox', { name: 'Glacière' }));
+      await act.click(base.getByRole('checkbox', { name: 'Chariot de transport' }));
+      await retype(act, page, base.getByLabel('Quantité, Glacière'), '3');
+      await act.click(base.getByRole('button', { name: /^Ajouter 3 articles/ }));
+      await act.hover(page.getByText('Glacière', { exact: true }));
+      await act.pause(900);
+      await act.click(page.getByRole('button', { name: 'Nouvel article' }));
+      const form = page.getByRole('dialog', { name: 'Nouvel article' });
+      await act.type(form.getByLabel('Article'), 'Machine à glaçons');
+      await choose(act, form.getByLabel('Unité'), 'pièce');
+      await act.click(form.getByRole('button', { name: 'Enregistrer' }));
+      await act.hover(page.getByText('Machine à glaçons', { exact: true }));
+      await act.pause(800);
+      await act.hover(page.getByRole('button', { name: 'Retirer Percolateur' }));
+      await act.pause(900);
+    },
+  },
+
+  'prestation-prix': {
+    start: '/prestations',
+    async run({ page, act }) {
+      await act.click(page.getByRole('tab', { name: 'Dîner', exact: true }));
+      await act.pause(600);
+      const price = page.getByLabel(/^Prix HT, Risotto aux champignons/);
+      await act.click(price);
+      await act.pause(400);
+      await price.pressSequentially('21,50', { delay: 110 });
+      await act.pause(500);
+      await act.press('Enter');
+      await act.pause(1400);
+    },
+  },
+
+  'reviser-prix': {
+    start: '/prestations',
+    async run({ page, act }) {
+      await act.click(page.getByRole('tab', { name: 'Cocktail', exact: true }));
+      await act.pause(600);
+      await act.click(page.getByRole('button', { name: 'Réviser les prix' }));
+      const win = page.getByRole('dialog', { name: 'Réviser les prix' });
+      await act.type(win.getByLabel('Variation en %'), '4');
+      await choose(act, win.getByLabel('Arrondi'), 'Aux 10 centimes');
+      await act.hover(win.locator('ul li').first());
+      await act.pause(1500);
+      await act.click(win.getByRole('button', { name: /^Appliquer à/ }));
+      await act.pause(1500);
+    },
+  },
+
+  'prestations-selection': {
+    start: '/prestations',
+    async run({ page, act }) {
+      await act.click(page.getByRole('tab', { name: 'Dîner', exact: true }));
+      await act.pause(600);
+      const boxes = page.getByRole('checkbox', { name: /^Sélectionner / });
+      await act.click(boxes.nth(0));
+      await act.click(boxes.nth(1));
+      await act.pause(500);
+      await act.click(page.getByRole('button', { name: 'Changer de catégorie' }));
+      const win = page.getByRole('dialog', { name: 'Changer de catégorie' });
+      await choose(act, win.getByLabel('Catégorie', { exact: true }), 'Cocktail');
+      await act.pause(500);
+      await act.click(win.getByRole('button', { name: /^Appliquer à/ }));
+      await act.pause(900);
+      await act.click(page.getByRole('tab', { name: 'Cocktail', exact: true }));
+      await act.pause(600);
+      await act.click(page.getByRole('checkbox', { name: /^Sélectionner / }).last());
+      await act.click(page.getByRole('toolbar', { name: 'Actions sur la sélection' }).getByRole('button', { name: 'Supprimer' }));
+      await act.pause(700);
+      await act.hover(page.getByRole('dialog').getByRole('button', { name: /^Supprimer 1 prestation/ }));
+      await act.pause(1300);
     },
   },
 };

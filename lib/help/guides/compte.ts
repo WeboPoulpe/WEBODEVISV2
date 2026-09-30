@@ -22,9 +22,27 @@ export const compte: HelpGuide[] = [
   {
     id: 'mot-de-passe',
     category: 'compte',
-    title: 'Changer de mot de passe ou le retrouver',
-    summary: 'Le mot de passe se change depuis la page de connexion, par un lien reçu par email.',
-    keywords: ['mot de passe', 'oublié', 'perdu', 'réinitialiser', 'changer', 'connexion', 'se connecter', 'identifiants', 'sécurité', 'déconnexion'],
+    title: 'Changer votre mot de passe',
+    summary: 'Une fois connecté, le mot de passe se change dans les paramètres, en redonnant l’actuel.',
+    keywords: ['mot de passe', 'changer', 'modifier', 'nouveau mot de passe', 'sécurité', 'identifiants', 'paramètres', 'compte'],
+    href: '/parametres',
+    steps: [
+      { title: 'Ouvrez « Mon entreprise » dans le menu « Paramètres »', text: 'La section « Mot de passe » est en bas de la page.' },
+      { title: 'Saisissez votre « Mot de passe actuel »', text: 'L’icône en forme d’œil affiche ou masque ce que vous tapez.' },
+      { title: 'Choisissez le « Nouveau mot de passe »', text: 'Six caractères au moins. Tapez-le une seconde fois dans « Confirmer le nouveau mot de passe ».' },
+      { title: 'Cliquez sur « Changer le mot de passe »', text: 'Un message confirme le changement, et un email de confirmation vous est envoyé.' },
+    ],
+    notes: [
+      'Vous avez oublié le mot de passe actuel ? Passez par « Mot de passe oublié ? » sur la page de connexion.',
+      'Le mot de passe ne se change pas dans la démonstration.',
+    ],
+  },
+  {
+    id: 'mot-de-passe-oublie',
+    category: 'compte',
+    title: 'Retrouver l’accès avec un mot de passe oublié',
+    summary: 'Depuis la page de connexion, un lien reçu par email permet de choisir un nouveau mot de passe.',
+    keywords: ['mot de passe', 'oublié', 'perdu', 'réinitialiser', 'connexion', 'se connecter', 'identifiants', 'accès', 'bloqué', 'lien'],
     steps: [
       { title: 'Ouvrez la page de connexion', text: 'Si vous êtes connecté, déconnectez-vous d’abord : l’icône « Se déconnecter » est en bas du menu, à droite de votre nom.' },
       { title: 'Saisissez votre adresse email', text: 'Laissez le mot de passe vide.' },
@@ -33,7 +51,6 @@ export const compte: HelpGuide[] = [
       { title: 'Choisissez le nouveau mot de passe', text: 'Six caractères au moins, à saisir deux fois, puis « Mettre à jour le mot de passe ». L’app vous ramène à la connexion.' },
     ],
     notes: [
-      'Il n’y a pas d’écran pour changer le mot de passe une fois connecté : le parcours est le même que pour un mot de passe oublié.',
       'Si le lien a expiré, refaites une demande depuis la page de connexion.',
       'Pas d’email reçu ? Vérifiez l’adresse saisie et le dossier des courriers indésirables.',
     ],

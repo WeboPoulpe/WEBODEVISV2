@@ -32,7 +32,7 @@ const DEMO_EMAIL = 'demo@webodevis.fr';
 // Identifiants stables d'une exécution à l'autre : les adresses des fiches restent valables après un rejeu.
 const KINDS = ['supplier', 'ingredient', 'prestation', 'recipe', 'customer', 'contact', 'folder', 'token', 'prospect', 'quote',
   'line', 'task', 'material', 'cost', 'rental', 'rentalTpl', 'course', 'extra', 'mission', 'order', 'orderItem', 'movement',
-  'devisTpl', 'quoteTpl', 'notification', 'rentalSet'];
+  'devisTpl', 'quoteTpl', 'notification', 'rentalSet', 'preset'];
 const seq = {};
 const uid = (kind) => {
   const k = KINDS.indexOf(kind);
@@ -659,6 +659,7 @@ try {
     'delete from public.supplier_orders where user_id = $1',
     'delete from public.service_ingredients where user_id = $1',
     'delete from public.service_materials where user_id = $1',
+    'delete from public.material_presets where user_id = $1',
     'delete from public.rental_templates where user_id = $1',
     'delete from public.rental_template_sets where user_id = $1',
     `delete from public.quote_status_history where quote_id in ${mine}`,
@@ -725,6 +726,15 @@ try {
   ].map(([material_name, qty_per_guest, unit, price], i) => ({
     id: uid('rentalTpl'), user_id: DEMO, set_id: SET_COCKTAIL, material_name, qty_per_guest, unit,
     default_supplier_id: supplier('location').id, default_price_per_unit: price, sort_order: i,
+  })));
+  // Matériel du traiteur (page Matériel, « Choisir dans ma liste » d'un événement) : une partie de la liste de base,
+  // le reste reste à cocher dans « Depuis la liste ».
+  await insert('material_presets', [
+    ['Bacs gastronormes GN 1/1', 'pièce', 12, null], ['Caisse isotherme', 'pièce', 8, null], ['Chafing dish', 'pièce', 4, null],
+    ['Étuve chauffante', 'pièce', 1, null], ['Percolateur', 'pièce', 1, null], ['Plateaux de service', 'pièce', 12, null],
+    ['Rallonges électriques', 'pièce', 3, null], ['Serviettes cocktail', 'pièce', 1, 2], ['Trousse de secours', 'pièce', 1, null],
+  ].map(([name, unit, default_qty, qty_per_guest], i) => ({
+    id: uid('preset'), user_id: DEMO, name, unit, default_qty, qty_per_guest, created_at: ts(-190 + i, 9),
   })));
 
   // 4. Clients et demandes

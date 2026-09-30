@@ -75,6 +75,34 @@ export default {
     },
   },
 
+  // Nouveau devis depuis la fiche d'un client : le client est déjà choisi (la vidéo s'arrête avant « Créer le devis »).
+  'devis-pour-client': {
+    start: '/clients',
+    async run({ page, act }) {
+      await act.type(page.getByLabel('Rechercher un client'), 'sor');
+      await act.pause(500);
+      await act.click(page.getByRole('button', { name: /Groupe Sorélia/ }).first());
+      await act.pause(1200);
+      await act.click(page.getByRole('link', { name: 'Nouveau devis pour ce client' }));
+      await page.waitForURL(/\/devis\/nouveau/);
+      await page.getByRole('button', { name: 'Séminaire', exact: true }).waitFor({ timeout: 30_000 });
+      await act.pause(700);
+      await act.click(page.getByRole('button', { name: 'Séminaire', exact: true }));
+      await act.click(page.getByLabel('Date', { exact: true }));
+      await page.getByLabel('Date', { exact: true }).fill('2027-03-11');
+      await act.pause(400);
+      await act.type(page.getByLabel('Couverts'), '60');
+      await act.click(page.getByRole('button', { name: 'Continuer' }));
+      await act.pause(900);
+      await act.hover(page.getByText('Groupe Sorélia').last());
+      await act.pause(1300);
+      await act.click(page.getByRole('button', { name: 'Continuer' }));
+      await act.pause(600);
+      await pointAt(page, act, page.getByRole('button', { name: 'Créer le devis' }));
+      await act.pause(1300);
+    },
+  },
+
   // Importer des clients en masse par collage (la vidéo s'arrête avant « Importer 3 clients »).
   'importer-clients': {
     start: '/clients',
