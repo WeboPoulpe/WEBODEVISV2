@@ -36,6 +36,20 @@
       "when": 1790777316692,
       "tag": "0004_quote_share",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790779327657,
+      "tag": "0005_site_requests_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790779505313,
+      "tag": "0006_profile_modules",
+      "breakpoints": true
     }
   ]
 }

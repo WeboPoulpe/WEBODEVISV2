@@ -10,6 +10,7 @@ import { isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
 import { getSessionUser } from './session';
+import { isSignupOpen } from './settings';
 
 const MIN_PASSWORD = 6;
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -22,6 +23,7 @@ export async function registerUser(input: {
   firstName: string;
   lastName: string;
 }): Promise<{ error: string | null }> {
+  if (!(await isSignupOpen())) return { error: 'Les inscriptions ne sont pas encore ouvertes.' };
   const email = normalizeEmail(input.email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Adresse email invalide' };
   if (input.password.length < MIN_PASSWORD) return { error: 'Le mot de passe doit faire au moins 6 caractères' };

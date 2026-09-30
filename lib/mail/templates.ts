@@ -129,3 +129,69 @@ export function quoteProposalEmail({ companyName, clientName, eventType, eventDa
     }),
   };
 }
+
+// ── Demandes envoyées depuis le site de présentation ──────────────────────────
+export interface SiteRequestDetails {
+  kind: 'devis' | 'message';
+  name: string;
+  email: string;
+  phone?: string | null;
+  company?: string | null;
+  teamSize?: string | null;
+  message: string;
+}
+
+/** À l'équipe WeboDevis : une demande vient d'arriver par le site. */
+export function siteRequestNotificationEmail({ request, appUrl }: { request: SiteRequestDetails; appUrl: string }): Email {
+  const what = request.kind === 'devis' ? 'Demande de devis' : 'Message';
+  return {
+    subject: `${what} depuis le site : ${request.name}`,
+    html: renderEmail({
+      preheader: `${request.name}${request.company ? `, ${request.company}` : ''} vous écrit depuis webodevis.fr.`,
+      title: request.kind === 'devis' ? 'Nouvelle demande de devis' : 'Nouveau message',
+      paragraphs: [`« ${multiline(request.message)} »`],
+      facts: [
+        ['Nom', request.name],
+        ['Entreprise', request.company ?? ''],
+        ['Email', request.email],
+        ['Téléphone', request.phone ?? ''],
+        ['Équipe', request.teamSize ?? ''],
+      ],
+      button: { label: 'Ouvrir dans l’administration', url: `${appUrl}/admin/demandes` },
+      note: 'Répondre à cet email écrit directement à la personne.',
+    }),
+  };
+}
+
+/** À la personne qui a écrit : accusé de réception. */
+export function siteRequestAckEmail({ request }: { request: SiteRequestDetails }): Email {
+  return {
+    subject: request.kind === 'devis' ? 'Votre demande de devis WeboDevis' : 'Nous avons bien reçu votre message',
+    html: renderEmail({
+      preheader: 'Votre message est bien arrivé. Nous vous répondons rapidement.',
+      title: `Merci ${request.name.split(/\s+/)[0]}`,
+      paragraphs: [
+        request.kind === 'devis'
+          ? 'Votre demande de devis est bien arrivée. Nous l’étudions et revenons vers vous par email.'
+          : 'Votre message est bien arrivé. Nous vous répondons par email.',
+        'Pour mémoire, voici ce que vous nous avez écrit :',
+        `« ${multiline(request.message)} »`,
+      ],
+      note: 'Pour compléter votre demande, répondez simplement à cet email.',
+    }),
+  };
+}
+
+// ── Compte créé par un administrateur ─────────────────────────────────────────
+export function accountInviteEmail({ firstName, link }: { firstName: string | null; link: string }): Email {
+  return {
+    subject: 'Votre compte WeboDevis est prêt',
+    html: renderEmail({
+      preheader: 'Choisissez votre mot de passe pour ouvrir votre compte.',
+      title: firstName ? `Bienvenue ${firstName}` : 'Bienvenue',
+      paragraphs: ['Un compte WeboDevis vient d’être créé pour vous. Il ne reste qu’à choisir votre mot de passe.'],
+      button: { label: 'Choisir mon mot de passe', url: link },
+      note: 'Ce lien est valable sept jours et ne peut servir qu’une fois. Passé ce délai, utilisez « Mot de passe oublié » sur la page de connexion.',
+    }),
+  };
+}

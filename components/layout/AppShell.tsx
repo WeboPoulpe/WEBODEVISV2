@@ -15,11 +15,15 @@ import { signOut as endSession } from 'next-auth/react';
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [helpOpen, setHelpOpen] = useState(false);
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, actingAsAdmin, actAs } = useAuth();
+  const leaveAccount = async () => {
+    await actAs(null);
+    window.location.assign('/admin/comptes');
+  };
   const badges = useNavBadges();
 
   // Show onboarding overlay if user has not completed it
-  const showOnboarding = !loading && user && profile && profile.has_completed_onboarding === false;
+  const showOnboarding = !loading && !actingAsAdmin && user && profile && profile.has_completed_onboarding === false;
 
   return (
     <div className="flex h-[100dvh] overflow-hidden">
@@ -28,6 +32,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar badges={badges} />
 
       <div className="app-main-area flex flex-col flex-1 min-w-0 transition-[margin-left] duration-200" style={{ marginLeft: 'var(--shell-left)' }}>
+        {actingAsAdmin && (
+          <div role="status" className="flex items-center justify-between gap-3 mx-4 md:mx-6 mt-3 px-4 py-2.5 rounded-2xl bg-primary text-white text-sm">
+            <p className="min-w-0 truncate">
+              <span className="font-semibold">Administration.</span>{' '}
+              <span className="text-white/85">Vous êtes dans le compte de {profile?.company_name || profile?.email || user?.email}.</span>
+            </p>
+            <button onClick={leaveAccount} className="flex-shrink-0 font-semibold underline underline-offset-4 hover:no-underline">
+              Revenir
+            </button>
+          </div>
+        )}
         {isDemoUser(user?.id) && (
           <div role="status" className="flex items-center justify-between gap-3 mx-4 md:mx-6 mt-3 px-4 py-2.5 rounded-2xl bg-forest text-white text-sm">
             <p className="min-w-0">

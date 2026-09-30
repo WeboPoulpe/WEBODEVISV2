@@ -825,6 +825,8 @@ export const profiles = pgTable("profiles", {
 	pdf_font_size_services_details: integer().default(14),
 	pdf_font_size_conditions: integer().default(12),
 	has_completed_onboarding: boolean().default(false),
+	// Options activées pour ce compte (voir lib/modules.ts). Vide : les options standard.
+	modules: jsonb(),
 	default_vat_rate: integer().default(20),
 	cgv: text(),
 	siret: text(),
@@ -1447,3 +1449,33 @@ export const user_photo_categories = pgTable("user_photo_categories", {
 		}).onDelete("cascade"),
 	unique("user_photo_categories_user_id_name_key").on(table.name, table.user_id),
 ]);
+
+// Demandes envoyées depuis le site de présentation : devis pour le logiciel, ou simple message.
+export const site_requests = pgTable("site_requests", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	kind: text().notNull(),
+	name: text().notNull(),
+	email: text().notNull(),
+	phone: text(),
+	company: text(),
+	// Taille de l'équipe, telle que choisie dans le formulaire (demande de devis).
+	team_size: text(),
+	message: text().notNull(),
+	status: text().default('nouvelle').notNull(),
+	admin_notes: text(),
+	// Empreinte de l'adresse IP, pour limiter les envois en rafale ; l'adresse elle-même n'est pas gardée.
+	ip_hash: text(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	handled_at: timestamp({ withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("idx_site_requests_created_at").using("btree", table.created_at.desc().nullsFirst()),
+	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text])`),
+	check("site_requests_status_check", sql`status = ANY (ARRAY['nouvelle'::text, 'en_cours'::text, 'traitee'::text])`),
+]);
+
+// Réglages de la plateforme, modifiables depuis l'espace d'administration (une ligne par réglage).
+export const app_settings = pgTable("app_settings", {
+	key: text().primaryKey().notNull(),
+	value: jsonb().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});

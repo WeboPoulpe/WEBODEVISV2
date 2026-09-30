@@ -49,7 +49,7 @@ export const RULES: Record<string, TableRule> = {
   profiles: {
     ...both(own('id')),
     admin: ['select', 'update'],
-    adminOnlyColumns: ['role', 'is_active', 'subscription_type', 'subscription_plan', 'max_linked_users', 'parent_user_id', 'can_view_all_company_data'],
+    adminOnlyColumns: ['modules', 'role', 'is_active', 'subscription_type', 'subscription_plan', 'max_linked_users', 'parent_user_id', 'can_view_all_company_data'],
   },
   prestations: both(own('user_id')),
   prestation_categories: { read: globalOrOwn, write: own('user_id'), adminWrite: (t) => `${t}.user_id is null` },

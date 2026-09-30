@@ -8,6 +8,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { CONFIRMED_STATUSES, PENDING_STATUSES } from '@/lib/quoteStatus';
+import { hiddenRoutes } from '@/lib/modules';
 
 export type BadgeKey = 'pendingDevis' | 'todayEvent' | 'newProspects' | 'stockAlert';
 
@@ -81,8 +82,12 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 /** Groupes de navigation, avec l'espace admin pour les administrateurs. */
 export function useNavGroups(): NavGroup[] {
   const { profile } = useAuth();
-  return NAV_GROUPS.map((g) =>
-    g.title === 'Paramètres' && profile?.role === 'admin' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g);
+  // Les pages des options non activées pour ce compte disparaissent du menu.
+  const hidden = hiddenRoutes(profile?.modules);
+  return NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((i) => !hidden.includes(i.href)) }))
+    .map((g) => (g.title === 'Paramètres' && profile?.role === 'admin' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g))
+    .filter((g) => g.items.length > 0);
 }
 
 export type Badges = Record<BadgeKey, number | 'dot' | null>;

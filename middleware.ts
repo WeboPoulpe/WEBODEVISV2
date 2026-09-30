@@ -2,7 +2,7 @@ import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
-const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/mentions-legales', '/confidentialite'];
+const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

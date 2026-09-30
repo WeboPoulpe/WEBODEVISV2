@@ -24,6 +24,8 @@ export interface Profile {
   can_view_all_company_data: boolean;
   has_completed_onboarding: boolean | null;
   default_vat_rate: number | null;
+  /** Options activées pour le compte (voir lib/modules.ts). */
+  modules: unknown;
 }
 
 export interface AuthUser {
@@ -36,6 +38,10 @@ interface AuthContextType {
   user: AuthUser | null;
   profile: Profile | null;
   loading: boolean;
+  /** Un administrateur a ouvert ce compte depuis l'espace d'administration. */
+  actingAsAdmin: boolean;
+  /** Ouvre le compte d'un client (administrateurs), ou en ressort avec null. */
+  actAs: (userId: string | null) => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -45,7 +51,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 function AuthState({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const userId = session?.user?.id ?? null;
@@ -73,13 +79,17 @@ function AuthState({ children }: { children: React.ReactNode }) {
   const signUp = (email: string, password: string, firstName: string, lastName: string) =>
     registerUser({ email, password, firstName, lastName });
 
+  const actAs = async (targetId: string | null) => {
+    await update({ actAs: targetId });
+  };
+
   const signOut = async () => {
     await nextAuthSignOut({ redirect: false });
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading: status === 'loading', signIn, signUp, signOut, refreshProfile: fetchProfile }}
+      value={{ user, profile, loading: status === 'loading', actingAsAdmin: !!session?.actingAsAdmin, actAs, signIn, signUp, signOut, refreshProfile: fetchProfile }}
     >
       {children}
     </AuthContext.Provider>

@@ -2,77 +2,75 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Shield, FolderTree, ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft, FolderTree, Inbox, LayoutDashboard, LogOut, Settings2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import Wordmark from '@/components/brand/Wordmark';
 
 const NAV = [
-  { href: '/admin',            icon: LayoutDashboard, label: 'Dashboard',           exact: true },
-  { href: '/admin/users',      icon: Users,           label: 'Utilisateurs',        exact: false },
-  { href: '/admin/categories', icon: FolderTree,      label: 'Catégories globales', exact: false },
+  { href: '/admin', icon: LayoutDashboard, label: 'Vue d’ensemble', exact: true },
+  { href: '/admin/comptes', icon: Users, label: 'Comptes', exact: false },
+  { href: '/admin/demandes', icon: Inbox, label: 'Demandes', exact: false },
+  { href: '/admin/categories', icon: FolderTree, label: 'Catégories', exact: false },
+  { href: '/admin/reglages', icon: Settings2, label: 'Réglages', exact: false },
 ];
 
+// Coque de l'espace d'administration : barre latérale sur ordinateur, onglets en haut sur téléphone et tablette.
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { signOut } = useAuth();
-
-  const isActive = (item: typeof NAV[number]) => {
-    if (item.exact) return pathname === item.href;
-    return pathname === item.href || pathname.startsWith(item.href + '/');
-  };
+  const isActive = (item: (typeof NAV)[number]) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
+  const leave = async () => { await signOut(); window.location.assign('/login'); };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar admin */}
-      <aside
-        className="fixed inset-y-0 left-0 z-30 hidden lg:flex flex-col w-60 overflow-hidden"
-        style={{ background: 'linear-gradient(175deg, #0f172a 0%, #1e1b4b 55%, #0f172a 100%)' }}
-      >
-        <div className="flex items-center h-[60px] px-5 border-b border-white/[0.08] flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-400 to-red-500 shadow-md">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm">WeboDevis</p>
-              <p className="text-amber-300 text-[9px] font-bold tracking-widest uppercase">Admin</p>
-            </div>
-          </div>
+    <div className="flex h-[100dvh] overflow-hidden bg-page">
+      <aside className="hidden lg:flex flex-col w-64 m-2 rounded-3xl bg-forest text-white flex-shrink-0">
+        <div className="px-6 pt-7 pb-6">
+          <Wordmark className="text-[22px] text-white" />
+          <p className="text-sm text-white/55 mt-1.5">Administration</p>
         </div>
-
-        <nav className="flex-1 py-3 px-3 space-y-1">
-          <Link href="/" className="flex items-center gap-2 px-3 py-2.5 mb-3 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Retour à l&apos;app</span>
-          </Link>
-          <div className="border-t border-white/10 pt-3 space-y-1">
-            {NAV.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item);
-              return (
-                <Link key={item.href} href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
-                    active ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
+        <nav className="flex-1 px-3 space-y-1" aria-label="Administration">
+          {NAV.map((item) => (
+            <Link key={item.href} href={item.href} aria-current={isActive(item) ? 'page' : undefined}
+              className={cn('flex items-center gap-3 h-11 px-3 rounded-xl text-[15px] font-medium transition-colors',
+                isActive(item) ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white')}>
+              <item.icon className="h-[18px] w-[18px]" />
+              {item.label}
+            </Link>
+          ))}
         </nav>
-
-        <div className="p-3 border-t border-white/10">
-          <button onClick={signOut} className="w-full flex items-center gap-2 px-3 py-2 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors text-sm">
-            <LogOut className="h-4 w-4" />Déconnexion
+        <div className="p-3 space-y-1">
+          <Link href="/" className="flex items-center gap-3 h-11 px-3 rounded-xl text-[15px] text-white/70 hover:bg-white/5 hover:text-white transition-colors">
+            <ArrowLeft className="h-[18px] w-[18px]" />Retour à l’app
+          </Link>
+          <button onClick={leave} className="w-full flex items-center gap-3 h-11 px-3 rounded-xl text-[15px] text-white/70 hover:bg-white/5 hover:text-white transition-colors">
+            <LogOut className="h-[18px] w-[18px]" />Se déconnecter
           </button>
         </div>
       </aside>
 
-      <div className="flex flex-col flex-1 min-w-0" style={{ marginLeft: 240 }}>
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex flex-col flex-1 min-w-0">
+        <header className="lg:hidden flex-shrink-0 bg-forest text-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="flex items-center justify-between gap-3 h-14 px-4">
+            <p className="flex items-baseline gap-2 min-w-0">
+              <Wordmark className="text-lg text-white" />
+              <span className="text-sm text-white/55 truncate">Administration</span>
+            </p>
+            <Link href="/" className="flex items-center gap-1.5 h-10 px-3 -mr-2 rounded-xl text-sm font-medium text-white/80 hover:text-white">
+              <ArrowLeft className="h-4 w-4" />L’app
+            </Link>
+          </div>
+          <nav className="flex gap-1 px-3 pb-2 overflow-x-auto scrollbar-none" aria-label="Administration">
+            {NAV.map((item) => (
+              <Link key={item.href} href={item.href} aria-current={isActive(item) ? 'page' : undefined}
+                className={cn('flex-shrink-0 h-10 px-3.5 flex items-center rounded-full text-sm font-medium whitespace-nowrap transition-colors',
+                  isActive(item) ? 'bg-white text-forest' : 'text-white/75 hover:text-white')}>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </header>
+        <main className="flex-1 overflow-y-auto pt-5 lg:pt-8" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
           {children}
         </main>
       </div>

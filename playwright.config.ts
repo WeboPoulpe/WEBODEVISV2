@@ -27,6 +27,7 @@ export default defineConfig({
   workers: 3,
   timeout: 60_000,
   reporter: [['list']],
+  globalTeardown: './e2e/global-teardown.ts',
   use: {
     baseURL: 'http://localhost:3001',
     locale: 'fr-FR',
