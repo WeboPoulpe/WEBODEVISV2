@@ -34,10 +34,11 @@ for (const { name, path } of PAGES) {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(`exception : ${e.message}`));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(`console : ${m.text().slice(0, 200)}`); });
-    page.on('response', (r) => {
-      if (r.status() >= 400 && /supabase\.co\/(rest|auth|storage)/.test(r.url())) {
-        errors.push(`HTTP ${r.status()} : ${r.url().split('?')[0].split('/').slice(-2).join('/')}`);
-      }
+    // Toute requête de données refusée ou en erreur côté serveur fait échouer le test.
+    page.on('response', async (r) => {
+      if (!r.url().endsWith('/api/db')) return;
+      const body = await r.json().catch(() => null);
+      if (body?.error) errors.push(`données : ${body.error.message}`);
     });
 
     await page.goto(path);
@@ -63,9 +64,9 @@ test('fiche événement : chaque onglet s\'affiche', async ({ page }, testInfo) 
   await expect(page).toHaveURL(/\/evenements\/[^/]+$/);
   await page.waitForLoadState('networkidle');
 
-  const tabs = page.locator('div.overflow-x-auto > button');
-  const count = await tabs.count();
-  for (let i = 0; i < count; i++) {
+  const tabs = page.getByRole('tablist', { name: 'Préparation de l\'événement' }).getByRole('tab');
+  await expect(tabs).toHaveCount(4, { timeout: 20_000 });
+  for (let i = 0; i < 4; i++) {
     await tabs.nth(i).click();
     await page.waitForLoadState('networkidle');
     await shot(page, testInfo, `evenement-onglet-${i + 1}`);

@@ -42,7 +42,13 @@ export function normalizeName(name: string): string {
  * ligne encode déjà le plus souvent le nombre de convives.
  */
 export function computeIngredientNeeds(lines: QuoteLine[], recipes: PrestationRecipe[], guestCount: number) {
-  const byName = new Map(recipes.map((r) => [normalizeName(r.name), r]));
+  // Si deux prestations portent le même nom, celle qui a des ingrédients l'emporte.
+  const byName = new Map<string, PrestationRecipe>();
+  for (const r of recipes) {
+    const key = normalizeName(r.name);
+    const existing = byName.get(key);
+    if (!existing || (existing.ingredients.length === 0 && r.ingredients.length > 0)) byName.set(key, r);
+  }
   const matched: string[] = [];
   const unmatched: string[] = [];
   const withoutIngredients: string[] = [];

@@ -59,7 +59,9 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
   useEffect(() => {
     if (loading || !open || !quoteId) return;
     const t = setTimeout(() => {
-      createClient().from('quotes').update({ extra_costs: extraCosts }).eq('id', quoteId);
+      // La requête ne part que si on attend son résultat.
+      createClient().from('quotes').update({ extra_costs: extraCosts }).eq('id', quoteId)
+        .then(({ error }) => { if (error) console.error('Frais additionnels non enregistrés :', error.message); });
     }, 600);
     return () => clearTimeout(t);
   }, [extraCosts, loading, open, quoteId]);

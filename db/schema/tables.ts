@@ -154,6 +154,8 @@ export const quotes = pgTable("quotes", {
 	user_id: uuid(),
 	content_html: text(),
 	event_materials: jsonb().default([]),
+	// Lignes « matériel » et « personnel » du devis déjà préparées (identifiants de lignes).
+	event_material_checks: jsonb().default([]),
 	selected_font: varchar({ length: 100 }).default('Georgia'),
 	selected_font_size: integer(),
 	language: text().default('fr'),
@@ -480,6 +482,8 @@ export const event_ingredients = pgTable("event_ingredients", {
 	supplier_id: uuid(),
 	notes: text(),
 	checked: boolean().default(false).notNull(),
+	// 'auto' : ligne calculée depuis les prestations (remplacée au recalcul) ; 'manuelle' : ajoutée à la main (conservée).
+	source: text().default('manuelle').notNull(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_event_ingredients_quote_id").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops")),

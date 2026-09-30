@@ -15,6 +15,13 @@
       "when": 1790771688987,
       "tag": "0001_v2_missing_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790774346324,
+      "tag": "0002_event_courses_source",
+      "breakpoints": true
     }
   ]
 }
