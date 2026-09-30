@@ -10,7 +10,7 @@ export const pool =
   new Pool({
     // URL poolée en priorité : adaptée aux fonctions serverless de Vercel.
     connectionString: process.env.DATABASE_URL_POOLED ?? process.env.DATABASE_URL,
-    max: 5,
+    max: 10,
   });
 
 if (process.env.NODE_ENV !== 'production') globalForDb.pgPool = pool;

@@ -25,7 +25,11 @@ export interface TableRule {
 }
 
 const own = (column: string): Predicate => (t, u) => `${t}.${column} = ${u}`;
-const company: Predicate = (t, u) => `public.get_owner_user_id(${u}) = public.get_owner_user_id(${t}.owner_user_id)`;
+// Comptes d'une même entreprise : ceux qui partagent le même compte parent. Écrit comme un ensemble
+// (une sous-requête évaluée une fois) plutôt qu'avec get_owner_user_id(), qui lançait une requête par ligne.
+export const companyMembers = (u: string) =>
+  `(select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${u}))`;
+const company: Predicate = (t, u) => `${t}.owner_user_id in ${companyMembers(u)}`;
 const quoteAccess: Predicate = (t, u) => `(${t}.user_id = ${u} or ${t}.owner_user_id = ${u} or ${company(t, u)})`;
 const viaQuote: Predicate = (t, u) =>
   `exists (select 1 from public.quotes pq where pq.id = ${t}.quote_id and ${quoteAccess('pq', u)})`;

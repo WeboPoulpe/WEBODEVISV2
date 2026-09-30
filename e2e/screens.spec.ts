@@ -38,12 +38,15 @@ for (const { name, path } of PAGES) {
     page.on('response', async (r) => {
       if (!r.url().endsWith('/api/db')) return;
       const body = await r.json().catch(() => null);
-      if (body?.error) errors.push(`données : ${body.error.message}`);
+      for (const result of body?.results ?? []) if (result?.error) errors.push(`données : ${result.error.message}`);
+      if (body?.error) errors.push(`données : ${body.error}`);
     });
 
     await page.goto(path);
     await expect(page).not.toHaveURL(/\/login/);
     await page.waitForLoadState('networkidle');
+    // Les gabarits de chargement doivent avoir laissé place au contenu.
+    await expect.soft(page.locator('.animate-pulse'), 'chargement qui ne se termine pas').toHaveCount(0, { timeout: 20_000 });
     await shot(page, testInfo, name);
 
     const overflow = await horizontalOverflow(page);

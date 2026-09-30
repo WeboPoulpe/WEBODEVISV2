@@ -19,7 +19,7 @@ async function loadOwnedQuote(uid: string, quoteId: string) {
     .from(quotes)
     .where(and(
       eq(quotes.id, quoteId),
-      sql`(${quotes.user_id} = ${uid} or ${quotes.owner_user_id} = ${uid} or public.get_owner_user_id(${uid}::uuid) = public.get_owner_user_id(${quotes.owner_user_id}))`,
+      sql`(${quotes.user_id} = ${uid} or ${quotes.owner_user_id} = ${uid} or ${quotes.owner_user_id} in (select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${uid}::uuid)))`,
     ))
     .limit(1);
   return quote ?? null;

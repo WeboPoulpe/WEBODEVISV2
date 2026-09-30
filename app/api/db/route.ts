@@ -7,19 +7,24 @@ import { getSessionUser } from '@/server/session';
  * Point d'entrée des requêtes venant du navigateur.
  * L'utilisateur vient de la session, jamais de la requête : les règles d'accès
  * (server/compat/rules.ts) sont appliquées côté serveur à chaque appel.
- * Une route plutôt qu'une fonction serveur : le navigateur peut lancer plusieurs requêtes en parallèle,
- * alors que les fonctions serveur s'exécutent l'une après l'autre.
+ * Le navigateur regroupe les requêtes lancées au même moment en un seul appel (voir lib/supabase/client.ts).
  */
+const MAX_BATCH = 40;
+
 export async function POST(request: NextRequest) {
-  let descriptor: QueryDescriptor;
+  let body: { batch?: QueryDescriptor[] };
   try {
-    descriptor = await request.json();
+    body = await request.json();
   } catch {
-    return NextResponse.json({ data: null, count: null, error: { message: 'Requête illisible' } }, { status: 400 });
+    return NextResponse.json({ error: 'Requête illisible' }, { status: 400 });
   }
-  if (!descriptor || typeof descriptor.table !== 'string' || !Array.isArray(descriptor.filters) || !Array.isArray(descriptor.order)) {
-    return NextResponse.json({ data: null, count: null, error: { message: 'Requête incomplète' } }, { status: 400 });
+  const batch = body?.batch;
+  const valid = (d: QueryDescriptor) => d && typeof d.table === 'string' && Array.isArray(d.filters) && Array.isArray(d.order);
+  if (!Array.isArray(batch) || batch.length === 0 || batch.length > MAX_BATCH || !batch.every(valid)) {
+    return NextResponse.json({ error: 'Requête incomplète' }, { status: 400 });
   }
+  // La session est lue une fois pour tout le lot ; les requêtes s'exécutent en parallèle.
   const user = await getSessionUser();
-  return NextResponse.json(await executeQuery(descriptor, { uid: user?.id ?? null }));
+  const results = await Promise.all(batch.map((d) => executeQuery(d, { uid: user?.id ?? null })));
+  return NextResponse.json({ results });
 }

@@ -6,12 +6,40 @@ import { QueryBuilder, type QueryDescriptor, type QueryResult } from '@/lib/comp
 // `.from(...).select(...)` et `.storage.from(...)`, mais tout passe par le serveur,
 // qui applique les règles d'accès.
 
-// Chaque requête est un appel HTTP indépendant : plusieurs peuvent partir en parallèle.
+// Les requêtes lancées au même moment (chargement d'une page, compteurs du menu…) partent dans un seul
+// appel HTTP : une seule vérification de session, puis exécution en parallèle côté serveur.
 // Le passage en JSON retire les `undefined` et transforme les dates en texte, comme le faisait supabase-js.
-const execute = async (d: QueryDescriptor): Promise<QueryResult> => {
-  const res = await fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) });
-  return res.json();
-};
+let pending: { descriptor: QueryDescriptor; resolve: (result: QueryResult) => void }[] = [];
+let scheduled = false;
+
+// Le serveur accepte au plus 40 requêtes par appel.
+const MAX_BATCH = 40;
+
+async function flush() {
+  const batch = pending.slice(0, MAX_BATCH);
+  pending = pending.slice(MAX_BATCH);
+  scheduled = pending.length > 0;
+  if (scheduled) setTimeout(flush, 0);
+  const fail = (message: string) => batch.forEach((b) => b.resolve({ data: null, count: null, error: { message } }));
+  try {
+    const res = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batch: batch.map((b) => b.descriptor) }),
+    });
+    const body = await res.json();
+    if (!Array.isArray(body.results)) { fail(body.error ?? 'Le serveur n’a pas répondu correctement.'); return; }
+    batch.forEach((b, i) => b.resolve(body.results[i]));
+  } catch {
+    fail('Connexion au serveur impossible. Vérifiez votre réseau.');
+  }
+}
+
+const execute = (descriptor: QueryDescriptor): Promise<QueryResult> =>
+  new Promise((resolve) => {
+    pending.push({ descriptor, resolve });
+    if (!scheduled) { scheduled = true; setTimeout(flush, 0); }
+  });
 
 // Adresse publique de chaque fichier envoyé pendant cette session (chemin → URL).
 const uploadedUrls = new Map<string, string>();
