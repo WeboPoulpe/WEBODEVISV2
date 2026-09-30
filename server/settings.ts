@@ -30,7 +30,12 @@ export const SETTINGS_TAG = 'app-settings';
  * Même réponse qu'isSignupOpen, gardée en cache : les pages du site la lisent à chaque affichage
  * sans interroger la base. Le cache est vidé quand le réglage change.
  */
-export const isSignupOpenCached = unstable_cache(async () => isSignupOpen(), ['signup-open'], { tags: [SETTINGS_TAG], revalidate: 3600 });
+export const isSignupOpenCached = unstable_cache(
+  // Base injoignable (construction sans variables d'environnement, coupure) : le site s'affiche quand même, avec le réglage par défaut.
+  async () => isSignupOpen().catch(() => DEFAULTS.signup_open),
+  ['signup-open'],
+  { tags: [SETTINGS_TAG], revalidate: 3600 },
+);
 
 export async function isSignupOpen(): Promise<boolean> {
   const [row] = await db.select({ value: app_settings.value }).from(app_settings).where(eq(app_settings.key, 'signup_open')).limit(1);

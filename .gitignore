@@ -11,3 +11,6 @@ e2e/screenshots
 
 # Enregistrements du centre d'aide avant envoi
 .help-media
+
+# Construction de production de vérification
+.next-build
