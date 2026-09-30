@@ -6,6 +6,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '@/db';
 import { password_reset_tokens, profiles, users, type ProfileRow } from '@/db/schema';
 import { normalizeEmail } from '@/lib/auth';
+import { isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
 import { getSessionUser } from './session';
@@ -59,7 +60,8 @@ export async function getMyProfile(): Promise<ProfileRow | null> {
 export async function requestPasswordReset(rawEmail: string): Promise<{ error: string | null }> {
   const email = normalizeEmail(rawEmail);
   const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-  if (!user) return { error: null };
+  // Le compte de démonstration n'a pas de mot de passe à changer.
+  if (!user || isDemoUser(user.id)) return { error: null };
 
   const token = crypto.randomBytes(32).toString('base64url');
   await db.insert(password_reset_tokens).values({

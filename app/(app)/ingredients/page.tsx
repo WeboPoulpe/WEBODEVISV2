@@ -745,7 +745,7 @@ export default function IngredientsPage() {
               className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
             >
               {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-              {seeding ? `${seedProgress.done}/${seedProgress.total}` : 'Seed images'}
+              {seeding ? `${seedProgress.done}/${seedProgress.total}` : 'Trouver les photos'}
             </button>
             <button
               onClick={() => setModal({ open: true, item: null })}

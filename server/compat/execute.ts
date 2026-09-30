@@ -1,6 +1,7 @@
 import 'server-only';
 import { pool } from '@/db';
 import type { Filter, QueryDescriptor, QueryResult } from '@/lib/compat/builder';
+import { isDemoUser } from '@/lib/demo';
 import { RULES, type TableRule } from './rules';
 
 /** Qui exécute la requête. `bypass` est réservé au code serveur de confiance (pages à jeton). */
@@ -311,7 +312,8 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
         await client.query('rollback');
         return { data: null, count: null, error: { code: '42501', message: `new row violates row-level security policy for table "${d.table}"` } };
       }
-      await client.query('commit');
+      // Compte de démonstration : l'écriture est jouée pour de vrai (mêmes contrôles, même réponse) puis annulée.
+      await client.query(isDemoUser(ctx.uid) ? 'rollback' : 'commit');
       return finish(d, d.returning ? res.rows[0].data : null, null);
     } catch (e) {
       await client.query('rollback').catch(() => {});

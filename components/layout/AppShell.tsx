@@ -8,6 +8,8 @@ import { useNavBadges } from './nav';
 import OnboardingOverlay from '@/components/onboarding/OnboardingOverlay';
 import HelpWidget from '@/components/help/HelpWidget';
 import { useAuth } from '@/context/AuthContext';
+import { isDemoUser } from '@/lib/demo';
+import { signOut as endSession } from 'next-auth/react';
 
 // Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
@@ -26,6 +28,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar badges={badges} />
 
       <div className="app-main-area flex flex-col flex-1 min-w-0 transition-[margin-left] duration-200" style={{ marginLeft: 'var(--shell-left)' }}>
+        {isDemoUser(user?.id) && (
+          <div role="status" className="flex items-center justify-between gap-3 mx-4 md:mx-6 mt-3 px-4 py-2.5 rounded-2xl bg-forest text-white text-sm">
+            <p className="min-w-0">
+              <span className="font-semibold">Démonstration.</span>{' '}
+              <span className="text-white/75">Essayez tout : rien de ce que vous modifiez n’est enregistré.</span>
+            </p>
+            <button onClick={() => endSession({ callbackUrl: '/' })} className="flex-shrink-0 font-semibold underline underline-offset-4 hover:no-underline">
+              Quitter
+            </button>
+          </div>
+        )}
         <Header onHelp={() => setHelpOpen(true)} />
         <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'var(--tabbar-h)' }}>
           {children}

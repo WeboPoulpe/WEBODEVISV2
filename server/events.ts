@@ -6,6 +6,7 @@ import {
   event_ingredients, ingredients, prestations, quotes, service_ingredients, supplier_order_items, supplier_orders,
 } from '@/db/schema';
 import { computeIngredientNeeds, groupNeedsBySupplier, type PrestationRecipe, type QuoteLine } from '@/lib/events/needs';
+import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { requireUser } from './session';
 
 // Opérations en plusieurs étapes de la fiche événement. Chacune vérifie que le devis
@@ -44,6 +45,7 @@ export async function recalculateCourses(quoteId: string): Promise<RecalculateRe
   const user = await requireUser();
   const quote = await loadOwnedQuote(user.id, quoteId);
   const empty = { lines: 0, unmatched: [], withoutIngredients: [] };
+  if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, ...empty };
   if (!quote) return { error: 'Événement introuvable.', ...empty };
 
   const lines = (Array.isArray(quote.services) ? quote.services : []) as QuoteLine[];
@@ -114,6 +116,7 @@ export interface CreateOrdersResult {
  */
 export async function createSupplierOrders(quoteId: string): Promise<CreateOrdersResult> {
   const user = await requireUser();
+  if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, created: 0, withoutSupplier: 0 };
   const quote = await loadOwnedQuote(user.id, quoteId);
   if (!quote) return { error: 'Événement introuvable.', created: 0, withoutSupplier: 0 };
 

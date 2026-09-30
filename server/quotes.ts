@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { profiles, quotes } from '@/db/schema';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { quoteProposalEmail } from '@/lib/mail/templates';
+import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { requireUser } from './session';
 
 /** Statuts d'avant l'envoi : à l'envoi, le devis passe à « Devis envoyé ». */
@@ -23,6 +24,7 @@ export interface SendQuoteResult {
  */
 export async function sendQuoteToClient(input: { quoteId: string; to: string; message: string }): Promise<SendQuoteResult> {
   const user = await requireUser();
+  if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const to = input.to.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return { error: 'L’adresse email du client n’est pas valide.' };
   if (!input.message.trim()) return { error: 'Écrivez quelques mots pour accompagner le devis.' };

@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { profiles } from '@/db/schema';
 import { appOrigin, sendMail } from '@/lib/mail';
+import { isDemoUser } from '@/lib/demo';
 import { prospectAckEmail, prospectNotificationEmail, type ProspectDetails } from '@/lib/mail/templates';
 
 // ── CORS helper ──────────────────────────────────────────────────────────────
@@ -85,6 +86,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Format email invalide' },
         { status: 400, headers: corsHeaders },
+      );
+    }
+
+    // Compte de démonstration : le formulaire répond normalement, mais rien n'est enregistré ni envoyé.
+    if (isDemoUser(tokenData.user_id)) {
+      return NextResponse.json(
+        { success: true, message: 'Demande de devis enregistrée avec succès' },
+        { status: 201, headers: corsHeaders },
       );
     }
 

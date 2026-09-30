@@ -1,6 +1,9 @@
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
+const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/mentions-legales', '/confidentialite'];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
@@ -14,8 +17,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/d/') ||
     pathname.startsWith('/reset-password') ||
     // /site : le site de présentation, ouvert à tous.
-    pathname === '/site' ||
-    pathname.startsWith('/site/') ||
+    SITE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/robots.txt' ||
     // Fichiers de l'app installable : ils doivent se charger sans session.
     pathname === '/manifest.webmanifest' ||
     pathname === '/sw.js' ||

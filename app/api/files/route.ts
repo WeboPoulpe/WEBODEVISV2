@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { del } from '@vercel/blob';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { getSessionUser } from '@/server/session';
 
 // Fichiers des utilisateurs (logos, photos, devis importés), stockés sur Vercel Blob.
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const user = await getSessionUser();
         if (!user) throw new Error('Non connecté');
+        if (isDemoUser(user.id)) throw new Error(DEMO_BLOCKED);
         // Chaque compte n'écrit que dans son propre dossier.
         if (!pathname.startsWith(`${user.id}/`) || pathname.includes('..')) throw new Error('Emplacement refusé');
         const upsert = clientPayload ? !!JSON.parse(clientPayload).upsert : false;
@@ -46,6 +48,7 @@ export async function DELETE(request: NextRequest) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return notConfigured();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+  if (isDemoUser(user.id)) return NextResponse.json({ error: DEMO_BLOCKED }, { status: 403 });
   const { paths } = (await request.json()) as { paths?: string[] };
   const own = (paths ?? []).filter((p) => typeof p === 'string' && p.startsWith(`${user.id}/`) && !p.includes('..'));
   if (own.length === 0) return NextResponse.json({ error: 'Aucun fichier à supprimer' }, { status: 400 });
