@@ -5,34 +5,17 @@ import DemoStart from './DemoStart';
 
 export const metadata: Metadata = {
   title: 'Essayer WeboDevis : la démonstration',
-  description: 'Ouvrez le compte d’un traiteur fictif et parcourez WeboDevis : devis, demandes, événements, courses, équipe. Sans inscription.',
+  description: 'Ouvrez le compte d’un traiteur fictif et parcourez WeboDevis : devis, demandes, événements, courses, équipe.',
 };
-
-const INSIDE = [
-  'Une vingtaine de devis, à tous les stades',
-  'Des événements à préparer : checklist, matériel, courses, extras',
-  'Un catalogue de prestations et d’ingrédients, des clients, des fournisseurs',
-];
 
 export default function DemoPage() {
   return (
     <AuthShell
       title="Essayez WeboDevis"
-      subtitle="Vous entrez dans le compte de Maison Verdier, un traiteur inventé pour l’occasion. Aucune inscription."
+      subtitle="Trois étapes courtes, puis vous entrez dans le compte de Maison Verdier, un traiteur inventé pour l’occasion : une vingtaine de devis, des événements à préparer, un catalogue complet."
       footer={<>Déjà un compte ? <Link href="/login" className="font-semibold text-primary hover:text-primary-dark">Se connecter</Link></>}
     >
-      <ul className="space-y-2.5 text-[15px] text-gray-700 mb-6">
-        {INSIDE.map((line) => (
-          <li key={line} className="flex gap-3">
-            <span aria-hidden className="mt-2 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-            {line}
-          </li>
-        ))}
-      </ul>
       <DemoStart />
-      <p className="text-sm text-gray-500 mt-4">
-        Vous pouvez tout ouvrir et tout essayer. Ce que vous modifiez n’est pas enregistré, et l’envoi d’emails et de fichiers est fermé.
-      </p>
     </AuthShell>
   );
 }

@@ -1450,7 +1450,8 @@ export const user_photo_categories = pgTable("user_photo_categories", {
 	unique("user_photo_categories_user_id_name_key").on(table.name, table.user_id),
 ]);
 
-// Demandes envoyées depuis le site de présentation : devis pour le logiciel, ou simple message.
+// Demandes envoyées depuis le site de présentation : devis pour le logiciel, simple message,
+// ou coordonnées laissées pour essayer la démonstration.
 export const site_requests = pgTable("site_requests", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	kind: text().notNull(),
@@ -1469,7 +1470,7 @@ export const site_requests = pgTable("site_requests", {
 	handled_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("idx_site_requests_created_at").using("btree", table.created_at.desc().nullsFirst()),
-	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text])`),
+	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text, 'demo'::text])`),
 	check("site_requests_status_check", sql`status = ANY (ARRAY['nouvelle'::text, 'en_cours'::text, 'traitee'::text])`),
 ]);
 

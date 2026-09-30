@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { profiles, users } from '@/db/schema';
 import { DEMO_USER_ID } from '@/lib/demo';
+import { readTicket } from '@/server/tickets';
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -12,12 +13,14 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [
-    // Démonstration : un bouton, pas de mot de passe. Le compte n'existe que si ses données ont été créées.
+    // Démonstration : pas de mot de passe, mais un ticket signé, remis après le formulaire de /demo
+    // (voir server/demo.ts). Le compte n'existe que si ses données ont été créées.
     CredentialsProvider({
       id: 'demo',
       name: 'Démonstration',
-      credentials: {},
-      async authorize() {
+      credentials: { ticket: { label: 'Ticket', type: 'text' } },
+      async authorize(credentials) {
+        if (readTicket<{ k: string }>(credentials?.ticket)?.k !== 'demo') return null;
         const [user] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, DEMO_USER_ID)).limit(1);
         return user ?? null;
       },

@@ -3,6 +3,7 @@
 export const REQUEST_KIND: Record<string, string> = {
   devis: 'Demande de devis',
   message: 'Message',
+  demo: 'Essai de la démo',
 };
 
 export const REQUEST_STATUS: Record<string, { label: string; cls: string }> = {

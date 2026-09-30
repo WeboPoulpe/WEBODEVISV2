@@ -1,0 +1,2 @@
+ALTER TABLE "site_requests" DROP CONSTRAINT "site_requests_kind_check";--> statement-breakpoint
+ALTER TABLE "site_requests" ADD CONSTRAINT "site_requests_kind_check" CHECK (kind = ANY (ARRAY['devis'::text, 'message'::text, 'demo'::text]));

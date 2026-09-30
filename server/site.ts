@@ -5,7 +5,7 @@ import { headers } from 'next/headers';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { profiles, site_requests } from '@/db/schema';
-import { appOrigin, sendMail } from '@/lib/mail';
+import { appOrigin, isTestAddress, sendMail } from '@/lib/mail';
 import { siteRequestAckEmail, siteRequestNotificationEmail } from '@/lib/mail/templates';
 
 export interface SiteRequestInput {
@@ -59,6 +59,9 @@ export async function submitSiteRequest(input: SiteRequestInput): Promise<{ erro
     kind, name, email, message, ip_hash,
     phone: request.phone, company: request.company, team_size: request.teamSize,
   });
+
+  // Une adresse d'essai (tests automatiques) ne prévient personne.
+  if (isTestAddress(email)) return { error: null };
 
   // La demande est enregistrée : un email qui ne part pas ne doit pas faire échouer l'envoi du formulaire.
   const admins = process.env.CONTACT_EMAIL

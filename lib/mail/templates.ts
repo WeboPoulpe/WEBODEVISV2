@@ -195,3 +195,36 @@ export function accountInviteEmail({ firstName, link }: { firstName: string | nu
     }),
   };
 }
+
+// ── Démonstration ─────────────────────────────────────────────────────────────
+/** À l'équipe WeboDevis : quelqu'un vient d'ouvrir la démonstration en laissant ses coordonnées. */
+export function demoLeadNotificationEmail({ name, email, phone, company, appUrl }: { name: string; email: string; phone: string; company: string | null; appUrl: string }): Email {
+  return {
+    subject: `Essai de la démo : ${name}`,
+    html: renderEmail({
+      preheader: `${name}${company ? `, ${company}` : ''} vient d’ouvrir la démonstration.`,
+      title: 'Nouvel essai de la démonstration',
+      paragraphs: [`<strong style="color:#1B1A17;">${esc(name)}</strong> vient d’ouvrir la démonstration depuis le site.`],
+      facts: [['Entreprise', company ?? ''], ['Email', email], ['Téléphone', phone]],
+      button: { label: 'Ouvrir dans l’administration', url: `${appUrl}/admin/demandes` },
+      note: 'Répondre à cet email écrit directement à la personne.',
+    }),
+  };
+}
+
+/** À la personne : le lien pour rouvrir la démonstration, et la suite possible. */
+export function demoAccessEmail({ firstName, link, contactUrl }: { firstName: string; link: string; contactUrl: string }): Email {
+  return {
+    subject: 'Votre accès à la démonstration WeboDevis',
+    html: renderEmail({
+      preheader: 'Un lien pour rouvrir la démonstration quand vous voulez, pendant sept jours.',
+      title: `Bonjour ${firstName}`,
+      paragraphs: [
+        'La démonstration de WeboDevis vous est ouverte. Vous y entrez dans le compte d’un traiteur fictif, Maison Verdier : devis, demandes, événements, courses, équipe.',
+        'Ce lien vous y ramène sans rien ressaisir, pendant sept jours.',
+      ],
+      button: { label: 'Rouvrir la démonstration', url: link },
+      note: `Pour en parler ou recevoir une proposition pour votre activité, répondez à cet email ou <a href="${esc(contactUrl)}" style="color:#B4502D;">demandez un devis</a>.`,
+    }),
+  };
+}

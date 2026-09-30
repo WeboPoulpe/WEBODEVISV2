@@ -13,6 +13,9 @@ interface Mail {
 
 const DEFAULT_FROM = 'WeboDevis <onboarding@resend.dev>';
 
+/** Adresse d'un domaine réservé aux essais : aucune boîte n'existe derrière, un envoi ne ferait que rebondir. */
+export const isTestAddress = (email: string) => /\.(local|test|example|invalid)$/i.test(email.trim());
+
 /**
  * Envoi d'email via Resend. Sans RESEND_API_KEY (développement), le message n'est pas envoyé :
  * son objet et son destinataire sont écrits dans la console du serveur.
@@ -28,8 +31,7 @@ export async function sendMail({ to, subject, html, fromName, replyTo }: Mail): 
     console.info(`[mail non envoyé — RESEND_API_KEY absent] à ${to} : ${subject}`);
     return { error: null };
   }
-  // Domaines réservés aux essais : aucune boîte n'existe derrière, l'envoi ne ferait que rebondir.
-  if (/\.(local|test|example|invalid)$/i.test(to.trim())) {
+  if (isTestAddress(to)) {
     console.info(`[mail non envoyé — adresse d'essai] à ${to} : ${subject}`);
     return { error: null };
   }
