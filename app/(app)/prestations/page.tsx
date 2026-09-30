@@ -8,7 +8,8 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { PENDING_STATUSES } from '@/lib/quoteStatus';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
+import { btnPrimary, btnSecondary, cardCls, iconBtn, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 import { usePrestationCategories } from '@/hooks/usePrestationCategories';
@@ -797,72 +798,42 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
   );
 }
 
-// ── Prestation card ───────────────────────────────────────────────────────────
-function PrestationCard({
+// ── Ligne du catalogue ────────────────────────────────────────────────────────
+/** Texte brut d'une description mise en forme, pour l'aperçu dans la liste. */
+const plainText = (html: string | null) =>
+  (html ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&(#39|rsquo|apos);/g, '’')
+    .replace(/&[a-z0-9#]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+
+function PrestationRow({
   p, onEdit, onDelete, onDuplicate,
 }: {
   p: Prestation; onEdit: () => void; onDelete: () => void; onDuplicate: () => void;
 }) {
-  const colors = categoryColor(p.category);
+  const excerpt = plainText(p.description);
   return (
-    <div className="group bg-white border border-gray-200 rounded-2xl p-4 hover:border-primary/30 hover:shadow-sm transition-all">
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 truncate">
-            {p.name}
-            {p.is_option && (
-              <span className="ml-2 inline-block text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded align-middle">OPTION</span>
-            )}
-          </p>
-          {p.description && (
-            <div
-              className="text-xs text-gray-500 mt-0.5 line-clamp-2 description-html"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(p.description) }}
-            />
-          )}
-        </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button
-            onClick={onEdit}
-            title="Modifier"
-            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onDuplicate}
-            title="Dupliquer"
-            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onDelete}
-            title="Supprimer"
-            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {p.category && (
-            <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize flex-shrink-0 ${colors.bg} ${colors.text}`}>
-              {p.category}
+    <li className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition-colors">
+      <button onClick={onEdit} className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1 text-left pl-4 sm:pl-5 py-3.5">
+        <span className="sm:flex-1 min-w-0 w-full">
+          <span className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 line-clamp-2">{p.name}</span>
+            {p.is_option && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Option</span>}
+          </span>
+          {(excerpt || p.sub_category) && (
+            <span className="block text-sm text-gray-500 truncate mt-0.5">
+              {p.sub_category && <span className="lg:hidden">{p.sub_category}{excerpt ? ', ' : ''}</span>}
+              {excerpt}
             </span>
           )}
-          {p.sub_category && (
-            <span className="text-[10px] text-gray-500 truncate italic">{p.sub_category}</span>
-          )}
-        </div>
-        <p className="font-bold text-gray-900 tabular-nums flex-shrink-0">
+        </span>
+        {p.sub_category && <span className="hidden lg:block w-44 text-sm text-gray-500 truncate">{p.sub_category}</span>}
+        <span className="font-semibold text-gray-900 tabular-nums whitespace-nowrap">
           {formatCurrency(p.unit_price)}
-          <span className="text-xs font-normal text-gray-400 ml-1">HT</span>
-        </p>
-      </div>
-    </div>
+          <span className="text-xs font-normal text-gray-500 ml-1">HT</span>
+        </span>
+      </button>
+      <button onClick={onDuplicate} className={iconBtn} aria-label={`Dupliquer ${p.name}`}><Copy className="h-4 w-4" /></button>
+      <button onClick={onDelete} className={iconBtnDanger} aria-label={`Supprimer ${p.name}`}><Trash2 className="h-4 w-4" /></button>
+    </li>
   );
 }
 
@@ -1010,55 +981,65 @@ export default function PrestationsPage() {
     return matchTab && matchSub && matchSearch;
   });
 
+  // Sans filtre, le catalogue est rangé par catégorie ; une catégorie choisie ou une recherche donne une liste simple.
+  const groups = useMemo(() => {
+    if (activeTab !== 'all' || search) return [{ label: '', items: filtered }];
+    const byLabel = new Map<string, Prestation[]>();
+    for (const p of filtered) {
+      const label = dbCategories.find((c) => c.id === p.category_id)?.name ?? p.category ?? '';
+      const key = label ? label.charAt(0).toUpperCase() + label.slice(1).toLowerCase() : 'Sans catégorie';
+      byLabel.set(key, [...(byLabel.get(key) ?? []), p]);
+    }
+    return [...byLabel.entries()]
+      .sort(([a], [b]) => Number(a === 'Sans catégorie') - Number(b === 'Sans catégorie'))
+      .map(([label, items]) => ({ label, items }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, activeTab, activeSub, search, dbCategories]);
+
   return (
     <div className="px-4 md:px-6 pb-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
         <div>
-          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Catalogue de prestations</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Prestations</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {loading ? '…' : `${items.length} prestation${items.length !== 1 ? 's' : ''}`}
+            {loading ? ' ' : `${items.length} prestation${items.length !== 1 ? 's' : ''} au catalogue`}
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3.5 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
-          >
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileSelect} />
+          <button onClick={() => fileInputRef.current?.click()} className={cn(btnSecondary, 'whitespace-nowrap')} aria-label="Importer un CSV">
             <UploadCloud className="h-4 w-4" />
-            CSV
+            <span className="sm:hidden">CSV</span><span className="hidden sm:inline">Importer un CSV</span>
           </button>
-          <button
-            onClick={() => setModal({ open: true, editing: null })}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
-          >
+          <button onClick={() => setModal({ open: true, editing: null })} className={cn(btnPrimary, 'flex-1 sm:flex-none whitespace-nowrap')}>
             <Plus className="h-4 w-4" />
             Nouvelle prestation
           </button>
         </div>
       </div>
 
-      {/* Category tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-4">
-        {allCategories.map(({ key, label, icon: Icon, isCustom }) => (
+      <div className="relative mb-3">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher une prestation"
+          aria-label="Rechercher une prestation"
+          className={cn(inputCls, 'pl-11')}
+        />
+      </div>
+
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-1 mb-3" role="tablist" aria-label="Catégories">
+        {allCategories.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={activeTab === key}
             onClick={() => { setActiveTab(key); setActiveSub(null); }}
-            className={[
-              'flex items-center gap-1.5 flex-shrink-0 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors',
-              activeTab === key
-                ? 'bg-primary text-white shadow-sm'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-primary/30 hover:bg-primary-50/50',
-              isCustom && activeTab !== key ? 'border-dashed border-primary/30' : '',
-            ].join(' ')}
-            title={isCustom ? 'Catégorie perso' : undefined}
+            className={cn(
+              'flex items-center gap-1.5 flex-shrink-0 h-10 px-3.5 rounded-full text-sm font-medium transition-colors',
+              activeTab === key ? 'bg-forest text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300',
+            )}
           >
             <Icon className="h-4 w-4" />
             {label}
@@ -1066,19 +1047,17 @@ export default function PrestationsPage() {
         ))}
       </div>
 
-      {/* Subcategory pills */}
       {currentSubList.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-4">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-1 mb-3">
           {currentSubList.map(({ key, label }) => (
             <button
               key={key}
+              aria-pressed={activeSub === key}
               onClick={() => setActiveSub(activeSub === key ? null : key)}
-              className={[
-                'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                activeSub === key
-                  ? 'bg-primary/15 text-primary border border-primary/40'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:border-primary/30 hover:bg-primary-50/50',
-              ].join(' ')}
+              className={cn(
+                'flex-shrink-0 h-9 px-3 rounded-full text-sm font-medium transition-colors',
+                activeSub === key ? 'bg-primary-50 text-primary-700 border border-primary-200' : 'text-gray-600 border border-transparent hover:bg-gray-100',
+              )}
             >
               {label}
             </button>
@@ -1086,60 +1065,57 @@ export default function PrestationsPage() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher une prestation…"
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-        />
-      </div>
-
-      {/* Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+        <div className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden mt-2')}>
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 animate-pulse space-y-3">
-              <div className="h-4 bg-gray-100 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-full" />
-              <div className="flex justify-between pt-2 border-t border-gray-100">
-                <div className="h-5 bg-gray-100 rounded-full w-16" />
-                <div className="h-5 bg-gray-100 rounded w-20" />
+            <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-100 rounded w-1/3" />
+                <div className="h-3 bg-gray-100 rounded w-2/3" />
               </div>
+              <div className="h-4 bg-gray-100 rounded w-16" />
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center py-20 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-            <Package className="h-8 w-8 text-gray-400" />
-          </div>
-          <p className="text-gray-500 font-medium mb-1">Aucune prestation</p>
-          <p className="text-sm text-gray-400 mb-4">
-            {search ? 'Aucun résultat pour cette recherche.' : 'Commencez à construire votre catalogue.'}
+        <div className={cn(cardCls, 'flex flex-col items-center px-6 py-16 text-center mt-2')}>
+          <p className="font-semibold text-gray-900 mb-1">
+            {search || activeTab !== 'all' ? 'Aucune prestation ne correspond' : 'Votre catalogue est vide'}
           </p>
-          {!search && (
-            <button
-              onClick={() => setModal({ open: true, editing: null })}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"
-            >
+          <p className="text-sm text-gray-500 mb-5 max-w-sm">
+            {search || activeTab !== 'all'
+              ? 'Essayez un autre mot ou une autre catégorie.'
+              : 'Ajoutez vos prestations une fois : elles se glissent ensuite dans chaque devis, avec leur prix.'}
+          </p>
+          {!search && activeTab === 'all' && (
+            <button onClick={() => setModal({ open: true, editing: null })} className={btnPrimary}>
               <Plus className="h-4 w-4" />
-              Ajouter une prestation
+              Nouvelle prestation
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-          {filtered.map((p) => (
-            <PrestationCard
-              key={p.id}
-              p={p}
-              onEdit={() => setModal({ open: true, editing: p })}
-              onDelete={() => handleDelete(p.id)}
-              onDuplicate={() => handleDuplicate(p)}
-            />
+        <div className="space-y-6 mt-2">
+          {groups.map((g) => (
+            <section key={g.label || 'liste'}>
+              {g.label && (
+                <h2 className="flex items-baseline gap-2 px-1 mb-2 text-[15px] font-semibold text-gray-900">
+                  {g.label}
+                  <span className="text-sm font-normal text-gray-500">{g.items.length}</span>
+                </h2>
+              )}
+              <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+                {g.items.map((p) => (
+                  <PrestationRow
+                    key={p.id}
+                    p={p}
+                    onEdit={() => setModal({ open: true, editing: p })}
+                    onDelete={() => handleDelete(p.id)}
+                    onDuplicate={() => handleDuplicate(p)}
+                  />
+                ))}
+              </ul>
+            </section>
           ))}
         </div>
       )}
