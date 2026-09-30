@@ -11,6 +11,11 @@ const config: NextConfig = {
         protocol: 'https',
         hostname: 'cxtwwqthczohsztzecjd.supabase.co',
       },
+      {
+        // Fichiers des utilisateurs sur Vercel Blob.
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+      },
     ],
   },
 };

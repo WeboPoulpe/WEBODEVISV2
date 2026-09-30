@@ -36,7 +36,7 @@ export default function ImageUpload({ images, onChange, userId, max = 5, bucket 
       const path = `${userId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
       const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
       if (error) {
-        setUploadError(`Erreur upload : ${error.message}. Vérifiez que le bucket "${bucket}" existe dans Supabase Storage avec accès public.`);
+        setUploadError(`L’image n’a pas pu être envoyée : ${error.message}`);
       } else {
         const { data } = supabase.storage.from(bucket).getPublicUrl(path);
         newUrls.push(`${data.publicUrl}?t=${Date.now()}`);
