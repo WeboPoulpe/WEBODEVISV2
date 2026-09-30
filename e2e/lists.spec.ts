@@ -137,3 +137,44 @@ test('nouveau devis depuis une fiche client et depuis un jour du calendrier', as
     await expect(page.locator('#nd-guests')).toHaveValue('45');
   });
 });
+
+test('dupliquer un devis pour un autre client, une autre date et un autre nombre de couverts', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+  await withAccount(browser, 'duplication', async (page, userId) => {
+    const [other] = await sql<{ id: string }>(
+      `insert into public.customers (owner_user_id, user_id, customer_type, email, first_name, last_name, address)
+       values ($1, $1, 'particulier', 'lea.moreau@essai.test', 'Léa', 'Moreau', '4 place du Marché, 69002 Lyon') returning id`, [userId]);
+    const services = [
+      { id: 's1', name: 'Menu Prestige', quantity: 40, unitPrice: 30 },
+      { id: 's2', name: 'Forfait livraison', quantity: 1, unitPrice: 150 },
+    ];
+    await sql(
+      `insert into public.quotes (owner_user_id, user_id, client_name, client_first_name, client_last_name, event_date, event_type, guest_count, status, services, template)
+       values ($1, $1, 'Paul Durand', 'Paul', 'Durand', '2027-05-01', 'Mariage', 40, 'devis_envoye', $2, 'classique')`, [userId, JSON.stringify(services)]);
+
+    await page.goto('/devis');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /^Actions pour/ }).first().click();
+    await page.getByRole('button', { name: 'Dupliquer' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Dupliquer le devis' });
+    await expect(dialog.locator('#dup-guests')).toHaveValue('40');
+    await dialog.getByRole('tab', { name: 'Autre client' }).click();
+    await dialog.getByLabel('Rechercher un client').fill('Moreau');
+    await dialog.getByRole('button', { name: /Léa Moreau/ }).click();
+    await dialog.locator('#dup-date').fill('2027-09-18');
+    await dialog.locator('#dup-guests').fill('60');
+    await dialog.getByRole('button', { name: 'Créer la copie' }).click();
+    await expect(page).toHaveURL(/\/devis\/[^/]+\/modifier\?mode=weboword/, { timeout: 20_000 });
+
+    const [copy] = await sql<{ customer_id: string; client_name: string; client_address: string; event_date: string; guest_count: number; services: { name: string; quantity: number }[] }>(
+      `select customer_id, client_name, client_address, to_char(event_date, 'YYYY-MM-DD') as event_date, guest_count, services
+       from public.quotes where owner_user_id = $1 and client_name <> 'Paul Durand'`, [userId]);
+    expect(copy.customer_id).toBe(other.id);
+    expect(copy.client_name).toBe('Léa Moreau');
+    expect(copy.client_address).toBe('4 place du Marché, 69002 Lyon');
+    expect(copy.event_date).toBe('2027-09-18');
+    expect(copy.guest_count).toBe(60);
+    // Le menu suit les couverts, le forfait reste à 1.
+    expect(copy.services.map((s) => [s.name, s.quantity])).toEqual([['Menu Prestige', 60], ['Forfait livraison', 1]]);
+  });
+});

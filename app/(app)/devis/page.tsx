@@ -28,6 +28,7 @@ import TemplateThumb from '@/components/devis/TemplateThumb';
 import { sendQuoteToClient } from '@/server/quotes';
 import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
+import DuplicateQuoteModal from '@/components/devis/DuplicateQuoteModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -899,82 +900,6 @@ export default function DevisPage() {
     setDupModal({ open: true, quoteId: id, saving: false, templateName: '' });
   }, []);
 
-  // Perform duplication (simple or with template save)
-  const executeDuplicate = useCallback(async (saveAsTemplate: boolean) => {
-    if (!dupModal.quoteId || !user) return;
-    setDupModal((m) => ({ ...m, saving: true }));
-    const supabase = createClient();
-    const { data } = await supabase
-      .from('quotes')
-      .select('services, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, remarks, vat_rate, hide_price, template, images, content_html, selected_font, selected_font_size, client_name, client_first_name, client_last_name, client_email, client_phone, client_address, client_type, company_name, contact_person_name, customer_id, folder_id')
-      .eq('id', dupModal.quoteId)
-      .single();
-    if (!data) { setDupModal((m) => ({ ...m, saving: false })); return; }
-
-    // Save as template if requested
-    if (saveAsTemplate && dupModal.templateName.trim()) {
-      await supabase.from('devis_templates').insert({
-        user_id: user.id,
-        name: dupModal.templateName.trim(),
-        services: data.services || [],
-        content_html: data.content_html || null,
-        template: data.template || 'standard',
-        selected_font: data.selected_font || null,
-        selected_font_size: data.selected_font_size || 12,
-        remarks: data.remarks || null,
-        vat_rate: data.vat_rate ?? 20,
-        hide_price: data.hide_price ?? false,
-      });
-    }
-
-    // Create new quote with content_html preserved
-    const dupPayload = {
-      user_id: user.id,
-      owner_user_id: user.id,
-      status: 'devis_a_faire',
-      // Client repris à l'identique (duplication simple = même client).
-      client_name: data.client_name || '',
-      client_first_name: data.client_first_name || null,
-      client_last_name: data.client_last_name || null,
-      client_email: data.client_email || null,
-      client_phone: data.client_phone || null,
-      client_address: data.client_address || null,
-      client_type: data.client_type || 'particulier',
-      company_name: data.company_name || null,
-      contact_person_name: data.contact_person_name || null,
-      customer_id: data.customer_id || null,
-      services: data.services || [],
-      content_html: data.content_html || null,
-      selected_font: data.selected_font || null,
-      selected_font_size: data.selected_font_size || 12,
-      template: data.template || 'standard',
-      event_type: data.event_type || '',
-      event_date: data.event_date || new Date().toISOString().slice(0, 10),
-      event_location: data.event_location || '',
-      guest_count: data.guest_count || 1,
-      guest_count_adults: data.guest_count_adults ?? null,
-      guest_count_children: data.guest_count_children ?? null,
-      remarks: data.remarks || null,
-      vat_rate: data.vat_rate ?? 20,
-      hide_price: data.hide_price ?? false,
-      images: data.images || [],
-      folder_id: data.folder_id ?? null, // la copie reste dans le dossier de l'original
-    };
-    const res = await supabase.from('quotes').insert(dupPayload).select('id').single();
-    if (res.error) {
-      console.error('Erreur duplication:', res.error.message);
-      alert('Erreur: ' + res.error.message);
-    }
-    const newQuote = res.data;
-
-    setDupModal({ open: false, quoteId: null, saving: false, templateName: '' });
-
-    if (newQuote) {
-      // Go directly to WeboWord with the duplicated content
-      router.push(`/devis/${newQuote.id}/modifier?mode=weboword`);
-    }
-  }, [dupModal.quoteId, dupModal.templateName, user, router]);
-
   // ── Actions sur les dossiers ───────────────────────────────────────────────
   const createFolder = useCallback(async ({ name, color, icon, parentId }: { name: string; color: string; icon: string; parentId: string | null }) => {
     if (!user) return;
@@ -1409,67 +1334,8 @@ export default function DevisPage() {
         </div>
       )}
 
-      {dupModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !dupModal.saving && setDupModal({ open: false, quoteId: null, saving: false, templateName: '' })} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92dvh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-primary-50 rounded-xl">
-                  <Copy className="h-4 w-4 text-primary" />
-                </div>
-                <h2 className="font-semibold text-gray-900">Dupliquer le devis</h2>
-              </div>
-              <button onClick={() => !dupModal.saving && setDupModal({ open: false, quoteId: null, saving: false, templateName: '' })} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Option 1: Simple */}
-              <button
-                onClick={() => executeDuplicate(false)}
-                disabled={dupModal.saving}
-                className="w-full flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-primary/40 hover:bg-primary-50 transition-all text-left group"
-              >
-                <div className="p-2.5 bg-gray-100 rounded-xl group-hover:bg-primary-50 transition-colors flex-shrink-0">
-                  <Copy className="h-5 w-5 text-gray-500 group-hover:text-primary transition-colors" />
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">Duplication simple</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Crée une copie exacte du devis (mise en page WeboWord conservée). Vous pourrez modifier le client ensuite.</p>
-                </div>
-              </button>
-
-              {/* Option 2: Save as template */}
-              <div className="border border-gray-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-start gap-4">
-                  <div className="p-2.5 bg-amber-50 rounded-xl flex-shrink-0">
-                    <Library className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">Dupliquer + sauvegarder en modèle</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Crée une copie et enregistre ce devis comme modèle réutilisable dans votre bibliothèque.</p>
-                  </div>
-                </div>
-                <input
-                  value={dupModal.templateName}
-                  onChange={(e) => setDupModal((m) => ({ ...m, templateName: e.target.value }))}
-                  placeholder="Nom du modèle (ex: Menu Prestige 80 couverts)"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-                />
-                <button
-                  onClick={() => executeDuplicate(true)}
-                  disabled={dupModal.saving || !dupModal.templateName.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
-                >
-                  {dupModal.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookCopy className="h-4 w-4" />}
-                  Dupliquer + enregistrer modèle
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {dupModal.open && dupModal.quoteId && user && (
+        <DuplicateQuoteModal quoteId={dupModal.quoteId} userId={user.id} onClose={() => setDupModal({ open: false, quoteId: null, saving: false, templateName: '' })} />
       )}
     </div>
   );
