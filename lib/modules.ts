@@ -25,7 +25,7 @@ export const MODULES: AppModule[] = [
     key: 'evenements',
     label: 'Événements',
     description: 'Checklist, matériel et location, liste de courses calculée depuis le devis.',
-    routes: ['/evenements', '/courses-globales', '/location-globale', '/location-templates'],
+    routes: ['/evenements', '/courses-globales', '/location-globale', '/location-templates', '/materiel'],
     standard: true,
   },
   {

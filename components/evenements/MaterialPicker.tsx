@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { Check } from './shared';
+import { EQUIPMENT_BASE, findBaseArticle, UNITS } from '@/lib/equipment';
 
 // Liste de matériel du traiteur : on coche ce qu'on emporte à l'événement au lieu de tout retaper.
 // La quantité proposée est fixe, ou calculée d'après le nombre de couverts.
@@ -44,7 +45,7 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [qty, setQty] = useState('1');
-  const [unit, setUnit] = useState('');
+  const [unit, setUnit] = useState('pièce');
   const [perGuest, setPerGuest] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -77,14 +78,14 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
     setSaving(true); setError(null);
     const amount = parseFloat(qty.replace(',', '.')) || 1;
     const res = await createClient().from('material_presets')
-      .insert({ user_id: userId, name: value, unit: unit.trim() || null, default_qty: perGuest ? 1 : amount, qty_per_guest: perGuest ? amount : null })
+      .insert({ user_id: userId, name: value, unit: unit || 'pièce', default_qty: perGuest ? 1 : amount, qty_per_guest: perGuest ? amount : null })
       .select('id, name, unit, default_qty, qty_per_guest').single();
     setSaving(false);
     if (res.error || !res.data) { setError('L’article n’a pas pu être ajouté à votre liste. Réessayez.'); return; }
     const created = res.data as Preset;
     setPresets([...presets, created].sort((a, b) => a.name.localeCompare(b.name, 'fr')));
     setPicked((prev) => ({ ...prev, [created.id]: String(suggested(created)) }));
-    setName(''); setQty('1'); setUnit(''); setPerGuest(false);
+    setName(''); setQty('1'); setUnit('pièce'); setPerGuest(false);
   };
 
   const removePreset = async (p: Preset) => {
@@ -121,7 +122,8 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
           <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 rounded-2xl bg-gray-50 animate-pulse" />)}</div>
         ) : presets.length === 0 ? (
           <p className="text-[15px] text-gray-600">
-            Votre liste est vide. Ajoutez ci-dessous ce que vous emportez d’habitude : il suffira ensuite de cocher, événement après événement.
+            Votre liste est vide. Ajoutez ci-dessous ce que vous emportez d’habitude, ou cochez-le d’un coup dans la liste de base de la page{' '}
+            <a href="/materiel" className="font-medium text-primary underline underline-offset-2">Matériel</a>.
           </p>
         ) : (
           <>
@@ -160,10 +162,18 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
 
         <form onSubmit={addPreset} className="pt-4 border-t border-gray-200 space-y-2">
           <p className="text-sm font-medium text-gray-700">Ajouter à ma liste</p>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Chafing dish, nappe blanche, caisse isotherme" aria-label="Nom du matériel" className={inputCls} />
+          <input value={name} list="equipment-base-picker" placeholder="Chafing dish, caisse isotherme, rallonge" aria-label="Nom du matériel" className={inputCls}
+            onChange={(e) => {
+              const base = findBaseArticle(EQUIPMENT_BASE, e.target.value);
+              setName(base ? base.name : e.target.value);
+              if (base) { setUnit(base.unit); setQty(String(base.qty)); setPerGuest(false); }
+            }} />
+          <datalist id="equipment-base-picker">{EQUIPMENT_BASE.map((a) => <option key={a.name} value={a.name} />)}</datalist>
           <div className="flex gap-2">
             <input type="number" inputMode="decimal" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Quantité" className={cn(inputCls, 'w-24 text-center')} />
-            <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="unité" aria-label="Unité" className={cn(inputCls, 'flex-1 min-w-0')} />
+            <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unité" className={cn(inputCls, 'flex-1 min-w-0')}>
+              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
             <button type="submit" disabled={!name.trim() || saving} className={cn(btnSecondary, 'h-12')} aria-label="Ajouter à ma liste">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             </button>

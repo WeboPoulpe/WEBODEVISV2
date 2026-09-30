@@ -20,6 +20,7 @@ const PAGES: { name: string; path: string }[] = [
   { name: 'courses-globales', path: '/courses-globales' },
   { name: 'location-globale', path: '/location-globale' },
   { name: 'location-templates', path: '/location-templates' },
+  { name: 'materiel', path: '/materiel' },
   { name: 'modeles', path: '/modeles' },
   { name: 'notifications', path: '/notifications' },
   { name: 'parametres', path: '/parametres' },
@@ -38,6 +39,9 @@ for (const { name, path } of PAGES) {
     page.on('requestfailed', (r) => {
       // Photos hébergées sur Vercel Blob : ce poste est parfois limité par Vercel après des envois en série ; ce n'est pas l'app.
       if (r.resourceType() === 'image' && /vercel-storage.com/.test(r.url())) return;
+      // Préchargements de liens et appels annulés par le navigateur (page fermée, lien quitté) : les vraies pannes
+      // remontent par leur code 500 ou leur erreur de données, relevés plus bas.
+      if (r.resourceType() === 'fetch' && r.failure()?.errorText === 'net::ERR_ABORTED') return;
       errors.push(`réseau : ${r.resourceType()} ${new URL(r.url()).pathname.slice(0, 80)} ${r.failure()?.errorText ?? ''}`);
     });
     page.on('response', (r) => { if (r.status() >= 500) errors.push(`réseau : ${r.status()} ${new URL(r.url()).pathname.slice(0, 80)}`); });

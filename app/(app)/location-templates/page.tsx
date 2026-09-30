@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, ListChecks, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { findBaseArticle, RENTAL_BASE, sameName, UNITS } from '@/lib/equipment';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/ui/Modal';
@@ -27,7 +28,7 @@ interface Supplier { id: string; name: string }
 const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
 const num = (v: string, fallback: number) => { const n = parseFloat(v.replace(',', '.')); return Number.isFinite(n) ? n : fallback; };
 const EXAMPLE_GUESTS = 100;
-const emptyItem = { id: null as string | null, name: '', qty: '1', unit: '', supplierId: '', price: '0' };
+const emptyItem = { id: null as string | null, name: '', qty: '1', unit: 'pièce', supplierId: '', price: '0' };
 
 export default function LocationTemplatesPage() {
   const { user } = useAuth();
@@ -39,6 +40,8 @@ export default function LocationTemplatesPage() {
   const [naming, setNaming] = useState<{ id: string | null; name: string } | null>(null);
   const [form, setForm] = useState<typeof emptyItem | null>(null);
   const [busy, setBusy] = useState(false);
+  // Liste de base : articles cochés et leur quantité par couvert.
+  const [picking, setPicking] = useState<Record<string, string> | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -76,7 +79,7 @@ export default function LocationTemplatesPage() {
     } else {
       const res = await supabase.from('rental_template_sets').insert({ user_id: user.id, name }).select('id, name').single();
       if (res.error || !res.data) setError('Le modèle n’a pas pu être créé. Réessayez.');
-      else { const created = res.data as TemplateSet; setSets((list) => [...(list ?? []), created]); setActiveId(created.id); }
+      else { const created = res.data as TemplateSet; setSets((list) => [...(list ?? []), created]); setActiveId(created.id); setPicking({}); }
     }
     setBusy(false);
     setNaming(null);
@@ -133,6 +136,21 @@ export default function LocationTemplatesPage() {
     const saved = { ...(res.data as Item), qty_per_guest: Number(res.data.qty_per_guest), default_price_per_unit: Number(res.data.default_price_per_unit) };
     setItems((list) => (form.id ? list.map((i) => (i.id === saved.id ? saved : i)) : [...list, saved]));
     setForm(null);
+  };
+
+  const addFromBase = async () => {
+    if (!picking || !user || !active) return;
+    const chosen = RENTAL_BASE.filter((a) => a.name in picking);
+    if (chosen.length === 0) { setPicking(null); return; }
+    setBusy(true); setError(null);
+    const res = await createClient().from('rental_templates').insert(chosen.map((a, i) => ({
+      user_id: user.id, set_id: active.id, material_name: a.name, unit: a.unit,
+      qty_per_guest: num(picking[a.name], a.perGuest), default_price_per_unit: 0, sort_order: activeItems.length + i,
+    }))).select('*');
+    setBusy(false);
+    if (res.error) { setError('Les articles n’ont pas pu être ajoutés. Réessayez.'); return; }
+    setItems((list) => [...list, ...((res.data ?? []) as Item[]).map((it) => ({ ...it, qty_per_guest: Number(it.qty_per_guest), default_price_per_unit: Number(it.default_price_per_unit) }))]);
+    setPicking(null);
   };
 
   const removeItem = async (item: Item) => {
@@ -192,12 +210,13 @@ export default function LocationTemplatesPage() {
                   <button onClick={() => setNaming({ id: active.id, name: active.name })} className={iconBtn} aria-label="Renommer le modèle"><Pencil className="h-4 w-4" /></button>
                   <button onClick={duplicate} disabled={busy} className={iconBtn} aria-label="Dupliquer le modèle"><Copy className="h-4 w-4" /></button>
                   <button onClick={removeSet} className={iconBtnDanger} aria-label="Supprimer le modèle"><Trash2 className="h-4 w-4" /></button>
-                  <button onClick={() => setForm({ ...emptyItem })} className={cn(btnSecondary, 'ml-1')}><Plus className="h-4 w-4" />Ajouter un article</button>
+                  <button onClick={() => setPicking({})} className={cn(btnSecondary, 'ml-1')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
+                  <button onClick={() => setForm({ ...emptyItem })} className={btnSecondary}><Plus className="h-4 w-4" />Ajouter un article</button>
                 </div>
               </header>
 
               {activeItems.length === 0 ? (
-                <p className="px-5 pb-6 text-[15px] text-gray-600">Ce modèle est vide. Ajoutez ses articles : assiettes, verres, couverts, nappes, mobilier.</p>
+                <p className="px-5 pb-6 text-[15px] text-gray-600">Ce modèle est vide. « Depuis la liste » propose les articles courants (assiettes, couverts, verres, nappage, mobilier) avec leur quantité habituelle par couvert : il suffit de cocher.</p>
               ) : (
                 <ul className="divide-y divide-gray-100 border-t border-gray-100">
                   {activeItems.map((i) => (
@@ -239,6 +258,59 @@ export default function LocationTemplatesPage() {
         </Modal>
       )}
 
+      {picking && active && (() => {
+        const available = RENTAL_BASE.filter((a) => !activeItems.some((i) => sameName(i.material_name, a.name)));
+        const groups = [...new Set(available.map((a) => a.group))];
+        const count = Object.keys(picking).length;
+        return (
+          <Modal
+            title={`Ajouter à « ${active.name} »`}
+            onClose={() => setPicking(null)}
+            footer={<>
+              <button onClick={() => setPicking(null)} className={btnGhost}>Fermer</button>
+              <button onClick={addFromBase} disabled={count === 0 || busy} className={btnPrimary}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}{count > 0 ? `Ajouter ${count} article${count > 1 ? 's' : ''}` : 'Ajouter'}</button>
+            </>}
+          >
+            <div className="pb-3 space-y-5">
+              <p className="text-sm text-gray-600">Cochez ce que ce modèle contient. La quantité est par couvert : 0,1 pour une table de dix.</p>
+              {available.length === 0 && <p className="text-[15px] text-gray-700">Tous les articles de la liste sont déjà dans ce modèle.</p>}
+              {groups.map((g) => {
+                const rows = available.filter((a) => a.group === g);
+                const allOn = rows.every((a) => a.name in picking);
+                return (
+                  <section key={g}>
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-[15px] font-semibold text-gray-900">{g}</h3>
+                      <button onClick={() => setPicking((p) => { const next = { ...p }; rows.forEach((a) => { if (allOn) delete next[a.name]; else next[a.name] = next[a.name] ?? String(a.perGuest); }); return next; })}
+                        className="h-9 px-2 text-sm font-medium text-primary hover:text-primary-dark">{allOn ? 'Tout décocher' : 'Tout cocher'}</button>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {rows.map((a) => {
+                        const on = a.name in picking;
+                        return (
+                          <li key={a.name} className="flex items-center gap-3 pl-3 pr-2 py-1 rounded-2xl bg-gray-50">
+                            <input type="checkbox" checked={on} aria-label={a.name} className="h-6 w-6 rounded-md accent-sage flex-shrink-0"
+                              onChange={(e) => setPicking((p) => { const next = { ...p }; if (e.target.checked) next[a.name] = String(a.perGuest); else delete next[a.name]; return next; })} />
+                            <span className="flex-1 min-w-0 py-2 text-[15px] text-gray-900">{a.name}</span>
+                            {on ? (
+                              <input type="number" inputMode="decimal" min="0" step="any" value={picking[a.name]} aria-label={`Quantité par couvert, ${a.name}`}
+                                onChange={(e) => setPicking((p) => ({ ...p, [a.name]: e.target.value }))} className={cn(inputCls, 'w-20 h-10 px-2 text-center')} />
+                            ) : (
+                              <span className="text-sm text-gray-500 tabular-nums">{a.perGuest.toLocaleString('fr-FR')}</span>
+                            )}
+                            <span className="w-24 text-sm text-gray-500">{a.unit} par couvert</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          </Modal>
+        );
+      })()}
+
       {form && (
         <Modal
           title={form.id ? 'Modifier l’article' : 'Nouvel article'}
@@ -251,7 +323,14 @@ export default function LocationTemplatesPage() {
           <div className="space-y-4 pb-3">
             <div>
               <label htmlFor="tpl-name" className={labelCls}>Article</label>
-              <input id="tpl-name" autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Assiette plate 27 cm" className={inputCls} />
+              <input id="tpl-name" autoFocus list="rental-base" value={form.name} placeholder="Commencez à taper : assiette, verre, nappe…" className={inputCls}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  const base = findBaseArticle(RENTAL_BASE, name);
+                  // Un article de la liste de base apporte son unité et sa quantité habituelle.
+                  setForm(base && !form.id ? { ...form, name: base.name, unit: base.unit, qty: String(base.perGuest) } : { ...form, name });
+                }} />
+              <datalist id="rental-base">{RENTAL_BASE.map((a) => <option key={a.name} value={a.name} />)}</datalist>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -260,7 +339,9 @@ export default function LocationTemplatesPage() {
               </div>
               <div>
                 <label htmlFor="tpl-unit" className={labelCls}>Unité</label>
-                <input id="tpl-unit" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="pièce" className={inputCls} />
+                <select id="tpl-unit" value={form.unit || 'pièce'} onChange={(e) => setForm({ ...form, unit: e.target.value })} className={inputCls}>
+                  {[...UNITS, ...(form.unit && !(UNITS as readonly string[]).includes(form.unit) ? [form.unit] : [])].map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
               </div>
             </div>
             <p className="text-sm text-gray-500 -mt-2">Pour une table de dix, indiquez 0,1 : la quantité est arrondie à l’unité supérieure.</p>

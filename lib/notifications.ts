@@ -3,7 +3,7 @@
 // qui correspond au type de notification plutôt que sur une page introuvable.
 
 const PAGES = ['/', '/devis', '/clients', '/prospects', '/calendrier', '/evenements', '/commandes', '/stock', '/prestations',
-  '/ingredients', '/extras', '/fournisseurs', '/location-globale', '/courses-globales', '/parametres', '/modeles', '/location-templates', '/notifications'];
+  '/ingredients', '/extras', '/fournisseurs', '/location-globale', '/courses-globales', '/materiel', '/parametres', '/modeles', '/location-templates', '/notifications'];
 
 /** Anciennes adresses et leur équivalent. */
 const LEGACY: [RegExp, string][] = [
