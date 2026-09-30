@@ -191,6 +191,17 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [notice, setNotice] = useState<string | null>(null);
   // Session expirée pendant la saisie : le texte reste sur l'appareil, on attend la reconnexion.
   const [sessionLost, setSessionLost] = useState(false);
+  // Téléphone : la page A4 (210 mm ≈ 794 px) est réduite à la largeur de l'écran ; la barre d'outils se replie.
+  const [sheetZoom, setSheetZoom] = useState(1);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  // Page entière (lecture, vue d'ensemble) ou taille réelle (pour écrire confortablement).
+  const [fitSheet, setFitSheet] = useState(true);
+  useEffect(() => {
+    const fit = () => setSheetZoom(Math.min(1, (window.innerWidth - 16) / 794));
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
   useEffect(() => {
     try {
       const key = `weboword_notice_${quoteId}`;
@@ -1098,8 +1109,18 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </div>
         )}
 
-        {/* Formatting bar */}
-        <div className="flex items-center gap-0.5 px-4 py-1.5 flex-wrap">
+        {/* Formatting bar — repliée sur une ligne sur téléphone, « Plus d’outils » l’ouvre en entier */}
+        <div className={cn('flex items-center gap-0.5 px-2 md:px-4 py-1.5 flex-wrap', !toolsOpen && 'max-md:max-h-[42px] max-md:overflow-hidden')}>
+          <button type="button" onClick={() => setToolsOpen((v) => !v)} aria-expanded={toolsOpen}
+            className="md:hidden h-8 px-2.5 mr-1 rounded-lg bg-gray-100 text-xs font-semibold text-gray-700 flex-shrink-0">
+            {toolsOpen ? 'Moins' : 'Plus d’outils'}
+          </button>
+          {sheetZoom < 1 && (
+            <button type="button" onClick={() => setFitSheet((v) => !v)} aria-pressed={!fitSheet}
+              className="md:hidden h-8 px-2.5 mr-1 rounded-lg bg-gray-100 text-xs font-semibold text-gray-700 flex-shrink-0">
+              {fitSheet ? 'Taille réelle' : 'Page entière'}
+            </button>
+          )}
           <TB onClick={() => exec('bold')}           title="Gras (Ctrl+B)">
             <Bold className="h-3.5 w-3.5" />
           </TB>
@@ -1375,6 +1396,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </div>
         )}
 
+        <div style={sheetZoom < 1 && fitSheet ? { zoom: sheetZoom } : undefined}>
         {/* Page de garde */}
         {coverConfig.enabled && (
           <>
@@ -1461,6 +1483,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             </div>
           </>
         )}
+
+        </div>
 
         {/* Bottom padding */}
         <div className="h-12 print:hidden" />

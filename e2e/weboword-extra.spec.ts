@@ -115,3 +115,28 @@ test('client ou événement changé : l’intro réécrite à la main est signal
     expect(html).toContain('Chers Paul et Marie');
   });
 });
+
+test('sur téléphone : la page tient dans l’écran, on écrit, le menu donne les actions du devis', async ({ browser }) => {
+  await withAccount(browser, 'mobile', async ({ page, userId }) => {
+    const id = await newQuote(userId);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openEditor(page, id);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+    const sheet = await page.locator('#weboword-sheet').boundingBox();
+    expect(sheet!.x + sheet!.width).toBeLessThanOrEqual(390);
+
+    await page.locator('#weboword-sheet [data-webo-intro] p').click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' Écrit depuis le téléphone.');
+    await page.getByRole('navigation', { name: 'Actions du document' }).getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await expect.poll(async () => (await contentOf(id)).includes('Écrit depuis le téléphone.'), { timeout: 15_000 }).toBe(true);
+
+    await page.getByRole('button', { name: 'Taille réelle' }).click();
+    await page.getByRole('button', { name: 'Page entière' }).click();
+
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Client' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Envoyer au client' }).last()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dupliquer' }).last()).toBeVisible();
+  });
+});

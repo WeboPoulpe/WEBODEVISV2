@@ -506,7 +506,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       <div className="fixed inset-0 z-40 bg-black/20 print:hidden" style={{ left: 'var(--shell-left)' }} onClick={onClose} />
 
       {/* Panel — positioned right after the app sidebar */}
-      <div className="fixed top-0 bottom-0 w-80 bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200 print:hidden" style={{ left: 'var(--shell-left)' }}>
+      <div className="fixed top-0 bottom-0 w-full max-w-[380px] md:w-80 bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200 print:hidden" style={{ left: 'var(--shell-left)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">

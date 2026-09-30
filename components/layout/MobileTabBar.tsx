@@ -7,6 +7,7 @@ import { ArrowLeft, CalendarRange, Download, FileText, HelpCircle, Home, LayoutG
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
+import QuoteEditorActions from '@/components/devis/QuoteEditorActions';
 
 const bar = 'md:hidden fixed inset-x-3 z-30 h-16 rounded-3xl bg-forest shadow-float flex items-stretch px-1.5';
 const barStyle = { bottom: 'max(12px, env(safe-area-inset-bottom))' };
@@ -52,6 +53,12 @@ export default function MobileTabBar({ badges, onHelp }: { badges: Badges; onHel
                   {panel.label}
                 </Link>
               ))}
+              {editor.quoteId && (
+                <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                  <QuoteEditorActions quoteId={editor.quoteId} light
+                    itemBase="flex items-center gap-3 h-12 px-4 rounded-2xl text-[15px] font-medium" itemIdle="text-gray-800 hover:bg-gray-50" />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -63,7 +70,7 @@ export default function MobileTabBar({ badges, onHelp }: { badges: Badges; onHel
             <>
               <button onClick={() => setPanelsOpen((v) => !v)} className="h-12 px-3 flex items-center gap-2 rounded-2xl text-sm font-medium text-white/90">
                 <PanelLeft className="h-5 w-5" />
-                Panneaux
+                Menu
               </button>
               <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))} className="w-12 h-12 flex items-center justify-center rounded-2xl text-white/80" aria-label="Enregistrer en PDF">
                 <Download className="h-5 w-5" />

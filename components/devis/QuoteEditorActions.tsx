@@ -21,7 +21,7 @@ const saveOpenDocument = () => new Promise<boolean>((resolve) => {
   window.dispatchEvent(new CustomEvent('weboword:save', { detail: { done: (ok: boolean) => { clearTimeout(timer); resolve(ok); } } }));
 });
 
-export default function QuoteEditorActions({ quoteId, itemBase, itemIdle }: { quoteId: string; itemBase: string; itemIdle: string }) {
+export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light }: { quoteId: string; itemBase: string; itemIdle: string; /** Menu clair (téléphone) plutôt que la barre latérale foncée. */ light?: boolean }) {
   const { user, profile } = useAuth();
   const [meta, setMeta] = useState<QuoteMeta | null>(null);
   const [busy, setBusy] = useState<'send' | 'copy' | 'status' | null>(null);
@@ -54,25 +54,25 @@ export default function QuoteEditorActions({ quoteId, itemBase, itemIdle }: { qu
   if (!meta) return null;
   return (
     <>
-      <label className="sb-label block px-3 pt-2">
-        <span className="block text-xs text-white/50 mb-1">Statut du devis</span>
+      <label className={cn('block px-3 pt-2', !light && 'sb-label')}>
+        <span className={cn('block text-xs mb-1', light ? 'text-gray-500' : 'text-white/50')}>Statut du devis</span>
         <select value={meta.status} onChange={(e) => changeStatus(e.target.value)} disabled={busy === 'status'} aria-label="Statut du devis"
-          className="w-full h-10 px-2.5 rounded-xl bg-white/[0.08] text-sm text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/30 [&>option]:text-gray-900">
+          className={cn('w-full h-10 px-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 [&>option]:text-gray-900', light ? 'bg-white text-gray-900 border border-gray-200 focus:ring-primary/30' : 'bg-white/[0.08] text-white border border-white/10 focus:ring-white/30')}>
           {QUOTE_STATUSES.map((s) => <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>)}
         </select>
       </label>
       <button onClick={() => saveThenOpen('send')} disabled={!!busy} title="Envoyer au client" className={cn(itemBase, itemIdle, 'w-full')}>
         {busy === 'send' ? <Loader2 className="h-[18px] w-[18px] flex-shrink-0 animate-spin" /> : <Send className="h-[18px] w-[18px] flex-shrink-0" />}
-        <span className="sb-label">Envoyer au client</span>
+        <span className={light ? undefined : 'sb-label'}>Envoyer au client</span>
       </button>
       <button onClick={() => saveThenOpen('copy')} disabled={!!busy} title="Dupliquer" className={cn(itemBase, itemIdle, 'w-full')}>
         {busy === 'copy' ? <Loader2 className="h-[18px] w-[18px] flex-shrink-0 animate-spin" /> : <Copy className="h-[18px] w-[18px] flex-shrink-0" />}
-        <span className="sb-label">Dupliquer</span>
+        <span className={light ? undefined : 'sb-label'}>Dupliquer</span>
       </button>
       {isConfirmed(meta.status) && (
         <Link href={`/evenements/${quoteId}`} title="Préparer l’événement" className={cn(itemBase, itemIdle)}>
           <CalendarCheck className="h-[18px] w-[18px] flex-shrink-0" />
-          <span className="sb-label">Préparer l’événement</span>
+          <span className={light ? undefined : 'sb-label'}>Préparer l’événement</span>
         </Link>
       )}
 
