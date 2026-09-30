@@ -123,6 +123,52 @@ test.describe('écritures', () => {
   });
 });
 
+test.describe('envoi du devis au client', () => {
+  test.use({ storageState: AUTH_FILE });
+
+  test('le devis part, passe en « envoyé », et son lien s\'ouvre sans compte', async ({ page, browser }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+    const client = `Client e2e ${Date.now()}`;
+    // Adresse d'un domaine réservé aux essais : rien ne part réellement.
+    const email = 'client-e2e@test.webodevis.local';
+    const [owner] = await sql<{ id: string }>(
+      `select u.id from public.users u left join public.quotes q on q.owner_user_id = u.id group by u.id order by count(q.id) desc limit 1`);
+    const [quote] = await sql<{ id: string }>(
+      `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, content_html)
+       values ($1, $1, $2, current_date + 90, 'Mariage', 40, 'devis_a_faire', '<p>Proposition e2e pour le client</p>') returning id`,
+      [owner.id, client]);
+    try {
+      await page.goto('/devis');
+      await page.getByLabel('Filtrer les devis').fill(client);
+      await page.getByRole('button', { name: `Actions pour ${client}` }).first().click();
+      await page.getByRole('button', { name: 'Envoyer au client' }).click();
+      await page.locator('#send-to').fill(email);
+      await expect(page.locator('#send-message')).not.toHaveValue('');
+      await page.getByRole('button', { name: 'Envoyer', exact: true }).click();
+      await expect(page.getByText('L’email est parti')).toBeVisible({ timeout: 20_000 });
+
+      const [row] = await sql<{ status: string; share_token: string | null; sent_at: string | null; client_email: string | null }>(
+        `select status, share_token, sent_at, client_email from public.quotes where id = $1`, [quote.id]);
+      expect(row.status).toBe('devis_envoye');
+      expect(row.client_email).toBe(email);
+      expect(row.sent_at).not.toBeNull();
+      expect(row.share_token).toMatch(/^[A-Za-z0-9_-]{16,}$/);
+
+      // Le client n'a pas de compte : le lien doit s'ouvrir dans un navigateur sans session.
+      const visitor = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const publicPage = await visitor.newPage();
+      await publicPage.goto(`/d/${row.share_token}`);
+      await expect(publicPage).not.toHaveURL(/\/login/);
+      await expect(publicPage.getByText('Proposition e2e pour le client')).toBeVisible();
+      await expect(publicPage.getByRole('button', { name: 'Enregistrer en PDF' })).toBeVisible();
+      await publicPage.screenshot({ path: path.join(__dirname, 'screenshots', 'desktop', 'devis-public.png'), fullPage: true });
+      await visitor.close();
+    } finally {
+      await sql(`delete from public.quotes where id = $1`, [quote.id]);
+    }
+  });
+});
+
 test.describe('étanchéité entre comptes', () => {
   test('un nouveau compte ne voit aucune donnée des autres', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');

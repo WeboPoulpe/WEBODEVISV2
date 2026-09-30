@@ -209,8 +209,11 @@ h1, h2, .font-display {
     visibility: hidden !important;
   }
 
+  /* .quote-render : devis rédigé dans l'éditeur, rendu par QuoteRender (impression et page publique). */
   .quote-document,
-  .quote-document * {
+  .quote-document *,
+  .quote-render,
+  .quote-render * {
     visibility: visible !important;
   }
 

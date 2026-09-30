@@ -3,11 +3,11 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import { db } from '@/db';
 import { password_reset_tokens, profiles, users, type ProfileRow } from '@/db/schema';
 import { normalizeEmail } from '@/lib/auth';
-import { sendMail } from '@/lib/mail';
+import { appOrigin, sendMail } from '@/lib/mail';
+import { passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
 import { getSessionUser } from './session';
 
 const MIN_PASSWORD = 6;
@@ -42,6 +42,8 @@ export async function registerUser(input: {
       has_completed_onboarding: false,
     });
   });
+  // L'email de bienvenue ne bloque pas l'inscription s'il ne part pas.
+  await sendMail({ to: email, ...welcomeEmail({ firstName: input.firstName.trim() || null, appUrl: await appOrigin() }) });
   return { error: null };
 }
 
@@ -66,14 +68,8 @@ export async function requestPasswordReset(rawEmail: string): Promise<{ error: s
     expires_at: new Date(Date.now() + RESET_TTL_MS).toISOString(),
   });
 
-  const h = await headers();
-  const origin = process.env.NEXTAUTH_URL ?? `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
-  const link = `${origin}/reset-password?token=${token}`;
-  return sendMail({
-    to: email,
-    subject: 'Réinitialisation de votre mot de passe WeboDevis',
-    html: `<p>Bonjour,</p><p>Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :</p><p><a href="${link}">${link}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`,
-  });
+  const link = `${await appOrigin()}/reset-password?token=${token}`;
+  return sendMail({ to: email, ...passwordResetEmail({ link }) });
 }
 
 export async function resetPassword(token: string, password: string): Promise<{ error: string | null }> {

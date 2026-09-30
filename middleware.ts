@@ -10,7 +10,12 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/p/') ||
     pathname.startsWith('/e/') ||
+    // /d/ : devis consulté par le client, à partir du lien reçu par email.
+    pathname.startsWith('/d/') ||
     pathname.startsWith('/reset-password') ||
+    // /site : le site de présentation, ouvert à tous.
+    pathname === '/site' ||
+    pathname.startsWith('/site/') ||
     // Fichiers de l'app installable : ils doivent se charger sans session.
     pathname === '/manifest.webmanifest' ||
     pathname === '/sw.js' ||

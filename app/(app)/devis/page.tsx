@@ -7,7 +7,7 @@ import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal,
+  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal, Send,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn, formatDate, formatCurrency } from '@/lib/utils';
@@ -24,6 +24,8 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES } from '@/lib/quoteStatus';
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
 import FolderBar, { DragItem } from '@/components/devis/FolderBar';
+import { sendQuoteToClient } from '@/server/quotes';
+import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -675,7 +677,7 @@ function PipelineView({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DevisPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [prospects, setProspects] = useState<ProspectLite[]>([]);
@@ -684,6 +686,31 @@ export default function DevisPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [scope, setScope] = useState<Scope>('encours');
   const [menuQuote, setMenuQuote] = useState<Quote | null>(null);
+  // Envoi du devis au client par email
+  const [sendForm, setSendForm] = useState<{ quote: Quote; to: string; message: string; sending: boolean; error: string | null; done: boolean } | null>(null);
+
+  const openSend = (q: Quote) => {
+    const when = q.event_date ? ` du ${new Date(q.event_date.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : '';
+    setSendForm({
+      quote: q,
+      to: q.client_email ?? '',
+      message: `Vous trouverez ci-dessous notre proposition pour votre ${(q.event_type || 'événement').toLowerCase()}${when}.\n\nNous restons à votre disposition pour en discuter ou l'ajuster.\n\n${profile?.company_name ?? ''}`.trim(),
+      sending: false,
+      error: null,
+      done: false,
+    });
+  };
+
+  const submitSend = async () => {
+    if (!sendForm) return;
+    setSendForm({ ...sendForm, sending: true, error: null });
+    const res = await sendQuoteToClient({ quoteId: sendForm.quote.id, to: sendForm.to, message: sendForm.message })
+      .catch(() => ({ error: 'L’envoi a échoué. Réessayez dans un instant.' } as Awaited<ReturnType<typeof sendQuoteToClient>>));
+    if (res.error) { setSendForm((f) => (f ? { ...f, sending: false, error: res.error } : f)); return; }
+    if (res.status) handleStatusChange(sendForm.quote.id, res.status);
+    setQuotes((prev) => prev.map((q) => (q.id === sendForm.quote.id ? { ...q, client_email: sendForm.to.trim().toLowerCase() } : q)));
+    setSendForm((f) => (f ? { ...f, sending: false, done: true } : f));
+  };
   const [sort, setSort] = useState<'recent' | 'event' | 'amount' | 'client'>('recent');
   const [view, setView] = useState<ViewMode>('list');
   const [sheetQuote, setSheetQuote] = useState<Quote | null>(null);
@@ -1196,6 +1223,7 @@ export default function DevisPage() {
               {(CONFIRMED_STATUSES as string[]).includes(q.status) && (
                 <Link href={`/evenements/${q.id}`} className={item}><CalendarRange className="h-5 w-5 text-gray-500" />Préparer l’événement</Link>
               )}
+              {!q.imported && <button onClick={() => { close(); openSend(q); }} className={item}><Send className="h-5 w-5 text-gray-500" />Envoyer au client</button>}
               <Link href={`/devis/${q.id}/imprimer`} target="_blank" onClick={close} className={item}><Printer className="h-5 w-5 text-gray-500" />Imprimer ou enregistrer en PDF</Link>
               <button onClick={() => { close(); handleDuplicate(q.id); }} className={item}><Copy className="h-5 w-5 text-gray-500" />Dupliquer</button>
               <button onClick={() => { close(); setFinanceQuoteId(q.id); }} className={item}><Wallet className="h-5 w-5 text-gray-500" />Marge et coûts</button>
@@ -1206,6 +1234,41 @@ export default function DevisPage() {
           </Modal>
         );
       })()}
+
+      {/* ── Envoi au client ────────────────────────────────────────────── */}
+      {sendForm && (
+        <Modal
+          title={sendForm.done ? 'Devis envoyé' : 'Envoyer le devis au client'}
+          onClose={() => setSendForm(null)}
+          footer={sendForm.done
+            ? <button onClick={() => setSendForm(null)} className={btnPrimary}>Fermer</button>
+            : <>
+                <button onClick={() => setSendForm(null)} className={btnGhost}>Annuler</button>
+                <button onClick={submitSend} disabled={sendForm.sending} className={btnPrimary}>
+                  {sendForm.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Envoyer
+                </button>
+              </>}
+        >
+          {sendForm.done ? (
+            <p className="text-[15px] text-gray-700 pb-3">
+              L’email est parti à <strong className="text-gray-900">{sendForm.to}</strong>. Il contient un lien pour consulter le devis en ligne et l’enregistrer en PDF. Les réponses du client arriveront dans votre boîte.
+            </p>
+          ) : (
+            <div className="space-y-4 pb-3">
+              {sendForm.error && <p role="alert" className={errorCls}>{sendForm.error}</p>}
+              <div>
+                <label htmlFor="send-to" className={labelCls}>Email du client</label>
+                <input id="send-to" type="email" inputMode="email" value={sendForm.to} onChange={(e) => setSendForm({ ...sendForm, to: e.target.value })} placeholder="client@exemple.fr" className={inputCls} />
+              </div>
+              <div>
+                <label htmlFor="send-message" className={labelCls}>Message</label>
+                <textarea id="send-message" rows={7} value={sendForm.message} onChange={(e) => setSendForm({ ...sendForm, message: e.target.value })} className={cn(inputCls, 'h-auto py-3 resize-none')} />
+              </div>
+              <p className="text-sm text-gray-500">Le client reçoit un lien vers le devis, pas de pièce jointe. À l’envoi, un devis encore à faire passe en « Devis envoyé ».</p>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {/* ── Modèles enregistrés ────────────────────────────────────────── */}
       {showTemplates && (

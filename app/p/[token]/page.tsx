@@ -86,23 +86,26 @@ export default function ProspectFormPage() {
     setSubmitting(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error: err } = await supabase.from('prospect_requests').insert({
-      first_name:      firstName.trim(),
-      last_name:       lastName.trim(),
-      email:           email.trim().toLowerCase(),
-      phone:           phone.trim() || null,
-      address:         address.trim() || null,
-      service_address: serviceAddress.trim() || null,
-      event_type:      eventType || null,
-      event_date:      eventDate || null,
-      guest_count:     parseInt(guestCount) || null,
-      guest_count_children: parseInt(guestChildren) || null,
-      message:         message.trim() || null,
-      user_token:      token,
-      owner_user_id:   tokenData?.user_id ?? null,
-      status:          'nouveau',
-    });
+    // La demande passe par la route du formulaire : elle l'enregistre et envoie les emails.
+    const res = await fetch('/api/prospect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        address,
+        service_address: serviceAddress,
+        event_type: eventType,
+        event_date: eventDate,
+        guest_count: guestCount,
+        guest_count_children: guestChildren,
+        message,
+      }),
+    }).catch(() => null);
+    const err = !res || !res.ok;
 
     setSubmitting(false);
     if (err) {

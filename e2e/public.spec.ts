@@ -22,6 +22,13 @@ test.describe('pages publiques', () => {
     await expect(page).not.toHaveURL(/\/login/);
   });
 
+  test('lien devis /d/<token> : un jeton inconnu donne une page introuvable, pas /login', async ({ page }) => {
+    // Le lien reçu par email est destiné au client du traiteur, qui n'a pas de compte.
+    const response = await page.goto('/d/jeton-inconnu-0123456789');
+    await expect(page).not.toHaveURL(/\/login/);
+    expect(response?.status()).toBe(404);
+  });
+
   test('une page privée renvoie vers /login', async ({ page }) => {
     await page.goto('/evenements');
     await expect(page).toHaveURL(/\/login/);
