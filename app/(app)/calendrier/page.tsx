@@ -441,7 +441,7 @@ export default function CalendrierPage() {
           {/* Title + nav */}
           <div className="flex items-center gap-3">
             <CalendarDays className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-bold text-gray-900">Calendrier</h1>
+            <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Calendrier</h1>
             <div className="flex items-center gap-1 ml-2">
               <button
                 onClick={goPrev}

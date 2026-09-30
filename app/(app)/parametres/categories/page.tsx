@@ -86,14 +86,14 @@ export default function UserCategoriesPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="px-4 md:px-6 pb-8 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary-100 rounded-xl">
             <FolderTree className="h-5 w-5 text-primary-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Mes catégories</h1>
+            <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Mes catégories</h1>
             <p className="text-sm text-gray-500">Catégories personnelles + globales (en lecture seule)</p>
           </div>
         </div>

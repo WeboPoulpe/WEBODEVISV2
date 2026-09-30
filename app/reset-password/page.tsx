@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
+import Link from 'next/link';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import AuthShell, { authButton, authError, authInfo, authInput, authLabel } from '@/components/auth/AuthShell';
 import { resetPassword } from '@/server/auth';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
@@ -19,7 +20,6 @@ export default function ResetPasswordPage() {
   // Le jeton de réinitialisation est porté par le lien reçu par email.
   useEffect(() => {
     setToken(new URLSearchParams(window.location.search).get('token'));
-    setReady(true);
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -37,64 +37,56 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-primary-darker via-primary-darker to-primary">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-5">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Nouveau mot de passe</h1>
-          <p className="text-sm text-gray-500 mt-1">Choisissez un nouveau mot de passe pour votre compte.</p>
-        </div>
-
-        {done ? (
-          <p className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100 flex items-center gap-2">
-            <Check className="h-4 w-4" /> Mot de passe mis à jour. Redirection vers la connexion…
-          </p>
-        ) : !ready ? (
-          <p className="text-sm text-gray-500 flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Vérification du lien de réinitialisation…
-          </p>
-        ) : (
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nouveau mot de passe</label>
-              <div className="relative">
-                <input
-                  type={show ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-                <button type="button" onClick={() => setShow((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirmer</label>
+    <AuthShell
+      title="Nouveau mot de passe"
+      subtitle="Choisissez le mot de passe que vous utiliserez désormais."
+      points={['Le lien reçu par email est valable une heure', 'Il ne peut servir qu’une seule fois']}
+      footer={<Link href="/login" className="font-medium text-primary hover:underline">Retour à la connexion</Link>}
+    >
+      {done ? (
+        <p role="status" className={authInfo}>Mot de passe mis à jour. Redirection vers la connexion…</p>
+      ) : (
+        <form onSubmit={submit} className="space-y-5">
+          <div>
+            <label htmlFor="reset-password" className={authLabel}>Nouveau mot de passe</label>
+            <div className="relative">
               <input
+                id="reset-password"
                 type={show ? 'text' : 'password'}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${authInput} pr-12`}
               />
+              <button
+                type="button"
+                onClick={() => setShow((s) => !s)}
+                aria-label={show ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                className="absolute right-1 top-1 w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900"
+              >
+                {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
+          </div>
+          <div>
+            <label htmlFor="reset-confirm" className={authLabel}>Confirmer le mot de passe</label>
+            <input
+              id="reset-confirm"
+              type={show ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className={authInput}
+            />
+          </div>
 
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">{error}</p>
-            )}
+          {error && <p role="alert" className={authError}>{error}</p>}
 
-            <button
-              type="submit"
-              disabled={loading || !password || !confirm}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
-            >
-              {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Mise à jour…</> : 'Mettre à jour le mot de passe'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <button type="submit" disabled={loading || !password || !confirm} className={authButton}>
+            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Mise à jour…</> : 'Mettre à jour le mot de passe'}
+          </button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

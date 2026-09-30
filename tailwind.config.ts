@@ -12,7 +12,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Bleu pétrole : couleur d'action.
+        // Terracotta : couleur d'action.
         primary: {
           DEFAULT: v('--p-700'),
           dark: v('--p-800'),
@@ -29,7 +29,7 @@ const config: Config = {
           800: v('--p-800'),
           900: v('--p-900'),
         },
-        // Neutres froids (porcelaine → encre), à la place des gris par défaut.
+        // Neutres chauds (papier crème → encre), à la place des gris par défaut.
         gray: {
           50: v('--n-50'),
           100: v('--n-100'),
@@ -42,8 +42,11 @@ const config: Config = {
           800: v('--n-800'),
           900: v('--n-900'),
         },
-        // Citron : « aujourd'hui », pastilles de notification.
         accent: { DEFAULT: v('--accent'), ink: v('--accent-ink') },
+        page: v('--bg'),
+        // Vert sapin : barre latérale et carte sombre. Sauge : étiquettes et progression.
+        forest: { DEFAULT: v('--forest'), soft: v('--forest-soft') },
+        sage: { DEFAULT: v('--sage'), 100: v('--sage-100') },
         danger: v('--danger'),
       },
       fontFamily: {

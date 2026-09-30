@@ -381,10 +381,10 @@ export default function ClientsPage() {
   const habitualsCount = customers.filter((c) => (c.quote_count ?? 0) >= 3).length;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="px-4 md:px-6 pb-8 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Clients</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Clients</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {loading ? '…' : `${customers.length} client${customers.length !== 1 ? 's' : ''}`}
             {!loading && habitualsCount > 0 && <span className="ml-2 text-amber-600 font-medium">· {habitualsCount} habitué{habitualsCount > 1 ? 's' : ''} ⭐</span>}

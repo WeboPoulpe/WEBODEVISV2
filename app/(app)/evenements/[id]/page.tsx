@@ -1929,7 +1929,7 @@ export default function EvenementPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-3">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{quote.client_name || 'Événement'}</h1>
+                  <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight tracking-tight">{quote.client_name || 'Événement'}</h1>
                   <span className="inline-block mt-1.5 px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-gradient-to-r from-primary-100 to-primary-50 text-primary border border-primary-200/50">
                     {quote.event_type}
                   </span>

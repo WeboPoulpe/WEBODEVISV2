@@ -177,9 +177,9 @@ export default function ParametresPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-8">
+    <div className="px-4 md:px-6 pb-8 max-w-3xl space-y-8">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">Paramètres</h1>
+        <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Paramètres</h1>
         <p className="text-sm text-gray-500 mt-0.5">Informations de votre entreprise et préférences</p>
       </div>
 

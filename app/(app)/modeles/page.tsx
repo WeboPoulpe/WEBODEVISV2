@@ -498,12 +498,12 @@ export default function ModelesPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-10">
+    <div className="px-4 md:px-6 pb-8 max-w-5xl space-y-10">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Modèles de devis</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Modèles de devis</h1>
           <p className="text-sm text-gray-500 mt-1">
             Modèles prédéfinis et vos modèles personnalisés
           </p>

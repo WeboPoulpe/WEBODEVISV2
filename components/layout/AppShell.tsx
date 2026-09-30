@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileTabBar from './MobileTabBar';
@@ -12,14 +12,9 @@ import { useAuth } from '@/context/AuthContext';
 // Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const { user, profile, loading } = useAuth();
   const badges = useNavBadges();
-
-  useEffect(() => {
-    document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
-  }, [collapsed]);
 
   // Show onboarding overlay if user has not completed it
   const showOnboarding = !loading && user && profile && profile.has_completed_onboarding === false;
@@ -28,7 +23,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-[100dvh] overflow-hidden">
       {showOnboarding && <OnboardingOverlay userId={user!.id} />}
 
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} badges={badges} />
+      <Sidebar badges={badges} />
 
       <div className="app-main-area flex flex-col flex-1 min-w-0 transition-[margin-left] duration-200" style={{ marginLeft: 'var(--shell-left)' }}>
         <Header onHelp={() => setHelpOpen(true)} />

@@ -104,11 +104,11 @@ export default function FournisseursPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="px-4 md:px-6 pb-8 max-w-3xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Fournisseurs</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Fournisseurs</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Gérez vos fournisseurs de location de matériel et ingrédients.
           </p>

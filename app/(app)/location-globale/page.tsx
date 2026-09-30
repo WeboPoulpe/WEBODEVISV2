@@ -218,10 +218,10 @@ export default function LocationGlobalePage() {
   const grandTotal = rows.reduce((s, r) => s + r.total_cost, 0);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="px-4 md:px-6 pb-8 max-w-4xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">Location globale</h1>
+        <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Location globale</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Récapitulatif des besoins en location de matériel sur une saison / période.
         </p>

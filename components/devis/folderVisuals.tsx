@@ -29,14 +29,14 @@ export interface FolderColor {
 }
 
 export const FOLDER_COLORS: FolderColor[] = [
-  { key: 'purple',  label: 'Violet',   tile: 'bg-primary-50 border-[#e9d5ff]', hover: 'hover:border-primary/50', iconBg: 'bg-primary-50', iconText: 'text-primary', swatch: 'bg-primary', drop: 'border-primary bg-primary-50' },
-  { key: 'blue',    label: 'Bleu',     tile: 'bg-sky-50/60 border-sky-200',   hover: 'hover:border-sky-400',      iconBg: 'bg-sky-100',   iconText: 'text-sky-600',   swatch: 'bg-sky-500',   drop: 'border-sky-500 bg-sky-100' },
-  { key: 'emerald', label: 'Vert',     tile: 'bg-emerald-50/60 border-emerald-200', hover: 'hover:border-emerald-400', iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', swatch: 'bg-emerald-500', drop: 'border-emerald-500 bg-emerald-100' },
-  { key: 'amber',   label: 'Ambre',    tile: 'bg-amber-50/60 border-amber-200', hover: 'hover:border-amber-400',  iconBg: 'bg-amber-100', iconText: 'text-amber-600', swatch: 'bg-amber-500', drop: 'border-amber-500 bg-amber-100' },
-  { key: 'rose',    label: 'Rose',     tile: 'bg-rose-50/60 border-rose-200', hover: 'hover:border-rose-400',     iconBg: 'bg-rose-100',  iconText: 'text-rose-600',  swatch: 'bg-rose-500',  drop: 'border-rose-500 bg-rose-100' },
-  { key: 'teal',    label: 'Turquoise',tile: 'bg-teal-50/60 border-teal-200', hover: 'hover:border-teal-400',     iconBg: 'bg-teal-100',  iconText: 'text-teal-600',  swatch: 'bg-teal-500',  drop: 'border-teal-500 bg-teal-100' },
-  { key: 'orange',  label: 'Orange',   tile: 'bg-orange-50/60 border-orange-200', hover: 'hover:border-orange-400', iconBg: 'bg-orange-100', iconText: 'text-orange-600', swatch: 'bg-orange-500', drop: 'border-orange-500 bg-orange-100' },
-  { key: 'slate',   label: 'Gris',     tile: 'bg-gray-50 border-gray-200',    hover: 'hover:border-gray-400',     iconBg: 'bg-gray-100',  iconText: 'text-gray-600',  swatch: 'bg-gray-500',  drop: 'border-gray-500 bg-gray-100' },
+  { key: 'purple',  label: 'Terracotta',   tile: 'bg-white border-gray-200', hover: 'hover:border-primary/50', iconBg: 'bg-primary-100', iconText: 'text-primary', swatch: 'bg-primary', drop: 'border-primary bg-primary-50' },
+  { key: 'blue',    label: 'Bleu',     tile: 'bg-white border-gray-200',   hover: 'hover:border-sky-400',      iconBg: 'bg-sky-100',   iconText: 'text-sky-600',   swatch: 'bg-sky-500',   drop: 'border-sky-500 bg-sky-100' },
+  { key: 'emerald', label: 'Vert',     tile: 'bg-white border-gray-200', hover: 'hover:border-emerald-400', iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', swatch: 'bg-emerald-500', drop: 'border-emerald-500 bg-emerald-100' },
+  { key: 'amber',   label: 'Ambre',    tile: 'bg-white border-gray-200', hover: 'hover:border-amber-400',  iconBg: 'bg-amber-100', iconText: 'text-amber-600', swatch: 'bg-amber-500', drop: 'border-amber-500 bg-amber-100' },
+  { key: 'rose',    label: 'Rose',     tile: 'bg-white border-gray-200', hover: 'hover:border-rose-400',     iconBg: 'bg-rose-100',  iconText: 'text-rose-600',  swatch: 'bg-rose-500',  drop: 'border-rose-500 bg-rose-100' },
+  { key: 'teal',    label: 'Turquoise',tile: 'bg-white border-gray-200', hover: 'hover:border-teal-400',     iconBg: 'bg-teal-100',  iconText: 'text-teal-600',  swatch: 'bg-teal-500',  drop: 'border-teal-500 bg-teal-100' },
+  { key: 'orange',  label: 'Orange',   tile: 'bg-white border-gray-200', hover: 'hover:border-orange-400', iconBg: 'bg-orange-100', iconText: 'text-orange-600', swatch: 'bg-orange-500', drop: 'border-orange-500 bg-orange-100' },
+  { key: 'slate',   label: 'Gris',     tile: 'bg-white border-gray-200',    hover: 'hover:border-gray-400',     iconBg: 'bg-gray-100',  iconText: 'text-gray-600',  swatch: 'bg-gray-500',  drop: 'border-gray-500 bg-gray-100' },
 ];
 
 const COLOR_BY_KEY = new Map(FOLDER_COLORS.map((c) => [c.key, c]));

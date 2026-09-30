@@ -146,12 +146,12 @@ export default function EvenementsPage() {
   upcoming.sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="px-4 md:px-6 pb-8 max-w-3xl">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Événements</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Événements</h1>
           {!loading && (
             <p className="text-sm text-gray-500 mt-0.5">
               {upcoming.length} à venir · {past.length} passé{past.length > 1 ? 's' : ''}

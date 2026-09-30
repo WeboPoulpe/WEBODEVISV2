@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, ChevronRight, Home, Loader2, X, FolderPlus } from 'lucide-react';
+import { Plus, MoreHorizontal, Trash2, ChevronRight, Home, Loader2, X, FolderPlus } from 'lucide-react';
 import { QuoteFolder, childrenOf, folderPath, isSelfOrDescendant } from '@/lib/quoteFolders';
 import { FolderGlyph, FolderStylePicker, folderColor } from './folderVisuals';
 
@@ -148,7 +148,7 @@ export default function FolderBar({
 
       {/* ── Tuiles des sous-dossiers ──────────────────────────────────── */}
       {subFolders.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-none -mx-4 px-4 pb-1 sm:mx-0 sm:px-0 sm:pb-0 sm:grid sm:grid-cols-3 xl:grid-cols-4 sm:overflow-visible">
           {subFolders.map((f) => {
             const c = folderColor(f.color);
             const nb = counts.get(f.id) ?? 0;
@@ -167,7 +167,7 @@ export default function FolderBar({
                 onClick={() => onNavigate(f.id)}
                 {...dropProps(f.id)}
                 className={[
-                  'group relative flex items-center gap-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none',
+                  'relative flex items-center gap-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none flex-shrink-0 max-w-[280px] sm:max-w-none sm:flex-shrink',
                   over ? `${c.drop} scale-[1.02]` : `${c.tile} ${c.hover} hover:shadow-sm`,
                   dragItem?.type === 'folder' && dragItem.id === f.id ? 'opacity-40' : '',
                 ].join(' ')}
@@ -176,27 +176,17 @@ export default function FolderBar({
                 <FolderGlyph icon={f.icon} color={f.color} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900 truncate">{f.name}</p>
-                  <p className="text-[11px] text-gray-400">
-                    {nb} devis{nbSub > 0 ? ` · ${nbSub} sous-dossier${nbSub > 1 ? 's' : ''}` : ''}
+                  <p className="text-xs text-gray-500 whitespace-nowrap">
+                    {nb} devis{nbSub > 0 ? `, ${nbSub} sous-dossier${nbSub > 1 ? 's' : ''}` : ''}
                   </p>
                 </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setForm({ mode: 'edit', id: f.id, name: f.name, color: f.color, icon: f.icon }); }}
-                    title="Renommer / personnaliser"
-                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-white rounded-lg transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
-                    title="Supprimer le dossier"
-                    disabled={deleting === f.id}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition-colors"
-                  >
-                    {deleting === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setForm({ mode: 'edit', id: f.id, name: f.name, color: f.color, icon: f.icon }); }}
+                  aria-label={`Modifier le dossier ${f.name}`}
+                  className="w-9 h-9 -mr-1 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white/70 rounded-lg transition-colors flex-shrink-0"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
               </div>
             );
           })}
@@ -258,7 +248,18 @@ export default function FolderBar({
               />
             </div>
 
-            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 px-5 py-4 border-t border-gray-100">
+              {form.mode === 'edit' && form.id && (
+                <button
+                  onClick={async () => { const target = folders.find((x) => x.id === form.id); setForm(null); if (target) await handleDelete(target); }}
+                  disabled={saving || deleting === form.id}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-danger rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </button>
+              )}
+              <span className="flex-1" />
               <button onClick={() => setForm(null)} disabled={saving}
                 className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 Annuler

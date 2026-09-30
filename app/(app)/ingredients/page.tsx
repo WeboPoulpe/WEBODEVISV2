@@ -704,7 +704,7 @@ export default function IngredientsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Carrot className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-bold text-gray-900">Ingrédients</h1>
+            <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Ingrédients</h1>
             {!loading && (
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                 {filtered.length}

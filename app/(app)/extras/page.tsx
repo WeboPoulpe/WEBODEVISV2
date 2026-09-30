@@ -772,11 +772,11 @@ export default function ExtrasPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="px-4 md:px-6 pb-8 max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Gestion des Extras</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Gestion des Extras</h1>
           <p className="text-sm text-gray-500 mt-0.5">Gérez votre équipe et leurs missions événementielles</p>
         </div>
         <div className="flex items-center gap-2">

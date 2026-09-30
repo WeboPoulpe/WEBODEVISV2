@@ -2,34 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Thème « Émail » : porcelaine, encre, bleu pétrole, citron ───────────────── */
+/* ── Thème : crème, vert sapin, terracotta ──────────────────────────────────── */
 :root {
-  /* Bleu pétrole (action) */
-  --p-50: 239 246 247;
-  --p-100: 225 238 240;
-  --p-200: 194 221 226;
-  --p-300: 148 195 203;
-  --p-400: 95 162 174;
-  --p-500: 53 128 143;
-  --p-600: 26 101 118;
-  --p-700: 12 74 91;
-  --p-800: 10 60 74;
-  --p-900: 8 47 58;
-  /* Neutres froids */
-  --n-50: 246 248 247;
-  --n-100: 238 241 240;
-  --n-200: 223 228 226;
-  --n-300: 198 206 203;
-  --n-400: 152 163 160;
-  --n-500: 107 119 117;
-  --n-600: 76 88 86;
-  --n-700: 54 65 63;
-  --n-800: 34 45 43;
-  --n-900: 20 33 31;
-  /* Accents */
-  --accent: 245 197 24;
-  --accent-ink: 61 47 0;
-  --danger: 214 69 93;
+  /* Terracotta (action) */
+  --p-50: 251 243 238;
+  --p-100: 247 230 220;
+  --p-200: 240 207 189;
+  --p-300: 229 174 146;
+  --p-400: 216 140 104;
+  --p-500: 201 108 69;
+  --p-600: 190 92 54;
+  --p-700: 180 80 45;
+  --p-800: 150 63 34;
+  --p-900: 116 49 27;
+  /* Neutres chauds : du papier crème à l'encre */
+  --n-50: 247 243 236;
+  --n-100: 240 235 226;
+  --n-200: 230 223 211;
+  --n-300: 209 201 187;
+  --n-400: 163 156 142;
+  --n-500: 120 115 106;
+  --n-600: 87 83 76;
+  --n-700: 61 58 53;
+  --n-800: 42 40 37;
+  --n-900: 27 26 23;
+  /* Fond de page, vert sapin (barre latérale, carte sombre), sauge (étiquettes, progression) */
+  --bg: 243 238 230;
+  --forest: 28 38 33;
+  --forest-soft: 43 58 51;
+  --sage: 63 107 79;
+  --sage-100: 231 237 221;
+  --accent: 180 80 45;
+  --accent-ink: 255 255 255;
+  --danger: 196 58 58;
 
   /* Coque : largeur occupée par la navigation latérale */
   --shell-left: 0px;
@@ -40,11 +45,11 @@
   :root { --tabbar-h: calc(76px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (min-width: 768px) {
-  :root { --shell-left: 72px; }
+  :root { --shell-left: 88px; }
 }
 @media (min-width: 1024px) {
-  :root { --shell-left: 248px; }
-  :root[data-sidebar='collapsed'] { --shell-left: 72px; }
+  :root { --shell-left: 264px; }
+  :root[data-sidebar='collapsed'] { --shell-left: 88px; }
 }
 
 * {
@@ -57,7 +62,7 @@ body {
 }
 
 body {
-  background-color: rgb(var(--n-50));
+  background-color: rgb(var(--bg));
   color: rgb(var(--n-900));
   font-family: var(--font-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -75,11 +80,14 @@ h1, h2, .font-display {
   outline-offset: 2px;
 }
 
-/* Libellés de la barre latérale : visibles seulement quand elle est dépliée (grand écran) */
-.sb-label { display: none; }
+/* Barre latérale : .sb-label n'existe que dépliée (grand écran), .sb-rail-only que sur le rail d'icônes.
+   Les règles ne font que masquer : chaque élément garde son propre mode d'affichage. */
+@media (max-width: 1023px) {
+  .sb-label { display: none !important; }
+}
+:root[data-sidebar='collapsed'] .sb-label { display: none !important; }
 @media (min-width: 1024px) {
-  :root:not([data-sidebar='collapsed']) .sb-label { display: revert; }
-  :root:not([data-sidebar='collapsed']) .sb-rail-only { display: none; }
+  :root:not([data-sidebar='collapsed']) .sb-rail-only { display: none !important; }
 }
 
 .scrollbar-none { scrollbar-width: none; }
@@ -243,4 +251,9 @@ h1, h2, .font-display {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--n-400));
+}
+
+/* Sur téléphone, un champ en dessous de 16px fait zoomer iOS à la saisie. */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px !important; }
 }

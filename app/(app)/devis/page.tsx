@@ -1223,11 +1223,11 @@ export default function DevisPage() {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="px-4 md:px-6 pb-8 max-w-7xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Mes devis</h1>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Mes devis</h1>
           <p className="text-sm text-gray-500 mt-0.5">{loading ? '…' : `${quotes.length} devis au total`}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -1249,11 +1249,13 @@ export default function DevisPage() {
             <UploadCloud className="h-4 w-4" />
             <span className="hidden sm:inline">Importer</span>
           </button>
-          <Link href={currentFolder ? `/devis/nouveau?dossier=${currentFolder}` : '/devis/nouveau'}
-            title={currentFolder ? 'Le devis sera créé dans le dossier ouvert' : undefined}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors">
-            <Plus className="h-4 w-4" />Nouveau
-          </Link>
+          {/* À la racine, « Nouveau devis » est déjà dans l'en-tête (ou le bouton + sur téléphone). */}
+          {currentFolder && (
+            <Link href={`/devis/nouveau?dossier=${currentFolder}`}
+              className="flex items-center gap-2 px-4 py-2.5 border border-primary/40 text-primary text-sm font-semibold rounded-xl hover:bg-primary-50 transition-colors">
+              <Plus className="h-4 w-4" />Nouveau dans ce dossier
+            </Link>
+          )}
         </div>
       </div>
 

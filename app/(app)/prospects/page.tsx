@@ -976,7 +976,7 @@ function ProspectsPageInner() {
               <Users className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-gray-900">Demandes de devis</h1>
+              <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Demandes de devis</h1>
               <p className="text-sm text-gray-400">
                 {loading ? '…' : `${prospects.length} demande${prospects.length !== 1 ? 's' : ''}${newCount > 0 ? ` · ${newCount} nouvelle${newCount > 1 ? 's' : ''}` : ''}`}
               </p>

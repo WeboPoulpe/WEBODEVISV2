@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { requestPasswordReset } from '@/server/auth';
+import { authButton, authError, authInfo, authInput, authLabel } from './AuthShell';
 
 export default function LoginForm() {
   const { signIn } = useAuth();
@@ -20,7 +21,7 @@ export default function LoginForm() {
 
   const handleForgot = async () => {
     setError(null); setInfo(null);
-    if (!email.trim()) { setError('Entrez votre adresse email ci-dessus, puis cliquez sur « Mot de passe oublié ».'); return; }
+    if (!email.trim()) { setError('Saisissez votre adresse email, puis choisissez « Mot de passe oublié ».'); return; }
     setResetting(true);
     const { error: err } = await requestPasswordReset(email);
     setResetting(false);
@@ -39,9 +40,7 @@ export default function LoginForm() {
 
     if (error) {
       const msg = error.toLowerCase();
-      if (msg.includes('not confirmed') || msg.includes('confirm')) {
-        setError("Votre compte n'est pas encore confirmé. Ouvrez l'email de validation reçu lors de l'inscription (pensez à vérifier les spams), puis reconnectez-vous.");
-      } else if (msg.includes('invalid login') || msg.includes('credentials')) {
+      if (msg.includes('invalid login') || msg.includes('credentials')) {
         setError('Email ou mot de passe incorrect.');
       } else {
         setError(error);
@@ -55,83 +54,53 @@ export default function LoginForm() {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-sm"
-    >
-      {/* Email */}
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Adresse email</label>
+        <label htmlFor="login-email" className={authLabel}>Adresse email</label>
         <input
+          id="login-email"
           type="email"
           autoComplete="email"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="vous@exemple.fr"
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+          className={authInput}
         />
       </div>
 
-      {/* Password */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label htmlFor="login-password" className="text-sm font-medium text-gray-700">Mot de passe</label>
+          <button type="button" onClick={handleForgot} disabled={resetting} className="text-sm font-medium text-primary hover:underline disabled:opacity-60">
+            {resetting ? 'Envoi…' : 'Mot de passe oublié ?'}
+          </button>
+        </div>
         <div className="relative">
           <input
+            id="login-password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            className={`${authInput} pr-12`}
           />
           <button
             type="button"
             onClick={() => setShowPassword((s) => !s)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+            className="absolute right-1 top-1 w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900"
           >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mot de passe oublié */}
-      <div className="flex justify-end -mt-1">
-        <button
-          type="button"
-          onClick={handleForgot}
-          disabled={resetting}
-          className="text-xs text-primary hover:underline font-medium disabled:opacity-60"
-        >
-          {resetting ? 'Envoi…' : 'Mot de passe oublié ?'}
-        </button>
-      </div>
+      {error && <p role="alert" className={authError}>{error}</p>}
+      {info && <p role="status" className={authInfo}>{info}</p>}
 
-      {/* Error / Info */}
-      {error && (
-        <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
-          {error}
-        </p>
-      )}
-      {info && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
-          {info}
-        </p>
-      )}
-
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={loading || !email || !password}
-        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Connexion…
-          </>
-        ) : (
-          'Se connecter'
-        )}
+      <button type="submit" disabled={loading || !email || !password} className={authButton}>
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Connexion…</> : 'Se connecter'}
       </button>
     </form>
   );

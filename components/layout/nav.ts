@@ -22,6 +22,8 @@ export interface NavItem {
 export interface NavGroup {
   title: string;
   items: NavItem[];
+  /** Groupe replié par défaut dans la barre latérale (déplié si une de ses pages est ouverte). */
+  collapsible?: boolean;
 }
 
 // Une seule définition de la navigation, partagée par la barre latérale et le menu mobile.
@@ -46,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'Catalogue',
+    collapsible: true,
     items: [
       { href: '/prestations', icon: Package, label: 'Prestations', exact: false },
       { href: '/ingredients', icon: Carrot, label: 'Ingrédients', exact: false },
@@ -56,7 +59,8 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: 'Réglages',
+    title: 'Paramètres',
+    collapsible: true,
     items: [
       { href: '/parametres', icon: Building2, label: 'Mon entreprise', exact: true },
       { href: '/parametres/categories', icon: FolderTree, label: 'Catégories', exact: false },
@@ -78,7 +82,7 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 export function useNavGroups(): NavGroup[] {
   const { profile } = useAuth();
   return NAV_GROUPS.map((g) =>
-    g.title === 'Réglages' && profile?.role === 'admin' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g);
+    g.title === 'Paramètres' && profile?.role === 'admin' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g);
 }
 
 export type Badges = Record<BadgeKey, number | 'dot' | null>;

@@ -8,17 +8,17 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
 
-const bar = 'md:hidden fixed inset-x-3 z-30 h-16 rounded-3xl bg-white/90 backdrop-blur-xl border border-gray-200 shadow-float flex items-stretch px-1.5';
+const bar = 'md:hidden fixed inset-x-3 z-30 h-16 rounded-3xl bg-forest shadow-float flex items-stretch px-1.5';
 const barStyle = { bottom: 'max(12px, env(safe-area-inset-bottom))' };
 
 function Tab({ href, icon: Icon, label, active, dot }: { href: string; icon: React.ElementType; label: string; active: boolean; dot?: boolean }) {
   return (
     <Link href={href} className="relative flex-1 flex flex-col items-center justify-center gap-1" aria-current={active ? 'page' : undefined}>
-      <span className={cn('relative flex items-center justify-center w-12 h-7 rounded-full transition-colors', active && 'bg-primary-100')}>
-        <Icon className={cn('h-5 w-5', active ? 'text-primary' : 'text-gray-500')} strokeWidth={active ? 2.2 : 1.8} />
-        {dot && <span className="absolute top-0 right-1.5 w-2 h-2 rounded-full bg-accent ring-2 ring-white" />}
+      <span className={cn('relative flex items-center justify-center w-12 h-7 rounded-full transition-colors', active && 'bg-forest-soft')}>
+        <Icon className={cn('h-5 w-5', active ? 'text-white' : 'text-white/55')} strokeWidth={active ? 2.2 : 1.8} />
+        {dot && <span className="absolute top-0 right-1.5 w-2 h-2 rounded-full bg-primary-400 ring-2 ring-forest" />}
       </span>
-      <span className={cn('text-[11px] leading-none', active ? 'text-primary font-semibold' : 'text-gray-500 font-medium')}>{label}</span>
+      <span className={cn('text-[11px] leading-none', active ? 'text-white font-semibold' : 'text-white/55 font-medium')}>{label}</span>
     </Link>
   );
 }
@@ -56,16 +56,16 @@ export default function MobileTabBar({ badges }: { badges: Badges }) {
           </div>
         )}
         <nav className={cn(bar, 'gap-1.5 items-center px-2')} style={barStyle} aria-label="Actions du document">
-          <Link href={editor.isQuoteEditor ? '/devis' : '/prestations'} className="w-12 h-12 flex items-center justify-center rounded-2xl text-gray-600" aria-label="Retour">
+          <Link href={editor.isQuoteEditor ? '/devis' : '/prestations'} className="w-12 h-12 flex items-center justify-center rounded-2xl text-white/80" aria-label="Retour">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           {editor.isQuoteEditor && (
             <>
-              <button onClick={() => setPanelsOpen((v) => !v)} className="h-12 px-3 flex items-center gap-2 rounded-2xl text-sm font-medium text-gray-700">
+              <button onClick={() => setPanelsOpen((v) => !v)} className="h-12 px-3 flex items-center gap-2 rounded-2xl text-sm font-medium text-white/90">
                 <PanelLeft className="h-5 w-5" />
                 Panneaux
               </button>
-              <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))} className="w-12 h-12 flex items-center justify-center rounded-2xl text-gray-600" aria-label="Enregistrer en PDF">
+              <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))} className="w-12 h-12 flex items-center justify-center rounded-2xl text-white/80" aria-label="Enregistrer en PDF">
                 <Download className="h-5 w-5" />
               </button>
             </>
@@ -90,8 +90,8 @@ export default function MobileTabBar({ badges }: { badges: Badges }) {
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-label="Menu">
           <div className="absolute inset-0 bg-gray-900/40" onClick={() => setMenuOpen(false)} />
-          <div className="relative max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-gray-50 animate-sheet-up" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
-            <div className="sticky top-0 z-10 flex items-center justify-between px-5 pt-5 pb-3 bg-gray-50">
+          <div className="relative max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-page animate-sheet-up" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 pt-5 pb-3 bg-page">
               <div className="min-w-0">
                 <p className="font-display text-xl font-semibold text-gray-900 truncate">{profile?.company_name || 'WeboDevis'}</p>
                 <p className="text-sm text-gray-500 truncate">{profile?.email}</p>
@@ -144,17 +144,17 @@ export default function MobileTabBar({ badges }: { badges: Badges }) {
         <Tab href="/" icon={Home} label="Accueil" active={pathname === '/'} />
         <Tab href="/devis" icon={FileText} label="Devis" active={pathname.startsWith('/devis') && pathname !== '/devis/nouveau'} dot={!!badges.pendingDevis} />
         <div className="flex-1 flex items-center justify-center">
-          <Link href="/devis/nouveau" aria-label="Nouveau devis" className="w-14 h-14 -mt-6 rounded-full bg-primary text-white flex items-center justify-center shadow-float ring-4 ring-gray-50 active:scale-95 transition-transform">
+          <Link href="/devis/nouveau" aria-label="Nouveau devis" className="w-14 h-14 -mt-6 rounded-full bg-primary text-white flex items-center justify-center shadow-float ring-4 ring-page active:scale-95 transition-transform">
             <Plus className="h-6 w-6" strokeWidth={2.4} />
           </Link>
         </div>
         <Tab href="/evenements" icon={CalendarRange} label="Événements" active={pathname.startsWith('/evenements')} dot={badges.todayEvent === 'dot'} />
         <button onClick={() => setMenuOpen(true)} className="relative flex-1 flex flex-col items-center justify-center gap-1" aria-haspopup="dialog">
-          <span className={cn('relative flex items-center justify-center w-12 h-7 rounded-full', inMore && 'bg-primary-100')}>
-            <LayoutGrid className={cn('h-5 w-5', inMore ? 'text-primary' : 'text-gray-500')} strokeWidth={inMore ? 2.2 : 1.8} />
-            {(badges.newProspects || badges.stockAlert) && <span className="absolute top-0 right-1.5 w-2 h-2 rounded-full bg-accent ring-2 ring-white" />}
+          <span className={cn('relative flex items-center justify-center w-12 h-7 rounded-full', inMore && 'bg-forest-soft')}>
+            <LayoutGrid className={cn('h-5 w-5', inMore ? 'text-white' : 'text-white/55')} strokeWidth={inMore ? 2.2 : 1.8} />
+            {(badges.newProspects || badges.stockAlert) && <span className="absolute top-0 right-1.5 w-2 h-2 rounded-full bg-primary-400 ring-2 ring-forest" />}
           </span>
-          <span className={cn('text-[11px] leading-none', inMore ? 'text-primary font-semibold' : 'text-gray-500 font-medium')}>Plus</span>
+          <span className={cn('text-[11px] leading-none', inMore ? 'text-white font-semibold' : 'text-white/55 font-medium')}>Plus</span>
         </button>
       </nav>
     </>
