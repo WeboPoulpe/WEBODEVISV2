@@ -42,6 +42,9 @@ export default async function ModifierPage({
   const showWeboWord =
     mode === 'weboword' ||
     (!!quote.content_html && mode !== 'wizard');
+  // Les liens de l'app mènent ici sans préciser le mode : on le fixe dans l'adresse, c'est elle qui fait
+  // apparaître Enregistrer, PDF et les panneaux dans la navigation.
+  if (showWeboWord && mode !== 'weboword') redirect(`/devis/${id}/modifier?mode=weboword`);
 
   // ── Load services (needed by both editors) ────────────────────────────────
   let services: ServiceLine[] = [];

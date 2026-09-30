@@ -10,6 +10,7 @@
  */
 
 import { lineTotalHT, resolveGuestSplit } from './quoteTotals';
+import { sanitizeHtml } from './sanitize';
 
 export interface QuoteHtmlData {
   companyName: string;
@@ -189,7 +190,37 @@ export function generatedTextFragments(lang: 'fr' | 'en' = 'fr'): { intro: strin
   return { intro: chunks(t.intro(S, S, S, S)), menuTitle: chunks(t.menuTitle(S)) };
 }
 
-export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
+/** Échappe un texte simple (nom, lieu, remarque…) avant de le placer dans le document. */
+const esc = (value: string | null | undefined) =>
+  value == null ? value : String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
+/**
+ * Rien de ce que saisit une personne (traiteur, client, visiteur du formulaire de demande) n'entre tel quel
+ * dans le document : les textes simples sont échappés, les textes mis en forme sont nettoyés.
+ */
+function safeData(d: QuoteHtmlData): QuoteHtmlData {
+  return {
+    ...d,
+    companyName: esc(d.companyName) ?? '',
+    clientName: esc(d.clientName) ?? '',
+    clientEmail: esc(d.clientEmail), clientPhone: esc(d.clientPhone), clientAddress: esc(d.clientAddress),
+    clientCompanyName: esc(d.clientCompanyName), clientSiret: esc(d.clientSiret),
+    contactName: esc(d.contactName), contactRole: esc(d.contactRole), contactEmail: esc(d.contactEmail), contactPhone: esc(d.contactPhone),
+    eventType: esc(d.eventType), eventLocation: esc(d.eventLocation),
+    remarks: esc(d.remarks),
+    cgv: d.cgv ? sanitizeHtml(d.cgv) : d.cgv,
+    services: d.services.map((s) => ({
+      ...s,
+      name: esc(s.name) ?? '',
+      description: s.description ? sanitizeHtml(s.description) : s.description,
+      gastroCardHtml: s.gastroCardHtml ? sanitizeHtml(s.gastroCardHtml) : s.gastroCardHtml,
+      gastroCardHtmlEn: s.gastroCardHtmlEn ? sanitizeHtml(s.gastroCardHtmlEn) : s.gastroCardHtmlEn,
+    })),
+  };
+}
+
+export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions = {}): string {
+  const d = safeData(input);
   const lang: 'fr' | 'en' = d.language === 'en' ? 'en' : 'fr';
   const t = T[lang];
   const m = (n: number) => money(n, lang);
@@ -284,7 +315,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
   }).join('');
 
   // ── Menu items Page 2 — use gastroCardHtml if available, otherwise fallback ──
-  const menuItems = d.services
+  const menuItems = activeServices
     .filter((s) => s.name)
     .map((s) => {
       // If prestation has a custom gastro_card_html, use it as-is (wrapped in container)
@@ -300,7 +331,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       <div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
         <p style="font-size:15px;font-weight:normal;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
         ${s.description
-          ? `<p class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</p>`
+          ? `<div class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</div>`
           : ''}
       </div>`;
     }).join('');
@@ -339,11 +370,11 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
     <div data-webo-event="1" style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
       <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${eventTypeT || t.aPreciser}</p>
-      ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">📅 ${dateFr(d.eventDate)}</p>` : ''}
+      ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${dateFr(d.eventDate)}</p>` : ''}
       ${d.guestCountAdults || d.guestCountChildren
-        ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${d.guestCountAdults || 0} ${lang === 'en' ? 'adults' : 'adultes'}${d.guestCountChildren ? ` + ${d.guestCountChildren} ${lang === 'en' ? (d.guestCountChildren > 1 ? 'children' : 'child') : (d.guestCountChildren > 1 ? 'enfants' : 'enfant')}` : ''}</p>`
-        : (d.guestCount ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">👥 ${t.invite(d.guestCount)}</p>` : '')}
-      ${d.eventLocation ? `<p style="color:#555;margin:0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
+        ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.guestCountAdults || 0} ${lang === 'en' ? 'adults' : 'adultes'}${d.guestCountChildren ? ` + ${d.guestCountChildren} ${lang === 'en' ? (d.guestCountChildren > 1 ? 'children' : 'child') : (d.guestCountChildren > 1 ? 'enfants' : 'enfant')}` : ''}</p>`
+        : (d.guestCount ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${t.invite(d.guestCount)}</p>` : '')}
+      ${d.eventLocation ? `<p style="color:#555;margin:0;font-size:11px;">${d.eventLocation}</p>` : ''}
     </div>
   </div>
 
@@ -383,7 +414,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
         <span>${t.tva} (${d.vatRate}%)</span><span>${m(vat)}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:bold;color:${accentColor};">
+      <div style="display:flex;justify-content:space-between;gap:14px;font-size:15px;font-weight:bold;color:${accentColor};">
         <span>${t.totalTtc}</span><span>${m(ttc)}</span>
       </div>
       ${optionHt > 0 ? `
@@ -391,8 +422,8 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
         <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;">
           <span>${t.siOptionsHt}</span><span>+ ${m(optionHt)}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;color:#d97706;">
-          <span>${t.totalTtcOptions}</span><span>${m(ttcAvecOptions)}</span>
+        <div style="display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:bold;color:#d97706;">
+          <span>${t.totalTtcOptions}</span><span style="white-space:nowrap;">${m(ttcAvecOptions)}</span>
         </div>
       </div>
       ` : ''}
@@ -418,7 +449,7 @@ export function generateQuoteHtml(d: QuoteHtmlData, opts: QuoteHtmlOptions = {})
       ${t.eventLabel(eventTypeT, d.eventDate ? dateFr(d.eventDate) : '')}
     </p>
     <h2 style="font-size:24px;font-weight:bold;color:white;margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">${t.menuTitle(eventTypeT)}</h2>
-    ${d.eventLocation ? `<p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:11px;">📍 ${d.eventLocation}</p>` : ''}
+    ${d.eventLocation ? `<p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:11px;">${d.eventLocation}</p>` : ''}
     <div style="width:36px;height:2px;background:rgba(255,255,255,0.35);margin:12px auto 0;"></div>
   </div>
 

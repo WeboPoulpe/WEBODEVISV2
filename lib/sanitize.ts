@@ -12,7 +12,10 @@ const CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
   // Conserve les styles inline et les images data: (logos/photos en base64).
   ADD_ATTR: ['target', 'style'],
   ADD_TAGS: ['style'],
-  ALLOW_DATA_ATTR: false,
+  // Les repères data-webo-* servent à resynchroniser le document (tableau, client, événement).
+  ALLOW_DATA_ATTR: true,
+  // Un devis ne contient ni formulaire ni champ : ils ne serviraient qu'à piéger le lecteur.
+  FORBID_TAGS: ['form', 'input', 'button', 'textarea', 'select', 'option'],
 };
 
 /** Nettoie une chaîne HTML avant injection via dangerouslySetInnerHTML. */

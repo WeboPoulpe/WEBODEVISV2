@@ -10,6 +10,7 @@ import {
   PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw, ScrollText,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { useAuth } from '@/context/AuthContext';
@@ -216,7 +217,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     window.addEventListener('weboword:save', onSaveEvt);
     window.addEventListener('weboword:print', onPrintEvt);
     window.addEventListener('weboword:savepdf', onSavePdfEvt);
+    // Ctrl+S (Cmd+S sur Mac) enregistre, au lieu d'ouvrir « Enregistrer la page » du navigateur.
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); handleSaveRef.current(); }
+    };
+    window.addEventListener('keydown', onKey);
     return () => {
+      window.removeEventListener('keydown', onKey);
       window.removeEventListener('weboword:save', onSaveEvt);
       window.removeEventListener('weboword:print', onPrintEvt);
       window.removeEventListener('weboword:savepdf', onSavePdfEvt);
@@ -244,6 +251,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [showPhotoBlockPicker, setShowPhotoBlockPicker] = useState(false);
   const [localDraft, setLocalDraft] = useState<{ html: string; savedAt: string } | null>(null);
   const savedRange = useRef<Range | null>(null);
+  /** La feuille telle qu'enregistrée : sert à savoir s'il reste des modifications à enregistrer. */
+  const savedHtml = useRef('');
   const handlePrintRef = useRef<() => void>(() => {});
   const handleSavePdfRef = useRef<() => void>(() => {});
   const handleSaveRef = useRef<() => void>(() => {});
@@ -275,36 +284,48 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   useEffect(() => {
     if (!initDone.current && editorRef.current) {
       const draftKey = `weboword_draft_${quoteId}`;
+      let pendingDraft: { html: string; savedAt: string } | null = null;
       try {
         const raw = localStorage.getItem(draftKey);
         if (raw) {
           const draft = JSON.parse(raw) as { html: string; savedAt: string };
           // If draft exists and DB has no content (null→generated) or draft is recent, offer restore
-          setLocalDraft(draft);
-          editorRef.current.innerHTML = initialHtml;
-        } else {
-          editorRef.current.innerHTML = initialHtml;
+          pendingDraft = draft;
         }
-      } catch {
-        editorRef.current.innerHTML = initialHtml;
-      }
+      } catch { /* brouillon illisible : ignoré */ }
+      editorRef.current.innerHTML = sanitizeHtml(initialHtml);
       initDone.current = true;
       const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
       if (menu) menu.style.maxWidth = '100%';
+      // Référence de « rien à enregistrer » : la feuille telle qu'elle vient d'être chargée.
+      savedHtml.current = editorRef.current.innerHTML;
+      // Le brouillon n'est proposé que s'il diffère vraiment de ce qui est enregistré.
+      if (pendingDraft && pendingDraft.html !== savedHtml.current) setLocalDraft(pendingDraft);
+      else if (pendingDraft) { try { localStorage.removeItem(draftKey); } catch { /* rien */ } }
     }
   }, [initialHtml, quoteId]);
 
-  // Autosave to localStorage every 30 seconds
+  // Brouillon local : écrit toutes les cinq secondes, seulement quand la feuille diffère de ce qui est enregistré.
   useEffect(() => {
     const draftKey = `weboword_draft_${quoteId}`;
-    const interval = setInterval(() => {
+    const writeDraft = () => {
       const html = editorRef.current?.innerHTML;
       if (!html || !initDone.current) return;
       try {
-        localStorage.setItem(draftKey, JSON.stringify({ html, savedAt: new Date().toISOString() }));
+        if (html === savedHtml.current) localStorage.removeItem(draftKey);
+        else localStorage.setItem(draftKey, JSON.stringify({ html, savedAt: new Date().toISOString() }));
       } catch { /* quota exceeded — ignore */ }
-    }, 30_000);
-    return () => clearInterval(interval);
+    };
+    const interval = setInterval(writeDraft, 5_000);
+    // Fermer l'onglet avec des modifications non enregistrées : le brouillon est écrit, et le navigateur prévient.
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (!initDone.current || editorRef.current?.innerHTML === savedHtml.current) return;
+      writeDraft();
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onLeave);
+    return () => { clearInterval(interval); window.removeEventListener('beforeunload', onLeave); };
   }, [quoteId]);
 
   // Apply fontSize + lineHeight directly to DOM so contentEditable sees it immediately
@@ -793,6 +814,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
+    if (saving) return;
     const html = editorRef.current?.innerHTML ?? '';
     setSaving(true); setError(null);
     const supabase = createClient();
@@ -812,12 +834,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     // Clear local draft — content is safely in DB
     try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
     setLocalDraft(null);
+    savedHtml.current = html;
     setToast('Devis enregistré');
   };
 
   // ── Build print HTML (shared by print + PDF) ──────────────────────────────────
   const buildPrintHtml = () => {
-    const content = editorRef.current?.innerHTML ?? '';
+    // La fenêtre d'impression est de la même origine que l'app : le contenu y entre nettoyé.
+    const content = sanitizeHtml(editorRef.current?.innerHTML ?? '');
     const fontEntry = FONTS.find((x) => x.value === font);
     const fontImport = fontEntry?.google
       ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
@@ -884,7 +908,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
   // ── Save PDF — uses browser print (reliable, no html2canvas issues) ─────────
   const handleSavePdf = () => {
-    const content = editorRef.current?.innerHTML ?? '';
+    const content = sanitizeHtml(editorRef.current?.innerHTML ?? '');
     if (!content) return;
 
     // Build a clean filename
@@ -1368,7 +1392,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             </span>
             <button
               onClick={() => {
-                if (editorRef.current) editorRef.current.innerHTML = localDraft.html;
+                if (editorRef.current) editorRef.current.innerHTML = sanitizeHtml(localDraft.html);
                 setLocalDraft(null);
                 setToast('Brouillon restauré — pense à sauvegarder !');
               }}
@@ -1488,8 +1512,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           url.searchParams.delete('panel');
           window.history.replaceState(null, '', url.toString());
         }}
+        getSheetHtml={() => editorRef.current?.innerHTML ?? null}
         onApplied={() => {
           setActivePanel(null);
+          // La feuille vient d'être enregistrée avec le panneau : plus de brouillon, plus d'avertissement à la sortie.
+          try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* rien */ }
+          savedHtml.current = editorRef.current?.innerHTML ?? '';
           window.location.href = `/devis/${quoteId}/modifier?mode=weboword&t=${Date.now()}`;
         }}
       />

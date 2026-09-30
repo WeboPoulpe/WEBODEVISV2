@@ -14,6 +14,8 @@ import { useAuth } from '@/context/AuthContext';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
+import { syncWeboDocument } from '@/lib/weboFinancials';
+import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ServiceLine {
@@ -394,6 +396,34 @@ export default function QuoteInlineEditor({
     setSaving(true); setError(null); setSaved(false);
     const supabase = createClient();
 
+    // Le document mis en forme et la répartition adultes / enfants sont relus : le total tient compte du prix
+    // enfant, et le document est mis à jour (tableau, totaux, client, événement) au lieu d'être effacé.
+    const { data: current } = await supabase.from('quotes')
+      .select('content_html, selected_font, guest_count_adults, guest_count_children, language').eq('id', quoteId).maybeSingle();
+    const split = resolveGuestSplit(event.guestCount, current?.guest_count_adults as number | null, current?.guest_count_children as number | null);
+    const lines = services.filter((l) => !l.isPageBreak);
+    const htExact = lines.reduce((sum, l) => sum + (l.isFree || l.isOption ? 0 : lineTotalHT(l, split.adults, split.children)), 0);
+    const ttcExact = htExact * (1 + options.vatRate / 100);
+    const clientName = client.type === 'particulier' ? `${client.firstName} ${client.lastName}`.trim() : client.companyName;
+    const synced = current?.content_html
+      ? syncWeboDocument(current.content_html as string, {
+          all: {
+            companyName: '',
+            clientName, clientEmail: client.email || null, clientPhone: client.phone || null, clientAddress: client.address || null,
+            clientType: client.type, clientCompanyName: client.companyName || null, clientSiret: client.siret || null,
+            contactName: client.contactName || null, contactRole: client.contactRole || null,
+            contactEmail: client.contactEmail || null, contactPhone: client.contactPhone || null,
+            eventType: event.eventType || null, eventDate: event.eventDate || null, eventLocation: event.eventLocation || null,
+            guestCount: event.guestCount, guestCountAdults: (current.guest_count_adults as number | null) ?? null,
+            guestCountChildren: (current.guest_count_children as number | null) ?? null,
+            services: lines, vatRate: options.vatRate, hidePrice: options.hidePrice,
+            language: current.language === 'en' ? 'en' : 'fr',
+          },
+          financials: true,
+          parties: true,
+        }, { template, font: (current.selected_font as string | null) ?? undefined })
+      : null;
+
     const payload = {
       client_first_name:   client.firstName,
       client_last_name:    client.lastName,
@@ -411,14 +441,15 @@ export default function QuoteInlineEditor({
       event_location:      event.eventLocation || null,
       guest_count:         event.guestCount,
       services,
-      total_amount:        ttc,
+      total_amount:        ttcExact,
       vat_rate:            options.vatRate,
       hide_price:          options.hidePrice,
       remarks:             options.remarks || null,
       images:              options.images,
       template,
       user_id:             user.id,
-      content_html:        null, // force WeboWord regeneration
+      // Document mis à jour s'il existe ; sinon il sera généré à la première ouverture dans l'éditeur.
+      ...(synced ? { content_html: synced } : {}),
     };
 
     const { error: err } = await supabase.from('quotes').update(payload).eq('id', quoteId);

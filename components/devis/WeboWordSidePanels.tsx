@@ -22,6 +22,8 @@ interface Props {
   activePanel: PanelKey | null;
   onClose: () => void;
   onApplied: () => void; // Called after any save — parent triggers reload
+  /** La feuille telle qu'elle est à l'écran, avec ce qui a été tapé depuis le dernier enregistrement. */
+  getSheetHtml?: () => string | null;
   // Editor actions (top bar moved here)
   onSave?: () => void;
   onPrint?: () => void;
@@ -47,7 +49,7 @@ interface Client { id: string; first_name: string | null; last_name: string | nu
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; photo_url?: string; [key: string]: any; }
 
-export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
+export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
   // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
@@ -392,10 +394,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // rattrape aussi les devis dont la base a déjà les bonnes valeurs mais pas le document.
     const partiesChanged = currentParties !== initialParties.current
       || activePanel === 'client' || activePanel === 'event';
+    // Appliquer enregistre aussi ce qui a été tapé dans la feuille : rien n'est perdu au rechargement.
+    const sheetHtml = getSheetHtml?.() || null;
+    if (sheetHtml) updatePayload.content_html = sheetHtml;
     if (finChanged || partiesChanged) {
       const { data: cur } = await supabase.from('quotes')
         .select('content_html, selected_font').eq('id', quoteId).maybeSingle();
-      if (cur?.content_html) {
+      const baseHtml = sheetHtml ?? (cur?.content_html as string | null | undefined) ?? null;
+      if (cur && baseHtml) {
         const mapSvc = (s: Service) => ({
           name: s.name,
           description: s.description ?? null,
@@ -414,7 +420,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           .map(mapSvc);
 
         const updated = syncWeboDocument(
-          cur.content_html as string,
+          baseHtml,
           {
             all: {
               companyName: '',
