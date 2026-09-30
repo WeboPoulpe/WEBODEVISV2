@@ -49,9 +49,9 @@ export const catalogue: HelpGuide[] = [
     href: '/parametres/categories',
     steps: [
       { title: 'Ouvrez « Catégories » dans le menu « Paramètres »', text: 'La page « Mes catégories » liste chaque catégorie et ses sous-catégories.' },
-      { title: 'Repérez les catégories marquées « Globale »', text: 'Elles sont fournies avec l’app et ne se modifient pas.' },
-      { title: 'Cliquez sur « Catégorie » pour en créer une', text: 'Saisissez son nom, puis validez avec la coche ou la touche Entrée.' },
-      { title: 'Complétez vos propres catégories', text: 'Dans une catégorie que vous avez créée, « + Sous-catégorie » ajoute un niveau. Le crayon renomme, la corbeille supprime.' },
+      { title: 'Repérez les catégories marquées « Par défaut »', text: 'Elles sont fournies avec l’app et ne se modifient pas.' },
+      { title: 'Cliquez sur « Nouvelle catégorie »', text: 'Saisissez son nom, puis validez avec la coche ou la touche Entrée.' },
+      { title: 'Complétez vos propres catégories', text: 'Dans une catégorie que vous avez créée, « Ajouter une sous-catégorie » ajoute un niveau. Le crayon renomme, la corbeille supprime.' },
     ],
     notes: [
       'Supprimer une catégorie supprime aussi ses sous-catégories.',
@@ -69,11 +69,12 @@ export const catalogue: HelpGuide[] = [
       { title: 'Ouvrez « Extras » dans le menu « Catalogue »' },
       { title: 'Cliquez sur « Ajouter un extra »', text: 'Le nom est obligatoire. Le téléphone, l’email et le rôle (Cuisinier, Sous-chef, Serveur, Barman, Aide, Autre) sont facultatifs.' },
       { title: 'Affectez la personne avec « Assigner »', text: 'Choisissez l’événement, le statut de départ et l’heure d’arrivée. La mission s’affiche sous son nom.' },
-      { title: 'Cliquez sur une mission pour la compléter', text: 'Un panneau s’ouvre à droite : statut, heure d’arrivée, notes de mission, et « Retirer » pour annuler l’affectation.' },
+      { title: 'Cliquez sur une mission pour la compléter', text: 'Une fenêtre s’ouvre : statut, heure d’arrivée, notes de mission, et « Retirer » pour annuler l’affectation.' },
       { title: 'Passez en vue « Agenda »', text: 'Un tableau de huit semaines montre qui travaille quand, avec la couleur du statut.' },
     ],
     notes: [
       'L’icône de lien copie l’adresse de la page personnelle de l’extra, à lui transmettre par SMS ou par email.',
+      'Un clic sur le nom d’un extra rouvre sa fiche pour la modifier.',
       'La même affectation se fait depuis la fiche d’un événement, onglet « Extras ».',
     ],
   },

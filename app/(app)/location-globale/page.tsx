@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Package, Printer, Loader2, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react';
+import { Package, Printer, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
+import { cn } from '@/lib/utils';
+import { btnPrimary, btnSecondary, cardCls, inputCls, labelCls } from '@/components/ui/kit';
+import { ErrorBanner, esc, money, printDocument } from '@/components/evenements/shared';
 
 interface RentalRow {
   material_name: string;
@@ -22,6 +25,9 @@ interface QuoteInfo {
   guest_count: number | null;
 }
 
+const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+const fmtQty = (n: number) => n.toLocaleString('fr-FR');
+
 export default function LocationGlobalePage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate]     = useState('');
@@ -29,15 +35,17 @@ export default function LocationGlobalePage() {
   const [quotes, setQuotes]       = useState<QuoteInfo[]>([]);
   const [loading, setLoading]     = useState(false);
   const [searched, setSearched]   = useState(false);
+  const [error, setError]         = useState<string | null>(null);
   const [expandedSuppliers, setExpandedSuppliers] = useState<Record<string, boolean>>({});
 
   const search = async () => {
     if (!startDate || !endDate) return;
     setLoading(true);
     setSearched(true);
+    setError(null);
     const supabase = createClient();
 
-    const { data: quotesData } = await supabase
+    const { data: quotesData, error: quotesErr } = await supabase
       .from('quotes')
       .select('id, event_date, client_name, guest_count')
       .in('status', CONFIRMED_STATUSES)
@@ -45,6 +53,7 @@ export default function LocationGlobalePage() {
       .lte('event_date', endDate)
       .order('event_date');
 
+    if (quotesErr) setError('Les besoins n’ont pas pu être calculés. Réessayez.');
     if (!quotesData || quotesData.length === 0) {
       setRows([]);
       setQuotes([]);
@@ -56,19 +65,20 @@ export default function LocationGlobalePage() {
     const quoteIds = quotesData.map((q) => q.id);
     const quoteMap = Object.fromEntries(quotesData.map((q) => [q.id, q]));
 
-    const { data: rentals } = await supabase
+    const { data: rentals, error: rentalsErr } = await supabase
       .from('rental_items')
       .select('*, supplier:suppliers(id, name)')
       .in('quote_id', quoteIds)
       .or('confirmed_individually.is.null,confirmed_individually.eq.false');
 
+    if (rentalsErr) setError('Les besoins n’ont pas pu être calculés. Réessayez.');
     if (!rentals || rentals.length === 0) {
       setRows([]);
       setLoading(false);
       return;
     }
 
-    // Aggregate by material_name + supplier
+    // Regroupement par article et par fournisseur
     const agg: Record<string, RentalRow> = {};
     for (const r of rentals) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,13 +98,7 @@ export default function LocationGlobalePage() {
       }
       agg[key].total_qty += r.qty;
       agg[key].total_cost += r.qty * r.price_per_unit;
-      if (q) {
-        agg[key].events.push({
-          date: q.event_date,
-          client: q.client_name,
-          qty: r.qty,
-        });
-      }
+      if (q) agg[key].events.push({ date: q.event_date, client: q.client_name, qty: r.qty });
     }
 
     setRows(
@@ -122,240 +126,154 @@ export default function LocationGlobalePage() {
   [grouped]);
 
   const toggleSupplier = (key: string) =>
-    setExpandedSuppliers((p) => ({ ...p, [key]: !p[key] }));
+    setExpandedSuppliers((p) => ({ ...p, [key]: p[key] === false }));
 
-  const money = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
-  const fmtDate = (d: string) => new Date(d + 'T00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   const today = new Date().toLocaleDateString('fr-FR');
-  const periodLabel = startDate && endDate
-    ? `Du ${fmtDate(startDate)} au ${fmtDate(endDate)}`
-    : '';
+  const periodLabel = startDate && endDate ? `Du ${fmtDate(startDate)} au ${fmtDate(endDate)}` : '';
+  const grandTotal = rows.reduce((s, r) => s + r.total_cost, 0);
 
-  // Print general PDF (all suppliers)
-  const printGeneral = () => {
-    const grandTotal = rows.reduce((s, r) => s + r.total_cost, 0);
-    const supplierBlocks = supplierKeys.map((sup) => {
-      const items = grouped[sup];
-      const supTotal = items.reduce((s, r) => s + r.total_cost, 0);
-      const rowsHtml = items.map((r) => `
-        <tr style="border-bottom:1px solid #f3e5f5;">
-          <td style="padding:6px 8px;">${r.material_name}</td>
-          <td style="text-align:center;padding:6px 8px;">${r.total_qty}${r.unit ? ` ${r.unit}` : ''}</td>
-          <td style="text-align:right;padding:6px 8px;">${money(r.total_cost)}</td>
-          <td style="padding:6px 8px;color:#888;font-size:10px;">${r.events.map((e) => `${fmtDate(e.date)} (${e.qty})`).join(', ')}</td>
-        </tr>`).join('');
-      return `
-        <h3 style="color:#9c27b0;margin:18px 0 6px;font-size:14px;border-bottom:1px solid #e9d5ff;padding-bottom:4px;">${sup}</h3>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="background:#f3e5f5;">
-            <th style="text-align:left;padding:6px 8px;">Article</th>
-            <th style="text-align:center;padding:6px 8px;width:80px;">Qté totale</th>
-            <th style="text-align:right;padding:6px 8px;width:90px;">Coût</th>
-            <th style="text-align:left;padding:6px 8px;width:180px;">Événements</th>
-          </tr></thead>
-          <tbody>${rowsHtml}</tbody>
-          <tfoot><tr>
-            <td colspan="2" style="text-align:right;padding:6px 8px;font-weight:bold;font-size:12px;">Total ${sup}</td>
-            <td style="text-align:right;padding:6px 8px;font-weight:bold;color:#9c27b0;">${money(supTotal)}</td>
-            <td></td>
-          </tr></tfoot>
-        </table>`;
-    }).join('');
+  const table = (items: RentalRow[], detail: (r: RentalRow) => string, totalLabel: string) => `
+    <table>
+      <thead><tr><th>Article</th><th class="r" style="width:90px">Quantité</th><th class="r" style="width:90px">Coût</th><th style="width:200px">Événements</th></tr></thead>
+      <tbody>${items.map((r) => `<tr>
+        <td>${esc(r.material_name)}</td>
+        <td class="r">${fmtQty(r.total_qty)}${r.unit ? ` ${esc(r.unit)}` : ''}</td>
+        <td class="r">${money(r.total_cost)}</td>
+        <td class="muted">${detail(r)}</td>
+      </tr>`).join('')}</tbody>
+      <tfoot><tr>
+        <td colspan="2" class="r" style="font-weight:bold;border:0">${esc(totalLabel)}</td>
+        <td class="r" style="font-weight:bold;border:0">${money(items.reduce((s, r) => s + r.total_cost, 0))}</td>
+        <td style="border:0"></td>
+      </tr></tfoot>
+    </table>`;
 
-    openPrintWindow(
-      'Récapitulatif Location — Tous fournisseurs',
-      `<p style="color:#888;font-size:11px;margin:0 0 20px;">${periodLabel} — ${quotes.length} événement${quotes.length > 1 ? 's' : ''} — Imprimé le ${today}</p>
-      ${supplierBlocks}
-      <p style="margin-top:20px;text-align:right;font-size:14px;font-weight:bold;color:#9c27b0;">
-        Total général : ${money(grandTotal)}</p>`
-    );
+  const print = (title: string, body: string) => {
+    if (!printDocument(title, body)) setError('Votre navigateur a bloqué l’ouverture du bon. Autorisez les fenêtres pour ce site, puis réessayez.');
   };
 
-  // Print PDF for a single supplier
+  // Bon général : tous les fournisseurs
+  const printGeneral = () => {
+    const blocks = supplierKeys.map((sup) => `<h2>${esc(sup)}</h2>${table(
+      grouped[sup], (r) => r.events.map((e) => `${fmtDate(e.date)} (${fmtQty(e.qty)})`).join(', '), `Total ${sup}`)}`).join('');
+    print('Récapitulatif de location, tous fournisseurs',
+      `<p class="muted" style="margin:0 0 12px">${periodLabel}. ${quotes.length} événement${quotes.length > 1 ? 's' : ''}. Imprimé le ${today}.</p>
+      ${blocks}
+      <p style="margin-top:20px;text-align:right;font-size:14px;font-weight:bold;color:#b4502d">Total général : ${money(grandTotal)}</p>`);
+  };
+
+  // Bon d'un seul fournisseur, avec le détail par événement
   const printSupplier = (supplierName: string) => {
     const items = grouped[supplierName];
     if (!items) return;
-    const supTotal = items.reduce((s, r) => s + r.total_cost, 0);
-    const rowsHtml = items.map((r) => `
-      <tr style="border-bottom:1px solid #f3e5f5;">
-        <td style="padding:6px 8px;">${r.material_name}</td>
-        <td style="text-align:center;padding:6px 8px;">${r.total_qty}${r.unit ? ` ${r.unit}` : ''}</td>
-        <td style="text-align:right;padding:6px 8px;">${money(r.total_cost)}</td>
-        <td style="padding:6px 8px;color:#888;font-size:10px;">${r.events.map((e) => `${fmtDate(e.date)} — ${e.client} (${e.qty})`).join('<br>')}</td>
-      </tr>`).join('');
-
-    openPrintWindow(
-      `Bon de Commande — ${supplierName}`,
-      `<p style="color:#888;font-size:11px;margin:0 0 20px;">${periodLabel} — Imprimé le ${today}</p>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:#f3e5f5;">
-          <th style="text-align:left;padding:6px 8px;">Article</th>
-          <th style="text-align:center;padding:6px 8px;width:80px;">Qté totale</th>
-          <th style="text-align:right;padding:6px 8px;width:90px;">Coût</th>
-          <th style="text-align:left;padding:6px 8px;width:200px;">Détail événements</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot><tr>
-          <td colspan="2" style="text-align:right;padding:6px 8px;font-weight:bold;font-size:12px;">Total</td>
-          <td style="text-align:right;padding:6px 8px;font-weight:bold;color:#9c27b0;">${money(supTotal)}</td>
-          <td></td>
-        </tr></tfoot>
-      </table>`
-    );
+    print(`Bon de commande : ${supplierName}`,
+      `<p class="muted" style="margin:0 0 12px">${periodLabel}. Imprimé le ${today}.</p>
+      ${table(items, (r) => r.events.map((e) => `${fmtDate(e.date)}, ${esc(e.client)} (${fmtQty(e.qty)})`).join('<br>'), 'Total')}`);
   };
-
-  const openPrintWindow = (title: string, body: string) => {
-    const htmlStr = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${title}</title>
-      <style>@page{size:A4 landscape;margin:15mm}html,body{color-scheme:light}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;background:#fff;padding:20mm;}</style></head>
-      <body><h1 style="color:#9c27b0;font-size:18px;margin:0 0 4px;">${title}</h1>${body}</body></html>`;
-    const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const win  = window.open(url, '_blank');
-    if (!win) { URL.revokeObjectURL(url); return; }
-    win.onload = () => { setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 600); };
-  };
-
-  const grandTotal = rows.reduce((s, r) => s + r.total_cost, 0);
 
   return (
-    <div className="px-4 md:px-6 pb-8 space-y-6">
-      {/* Header */}
-      <div>
+    <div className="px-4 md:px-6 pb-8">
+      <div className="mb-5">
         <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Location globale</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Récapitulatif des besoins en location de matériel sur une saison / période.
+        <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">
+          Additionnez le matériel à louer pour vos événements confirmés sur une période, et sortez un bon par fournisseur.
         </p>
       </div>
 
-      {/* Date range picker */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Date de début</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Date de fin</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-            />
-          </div>
+      <form onSubmit={(e) => { e.preventDefault(); search(); }}
+        className={cn(cardCls, 'p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto] items-end gap-3 mb-5')}>
+        <div className="min-w-0">
+          <label htmlFor="lg-start" className={labelCls}>Date de début</label>
+          <input id="lg-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={cn(inputCls, 'px-3')} />
         </div>
-        <button
-          onClick={search}
-          disabled={!startDate || !endDate || loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
-        >
+        <div className="min-w-0">
+          <label htmlFor="lg-end" className={labelCls}>Date de fin</label>
+          <input id="lg-end" type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} className={cn(inputCls, 'px-3')} />
+        </div>
+        <button type="submit" disabled={!startDate || !endDate || loading} className={cn(btnPrimary, 'col-span-2 sm:col-span-1 h-12')}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
           Calculer les besoins
         </button>
-      </div>
+      </form>
 
-      {/* Events summary */}
-      {searched && !loading && quotes.length > 0 && (
-        <div className="bg-primary-50/50 border border-primary-100 rounded-xl p-4">
-          <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
-            {quotes.length} événement{quotes.length > 1 ? 's' : ''} sur la période
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {quotes.map((q) => (
-              <span key={q.id} className="inline-flex items-center gap-1.5 text-xs bg-white border border-primary-200 text-gray-700 px-2.5 py-1 rounded-lg">
-                <CalendarDays className="h-3 w-3 text-primary" />
-                {fmtDate(q.event_date)} — {q.client_name} ({q.guest_count ?? '?'} conv.)
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
 
-      {/* Results */}
-      {searched && !loading && (
-        rows.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-            <Package className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-400">Aucune location trouvée sur cette période.</p>
-            <p className="text-xs text-gray-400 mt-1">Vérifiez que vos événements ont une section « Location de matériel » remplie.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Actions */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-xs text-gray-500">
-                {rows.length} article{rows.length !== 1 ? 's' : ''} — {supplierKeys.length} fournisseur{supplierKeys.length !== 1 ? 's' : ''}
-                {' — '}
-                <span className="font-bold text-primary">{money(grandTotal)}</span>
-              </p>
-              <button
-                onClick={printGeneral}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary-50 transition-colors"
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Bon général PDF
-              </button>
+      {!searched ? (
+        <p className="px-1 text-[15px] text-gray-600">Choisissez une période : la location de tous les événements confirmés qui s’y déroulent est additionnée par fournisseur.</p>
+      ) : loading ? null : (
+        <div className="space-y-6">
+          {quotes.length > 0 && (
+            <section>
+              <h2 className="px-1 mb-2 text-[15px] font-semibold text-gray-900">
+                {quotes.length} événement{quotes.length > 1 ? 's' : ''} sur la période
+              </h2>
+              <ul className="flex flex-wrap gap-2">
+                {quotes.map((q) => (
+                  <li key={q.id} className="inline-flex items-center gap-1.5 max-w-full px-3 py-1.5 rounded-full bg-white border border-gray-200 text-sm text-gray-700">
+                    <span className="font-semibold text-gray-900 tabular-nums">{fmtDate(q.event_date)}</span>
+                    <span className="truncate">{q.client_name}</span>
+                    <span className="text-gray-500 whitespace-nowrap">{q.guest_count ?? '?'} couverts</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {rows.length === 0 ? (
+            <div className={cn(cardCls, 'px-6 py-14 text-center')}>
+              <p className="font-semibold text-gray-900">Aucune location sur cette période</p>
+              <p className="text-sm text-gray-500 mt-1">Vérifiez que vos événements confirmés ont leur location de matériel remplie.</p>
             </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-gray-600">
+                  {rows.length} article{rows.length !== 1 ? 's' : ''} chez {supplierKeys.length} fournisseur{supplierKeys.length !== 1 ? 's' : ''}, total{' '}
+                  <span className="font-semibold text-gray-900">{money(grandTotal)}</span>
+                </p>
+                <button onClick={printGeneral} className={btnSecondary}><Printer className="h-4 w-4" />Bon général</button>
+              </div>
 
-            {/* Grouped by supplier */}
-            {supplierKeys.map((sup) => {
-              const isOpen = expandedSuppliers[sup] !== false;
-              const supTotal = grouped[sup].reduce((s, r) => s + r.total_cost, 0);
-              return (
-                <div key={sup} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  {/* Deux boutons côte à côte : déplier le fournisseur, imprimer son bon. */}
-                  <div className="flex items-center gap-2 pr-3 hover:bg-gray-50 transition-colors">
-                    <button
-                      onClick={() => toggleSupplier(sup)}
-                      aria-expanded={isOpen}
-                      className="flex-1 min-w-0 flex items-center justify-between gap-2 pl-4 py-3 text-left"
-                    >
-                      <span className="flex items-center gap-2 flex-wrap min-w-0">
-                        <span className="text-sm font-semibold text-gray-900">{sup}</span>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                          {grouped[sup].length} article{grouped[sup].length !== 1 ? 's' : ''}
-                        </span>
-                        <span className="text-xs font-bold text-primary">{money(supTotal)}</span>
-                      </span>
-                      {isOpen
-                        ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
-                    </button>
-                    <button
-                      onClick={() => printSupplier(sup)}
-                      className="flex-shrink-0 flex items-center gap-1.5 h-9 px-3 text-xs font-medium text-primary border border-primary/20 rounded-lg hover:bg-primary-50 transition-colors"
-                      title={`Bon de commande ${sup}`}
-                    >
-                      <Printer className="h-3.5 w-3.5" />
-                      Bon fournisseur
-                    </button>
-                  </div>
-                  {isOpen && (
-                    <div className="border-t border-gray-100 divide-y divide-gray-50">
-                      {grouped[sup].map((r, i) => (
-                        <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                          <span className="flex-1 text-sm text-gray-800">{r.material_name}</span>
-                          <span className="text-sm font-bold text-primary tabular-nums bg-primary-50 px-2 py-0.5 rounded-lg">
-                            {r.total_qty} {r.unit ?? ''}
-                          </span>
-                          <span className="text-xs font-semibold text-gray-600 tabular-nums">{money(r.total_cost)}</span>
-                          <span className="text-[10px] text-gray-400 flex-shrink-0 max-w-[200px] truncate" title={r.events.map((e) => `${fmtDate(e.date)} ${e.client} (${e.qty})`).join(' | ')}>
-                            {r.events.map((e) => `${fmtDate(e.date)} (${e.qty})`).join(', ')}
-                          </span>
-                        </div>
-                      ))}
+              {supplierKeys.map((sup) => {
+                const isOpen = expandedSuppliers[sup] !== false;
+                const supTotal = grouped[sup].reduce((s, r) => s + r.total_cost, 0);
+                return (
+                  <section key={sup}>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <h2 className="min-w-0">
+                        <button onClick={() => toggleSupplier(sup)} aria-expanded={isOpen}
+                          className="flex items-center gap-2 min-h-10 px-1 text-[15px] font-semibold text-gray-900 text-left">
+                          {isOpen ? <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />}
+                          <span className="break-words min-w-0">{sup}</span>
+                          <span className="text-sm font-normal text-gray-500 whitespace-nowrap">{money(supTotal)}</span>
+                        </button>
+                      </h2>
+                      <button onClick={() => printSupplier(sup)} className={cn(btnSecondary, 'h-10 w-10 sm:w-auto px-0 sm:px-3 text-sm flex-shrink-0')}
+                        title={`Bon de commande pour ${sup}`} aria-label="Bon fournisseur">
+                        <Printer className="h-4 w-4" /><span className="hidden sm:inline">Bon fournisseur</span>
+                      </button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )
+                    {isOpen && (
+                      <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+                        {grouped[sup].map((r, i) => (
+                          <li key={i} className="flex flex-wrap sm:flex-nowrap items-baseline gap-x-4 gap-y-0.5 px-4 sm:px-5 py-3">
+                            <span className="basis-full sm:basis-auto sm:flex-1 min-w-0 text-[15px] text-gray-900 break-words">{r.material_name}</span>
+                            <span className="font-semibold text-gray-900 tabular-nums whitespace-nowrap">{fmtQty(r.total_qty)} {r.unit ?? ''}</span>
+                            <span className="sm:w-24 sm:text-right text-sm text-gray-700 tabular-nums whitespace-nowrap">{money(r.total_cost)}</span>
+                            <span className="basis-full sm:basis-48 sm:text-right text-sm text-gray-500 tabular-nums"
+                              title={r.events.map((e) => `${fmtDate(e.date)} ${e.client} (${e.qty})`).join(', ')}>
+                              {r.events.map((e) => `${fmtDate(e.date)} (${fmtQty(e.qty)})`).join(', ')}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </>
+          )}
+        </div>
       )}
     </div>
   );

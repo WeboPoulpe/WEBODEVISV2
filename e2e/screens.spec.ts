@@ -33,7 +33,14 @@ for (const { name, path } of PAGES) {
   test(`${name} : s'affiche sans débordement ni erreur`, async ({ page }, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(`exception : ${e.message}`));
-    page.on('console', (m) => { if (m.type() === 'error') errors.push(`console : ${m.text().slice(0, 200)}`); });
+    // Les échecs de chargement sont relevés par requête (on sait alors ce qui a échoué), pas par la console.
+    page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(`console : ${m.text().slice(0, 200)}`); });
+    page.on('requestfailed', (r) => {
+      // Photos hébergées sur Vercel Blob : ce poste est parfois limité par Vercel après des envois en série ; ce n'est pas l'app.
+      if (r.resourceType() === 'image' && /vercel-storage.com/.test(r.url())) return;
+      errors.push(`réseau : ${r.resourceType()} ${new URL(r.url()).pathname.slice(0, 80)} ${r.failure()?.errorText ?? ''}`);
+    });
+    page.on('response', (r) => { if (r.status() >= 500) errors.push(`réseau : ${r.status()} ${new URL(r.url()).pathname.slice(0, 80)}`); });
     // Toute requête de données refusée ou en erreur côté serveur fait échouer le test.
     page.on('response', async (r) => {
       if (!r.url().endsWith('/api/db')) return;

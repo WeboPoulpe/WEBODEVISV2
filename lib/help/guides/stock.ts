@@ -9,15 +9,15 @@ export const stock: HelpGuide[] = [
     keywords: ['ingrédients', 'produits', 'matières premières', 'denrées', 'unité', 'catégorie', 'prix d’achat', 'seuil', 'fournisseur', 'csv', 'importer'],
     href: '/ingredients',
     steps: [
-      { title: 'Ouvrez « Ingrédients » dans le menu « Catalogue »', text: 'Les boutons de catégorie et le champ « Rechercher… » filtrent la liste.' },
-      { title: 'Cliquez sur « Ajouter »', text: 'Donnez un nom, une catégorie et une unité : kg, L, Bouteille, Botte…' },
+      { title: 'Ouvrez « Ingrédients » dans le menu « Catalogue »', text: 'Les boutons de catégorie et le champ « Rechercher un ingrédient » filtrent la liste.' },
+      { title: 'Cliquez sur « Nouvel ingrédient »', text: 'Donnez un nom, une catégorie et une unité : kg, L, Bouteille, Botte…' },
       { title: 'Choisissez le fournisseur préféré', text: 'Il est repris dans les listes de courses calculées, et c’est chez lui que les commandes sont préparées.' },
       { title: 'Renseignez le seuil d’alerte et le prix unitaire', text: 'Le seuil déclenche l’alerte de stock bas. Le prix sert à chiffrer le stock et les commandes.' },
-      { title: 'Validez avec « Ajouter »', text: 'Pour modifier ou supprimer un ingrédient, survolez sa carte : un crayon et une corbeille apparaissent.' },
+      { title: 'Validez avec « Ajouter »', text: 'Pour modifier ou supprimer un ingrédient, utilisez le crayon ou la corbeille au bout de sa ligne.' },
     ],
     notes: [
       'Pendant que vous tapez le nom, une liste « Open Food Facts » peut proposer des produits : en choisir un reprend son nom et sa photo. Vous pouvez l’ignorer et continuer à taper.',
-      'Le bouton « CSV » importe une liste depuis un fichier à trois colonnes (catégorie, nom, unité). Les ingrédients déjà présents sont signalés et laissés de côté.',
+      'Le bouton « Importer un CSV » (« CSV » sur téléphone) importe une liste depuis un fichier à trois colonnes (catégorie, nom, unité). Les ingrédients déjà présents sont signalés et laissés de côté.',
       'Vos fournisseurs se gèrent aussi en bas de cette page, dans le bloc « Fournisseurs ».',
     ],
   },
@@ -29,7 +29,7 @@ export const stock: HelpGuide[] = [
     keywords: ['stock', 'inventaire', 'réserve', 'entrée', 'sortie', 'alerte', 'stock bas', 'rupture', 'épuisé', 'seuil', 'historique', 'mouvements'],
     href: '/stock',
     steps: [
-      { title: 'Ouvrez « Stock » dans le menu', text: 'En tête : le nombre d’ingrédients, ceux en « Stock bas » et ceux marqués « Épuisé ». Un clic sur l’un de ces deux cadres n’affiche que les ingrédients concernés ; « Tous » revient à la liste complète.' },
+      { title: 'Ouvrez « Stock » dans le menu', text: 'En tête : le nombre d’ingrédients et la valeur de la réserve. Les onglets « Stock bas » et « Épuisés » n’affichent que les ingrédients concernés ; « Tous » revient à la liste complète.' },
       { title: 'Consultez l’historique d’un ingrédient', text: 'L’icône d’horloge liste ses mouvements, du plus récent au plus ancien, avec la raison et la date.' },
       { title: 'Cliquez sur « Entrée » à la réception d’une marchandise', text: 'Saisissez la quantité et, si vous voulez, la raison. La fenêtre affiche le stock avant et après.' },
       { title: 'Cliquez sur « Sortie » pour ce qui quitte la réserve', text: 'Le geste est le même. Une sortie ne peut pas dépasser le stock disponible.' },
@@ -68,11 +68,11 @@ export const stock: HelpGuide[] = [
     keywords: ['commande', 'suivi', 'livraison', 'réception', 'envoyée', 'reçue', 'brouillon', 'bon de commande', 'imprimer', 'stock'],
     href: '/commandes',
     steps: [
-      { title: 'Filtrez avec les cadres du haut', text: '« Brouillons » et « Envoyées » n’affichent que les commandes de ce statut, avec leur montant total. « Total » les affiche toutes.' },
-      { title: 'Vérifiez le contenu avec « Détails »', text: 'La fenêtre liste les articles, les quantités, les prix et le total HT.' },
-      { title: 'Imprimez le bon de commande', text: 'L’icône d’imprimante ouvre le bon dans un nouvel onglet, pour l’imprimer ou l’enregistrer en PDF.' },
+      { title: 'Filtrez avec les onglets du haut', text: '« Brouillons », « Envoyées » et « Reçues » n’affichent que les commandes de ce statut. « Toutes » les affiche toutes. Les montants en brouillon et envoyés sont rappelés sous le titre.' },
+      { title: 'Cliquez sur une commande pour voir son contenu', text: 'La fenêtre liste les articles, les quantités, les prix et le total HT.' },
+      { title: 'Imprimez le bon de commande', text: 'L’icône d’imprimante, ou « Imprimer le bon » dans la fenêtre de la commande, ouvre le bon dans un nouvel onglet, pour l’imprimer ou l’enregistrer en PDF.' },
       { title: 'Cliquez sur « Marquer envoyée »', text: 'À faire une fois la commande passée auprès du fournisseur. La date d’envoi s’affiche sous son nom.' },
-      { title: 'À la livraison, cliquez sur « Marquer reçue (+stock) »', text: 'Après confirmation, les quantités de la commande entrent dans le stock.' },
+      { title: 'À la livraison, cliquez sur « Marquer reçue »', text: 'Après confirmation, les quantités de la commande entrent dans le stock.' },
     ],
     notes: [
       'L’app n’envoie pas la commande au fournisseur : transmettez-lui le bon vous-même.',
@@ -88,10 +88,10 @@ export const stock: HelpGuide[] = [
     href: '/fournisseurs',
     steps: [
       { title: 'Ouvrez « Fournisseurs » dans le menu « Catalogue »' },
-      { title: 'Cliquez sur « Ajouter »', text: 'Le formulaire « Nouveau fournisseur » s’ouvre sous la liste.' },
+      { title: 'Cliquez sur « Nouveau fournisseur »', text: 'Une fenêtre s’ouvre pour saisir sa fiche.' },
       { title: 'Renseignez le nom et les coordonnées', text: 'Seul le nom est obligatoire. Le téléphone, l’email, l’adresse et les notes (jours de livraison, minimum de commande) sont facultatifs.' },
       { title: 'Cliquez sur « Enregistrer »', text: 'Le fournisseur rejoint la liste, classée par ordre alphabétique.' },
-      { title: 'Modifiez ou supprimez', text: 'Le crayon rouvre la fiche. La corbeille supprime le fournisseur, après confirmation.' },
+      { title: 'Modifiez ou supprimez', text: 'Un clic sur un fournisseur rouvre sa fiche. La corbeille le supprime, après confirmation.' },
     ],
     notes: [
       'Un champ de recherche apparaît au-dessus de la liste à partir de six fournisseurs.',

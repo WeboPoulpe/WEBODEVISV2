@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import {
-  ShoppingCart, Plus, Truck, Loader2, X, Check, FileText, Trash2,
-  Package, Calendar, Search, Send, CheckCircle2, Printer,
-} from 'lucide-react';
+import { Plus, Loader2, Check, Trash2, Search, Send, CheckCircle2, Printer, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import Modal from '@/components/ui/Modal';
+import { btnGhost, btnPrimary, btnSecondary, cardCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill, errorCls } from '@/components/ui/kit';
+import { ErrorBanner, esc, printDocument } from '@/components/evenements/shared';
 
 interface Supplier { id: string; name: string; email: string | null; phone: string | null; }
 interface Ingredient { id: string; name: string; unit: string | null; volume_unit_price: number | null; preferred_supplier_id: string | null; }
@@ -29,19 +27,25 @@ interface SupplierOrder {
 }
 
 const STATUS_CONFIG = {
-  draft:     { label: 'Brouillon',   bg: 'bg-gray-100',     text: 'text-gray-700',     icon: FileText },
-  sent:      { label: 'Envoyée',     bg: 'bg-blue-100',     text: 'text-blue-700',     icon: Send },
-  received:  { label: 'Reçue',       bg: 'bg-emerald-100',  text: 'text-emerald-700',  icon: CheckCircle2 },
-  cancelled: { label: 'Annulée',     bg: 'bg-red-100',      text: 'text-red-700',      icon: X },
+  draft:     { label: 'Brouillon', cls: 'bg-gray-100 text-gray-700' },
+  sent:      { label: 'Envoyée',   cls: 'bg-primary-50 text-primary-700' },
+  received:  { label: 'Reçue',     cls: 'bg-sage-100 text-sage' },
+  cancelled: { label: 'Annulée',   cls: 'bg-gray-100 text-gray-500' },
 };
+
+type StatusFilter = 'all' | 'draft' | 'sent' | 'received';
+
+const euros = (n: number) => formatCurrency(n);
+const num = (n: number) => n.toLocaleString('fr-FR');
 
 export default function CommandesPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<SupplierOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'received'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [createModal, setCreateModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<SupplierOrder | null>(null);
 
@@ -49,15 +53,16 @@ export default function CommandesPage() {
     if (!user) return;
     setLoading(true);
     const supabase = createClient();
-    const [{ data: ordersData }, { data: suppliersData }] = await Promise.all([
+    const [ordersRes, suppliersRes] = await Promise.all([
       supabase.from('supplier_orders')
         .select('*, supplier:suppliers(id, name, email, phone), items:supplier_order_items(*, ingredient:ingredients(id, name, unit, volume_unit_price, preferred_supplier_id))')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
-      supabase.from('suppliers').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('suppliers').select('*').order('name'),
     ]);
-    setOrders((ordersData as SupplierOrder[]) ?? []);
-    setSuppliers((suppliersData as Supplier[]) ?? []);
+    if (ordersRes.error || suppliersRes.error) setError('Vos commandes n’ont pas pu être chargées. Rechargez la page.');
+    setOrders((ordersRes.data as SupplierOrder[]) ?? []);
+    setSuppliers((suppliersRes.data as Supplier[]) ?? []);
     setLoading(false);
   }, [user]);
 
@@ -69,126 +74,118 @@ export default function CommandesPage() {
     return matchSearch && matchStatus;
   });
 
+  const count = (s: SupplierOrder['status']) => orders.filter((o) => o.status === s).length;
   const totalToOrder = orders.filter((o) => o.status === 'draft').reduce((s, o) => s + (o.total_amount || 0), 0);
   const totalSent = orders.filter((o) => o.status === 'sent').reduce((s, o) => s + (o.total_amount || 0), 0);
 
+  const FILTERS: [StatusFilter, string][] = [
+    ['all', 'Toutes'],
+    ['draft', `Brouillons${count('draft') ? ` (${count('draft')})` : ''}`],
+    ['sent', `Envoyées${count('sent') ? ` (${count('sent')})` : ''}`],
+    ['received', `Reçues${count('received') ? ` (${count('received')})` : ''}`],
+  ];
+
+  const summary = [
+    `${orders.length} commande${orders.length > 1 ? 's' : ''}`,
+    totalToOrder > 0 ? `${euros(totalToOrder)} en brouillon` : null,
+    totalSent > 0 ? `${euros(totalSent)} envoyé${totalSent > 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join(', ');
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex-shrink-0 px-4 md:px-6 pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl">
-              <ShoppingCart className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h1 className="font-semibold text-gray-900 text-base">Commandes fournisseurs</h1>
-              <p className="text-xs text-gray-500">{orders.length} commande{orders.length > 1 ? 's' : ''}</p>
-            </div>
-          </div>
-          <button onClick={() => setCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark">
-            <Plus className="h-4 w-4" />Nouvelle commande
-          </button>
+    <div className="px-4 md:px-6 pb-8">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
+        <div>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Commandes fournisseurs</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{loading ? ' ' : summary}</p>
         </div>
+        <button onClick={() => setCreateModal(true)} className={cn(btnPrimary, 'w-full sm:w-auto')}>
+          <Plus className="h-4 w-4" />Nouvelle commande
+        </button>
+      </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <button onClick={() => setStatusFilter('draft')} className={cn('text-left rounded-xl p-3 border', statusFilter === 'draft' ? 'bg-gray-100 border-gray-400' : 'bg-gray-50 border-gray-200 hover:bg-gray-100')}>
-            <p className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">Brouillons</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalToOrder)}</p>
-          </button>
-          <button onClick={() => setStatusFilter('sent')} className={cn('text-left rounded-xl p-3 border', statusFilter === 'sent' ? 'bg-blue-100 border-blue-400' : 'bg-blue-50 border-blue-200 hover:bg-blue-100')}>
-            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Envoyées</p>
-            <p className="text-lg font-bold text-blue-900">{formatCurrency(totalSent)}</p>
-          </button>
-          <button onClick={() => setStatusFilter('all')} className={cn('text-left rounded-xl p-3 border', statusFilter === 'all' ? 'bg-emerald-100 border-emerald-400' : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100')}>
-            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Total</p>
-            <p className="text-lg font-bold text-emerald-900">{orders.length}</p>
-          </button>
+      {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un fournisseur"
+            aria-label="Rechercher un fournisseur" className={cn(inputCls, 'pl-11')} />
         </div>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher fournisseur…"
-            className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+        <div className="flex p-1 rounded-xl bg-gray-200/70 overflow-x-auto scrollbar-none" role="tablist" aria-label="Commandes affichées">
+          {FILTERS.map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={statusFilter === key} onClick={() => setStatusFilter(key)}
+              className={cn('flex-1 lg:flex-none flex-shrink-0 h-10 px-2.5 sm:px-3.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
+                statusFilter === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <ShoppingCart className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">Aucune commande</p>
-            <button onClick={() => setCreateModal(true)} className="mt-3 text-xs text-primary hover:underline font-medium">+ Créer une commande</button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((order) => {
-              const cfg = STATUS_CONFIG[order.status];
-              const Icon = cfg.icon;
-              return (
-                <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-all">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="p-2.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex-shrink-0">
-                        <Truck className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-bold text-gray-900 truncate">{order.supplier?.name || '—'}</p>
-                          <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>
-                            <Icon className="h-2.5 w-2.5" />{cfg.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {(order.items?.length ?? 0)} article{(order.items?.length ?? 0) > 1 ? 's' : ''} ·
-                          créée le {formatDate(order.created_at)}
-                          {order.ordered_at && ` · envoyée le ${formatDate(order.ordered_at)}`}
-                        </p>
-                        {order.notes && <p className="text-[10px] text-gray-400 italic mt-1 truncate">{order.notes}</p>}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-lg font-bold text-gray-900 tabular-nums">{formatCurrency(order.total_amount || 0)}</p>
-                      <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingOrder(order)} title="Détails" className="p-1 text-gray-400 hover:text-primary hover:bg-primary-50 rounded">
-                          <FileText className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-gray-100">
-                    <button onClick={() => setEditingOrder(order)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <FileText className="h-3 w-3" />Détails
+      {loading ? (
+        <div className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="px-5 py-4 animate-pulse space-y-2"><div className="h-4 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/2" /></div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className={cn(cardCls, 'flex flex-col items-center px-6 py-16 text-center')}>
+          <p className="font-semibold text-gray-900 mb-1">{orders.length === 0 ? 'Aucune commande pour le moment' : 'Aucune commande ne correspond'}</p>
+          <p className="text-sm text-gray-500 max-w-sm">
+            {orders.length === 0
+              ? 'Préparez un bon de commande : un fournisseur, des ingrédients, des quantités.'
+              : 'Essayez un autre fournisseur ou un autre filtre.'}
+          </p>
+        </div>
+      ) : (
+        <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {filtered.map((order) => {
+            const cfg = STATUS_CONFIG[order.status];
+            const n = order.items?.length ?? 0;
+            return (
+              <li key={order.id} className="flex flex-wrap md:flex-nowrap items-center gap-x-2 gap-y-2 pr-2 hover:bg-gray-50 transition-colors">
+                <button onClick={() => setEditingOrder(order)} className="flex-1 min-w-0 basis-full md:basis-auto flex items-center gap-3 text-left pl-4 sm:pl-5 pr-2 md:pr-0 pt-3.5 md:py-3.5">
+                  <span className="flex-1 min-w-0">
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-900 truncate">{order.supplier?.name || 'Fournisseur supprimé'}</span>
+                      <span className={cn(pill, cfg.cls)}>{cfg.label}</span>
+                    </span>
+                    <span className="block text-sm text-gray-500 mt-0.5">
+                      {n} article{n > 1 ? 's' : ''}, créée le {formatDate(order.created_at)}
+                      {order.ordered_at && `, envoyée le ${formatDate(order.ordered_at)}`}
+                    </span>
+                    {order.notes && <span className="block text-sm text-gray-500 truncate">{order.notes}</span>}
+                  </span>
+                  <span className="font-display text-lg font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                    {euros(order.total_amount || 0)}
+                  </span>
+                </button>
+                <div className="flex items-center gap-1 w-full md:w-auto pl-3 sm:pl-4 md:pl-2 pb-3 md:pb-0">
+                  {order.status === 'draft' && (
+                    <button onClick={() => updateStatus(order.id, 'sent')} className={cn(btnSecondary, 'h-10 flex-1 md:flex-none whitespace-nowrap')}>
+                      <Send className="h-4 w-4" />Marquer envoyée
                     </button>
-                    {order.status === 'draft' && (
-                      <button onClick={() => updateStatus(order.id, 'sent')} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg">
-                        <Send className="h-3 w-3" />Marquer envoyée
-                      </button>
-                    )}
-                    {order.status === 'sent' && (
-                      <button onClick={() => markAsReceived(order.id)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-emerald-600 border border-emerald-200 hover:bg-emerald-50 rounded-lg">
-                        <CheckCircle2 className="h-3 w-3" />Marquer reçue (+stock)
-                      </button>
-                    )}
-                    <button onClick={() => printOrder(order)} title="Imprimer" className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
-                      <Printer className="h-3.5 w-3.5" />
+                  )}
+                  {order.status === 'sent' && (
+                    <button onClick={() => markAsReceived(order.id)} className={cn(btnSecondary, 'h-10 flex-1 md:flex-none whitespace-nowrap')}>
+                      <CheckCircle2 className="h-4 w-4" />Marquer reçue
                     </button>
-                    <button onClick={() => deleteOrder(order.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                      <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  <span className={cn('flex items-center', order.status !== 'draft' && order.status !== 'sent' && 'ml-auto md:ml-0')}>
+                    <button onClick={() => printOrder(order)} className={iconBtn} aria-label={`Imprimer le bon de commande ${order.supplier?.name ?? ''}`} title="Imprimer le bon">
+                      <Printer className="h-[18px] w-[18px]" />
                     </button>
-                  </div>
+                    <button onClick={() => deleteOrder(order.id)} className={iconBtnDanger} aria-label={`Supprimer la commande ${order.supplier?.name ?? ''}`} title="Supprimer">
+                      <Trash2 className="h-[18px] w-[18px]" />
+                    </button>
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-      {/* Create modal */}
       {createModal && user && (
         <CreateOrderModal
           userId={user.id}
@@ -198,37 +195,35 @@ export default function CommandesPage() {
         />
       )}
 
-      {/* Edit/details modal */}
       {editingOrder && (
-        <OrderDetailsModal
-          order={editingOrder}
-          onClose={() => setEditingOrder(null)}
-          onUpdated={() => { setEditingOrder(null); fetchAll(); }}
-        />
+        <OrderDetailsModal order={editingOrder} onClose={() => setEditingOrder(null)} onPrint={() => printOrder(editingOrder)} />
       )}
     </div>
   );
 
   async function updateStatus(orderId: string, status: 'sent' | 'received' | 'cancelled') {
     const supabase = createClient();
-    await supabase.from('supplier_orders').update({
+    const { error: err } = await supabase.from('supplier_orders').update({
       status,
       ordered_at: status === 'sent' ? new Date().toISOString() : undefined,
       received_at: status === 'received' ? new Date().toISOString() : undefined,
     }).eq('id', orderId);
+    if (err) { setError('Le statut de la commande n’a pas pu être changé. Réessayez.'); return; }
+    setError(null);
     fetchAll();
   }
 
   async function markAsReceived(orderId: string) {
     if (!user) return;
-    if (!confirm('Marquer cette commande comme reçue ? Cela ajoutera les quantités au stock.')) return;
+    if (!confirm('Marquer cette commande comme reçue ? Ses quantités seront ajoutées au stock.')) return;
     const supabase = createClient();
     const order = orders.find((o) => o.id === orderId);
     if (!order || !order.items) return;
 
-    // Add stock movements for each item (auto-update via trigger)
+    // Un mouvement d'entrée par article (le stock se met à jour par déclencheur).
+    let failed = 0;
     for (const item of order.items) {
-      await supabase.from('stock_movements').insert({
+      const { error: err } = await supabase.from('stock_movements').insert({
         user_id: user.id,
         ingredient_id: item.ingredient_id,
         movement_type: 'in',
@@ -236,95 +231,81 @@ export default function CommandesPage() {
         reason: `Commande ${order.supplier?.name || 'fournisseur'} reçue`,
         order_id: orderId,
       });
+      if (err) failed++;
+    }
+    if (failed > 0) {
+      setError(`${failed} article${failed > 1 ? 's' : ''} n’${failed > 1 ? 'ont' : 'a'} pas pu entrer dans le stock. La commande reste « Envoyée » : vérifiez le stock avant de réessayer.`);
+      fetchAll();
+      return;
     }
 
-    await supabase.from('supplier_orders').update({
+    const { error: err } = await supabase.from('supplier_orders').update({
       status: 'received',
       received_at: new Date().toISOString(),
     }).eq('id', orderId);
+    if (err) setError('Le stock est à jour, mais la commande n’a pas pu passer en « Reçue ». Réessayez.');
+    else setError(null);
     fetchAll();
   }
 
   async function deleteOrder(orderId: string) {
-    if (!confirm('Supprimer cette commande ? Cette action est irréversible.')) return;
-    await createClient().from('supplier_orders').delete().eq('id', orderId);
+    if (!confirm('Supprimer cette commande ? Cette action est définitive.')) return;
+    const { error: err } = await createClient().from('supplier_orders').delete().eq('id', orderId);
+    if (err) { setError('La commande n’a pas pu être supprimée. Réessayez.'); return; }
+    setError(null);
     fetchAll();
   }
 
   function printOrder(order: SupplierOrder) {
-    const html = buildOrderHtml(order);
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 500);
+    if (!printDocument('Bon de commande', buildOrderBody(order))) {
+      setError('Votre navigateur a bloqué l’ouverture du bon. Autorisez les fenêtres pour ce site, puis réessayez.');
+    }
   }
 }
 
-// ── PDF / Print HTML ─────────────────────────────────────────────────────────
-function buildOrderHtml(order: SupplierOrder): string {
+// ── Bon de commande à imprimer ───────────────────────────────────────────────
+function buildOrderBody(order: SupplierOrder): string {
   const items = order.items || [];
   const total = items.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bon de commande</title>
-<style>
-  @page { size: A4; margin: 20mm; }
-  body { font-family: Georgia, serif; color: #1a1a1a; line-height: 1.5; }
-  h1 { color: #9c27b0; font-size: 28px; margin: 0 0 5px; }
-  .header { border-bottom: 3px solid #9c27b0; padding-bottom: 15px; margin-bottom: 20px; }
-  .info { display: flex; gap: 20px; margin-bottom: 20px; }
-  .info-block { flex: 1; padding: 12px; background: #faf5ff; border-radius: 8px; border: 1px solid #e9d5ff; }
-  .info-label { font-size: 9px; font-weight: bold; color: #9c27b0; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px; }
-  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-  th { background: #9c27b0; color: white; text-align: left; padding: 10px; font-size: 11px; }
-  th:nth-child(2), th:nth-child(3), th:nth-child(4) { text-align: right; }
-  td { padding: 9px 10px; border-bottom: 1px solid #e9d5ff; font-size: 12px; }
-  td:nth-child(2), td:nth-child(3), td:nth-child(4) { text-align: right; }
-  .total { background: #faf5ff; padding: 15px; border-radius: 8px; border: 1px solid #e9d5ff; text-align: right; margin-top: 20px; }
-  .total-amount { font-size: 22px; font-weight: bold; color: #9c27b0; }
-  .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: center; }
-</style></head>
-<body>
-  <div class="header">
-    <h1>BON DE COMMANDE</h1>
-    <p style="margin: 0; color: #666;">N° ${order.id.slice(0, 8).toUpperCase()} · ${new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
-  </div>
-  <div class="info">
-    <div class="info-block">
-      <p class="info-label">Fournisseur</p>
-      <p style="margin: 0; font-weight: bold; font-size: 14px;">${order.supplier?.name || '—'}</p>
-      ${order.supplier?.email ? `<p style="margin: 2px 0 0; font-size: 11px; color: #555;">${order.supplier.email}</p>` : ''}
-      ${order.supplier?.phone ? `<p style="margin: 2px 0 0; font-size: 11px; color: #555;">${order.supplier.phone}</p>` : ''}
+  const sup = order.supplier;
+  const box = 'flex:1;padding:10px 12px;background:#f7f3ec;border-radius:8px';
+  const label = 'margin:0 0 4px;font-size:11px;color:#78736a';
+  return `
+  <p class="muted" style="margin:0 0 16px">N° ${esc(order.id.slice(0, 8).toUpperCase())}, du ${new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
+  <div style="display:flex;gap:12px;margin-bottom:18px">
+    <div style="${box}">
+      <p style="${label}">Fournisseur</p>
+      <p style="margin:0;font-weight:bold;font-size:14px">${esc(sup?.name) || 'Fournisseur supprimé'}</p>
+      ${sup?.email ? `<p style="margin:2px 0 0;font-size:11px">${esc(sup.email)}</p>` : ''}
+      ${sup?.phone ? `<p style="margin:2px 0 0;font-size:11px">${esc(sup.phone)}</p>` : ''}
     </div>
-    <div class="info-block">
-      <p class="info-label">Statut</p>
-      <p style="margin: 0; font-weight: bold; font-size: 14px;">${STATUS_CONFIG[order.status].label}</p>
-      ${order.ordered_at ? `<p style="margin: 2px 0 0; font-size: 11px; color: #555;">Envoyée le ${new Date(order.ordered_at).toLocaleDateString('fr-FR')}</p>` : ''}
+    <div style="${box}">
+      <p style="${label}">Statut</p>
+      <p style="margin:0;font-weight:bold;font-size:14px">${STATUS_CONFIG[order.status].label}</p>
+      ${order.ordered_at ? `<p style="margin:2px 0 0;font-size:11px">Envoyée le ${new Date(order.ordered_at).toLocaleDateString('fr-FR')}</p>` : ''}
     </div>
   </div>
   <table>
-    <thead><tr><th>Article</th><th>Quantité</th><th>Prix unit.</th><th>Total</th></tr></thead>
+    <thead><tr><th>Article</th><th class="r">Quantité</th><th class="r">Prix unitaire HT</th><th class="r">Total HT</th></tr></thead>
     <tbody>
-      ${items.map((it) => `
-        <tr>
-          <td><strong>${it.ingredient?.name || '—'}</strong></td>
-          <td>${it.quantity} ${it.ingredient?.unit || ''}</td>
-          <td>${it.unit_price.toFixed(2)} €</td>
-          <td><strong>${(it.quantity * it.unit_price).toFixed(2)} €</strong></td>
-        </tr>
-      `).join('')}
-      ${items.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#bbb; font-style:italic; padding:20px;">Aucun article</td></tr>' : ''}
+      ${items.map((it) => `<tr>
+        <td><strong>${esc(it.ingredient?.name) || 'Ingrédient supprimé'}</strong></td>
+        <td class="r">${num(it.quantity)} ${esc(it.ingredient?.unit)}</td>
+        <td class="r">${euros(it.unit_price)}</td>
+        <td class="r"><strong>${euros(it.quantity * it.unit_price)}</strong></td>
+      </tr>`).join('')}
+      ${items.length === 0 ? '<tr><td colspan="4" class="muted" style="text-align:center;padding:16px">Aucun article</td></tr>' : ''}
     </tbody>
+    <tfoot><tr>
+      <td colspan="3" class="r" style="font-weight:bold;border:0;padding-top:12px">Total HT</td>
+      <td class="r" style="font-weight:bold;font-size:16px;color:#b4502d;border:0;padding-top:12px">${euros(total)}</td>
+    </tr></tfoot>
   </table>
-  <div class="total">
-    <p style="margin: 0 0 5px; font-size: 12px; color: #666;">Total HT</p>
-    <p class="total-amount" style="margin: 0;">${total.toFixed(2)} €</p>
-  </div>
-  ${order.notes ? `<div style="margin-top: 20px; padding: 12px; background: #fafafa; border-radius: 6px;"><p style="margin:0; font-size: 11px; color:#666; font-style:italic;">${order.notes}</p></div>` : ''}
-  <div class="footer">Document généré par WeboDevis</div>
-</body></html>`;
+  ${order.notes ? `<p style="margin-top:18px;padding:10px 12px;background:#f7f3ec;border-radius:8px;font-size:12px">${esc(order.notes)}</p>` : ''}
+  <p class="muted" style="margin-top:36px;text-align:center">Document préparé avec WeboDevis</p>`;
 }
 
-// ── Create order modal ──────────────────────────────────────────────────────
+// ── Nouvelle commande ────────────────────────────────────────────────────────
 function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
   userId: string; suppliers: Supplier[]; onClose: () => void; onCreated: () => void;
 }) {
@@ -335,21 +316,13 @@ function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const sb = createClient();
     sb.from('ingredients').select('id, name, unit, volume_unit_price, preferred_supplier_id').or(`user_id.is.null,user_id.eq.${userId}`).order('name')
       .then(({ data }) => setIngredients((data as Ingredient[]) ?? []));
   }, [userId]);
-
-  // Auto-suggest ingredients linked to selected supplier
-  useEffect(() => {
-    if (!supplierId) return;
-    const linked = ingredients.filter((i) => i.preferred_supplier_id === supplierId);
-    if (linked.length > 0 && items.length === 0) {
-      // Pre-suggest but don't auto-add
-    }
-  }, [supplierId, ingredients, items.length]);
 
   const addItem = (ing: Ingredient) => {
     if (items.find((it) => it.ingredient_id === ing.id)) return;
@@ -367,168 +340,164 @@ function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
   const total = items.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
 
   const save = async () => {
-    if (!supplierId || items.length === 0) { alert('Sélectionne un fournisseur et au moins un article'); return; }
-    setSaving(true);
+    if (!supplierId || items.length === 0) { setError('Choisissez un fournisseur et au moins un article.'); return; }
+    setSaving(true); setError(null);
     const sb = createClient();
-    const { data: order, error } = await sb.from('supplier_orders').insert({
+    const { data: order, error: err } = await sb.from('supplier_orders').insert({
       user_id: userId,
       supplier_id: supplierId,
       status: 'draft',
       total_amount: total,
       notes: notes || null,
     }).select('id').single();
-    if (error || !order) { alert('Erreur: ' + error?.message); setSaving(false); return; }
+    if (err || !order) { setError('La commande n’a pas pu être créée. Réessayez.'); setSaving(false); return; }
 
-    // Insert items
-    await sb.from('supplier_order_items').insert(items.map((i) => ({
+    const { error: itemsErr } = await sb.from('supplier_order_items').insert(items.map((i) => ({
       order_id: order.id,
       ingredient_id: i.ingredient_id,
       quantity: i.quantity,
       unit_price: i.unit_price,
     })));
     setSaving(false);
+    if (itemsErr) {
+      setError('La commande est créée, mais ses articles n’ont pas pu être enregistrés. Supprimez-la et recommencez.');
+      return;
+    }
     onCreated();
   };
 
+  const small = 'h-10 px-2 bg-white border border-gray-200 rounded-lg text-gray-900 tabular-nums focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-100';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-50 rounded-xl"><ShoppingCart className="h-4 w-4 text-amber-600" /></div>
-            <h2 className="font-semibold text-sm">Nouvelle commande fournisseur</h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="h-4 w-4" /></button>
+    <Modal
+      title="Nouvelle commande"
+      wide
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className={btnGhost}>Annuler</button>
+        <button onClick={save} disabled={saving || !supplierId || items.length === 0} className={btnPrimary}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Créer la commande
+        </button>
+      </>}
+    >
+      <div className="space-y-5 pb-3">
+        <div>
+          <label htmlFor="order-supplier" className={labelCls}>Fournisseur</label>
+          <select id="order-supplier" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputCls}>
+            <option value="">Choisir un fournisseur</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          {suppliers.length === 0 && <p className="text-sm text-gray-500 mt-2">Ajoutez d’abord vos fournisseurs dans la page Fournisseurs.</p>}
         </div>
 
-        <div className="p-6 space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Fournisseur *</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-              <option value="">— Choisir un fournisseur —</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-
-          {/* Add items */}
+        <div className="relative">
+          <label htmlFor="order-search" className={labelCls}>Ajouter un ingrédient</label>
           <div className="relative">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Ajouter un ingrédient</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-              <input value={search} onChange={(e) => { setSearch(e.target.value); setShowPicker(true); }}
-                placeholder="Rechercher un ingrédient…"
-                className="w-full text-sm border border-dashed border-primary/30 bg-primary-50 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30" />
-            </div>
-            {showPicker && filteredIngs.length > 0 && (
-              <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                {filteredIngs.map((ing) => (
-                  <button key={ing.id} onClick={() => addItem(ing)}
-                    className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-primary-50 text-left border-b border-gray-50 last:border-0">
-                    <span className="text-sm font-medium text-gray-900">{ing.name}</span>
-                    <span className="text-xs text-gray-400">{ing.unit || ''} · {(ing.volume_unit_price ?? 0).toFixed(2)}€</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input id="order-search" value={search} onChange={(e) => { setSearch(e.target.value); setShowPicker(true); }}
+              placeholder="Rechercher un ingrédient…" className={cn(inputCls, 'pl-11')} />
           </div>
-
-          {/* Items list */}
-          <div className="space-y-2">
-            {items.length === 0 ? (
-              <p className="text-xs text-gray-400 italic text-center py-4">Aucun article</p>
-            ) : items.map((it) => {
-              const ing = ingredients.find((i) => i.id === it.ingredient_id);
-              return (
-                <div key={it.id} className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg">
-                  <Package className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <p className="text-sm font-medium text-gray-900 flex-1 truncate">{ing?.name}</p>
-                  <input type="number" min={0.01} step={0.01} value={it.quantity}
-                    onChange={(e) => updateItem(it.id, 'quantity', parseFloat(e.target.value) || 0)}
-                    className="w-16 text-xs text-center border border-gray-200 rounded px-2 py-1" />
-                  <span className="text-[10px] text-gray-400">{ing?.unit || ''}</span>
-                  <input type="number" min={0} step={0.01} value={it.unit_price}
-                    onChange={(e) => updateItem(it.id, 'unit_price', parseFloat(e.target.value) || 0)}
-                    className="w-20 text-xs text-right border border-gray-200 rounded px-2 py-1" />
-                  <span className="text-[10px] text-gray-400">€</span>
-                  <span className="text-xs font-bold text-gray-900 w-20 text-right">{(it.quantity * it.unit_price).toFixed(2)}€</span>
-                  <button onClick={() => removeItem(it.id)} className="p-1 text-gray-300 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
-                </div>
-              );
-            })}
-          </div>
-
-          {items.length > 0 && (
-            <div className="flex justify-end pt-2 border-t border-gray-100">
-              <p className="text-base font-bold text-gray-900">Total HT : {formatCurrency(total)}</p>
+          {showPicker && filteredIngs.length > 0 && (
+            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-float max-h-56 overflow-y-auto">
+              {filteredIngs.map((ing) => (
+                <button key={ing.id} onClick={() => addItem(ing)}
+                  className="w-full flex items-center justify-between gap-3 px-4 min-h-11 py-2 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
+                  <span className="text-[15px] text-gray-900">{ing.name}</span>
+                  <span className="text-sm text-gray-500 whitespace-nowrap">{euros(ing.volume_unit_price ?? 0)}{ing.unit ? ` le ${ing.unit}` : ''}</span>
+                </button>
+              ))}
             </div>
           )}
-
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notes</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-              placeholder="Pour le mariage Dupont du 14 juin…"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-          </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Annuler</button>
-          <button onClick={save} disabled={saving || !supplierId || items.length === 0}
-            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            Créer la commande
-          </button>
+        {items.length === 0 ? (
+          <p className="rounded-2xl bg-gray-50 px-5 py-6 text-center text-[15px] text-gray-600">Aucun article pour l’instant. Cherchez un ingrédient ci-dessus.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 border-y border-gray-100">
+            {items.map((it) => {
+              const ing = ingredients.find((i) => i.id === it.ingredient_id);
+              return (
+                <li key={it.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 py-3">
+                  <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0 sm:order-none">
+                    <p className="font-medium text-gray-900 flex-1 min-w-0 break-words">{ing?.name}</p>
+                    <button onClick={() => removeItem(it.id)} className={cn(iconBtnDanger, 'sm:hidden')} aria-label={`Retirer ${ing?.name ?? 'l’article'}`}><X className="h-4 w-4" /></button>
+                  </div>
+                  <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                    <label className="flex items-center gap-1.5 text-sm text-gray-500">
+                      <input type="number" inputMode="decimal" min={0.01} step={0.01} value={it.quantity} aria-label={`Quantité de ${ing?.name ?? 'l’article'}`}
+                        onChange={(e) => updateItem(it.id, 'quantity', parseFloat(e.target.value) || 0)} className={cn(small, 'w-20 text-center')} />
+                      {ing?.unit || 'unité'}
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-500">
+                      à
+                      <input type="number" inputMode="decimal" min={0} step={0.01} value={it.unit_price} aria-label={`Prix unitaire de ${ing?.name ?? 'l’article'}`}
+                        onChange={(e) => updateItem(it.id, 'unit_price', parseFloat(e.target.value) || 0)} className={cn(small, 'w-24 text-right')} />
+                      €
+                    </label>
+                    <span className="ml-auto sm:ml-0 sm:w-24 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">{euros(it.quantity * it.unit_price)}</span>
+                    <button onClick={() => removeItem(it.id)} className={cn(iconBtnDanger, 'hidden sm:inline-flex')} aria-label={`Retirer ${ing?.name ?? 'l’article'}`}><X className="h-4 w-4" /></button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {items.length > 0 && (
+          <p className="flex justify-between text-base font-semibold text-gray-900">
+            <span>Total HT</span><span className="tabular-nums">{euros(total)}</span>
+          </p>
+        )}
+
+        <div>
+          <label htmlFor="order-notes" className={labelCls}>Notes</label>
+          <textarea id="order-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+            placeholder="Pour le mariage Dupont du 14 juin, livraison le matin"
+            className={cn(inputCls, 'h-auto py-3 resize-none')} />
         </div>
+
+        {error && <p role="alert" className={errorCls}>{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// ── Order details modal ─────────────────────────────────────────────────────
-function OrderDetailsModal({ order, onClose, onUpdated }: {
-  order: SupplierOrder; onClose: () => void; onUpdated: () => void;
-}) {
+// ── Détail d'une commande ────────────────────────────────────────────────────
+function OrderDetailsModal({ order, onClose, onPrint }: { order: SupplierOrder; onClose: () => void; onPrint: () => void }) {
   const cfg = STATUS_CONFIG[order.status];
   const items = order.items || [];
   const total = items.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-50 rounded-xl"><ShoppingCart className="h-4 w-4 text-amber-600" /></div>
-            <div>
-              <h2 className="font-semibold text-sm">Commande {order.supplier?.name}</h2>
-              <p className={cn('text-[10px] font-bold inline-block px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>{cfg.label}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="space-y-2">
+    <Modal
+      title={`Commande ${order.supplier?.name ?? ''}`.trim()}
+      wide
+      onClose={onClose}
+      footer={<button onClick={onPrint} className={btnSecondary}><Printer className="h-4 w-4" />Imprimer le bon</button>}
+    >
+      <div className="space-y-4 pb-3">
+        <p className="flex items-center gap-2 flex-wrap text-sm text-gray-500">
+          <span className={cn(pill, cfg.cls)}>{cfg.label}</span>
+          Créée le {formatDate(order.created_at)}{order.ordered_at && `, envoyée le ${formatDate(order.ordered_at)}`}
+        </p>
+        {items.length === 0 ? (
+          <p className="rounded-2xl bg-gray-50 px-5 py-6 text-center text-[15px] text-gray-600">Cette commande n’a aucun article.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 border-y border-gray-100">
             {items.map((it) => (
-              <div key={it.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
-                <Package className="h-4 w-4 text-gray-400" />
-                <p className="text-sm font-medium text-gray-900 flex-1">{it.ingredient?.name || '—'}</p>
-                <span className="text-xs text-gray-500">{it.quantity}{it.ingredient?.unit || ''}</span>
-                <span className="text-xs text-gray-500">× {it.unit_price.toFixed(2)}€</span>
-                <span className="text-sm font-bold text-gray-900 w-20 text-right">{(it.quantity * it.unit_price).toFixed(2)}€</span>
-              </div>
+              <li key={it.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-3">
+                <p className="font-medium text-gray-900 flex-1 min-w-[10rem]">{it.ingredient?.name || 'Ingrédient supprimé'}</p>
+                <span className="text-sm text-gray-500 tabular-nums">{num(it.quantity)} {it.ingredient?.unit || ''} à {euros(it.unit_price)}</span>
+                <span className="w-24 text-right font-semibold text-gray-900 tabular-nums">{euros(it.quantity * it.unit_price)}</span>
+              </li>
             ))}
-          </div>
-          <div className="border-t border-gray-100 pt-3 flex justify-between text-base font-bold">
-            <span>Total HT</span><span>{formatCurrency(total)}</span>
-          </div>
-          {order.notes && <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-600 italic">{order.notes}</p></div>}
-        </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Fermer</button>
-        </div>
+          </ul>
+        )}
+        <p className="flex justify-between text-base font-semibold text-gray-900">
+          <span>Total HT</span><span className="tabular-nums">{euros(total)}</span>
+        </p>
+        {order.notes && <p className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">{order.notes}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

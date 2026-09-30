@@ -1,18 +1,39 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FolderTree, Plus, Trash2, Pencil, Loader2, Check, X, ChevronDown, ChevronRight, Globe } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { cn } from '@/lib/utils';
+import { btnGhost, btnPrimary, cardCls, iconBtn, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
+import { ErrorBanner } from '@/components/evenements/shared';
 
 interface Category { id: string; name: string; icon: string | null; sort_order: number; user_id: string | null; }
 interface Subcategory { id: string; category_id: string; name: string; sort_order: number; user_id: string | null; }
+
+const fieldCls = cn(inputCls, 'h-10 flex-1 min-w-0');
+
+/** Champ de saisie d'un nom, validé par Entrée ou la coche, annulé par Échap ou la croix. */
+function NameInput({ value, onChange, onSubmit, onCancel, placeholder, label }: {
+  value: string; onChange: (v: string) => void; onSubmit: () => void; onCancel: () => void; placeholder?: string; label: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 flex-1 min-w-0">
+      <input autoFocus value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} placeholder={placeholder}
+        onKeyDown={(e) => { if (e.key === 'Enter') onSubmit(); if (e.key === 'Escape') onCancel(); }}
+        className={fieldCls} />
+      <button onClick={onSubmit} disabled={!value.trim()} className={iconBtn} aria-label="Valider"><Check className="h-4 w-4" /></button>
+      <button onClick={onCancel} className={iconBtn} aria-label="Annuler"><X className="h-4 w-4" /></button>
+    </div>
+  );
+}
 
 export default function UserCategoriesPage() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [subs, setSubs] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [addingCat, setAddingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -24,12 +45,13 @@ export default function UserCategoriesPage() {
 
   const fetchAll = useCallback(async () => {
     const sb = createClient();
-    const [{ data: cats }, { data: scs }] = await Promise.all([
+    const [cats, scs] = await Promise.all([
       sb.from('prestation_categories').select('*').order('sort_order').order('name'),
       sb.from('prestation_subcategories').select('*').order('sort_order').order('name'),
     ]);
-    setCategories((cats as Category[]) ?? []);
-    setSubs((scs as Subcategory[]) ?? []);
+    if (cats.error || scs.error) setError('Vos catégories n’ont pas pu être chargées. Rechargez la page.');
+    setCategories((cats.data as Category[]) ?? []);
+    setSubs((scs.data as Subcategory[]) ?? []);
     setLoading(false);
   }, []);
 
@@ -39,81 +61,85 @@ export default function UserCategoriesPage() {
   const isMine = (row: { user_id: string | null }) => row.user_id != null && row.user_id === user?.id;
   const isGlobal = (row: { user_id: string | null }) => row.user_id == null;
 
+  /** Vérifie le résultat d'une écriture : affiche le message et renvoie false en cas d'échec. */
+  const ok = (res: { error: unknown }, message: string) => {
+    if (res.error) { setError(message); return false; }
+    setError(null);
+    return true;
+  };
+
   const addCategory = async () => {
     if (!newCatName.trim() || !user) return;
-    const sb = createClient();
-    await sb.from('prestation_categories').insert({ name: newCatName.trim(), user_id: user.id });
+    const res = await createClient().from('prestation_categories').insert({ name: newCatName.trim(), user_id: user.id });
+    if (!ok(res, 'La catégorie n’a pas pu être créée. Réessayez.')) return;
     setNewCatName(''); setAddingCat(false);
     fetchAll();
   };
 
   const updateCategory = async (id: string) => {
     if (!editName.trim()) return;
-    const sb = createClient();
-    await sb.from('prestation_categories').update({ name: editName.trim() }).eq('id', id);
+    const res = await createClient().from('prestation_categories').update({ name: editName.trim() }).eq('id', id);
+    if (!ok(res, 'La catégorie n’a pas pu être renommée. Réessayez.')) return;
     setEditingCat(null); setEditName('');
     fetchAll();
   };
 
   const deleteCategory = async (id: string) => {
-    if (!confirm('Supprimer cette catégorie ? Les sous-catégories liées seront supprimées aussi.')) return;
-    const sb = createClient();
-    await sb.from('prestation_categories').delete().eq('id', id);
+    if (!confirm('Supprimer cette catégorie ? Ses sous-catégories seront supprimées aussi.')) return;
+    const res = await createClient().from('prestation_categories').delete().eq('id', id);
+    if (!ok(res, 'La catégorie n’a pas pu être supprimée. Réessayez.')) return;
     fetchAll();
   };
 
   const addSubcategory = async (catId: string) => {
     if (!newSubName.trim() || !user) return;
-    const sb = createClient();
-    await sb.from('prestation_subcategories').insert({ category_id: catId, name: newSubName.trim(), user_id: user.id });
+    const res = await createClient().from('prestation_subcategories').insert({ category_id: catId, name: newSubName.trim(), user_id: user.id });
+    if (!ok(res, 'La sous-catégorie n’a pas pu être créée. Réessayez.')) return;
     setNewSubName(''); setAddingSubFor(null);
     fetchAll();
   };
 
   const updateSubcategory = async (id: string) => {
     if (!editName.trim()) return;
-    const sb = createClient();
-    await sb.from('prestation_subcategories').update({ name: editName.trim() }).eq('id', id);
+    const res = await createClient().from('prestation_subcategories').update({ name: editName.trim() }).eq('id', id);
+    if (!ok(res, 'La sous-catégorie n’a pas pu être renommée. Réessayez.')) return;
     setEditingSub(null); setEditName('');
     fetchAll();
   };
 
   const deleteSubcategory = async (id: string) => {
     if (!confirm('Supprimer cette sous-catégorie ?')) return;
-    const sb = createClient();
-    await sb.from('prestation_subcategories').delete().eq('id', id);
+    const res = await createClient().from('prestation_subcategories').delete().eq('id', id);
+    if (!ok(res, 'La sous-catégorie n’a pas pu être supprimée. Réessayez.')) return;
     fetchAll();
   };
 
+  const defaultPill = <span className={cn(pill, 'bg-gray-100 text-gray-600')}>Par défaut</span>;
+
   return (
-    <div className="px-4 md:px-6 pb-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-100 rounded-xl">
-            <FolderTree className="h-5 w-5 text-primary-600" />
-          </div>
-          <div>
-            <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Mes catégories</h1>
-            <p className="text-sm text-gray-500">Catégories personnelles + globales (en lecture seule)</p>
-          </div>
+    <div className="px-4 md:px-6 pb-8 max-w-4xl">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
+        <div>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Mes catégories</h1>
+          <p className="text-sm text-gray-500 mt-0.5 max-w-xl">Elles rangent votre catalogue de prestations. Les catégories par défaut sont fournies avec l’app et ne se modifient pas.</p>
         </div>
-        <button onClick={() => setAddingCat(true)} className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark">
-          <Plus className="h-4 w-4" />Catégorie
+        <button onClick={() => { setAddingCat(true); setNewCatName(''); }} className={cn(btnPrimary, 'w-full sm:w-auto')}>
+          <Plus className="h-4 w-4" />Nouvelle catégorie
         </button>
       </div>
 
+      {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+
       {loading ? (
-        <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+        <div className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {[0, 1, 2, 3].map((i) => <div key={i} className="px-5 py-4 animate-pulse"><div className="h-4 bg-gray-100 rounded w-1/3" /></div>)}
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {addingCat && (
-            <div className="bg-white border-2 border-primary rounded-xl p-3 flex items-center gap-2">
-              <input autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addCategory(); if (e.key === 'Escape') setAddingCat(false); }}
-                placeholder="Nom de la catégorie…"
-                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none" />
-              <button onClick={addCategory} className="p-2 bg-primary text-white rounded-lg hover:bg-primary-dark"><Check className="h-4 w-4" /></button>
-              <button onClick={() => { setAddingCat(false); setNewCatName(''); }} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="h-4 w-4" /></button>
+            <div className={cn(cardCls, 'flex items-center gap-2 pl-4 pr-2 py-2')}>
+              <NameInput value={newCatName} onChange={setNewCatName} onSubmit={addCategory}
+                onCancel={() => { setAddingCat(false); setNewCatName(''); }} placeholder="Nom de la catégorie" label="Nom de la nouvelle catégorie" />
             </div>
           )}
 
@@ -123,94 +149,76 @@ export default function UserCategoriesPage() {
             const mine = isMine(cat);
             const global = isGlobal(cat);
             return (
-              <div key={cat.id} className={`bg-white border rounded-xl ${global ? 'border-gray-200' : 'border-primary-200'}`}>
-                <div className="flex items-center gap-2 p-3">
-                  <button onClick={() => setExpanded({ ...expanded, [cat.id]: !isOpen })} className="p-1 text-gray-400">
-                    {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </button>
+              <section key={cat.id} className={cn(cardCls, 'overflow-hidden')}>
+                <div className="flex items-center gap-1 pl-1 pr-2 py-1.5">
                   {editingCat === cat.id ? (
-                    <>
-                      <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') updateCategory(cat.id); if (e.key === 'Escape') setEditingCat(null); }}
-                        className="flex-1 text-sm font-medium border border-primary rounded-lg px-2 py-1" />
-                      <button onClick={() => updateCategory(cat.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check className="h-4 w-4" /></button>
-                      <button onClick={() => setEditingCat(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="h-4 w-4" /></button>
-                    </>
+                    <div className="flex-1 min-w-0 pl-3"><NameInput value={editName} onChange={setEditName} onSubmit={() => updateCategory(cat.id)}
+                      onCancel={() => setEditingCat(null)} label={`Nouveau nom de ${cat.name}`} /></div>
                   ) : (
                     <>
-                      <p className="flex-1 text-sm font-bold text-gray-900">{cat.name}</p>
-                      {global && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold tracking-wider text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded uppercase">
-                          <Globe className="h-2.5 w-2.5" />Globale
+                      <button onClick={() => setExpanded({ ...expanded, [cat.id]: !isOpen })} aria-expanded={isOpen}
+                        className="flex-1 min-w-0 flex items-center gap-2 min-h-11 pl-2 pr-1 text-left rounded-xl hover:bg-gray-50 transition-colors">
+                        {isOpen ? <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" /> : <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />}
+                        <span className="font-semibold text-gray-900 break-words min-w-0">{cat.name}</span>
+                        {global && defaultPill}
+                        <span className="hidden sm:inline text-sm text-gray-500 whitespace-nowrap ml-auto pl-2">
+                          {subList.length} sous-catégorie{subList.length > 1 ? 's' : ''}
                         </span>
-                      )}
-                      <span className="text-[10px] text-gray-400">{subList.length} sous-cat.</span>
+                      </button>
                       {mine && (
                         <>
-                          <button onClick={() => { setEditingCat(cat.id); setEditName(cat.name); }} className="p-1 text-gray-300 hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
-                          <button onClick={() => deleteCategory(cat.id)} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => { setEditingCat(cat.id); setEditName(cat.name); }} className={iconBtn} aria-label={`Renommer ${cat.name}`}><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => deleteCategory(cat.id)} className={iconBtnDanger} aria-label={`Supprimer ${cat.name}`}><Trash2 className="h-4 w-4" /></button>
                         </>
                       )}
                     </>
                   )}
                 </div>
-                {isOpen && (
-                  <div className="border-t border-gray-100 px-3 py-2 space-y-1.5">
-                    {subList.map((s) => {
-                      const subMine = isMine(s);
-                      const subGlobal = isGlobal(s);
-                      return (
-                        <div key={s.id} className="flex items-center gap-2 pl-6 group">
-                          {editingSub === s.id ? (
-                            <>
-                              <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') updateSubcategory(s.id); if (e.key === 'Escape') setEditingSub(null); }}
-                                className="flex-1 text-sm border border-primary rounded px-2 py-1" />
-                              <button onClick={() => updateSubcategory(s.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => setEditingSub(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="h-3.5 w-3.5" /></button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-gray-300">›</span>
-                              <p className="flex-1 text-xs text-gray-700">{s.name}</p>
-                              {subGlobal && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold tracking-wider text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded uppercase">
-                                  <Globe className="h-2.5 w-2.5" />Globale
-                                </span>
-                              )}
-                              {subMine && (
-                                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 transition-opacity">
-                                  <button onClick={() => { setEditingSub(s.id); setEditName(s.name); }} className="p-1 text-gray-300 hover:text-primary"><Pencil className="h-3 w-3" /></button>
-                                  <button onClick={() => deleteSubcategory(s.id)} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {mine && (addingSubFor === cat.id ? (
-                      <div className="flex items-center gap-2 pl-6">
-                        <input autoFocus value={newSubName} onChange={(e) => setNewSubName(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') addSubcategory(cat.id); if (e.key === 'Escape') setAddingSubFor(null); }}
-                          placeholder="Nom de la sous-catégorie…"
-                          className="flex-1 text-xs border border-primary rounded px-2 py-1" />
-                        <button onClick={() => addSubcategory(cat.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => setAddingSubFor(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="h-3.5 w-3.5" /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setAddingSubFor(cat.id)} className="ml-6 text-[10px] text-primary hover:underline">+ Sous-catégorie</button>
+
+                {isOpen && (subList.length > 0 || mine) && (
+                  <ul className="border-t border-gray-100 divide-y divide-gray-100">
+                    {subList.map((s) => (
+                      <li key={s.id} className="flex items-center gap-1 pl-10 pr-2 py-1 min-h-12">
+                        {editingSub === s.id ? (
+                          <NameInput value={editName} onChange={setEditName} onSubmit={() => updateSubcategory(s.id)}
+                            onCancel={() => setEditingSub(null)} label={`Nouveau nom de ${s.name}`} />
+                        ) : (
+                          <>
+                            <span className="flex-1 min-w-0 text-[15px] text-gray-800 break-words">{s.name}</span>
+                            {isGlobal(s) && defaultPill}
+                            {isMine(s) && (
+                              <>
+                                <button onClick={() => { setEditingSub(s.id); setEditName(s.name); }} className={iconBtn} aria-label={`Renommer ${s.name}`}><Pencil className="h-4 w-4" /></button>
+                                <button onClick={() => deleteSubcategory(s.id)} className={iconBtnDanger} aria-label={`Supprimer ${s.name}`}><Trash2 className="h-4 w-4" /></button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </li>
                     ))}
-                    {global && subList.length === 0 && (
-                      <p className="pl-6 text-[10px] text-gray-300 italic">Catégorie globale en lecture seule</p>
+                    {mine && (
+                      <li className="pl-8 pr-2 py-1.5">
+                        {addingSubFor === cat.id ? (
+                          <div className="pl-2"><NameInput value={newSubName} onChange={setNewSubName} onSubmit={() => addSubcategory(cat.id)}
+                            onCancel={() => setAddingSubFor(null)} placeholder="Nom de la sous-catégorie" label={`Nouvelle sous-catégorie de ${cat.name}`} /></div>
+                        ) : (
+                          <button onClick={() => { setAddingSubFor(cat.id); setNewSubName(''); }} className={cn(btnGhost, 'h-10 text-primary-700')}>
+                            <Plus className="h-4 w-4" />Ajouter une sous-catégorie
+                          </button>
+                        )}
+                      </li>
                     )}
-                  </div>
+                  </ul>
                 )}
-              </div>
+              </section>
             );
           })}
+
           {categories.length === 0 && !addingCat && (
-            <p className="text-center py-10 text-sm text-gray-400 italic">Aucune catégorie</p>
+            <div className={cn(cardCls, 'px-6 py-14 text-center')}>
+              <p className="font-semibold text-gray-900">Aucune catégorie</p>
+              <p className="text-sm text-gray-500 mt-1">Créez-en une pour ranger vos prestations : Cocktail, Dîner, Boissons.</p>
+            </div>
           )}
         </div>
       )}

@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  Plus, Pencil, Trash2, Link2, Loader2, X, Check, Users2,
-  Phone, Mail, LayoutGrid, List, ChevronLeft, ChevronRight,
-  UserPlus, CalendarDays, Clock, MapPin, Users, ExternalLink, Save,
+  Plus, Trash2, Link2, Loader2, Check, ChevronLeft, ChevronRight,
+  UserPlus, CalendarDays, MapPin, Users, ArrowRight, Phone, Mail,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { cn } from '@/lib/utils';
+import Modal from '@/components/ui/Modal';
+import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
+import { ErrorBanner } from '@/components/evenements/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Extra {
@@ -45,80 +48,76 @@ type Status = 'a_solliciter' | 'confirme' | 'present';
 
 const ROLES = ['Cuisinier', 'Sous-chef', 'Serveur', 'Barman', 'Aide', 'Autre'];
 
-const STATUSES: { value: Status; label: string; bg: string; text: string; ring: string; dot: string }[] = [
-  { value: 'a_solliciter', label: 'À solliciter', bg: 'bg-amber-50',    text: 'text-amber-700',   ring: 'ring-amber-200',   dot: 'bg-amber-400'   },
-  { value: 'confirme',     label: 'Confirmé',     bg: 'bg-blue-50',     text: 'text-blue-700',    ring: 'ring-blue-200',    dot: 'bg-blue-500'    },
-  { value: 'present',      label: 'Présent',      bg: 'bg-emerald-50',  text: 'text-emerald-700', ring: 'ring-emerald-200', dot: 'bg-emerald-500' },
+const STATUSES: { value: Status; label: string; cls: string; dot: string }[] = [
+  { value: 'a_solliciter', label: 'À solliciter', cls: 'bg-primary-50 text-primary-700', dot: 'bg-primary-500' },
+  { value: 'confirme',     label: 'Confirmé',     cls: 'bg-sage-100 text-sage',          dot: 'bg-sage' },
+  { value: 'present',      label: 'Présent',      cls: 'bg-gray-100 text-gray-700',      dot: 'bg-gray-500' },
 ];
 
 function st(s: Status) { return STATUSES.find((x) => x.value === s) ?? STATUSES[0]; }
 
 function dateFr(d: string | null, opts?: Intl.DateTimeFormatOptions) {
-  if (!d) return '—';
+  if (!d) return 'Sans date';
   return new Date(d + 'T00:00').toLocaleDateString('fr-FR', opts ?? { weekday: 'short', day: '2-digit', month: 'short' });
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
-function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
-  const initials = name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-  const cls = size === 'sm' ? 'h-8 w-8 text-xs' : size === 'lg' ? 'h-14 w-14 text-base' : 'h-10 w-10 text-sm';
-  return (
-    <div className={`${cls} rounded-xl bg-gradient-to-br from-primary-dark to-primary-light flex items-center justify-center flex-shrink-0`}>
-      <span className="text-white font-bold">{initials}</span>
-    </div>
-  );
+/** Date du jour au format AAAA-MM-JJ, en heure locale (toISOString décalerait d'un jour le soir et près de minuit). */
+function isoDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// ── Status pill ───────────────────────────────────────────────────────────────
-function StatusPill({ value, onChange }: { value: Status; onChange?: (s: Status) => void }) {
-  const [open, setOpen] = useState(false);
-  const s = st(value);
-  const content = (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ${s.bg} ${s.text} ${s.ring}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {s.label}
+const initialsOf = (name: string) =>
+  name.split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span aria-hidden className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 text-sm font-semibold flex items-center justify-center flex-shrink-0">
+      {initialsOf(name)}
     </span>
   );
-  if (!onChange) return content;
+}
+
+function StatusPill({ value }: { value: Status }) {
+  const s = st(value);
   return (
-    <div className="relative inline-block">
-      <button onClick={() => setOpen((v) => !v)} className="focus:outline-none">{content}</button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl min-w-[150px] py-1">
-            {STATUSES.map((sx) => (
-              <button key={sx.value} onClick={() => { onChange(sx.value); setOpen(false); }}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${sx.value === value ? 'font-bold' : ''}`}>
-                <span className={`w-2 h-2 rounded-full ${sx.dot}`} />
-                {sx.label}
-                {sx.value === value && <Check className="h-3 w-3 ml-auto text-primary" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+    <span className={cn(pill, 'gap-1.5', s.cls)}>
+      <span className={cn('w-1.5 h-1.5 rounded-full', s.dot)} />{s.label}
+    </span>
+  );
+}
+
+/** Choix du statut en onglets segmentés : visible d'un coup d'œil, confortable au doigt. */
+function StatusChoice({ value, onChange }: { value: Status; onChange: (s: Status) => void }) {
+  return (
+    <div className="flex p-1 rounded-xl bg-gray-200/70" role="radiogroup" aria-label="Statut">
+      {STATUSES.map((s) => (
+        <button key={s.value} type="button" role="radio" aria-checked={value === s.value} onClick={() => onChange(s.value)}
+          className={cn('flex-1 flex items-center justify-center gap-1.5 h-10 px-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
+            value === s.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
+          <span className={cn('w-2 h-2 rounded-full flex-shrink-0', s.dot)} />{s.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-// ── Event sheet (right drawer) ─────────────────────────────────────────────────
+// ── Fiche d'une mission ──────────────────────────────────────────────────────
 interface SheetProps {
   assignment: Assignment;
   extra: Extra;
   onClose: () => void;
-  onStatusChange: (id: string, s: Status) => void;
-  onRemove: (id: string) => void;
-  onSave: (id: string, arrivalTime: string, notes: string) => Promise<void>;
+  onStatusChange: (id: string, s: Status) => Promise<boolean>;
+  onRemove: (id: string) => Promise<boolean>;
+  onSave: (id: string, arrivalTime: string, notes: string) => Promise<boolean>;
 }
 
-function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSave }: SheetProps) {
-  const [detail, setDetail]     = useState<QuoteDetail | null>(null);
-  const [arrTime, setArrTime]   = useState(assignment.arrival_time ?? '');
-  const [notes, setNotes]       = useState(assignment.mission_notes ?? '');
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
-  const sheetRef = useRef<HTMLDivElement>(null);
+function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, onSave }: SheetProps) {
+  const [detail, setDetail]   = useState<QuoteDetail | null>(null);
+  const [arrTime, setArrTime] = useState(assignment.arrival_time ?? '');
+  const [notes, setNotes]     = useState(assignment.mission_notes ?? '');
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     createClient()
@@ -129,150 +128,96 @@ function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSa
       .then(({ data }) => { if (data) setDetail(data as QuoteDetail); });
   }, [assignment.quote.id]);
 
-  // Close on Escape
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
-
   const handleSave = async () => {
-    setSaving(true);
-    await onSave(assignment.id, arrTime, notes);
+    setSaving(true); setError(null);
+    const ok = await onSave(assignment.id, arrTime, notes);
     setSaving(false);
+    if (!ok) { setError('La mission n’a pas pu être enregistrée. Réessayez.'); return; }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const changeStatus = async (s: Status) => {
+    setError(null);
+    if (!(await onStatusChange(assignment.id, s))) setError('Le statut n’a pas pu être changé. Réessayez.');
+  };
+
+  const remove = async () => {
+    if (!confirm(`Retirer ${extra.name} de cet événement ?`)) return;
+    if (await onRemove(assignment.id)) onClose();
+    else setError('L’extra n’a pas pu être retiré. Réessayez.');
+  };
+
   const q = detail ?? assignment.quote;
-  const s = st(assignment.status);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      {/* Drawer */}
-      <div ref={sheetRef}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
-
-        {/* Header */}
-        <div className="flex-shrink-0 px-5 pt-5 pb-4 border-b border-gray-100">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-400 mb-1">Mission de</p>
-              <div className="flex items-center gap-2">
-                <Avatar name={extra.name} size="sm" />
-                <div>
-                  <p className="font-bold text-gray-900">{extra.name}</p>
-                  {extra.role && <p className="text-xs text-gray-400">{extra.role}</p>}
-                </div>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors flex-shrink-0">
-              <X className="h-4 w-4" />
-            </button>
+    <Modal
+      title={`Mission de ${extra.name}`}
+      onClose={onClose}
+      footer={<>
+        <button onClick={remove} className={cn(btnGhost, 'mr-auto text-danger hover:bg-danger/10')}>Retirer</button>
+        <button onClick={handleSave} disabled={saving} className={btnPrimary}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
+          {saved ? 'Enregistré' : 'Enregistrer'}
+        </button>
+      </>}
+    >
+      <div className="space-y-5 pb-3">
+        <div className="rounded-2xl bg-gray-50 p-4 space-y-2">
+          <p className="font-semibold text-gray-900 leading-snug">{q.event_type || 'Événement'}</p>
+          <p className="text-sm text-gray-600">{q.client_name}</p>
+          <div className="space-y-1.5 text-sm text-gray-700 pt-1">
+            {q.event_date && (
+              <p className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                {dateFr(q.event_date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            )}
+            {detail?.event_location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />{detail.event_location}</p>}
+            {detail?.guest_count ? <p className="flex items-center gap-2"><Users className="h-4 w-4 text-gray-500 flex-shrink-0" />{detail.guest_count} couverts</p> : null}
           </div>
+          <Link href={`/evenements/${q.id}`} className="inline-flex items-center gap-1.5 min-h-10 text-sm font-medium text-primary-700 hover:underline">
+            Voir l’événement<ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-
-          {/* Event card */}
-          <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-base leading-snug">{q.event_type || 'Événement'}</p>
-                <p className="text-sm text-gray-500">{q.client_name}</p>
-              </div>
-              <StatusPill value={assignment.status} onChange={(s) => onStatusChange(assignment.id, s)} />
-            </div>
-            <div className="space-y-1.5 text-sm text-gray-600">
-              {q.event_date && (
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                  <span className="font-medium">{dateFr(q.event_date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                </div>
-              )}
-              {detail?.event_location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                  <span>{detail.event_location}</span>
-                </div>
-              )}
-              {detail?.guest_count && (
-                <div className="flex items-center gap-2">
-                  <Users className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                  <span>{detail.guest_count} convives</span>
-                </div>
-              )}
-            </div>
-            <Link href={`/evenements/${q.id}`}
-              className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
-              <ExternalLink className="h-3 w-3" />Voir l&apos;événement complet
-            </Link>
-          </div>
-
-          {/* Arrival time */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
-              <Clock className="h-3.5 w-3.5 inline mr-1" />Heure d&apos;arrivée
-            </label>
-            <input type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Notes de mission</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              placeholder="Instructions spécifiques, tenue, matériel à apporter…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
-            />
-          </div>
-
-          {/* Contact de l'extra */}
-          {(extra.phone || extra.email) && (
-            <div className="bg-gray-50 rounded-xl p-3 space-y-1 text-xs text-gray-500">
-              <p className="font-semibold text-gray-400 uppercase tracking-widest text-[10px] mb-1">Contact</p>
-              {extra.phone && <div className="flex items-center gap-2"><Phone className="h-3 w-3" />{extra.phone}</div>}
-              {extra.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3" />{extra.email}</div>}
-            </div>
-          )}
+        <div>
+          <p className={labelCls}>Statut</p>
+          <StatusChoice value={assignment.status} onChange={changeStatus} />
         </div>
 
-        {/* Footer actions */}
-        <div className="flex-shrink-0 border-t border-gray-100 px-5 py-4 flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4 text-emerald-300" /> : <Save className="h-4 w-4" />}
-            {saved ? 'Sauvegardé !' : 'Enregistrer'}
-          </button>
-          <button
-            onClick={() => { if (confirm('Retirer cet extra de l\'événement ?')) { onRemove(assignment.id); onClose(); } }}
-            className="px-4 py-2.5 text-sm text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
-          >
-            Retirer
-          </button>
+        <div>
+          <label htmlFor="mission-time" className={labelCls}>Heure d’arrivée</label>
+          <input id="mission-time" type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)} className={inputCls} />
         </div>
+
+        <div>
+          <label htmlFor="mission-notes" className={labelCls}>Notes de mission</label>
+          <textarea id="mission-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4}
+            placeholder="Tenue, matériel à apporter, consignes particulières"
+            className={cn(inputCls, 'h-auto py-3 resize-none')} />
+        </div>
+
+        {(extra.phone || extra.email) && (
+          <div className="space-y-1 text-sm text-gray-700">
+            <p className="font-medium text-gray-900">Contact</p>
+            {extra.phone && <a href={`tel:${extra.phone}`} className="flex items-center gap-2 min-h-10"><Phone className="h-4 w-4 text-gray-500" />{extra.phone}</a>}
+            {extra.email && <a href={`mailto:${extra.email}`} className="flex items-center gap-2 min-h-10 break-all"><Mail className="h-4 w-4 text-gray-500 flex-shrink-0" />{extra.email}</a>}
+          </div>
+        )}
+
+        {error && <p role="alert" className={errorCls}>{error}</p>}
       </div>
-    </>
+    </Modal>
   );
 }
 
-// ── Assign modal ───────────────────────────────────────────────────────────────
+// ── Affecter à un événement ──────────────────────────────────────────────────
 function AssignModal({
   extra, userId, assignedQuoteIds, onSave, onClose,
 }: {
   extra: Extra;
   userId: string;
   assignedQuoteIds: string[];
-  onSave: (quoteId: string, status: Status, arrivalTime: string) => Promise<void>;
+  onSave: (quoteId: string, status: Status, arrivalTime: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [quotes, setQuotes]   = useState<QuoteOption[]>([]);
@@ -281,82 +226,79 @@ function AssignModal({
   const [quoteId, setQuoteId] = useState('');
   const [status, setStatus]   = useState<Status>('a_solliciter');
   const [arrTime, setArrTime] = useState('');
+  const [error, setError]     = useState<string | null>(null);
+  // Clé stable : la liste est recréée à chaque rendu de la page, sans que son contenu change.
+  const assignedKey = assignedQuoteIds.join(',');
 
   useEffect(() => {
+    const assigned = assignedKey ? assignedKey.split(',') : [];
     createClient()
       .from('quotes')
       .select('id, event_type, event_date, client_name')
       .eq('user_id', userId)
       .order('event_date', { ascending: true, nullsFirst: false })
       .then(({ data }) => {
-        setQuotes(((data ?? []) as QuoteOption[]).filter((q) => !assignedQuoteIds.includes(q.id)));
+        setQuotes(((data ?? []) as QuoteOption[]).filter((q) => !assigned.includes(q.id)));
         setLoading(false);
       });
-  }, [userId, assignedQuoteIds]);
+  }, [userId, assignedKey]);
+
+  const submit = async () => {
+    if (!quoteId) return;
+    setSaving(true); setError(null);
+    const ok = await onSave(quoteId, status, arrTime);
+    setSaving(false);
+    if (!ok) setError('L’extra n’a pas pu être affecté. Réessayez.');
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[92dvh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <div>
-            <h2 className="text-base font-bold text-gray-900">Assigner à un événement</h2>
-            <p className="text-xs text-gray-400">{extra.name}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Événement *</label>
-            {loading ? (
-              <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
-            ) : quotes.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2 text-center">Aucun événement disponible. Créez des devis depuis l&apos;onglet Devis.</p>
-            ) : (
-              <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white">
-                <option value="">— Choisir un événement —</option>
-                {quotes.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.event_type || 'Événement'} — {q.client_name}{q.event_date ? ` (${dateFr(q.event_date, { day: '2-digit', month: 'short' })})` : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Statut initial</label>
-            <div className="flex gap-2">
-              {STATUSES.map((sx) => (
-                <button key={sx.value} onClick={() => setStatus(sx.value)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold ring-1 transition-colors ${status === sx.value ? `${sx.bg} ${sx.text} ${sx.ring}` : 'bg-gray-50 text-gray-400 ring-gray-200'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${sx.dot}`} />{sx.label}
-                </button>
+    <Modal
+      title="Assigner à un événement"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className={btnGhost}>Annuler</button>
+        <button onClick={submit} disabled={!quoteId || saving} className={btnPrimary}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Assigner
+        </button>
+      </>}
+    >
+      <div className="space-y-4 pb-3">
+        <p className="text-[15px] font-semibold text-gray-900">{extra.name}</p>
+        <div>
+          <label htmlFor="assign-event" className={labelCls}>Événement</label>
+          {loading ? (
+            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
+          ) : quotes.length === 0 ? (
+            <p className="rounded-2xl bg-gray-50 px-4 py-4 text-sm text-gray-600">Aucun événement disponible. Les événements viennent de vos devis.</p>
+          ) : (
+            <select id="assign-event" value={quoteId} onChange={(e) => setQuoteId(e.target.value)} className={inputCls}>
+              <option value="">Choisir un événement</option>
+              {quotes.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.event_type || 'Événement'}, {q.client_name}{q.event_date ? ` (${dateFr(q.event_date, { day: 'numeric', month: 'long' })})` : ''}
+                </option>
               ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Heure d&apos;arrivée</label>
-            <input type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-          </div>
+            </select>
+          )}
         </div>
-        <div className="flex gap-2 px-5 pb-5">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Annuler</button>
-          <button onClick={async () => { if (!quoteId) return; setSaving(true); await onSave(quoteId, status, arrTime); setSaving(false); }}
-            disabled={!quoteId || saving}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50">
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}Assigner
-          </button>
+        <div>
+          <p className={labelCls}>Statut de départ</p>
+          <StatusChoice value={status} onChange={setStatus} />
         </div>
+        <div>
+          <label htmlFor="assign-time" className={labelCls}>Heure d’arrivée</label>
+          <input id="assign-time" type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)} className={inputCls} />
+        </div>
+        {error && <p role="alert" className={errorCls}>{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// ── Extra modal ────────────────────────────────────────────────────────────────
+// ── Fiche d'un extra ─────────────────────────────────────────────────────────
 function ExtraModal({ initial, onSave, onClose, saving }: {
   initial?: Partial<Extra>;
-  onSave: (d: { name: string; role: string; phone: string; email: string }) => Promise<void>;
+  onSave: (d: { name: string; role: string; phone: string; email: string }) => Promise<boolean>;
   onClose: () => void;
   saving: boolean;
 }) {
@@ -364,44 +306,50 @@ function ExtraModal({ initial, onSave, onClose, saving }: {
   const [role, setRole]   = useState(initial?.role  ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    setError(null);
+    if (!(await onSave({ name, role, phone, email }))) setError('L’extra n’a pas pu être enregistré. Réessayez.');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[92dvh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-900">{initial?.id ? "Modifier l'extra" : 'Nouvel extra'}</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"><X className="h-4 w-4" /></button>
+    <Modal
+      title={initial?.id ? 'Modifier l’extra' : 'Nouvel extra'}
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className={btnGhost}>Annuler</button>
+        <button onClick={submit} disabled={!name.trim() || saving} className={btnPrimary}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}{initial?.id ? 'Enregistrer' : 'Ajouter'}
+        </button>
+      </>}
+    >
+      <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4 pb-3">
+        <div>
+          <label htmlFor="extra-name" className={labelCls}>Nom complet</label>
+          <input id="extra-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Jean Dupont" className={inputCls} />
         </div>
-        <div className="p-5 space-y-3">
-          {[
-            { label: 'Nom complet *', value: name, set: setName, type: 'text', ph: 'Jean Dupont' },
-            { label: 'Téléphone', value: phone, set: setPhone, type: 'tel', ph: '06 00 00 00 00' },
-            { label: 'Email', value: email, set: setEmail, type: 'email', ph: 'jean@exemple.fr' },
-          ].map((f) => (
-            <div key={f.label}>
-              <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
-              <input type={f.type} value={f.value} onChange={(e) => f.set(e.target.value)} placeholder={f.ph}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-            </div>
-          ))}
+        <div>
+          <label htmlFor="extra-role" className={labelCls}>Rôle</label>
+          <select id="extra-role" value={role} onChange={(e) => setRole(e.target.value)} className={inputCls}>
+            <option value="">Aucun</option>
+            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Rôle</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white">
-              <option value="">— Sélectionner —</option>
-              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <label htmlFor="extra-phone" className={labelCls}>Téléphone</label>
+            <input id="extra-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 00 00 00 00" className={inputCls} />
+          </div>
+          <div>
+            <label htmlFor="extra-email" className={labelCls}>Email</label>
+            <input id="extra-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" className={inputCls} />
           </div>
         </div>
-        <div className="flex gap-2 px-5 pb-5">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Annuler</button>
-          <button onClick={() => onSave({ name, role, phone, email })} disabled={!name.trim() || saving}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50">
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            {initial?.id ? 'Mettre à jour' : 'Ajouter'}
-          </button>
-        </div>
-      </div>
-    </div>
+        {error && <p role="alert" className={errorCls}>{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -414,7 +362,6 @@ function mondayOf(d: Date) {
   return m;
 }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
-function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
 
 function AgendaView({ extras, assignments, onTagClick }: {
   extras: Extra[];
@@ -422,77 +369,53 @@ function AgendaView({ extras, assignments, onTagClick }: {
   onTagClick: (a: Assignment, e: Extra) => void;
 }) {
   const COLS = 8;
-  const [offset, setOffset] = useState(0); // in weeks
+  const [offset, setOffset] = useState(0); // en blocs de huit semaines
 
   const weeks = useMemo(() => {
-    const monday = addDays(mondayOf(new Date()), offset * COLS * 7 / COLS);
-    // Actually offset in weeks
-    const base = addDays(mondayOf(new Date()), offset * COLS);
+    const base = addDays(mondayOf(new Date()), offset * COLS * 7);
     return Array.from({ length: COLS }, (_, i) => {
       const start = addDays(base, i * 7);
-      return { start, end: addDays(start, 6), label: `${start.getDate()}/${start.getMonth() + 1}` };
+      return { start, end: addDays(start, 6) };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset]);
 
   const byExtra = useMemo(() => {
     const map: Record<string, Assignment[]> = {};
-    for (const a of assignments) {
-      if (!map[a.extra_id]) map[a.extra_id] = [];
-      map[a.extra_id].push(a);
-    }
+    for (const a of assignments) (map[a.extra_id] ??= []).push(a);
     return map;
   }, [assignments]);
 
-  const extraMap = useMemo(() => Object.fromEntries(extras.map((e) => [e.id, e])), [extras]);
-
-  const periodLabel = () => {
-    const s = weeks[0].start;
-    const e = weeks[COLS - 1].end;
-    return `${s.getDate()} ${s.toLocaleDateString('fr-FR', { month: 'short' })} — ${e.getDate()} ${e.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}`;
-  };
+  const s = weeks[0].start;
+  const e = weeks[COLS - 1].end;
+  const periodLabel = `Du ${s.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} au ${e.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      {/* Nav */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
-        <button onClick={() => setOffset((v) => v - 1)}
-          className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors text-gray-500">
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <div className="text-center">
-          <p className="text-xs font-semibold text-gray-700">{periodLabel()}</p>
-          <div className="flex items-center justify-center gap-3 mt-1">
-            {STATUSES.map((s) => (
-              <span key={s.value} className="flex items-center gap-1 text-[10px] text-gray-400">
-                <span className={`w-2 h-2 rounded-full ${s.dot}`} />{s.label}
-              </span>
-            ))}
-          </div>
+    <section className={cn(cardCls, 'overflow-hidden')}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-2 sm:px-3 py-2 border-b border-gray-100">
+        <div className="flex items-center gap-1 min-w-0">
+          <button onClick={() => setOffset((v) => v - 1)} className={iconBtn} aria-label="Huit semaines plus tôt"><ChevronLeft className="h-5 w-5" /></button>
+          <p className="text-[15px] font-semibold text-gray-900 min-w-0">{periodLabel}</p>
+          <button onClick={() => setOffset((v) => v + 1)} className={iconBtn} aria-label="Huit semaines plus tard"><ChevronRight className="h-5 w-5" /></button>
+          {offset !== 0 && <button onClick={() => setOffset(0)} className={cn(btnGhost, 'h-10 text-sm')}>Aujourd’hui</button>}
         </div>
-        <div className="flex items-center gap-1">
-          {offset !== 0 && (
-            <button onClick={() => setOffset(0)}
-              className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-400 transition-colors mr-1">
-              Auj.
-            </button>
-          )}
-          <button onClick={() => setOffset((v) => v + 1)}
-            className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors text-gray-500">
-            <ChevronRight className="h-4 w-4" />
-          </button>
+        <div className="flex items-center gap-3 px-2">
+          {STATUSES.map((x) => (
+            <span key={x.value} className="flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
+              <span className={cn('w-2 h-2 rounded-full', x.dot)} />{x.label}
+            </span>
+          ))}
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs border-collapse min-w-[700px]">
+        <table className="w-full text-sm border-collapse min-w-[760px]">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-500 min-w-[130px] sticky left-0 bg-white z-10">Extra</th>
+              <th className="text-left px-4 py-2.5 font-medium text-gray-500 min-w-[150px] sticky left-0 bg-white z-10">Extra</th>
               {weeks.map((w, i) => (
-                <th key={i} className="text-center px-1.5 py-2.5 font-medium text-gray-400 min-w-[90px]">
-                  <div className="text-[11px]">{w.start.toLocaleDateString('fr-FR', { weekday: 'short' })}</div>
-                  <div className="font-bold text-gray-600">{w.label}</div>
+                <th key={i} className="text-center px-1.5 py-2.5 font-medium text-gray-500 min-w-[88px]">
+                  <span className="block text-xs">Semaine du</span>
+                  <span className="block font-semibold text-gray-900">{w.start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' })}</span>
                 </th>
               ))}
             </tr>
@@ -501,41 +424,25 @@ function AgendaView({ extras, assignments, onTagClick }: {
             {extras.map((extra) => {
               const rows = byExtra[extra.id] ?? [];
               return (
-                <tr key={extra.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                <tr key={extra.id} className="border-b border-gray-100 last:border-0">
                   <td className="px-4 py-3 sticky left-0 bg-white z-10">
-                    <div className="flex items-center gap-2">
-                      <Avatar name={extra.name} size="sm" />
-                      <div>
-                        <div className="font-semibold text-gray-800 text-xs leading-snug">{extra.name}</div>
-                        {extra.role && <div className="text-[10px] text-gray-400">{extra.role}</div>}
-                      </div>
-                    </div>
+                    <p className="font-semibold text-gray-900 leading-snug">{extra.name}</p>
+                    {extra.role && <p className="text-xs text-gray-500">{extra.role}</p>}
                   </td>
                   {weeks.map((w, i) => {
-                    const hits = rows.filter((r) => {
-                      if (!r.quote.event_date) return false;
-                      return r.quote.event_date >= isoDate(w.start) && r.quote.event_date <= isoDate(w.end);
-                    });
+                    const hits = rows.filter((r) => r.quote.event_date && r.quote.event_date >= isoDate(w.start) && r.quote.event_date <= isoDate(w.end));
                     return (
-                      <td key={i} className="text-center px-1.5 py-2">
-                        {hits.length > 0 ? (
-                          <div className="flex flex-col gap-1 items-center">
-                            {hits.map((h) => {
-                              const s = st(h.status);
-                              return (
-                                <button key={h.id}
-                                  onClick={() => onTagClick(h, extraMap[h.extra_id] ?? extra)}
-                                  title={`${h.quote.event_type} — ${h.quote.client_name}\nCliquer pour voir les détails`}
-                                  className={`w-full px-1.5 py-1 rounded-lg text-[10px] font-semibold ring-1 hover:opacity-80 transition-opacity cursor-pointer ${s.bg} ${s.text} ${s.ring}`}>
-                                  {h.quote.event_date
-                                    ? new Date(h.quote.event_date + 'T00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-                                    : '—'}
-                                  <div className="truncate max-w-[72px] text-[9px] opacity-70">{h.quote.client_name}</div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : <span className="text-gray-100">·</span>}
+                      <td key={i} className="text-center px-1 py-2 align-top">
+                        <div className="flex flex-col gap-1">
+                          {hits.map((h) => (
+                            <button key={h.id} onClick={() => onTagClick(h, extra)}
+                              title={`${h.quote.event_type}, ${h.quote.client_name}`}
+                              className={cn('w-full min-h-10 px-1.5 py-1 rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity', st(h.status).cls)}>
+                              {dateFr(h.quote.event_date, { day: '2-digit', month: '2-digit' })}
+                              <span className="block truncate max-w-[80px] mx-auto text-[11px] font-normal">{h.quote.client_name}</span>
+                            </button>
+                          ))}
+                        </div>
                       </td>
                     );
                   })}
@@ -545,12 +452,12 @@ function AgendaView({ extras, assignments, onTagClick }: {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }
 
-// ── Extra card (list) ─────────────────────────────────────────────────────────
-function ExtraCard({
+// ── Ligne d'un extra ──────────────────────────────────────────────────────────
+function ExtraRow({
   extra, assignments, onEdit, onDelete, onAssign, onCopyLink, copied, onTagClick,
 }: {
   extra: Extra;
@@ -562,102 +469,71 @@ function ExtraCard({
   copied: boolean;
   onTagClick: (a: Assignment) => void;
 }) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = isoDate(new Date());
   const upcoming = assignments
     .filter((a) => !a.quote.event_date || a.quote.event_date >= today)
     .sort((a, b) => (a.quote.event_date ?? '').localeCompare(b.quote.event_date ?? ''));
   const past = assignments
     .filter((a) => a.quote.event_date && a.quote.event_date < today)
     .sort((a, b) => (b.quote.event_date ?? '').localeCompare(a.quote.event_date ?? ''));
+  const meta = [extra.role, extra.phone, extra.email].filter(Boolean).join(', ');
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-3 p-4">
-        <Avatar name={extra.name} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-bold text-gray-900">{extra.name}</p>
-            {extra.role && (
-              <span className="px-2 py-0.5 bg-primary-50 text-primary text-xs font-semibold rounded-full">{extra.role}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-            {extra.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{extra.phone}</span>}
-            {extra.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{extra.email}</span>}
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={onAssign} title="Assigner à un événement"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30 rounded-xl hover:bg-primary-50 transition-colors">
-            <UserPlus className="h-3.5 w-3.5" />Assigner
-          </button>
-          <button onClick={onCopyLink}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Copier le lien">
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Link2 className="h-3.5 w-3.5" />}
-          </button>
-          <button onClick={onEdit} className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={onDelete} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+    <li className="py-1">
+      <div className="flex items-center gap-1 pr-2">
+        <button onClick={onEdit} aria-label={`Modifier ${extra.name}`} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 text-left pl-4 sm:pl-5 py-2.5">
+          <Avatar name={extra.name} />
+          <span className="flex-1 min-w-0">
+            <span className="block font-semibold text-gray-900 truncate">{extra.name}</span>
+            <span className="block text-sm text-gray-500 truncate">{meta || 'Aucune coordonnée'}</span>
+          </span>
+        </button>
+        <button onClick={onAssign} className={cn(btnSecondary, 'h-10 px-3 hidden sm:inline-flex')}><UserPlus className="h-4 w-4" />Assigner</button>
+        <button onClick={onAssign} className={cn(iconBtn, 'sm:hidden')} aria-label={`Assigner ${extra.name} à un événement`}><UserPlus className="h-[18px] w-[18px]" /></button>
+        <button onClick={onCopyLink} className={iconBtn} aria-label={`Copier le lien de la page de ${extra.name}`} title={copied ? 'Lien copié' : 'Copier le lien de sa page'}>
+          {copied ? <Check className="h-[18px] w-[18px] text-sage" /> : <Link2 className="h-[18px] w-[18px]" />}
+        </button>
+        <button onClick={onDelete} className={iconBtnDanger} aria-label={`Supprimer ${extra.name}`} title="Supprimer"><Trash2 className="h-[18px] w-[18px]" /></button>
       </div>
 
-      {/* Missions tags — always visible */}
-      {assignments.length === 0 ? (
-        <div className="px-4 pb-4">
-          <button onClick={onAssign}
-            className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-primary/40 hover:text-primary hover:bg-primary-50/50 transition-colors">
-            <UserPlus className="h-3.5 w-3.5" />Assigner à un événement
-          </button>
-        </div>
-      ) : (
-        <div className="px-4 pb-4 space-y-2">
-          {/* Upcoming */}
-          {upcoming.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {upcoming.map((a) => {
-                const s = st(a.status);
-                return (
-                  <button key={a.id} onClick={() => onTagClick(a)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold ring-1 hover:opacity-80 transition-all cursor-pointer ${s.bg} ${s.text} ${s.ring}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
-                    <span className="font-bold">{a.quote.event_date ? dateFr(a.quote.event_date, { day: '2-digit', month: 'short' }) : '—'}</span>
-                    <span className="opacity-75 max-w-[120px] truncate">{a.quote.event_type || a.quote.client_name}</span>
-                    <CalendarDays className="h-3 w-3 opacity-50 flex-shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {/* Past (compact) */}
-          {past.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {past.slice(0, 3).map((a) => (
-                <button key={a.id} onClick={() => onTagClick(a)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors cursor-pointer">
-                  {a.quote.event_date ? dateFr(a.quote.event_date, { day: '2-digit', month: 'short' }) : '—'} — {a.quote.client_name}
-                </button>
-              ))}
-              {past.length > 3 && (
-                <span className="px-2.5 py-1 rounded-lg text-[10px] text-gray-300">+{past.length - 3} passé{past.length - 3 > 1 ? 's' : ''}</span>
-              )}
-            </div>
+      {assignments.length > 0 && (
+        <div className="flex flex-wrap gap-2 pl-4 sm:pl-[76px] pr-4 pb-2.5">
+          {upcoming.map((a) => {
+            const s = st(a.status);
+            return (
+              <button key={a.id} onClick={() => onTagClick(a)} title={s.label}
+                className={cn('inline-flex items-center gap-2 max-w-full min-h-10 px-3 rounded-xl text-sm font-medium hover:opacity-80 transition-opacity', s.cls)}>
+                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', s.dot)} />
+                <span className="font-semibold whitespace-nowrap">{dateFr(a.quote.event_date, { day: 'numeric', month: 'short' })}</span>
+                <span className="truncate">{a.quote.event_type || a.quote.client_name}</span>
+              </button>
+            );
+          })}
+          {past.slice(0, 3).map((a) => (
+            <button key={a.id} onClick={() => onTagClick(a)}
+              className="inline-flex items-center gap-2 max-w-full min-h-10 px-3 rounded-xl text-sm text-gray-500 bg-white border border-gray-200 hover:border-gray-300 transition-colors">
+              <span className="whitespace-nowrap">{dateFr(a.quote.event_date, { day: 'numeric', month: 'short' })}</span>
+              <span className="truncate">{a.quote.client_name}</span>
+            </button>
+          ))}
+          {past.length > 3 && (
+            <span className="inline-flex items-center min-h-10 px-1 text-sm text-gray-500">
+              et {past.length - 3} mission{past.length - 3 > 1 ? 's' : ''} passée{past.length - 3 > 1 ? 's' : ''}
+            </span>
           )}
         </div>
       )}
-    </div>
+    </li>
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function ExtrasPage() {
   const { user } = useAuth();
   const [extras,      setExtras]      = useState<Extra[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
   const [showModal,   setShowModal]   = useState(false);
   const [editing,     setEditing]     = useState<Extra | null>(null);
   const [saving,      setSaving]      = useState(false);
@@ -669,17 +545,20 @@ export default function ExtrasPage() {
   const load = useCallback(async () => {
     if (!user) return;
     const supabase = createClient();
-    const { data: extrasData } = await supabase.from('extras').select('*').eq('user_id', user.id).order('name');
+    const { data: extrasData, error: extrasErr } = await supabase.from('extras').select('*').eq('user_id', user.id).order('name');
     const extras = (extrasData ?? []) as Extra[];
     const extraIds = extras.map((e) => e.id);
     let assigns: Assignment[] = [];
+    let assignErr = false;
     if (extraIds.length > 0) {
-      const { data: aData } = await supabase
+      const { data: aData, error: aError } = await supabase
         .from('event_extras')
         .select('id, extra_id, status, arrival_time, mission_notes, quote:quotes(id, event_type, event_date, client_name)')
         .in('extra_id', extraIds);
+      assignErr = !!aError;
       assigns = ((aData ?? []) as unknown as Assignment[]).filter((a) => a.quote?.id);
     }
+    if (extrasErr || assignErr) setError('Vos extras n’ont pas pu être chargés. Rechargez la page.');
     setExtras(extras);
     setAssignments(assigns);
     setLoading(false);
@@ -689,150 +568,143 @@ export default function ExtrasPage() {
 
   const assignmentsByExtra = useMemo(() => {
     const map: Record<string, Assignment[]> = {};
-    for (const a of assignments) {
-      if (!map[a.extra_id]) map[a.extra_id] = [];
-      map[a.extra_id].push(a);
-    }
+    for (const a of assignments) (map[a.extra_id] ??= []).push(a);
     return map;
   }, [assignments]);
 
-  const extraMap = useMemo(() => Object.fromEntries(extras.map((e) => [e.id, e])), [extras]);
-
   const handleSaveExtra = async (form: { name: string; role: string; phone: string; email: string }) => {
-    if (!user) return;
+    if (!user) return false;
     setSaving(true);
     const supabase = createClient();
-    if (editing) {
-      const { data } = await supabase.from('extras')
-        .update({ name: form.name, role: form.role || null, phone: form.phone || null, email: form.email || null })
-        .eq('id', editing.id).select().single();
-      if (data) setExtras((p) => p.map((e) => e.id === editing.id ? data as Extra : e));
-    } else {
-      const { data } = await supabase.from('extras')
-        .insert({ user_id: user.id, name: form.name, role: form.role || null, phone: form.phone || null, email: form.email || null })
-        .select().single();
-      if (data) setExtras((p) => [...p, data as Extra].sort((a, b) => a.name.localeCompare(b.name, 'fr')));
-    }
+    const fields = { name: form.name.trim(), role: form.role || null, phone: form.phone || null, email: form.email || null };
+    const res = editing
+      ? await supabase.from('extras').update(fields).eq('id', editing.id).select().single()
+      : await supabase.from('extras').insert({ user_id: user.id, ...fields }).select().single();
     setSaving(false);
+    if (res.error || !res.data) return false;
+    const saved = res.data as Extra;
+    setExtras((p) => (editing ? p.map((e) => (e.id === saved.id ? saved : e)) : [...p, saved]).sort((a, b) => a.name.localeCompare(b.name, 'fr')));
     setShowModal(false);
     setEditing(null);
+    return true;
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cet extra ?')) return;
-    await createClient().from('extras').delete().eq('id', id);
-    setExtras((p) => p.filter((e) => e.id !== id));
-    setAssignments((p) => p.filter((a) => a.extra_id !== id));
+  const handleDelete = async (extra: Extra) => {
+    if (!confirm(`Supprimer ${extra.name} de vos extras ?`)) return;
+    const { error: err } = await createClient().from('extras').delete().eq('id', extra.id);
+    if (err) { setError('L’extra n’a pas pu être supprimé. Réessayez.'); return; }
+    setError(null);
+    setExtras((p) => p.filter((e) => e.id !== extra.id));
+    setAssignments((p) => p.filter((a) => a.extra_id !== extra.id));
   };
 
   const handleStatusChange = async (assignId: string, status: Status) => {
-    await createClient().from('event_extras').update({ status }).eq('id', assignId);
+    const { error: err } = await createClient().from('event_extras').update({ status }).eq('id', assignId);
+    if (err) return false;
     setAssignments((p) => p.map((a) => a.id === assignId ? { ...a, status } : a));
-    if (openSheet?.assignment.id === assignId) {
-      setOpenSheet((s) => s ? { ...s, assignment: { ...s.assignment, status } } : s);
-    }
+    setOpenSheet((s) => s && s.assignment.id === assignId ? { ...s, assignment: { ...s.assignment, status } } : s);
+    return true;
   };
 
   const handleRemoveAssignment = async (assignId: string) => {
-    await createClient().from('event_extras').delete().eq('id', assignId);
+    const { error: err } = await createClient().from('event_extras').delete().eq('id', assignId);
+    if (err) return false;
     setAssignments((p) => p.filter((a) => a.id !== assignId));
+    return true;
   };
 
   const handleSaveSheet = async (assignId: string, arrivalTime: string, notes: string) => {
-    await createClient().from('event_extras')
+    const { error: err } = await createClient().from('event_extras')
       .update({ arrival_time: arrivalTime || null, mission_notes: notes || null })
       .eq('id', assignId);
-    setAssignments((p) => p.map((a) =>
-      a.id === assignId ? { ...a, arrival_time: arrivalTime || null, mission_notes: notes || null } : a
-    ));
-    if (openSheet?.assignment.id === assignId) {
-      setOpenSheet((s) => s ? {
-        ...s,
-        assignment: { ...s.assignment, arrival_time: arrivalTime || null, mission_notes: notes || null }
-      } : s);
-    }
+    if (err) return false;
+    const patch = { arrival_time: arrivalTime || null, mission_notes: notes || null };
+    setAssignments((p) => p.map((a) => a.id === assignId ? { ...a, ...patch } : a));
+    setOpenSheet((s) => s && s.assignment.id === assignId ? { ...s, assignment: { ...s.assignment, ...patch } } : s);
+    return true;
   };
 
   const handleAssign = async (quoteId: string, status: Status, arrivalTime: string) => {
-    if (!assignFor) return;
-    const { data } = await createClient()
+    if (!assignFor) return false;
+    const { data, error: err } = await createClient()
       .from('event_extras')
       .insert({ extra_id: assignFor.id, quote_id: quoteId, status, arrival_time: arrivalTime || null, mission_notes: null })
       .select('id, extra_id, status, arrival_time, mission_notes, quote:quotes(id, event_type, event_date, client_name)')
       .single();
-    if (data) setAssignments((p) => [...p, data as unknown as Assignment]);
+    if (err || !data) return false;
+    setAssignments((p) => [...p, data as unknown as Assignment]);
     setAssignFor(null);
+    return true;
   };
 
   const copyLink = (token: string, id: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/e/${token}`).then(() => {
       setCopied(id);
       setTimeout(() => setCopied(null), 2000);
-    });
+    }, () => setError('Le lien n’a pas pu être copié. Réessayez.'));
   };
 
+  const openNew = () => { setEditing(null); setShowModal(true); };
+
   return (
-    <div className="px-4 md:px-6 pb-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="px-4 md:px-6 pb-8">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
         <div>
-          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Gestion des Extras</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gérez votre équipe et leurs missions événementielles</p>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Extras</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {loading ? ' ' : `${extras.length} extra${extras.length > 1 ? 's' : ''} dans votre équipe`}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100 rounded-xl p-1">
-            {([['list', 'Liste', List], ['agenda', 'Agenda', LayoutGrid]] as const).map(([mode, label, Icon]) => (
-              <button key={mode} onClick={() => setViewMode(mode as 'list' | 'agenda')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewMode === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                <Icon className="h-3.5 w-3.5" />{label}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => { setEditing(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark transition-colors">
-            <Plus className="h-4 w-4" />Ajouter un extra
-          </button>
-        </div>
+        <button onClick={openNew} className={cn(btnPrimary, 'w-full sm:w-auto')}><Plus className="h-4 w-4" />Ajouter un extra</button>
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>
-      ) : viewMode === 'agenda' ? (
-        <AgendaView
-          extras={extras}
-          assignments={assignments}
-          onTagClick={(a, e) => setOpenSheet({ assignment: a, extra: e })}
-        />
-      ) : extras.length === 0 ? (
-        <div className="text-center py-16 bg-white border border-dashed border-gray-200 rounded-2xl">
-          <Users2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-semibold">Aucun extra enregistré</p>
-          <p className="text-sm text-gray-400 mt-1 mb-4">Ajoutez votre équipe pour gérer le staffing événementiel.</p>
-          <button onClick={() => { setEditing(null); setShowModal(true); }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark transition-colors">
-            <Plus className="h-4 w-4" />Ajouter un extra
-          </button>
+      {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+
+      {!loading && extras.length > 0 && (
+        <div className="flex p-1 mb-4 rounded-xl bg-gray-200/70 w-fit" role="tablist" aria-label="Affichage">
+          {([['list', 'Liste'], ['agenda', 'Agenda']] as const).map(([mode, label]) => (
+            <button key={mode} role="tab" aria-selected={viewMode === mode} onClick={() => setViewMode(mode)}
+              className={cn('h-10 px-4 rounded-lg text-sm font-medium transition-colors', viewMode === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
+              {label}
+            </button>
+          ))}
         </div>
+      )}
+
+      {loading ? (
+        <div className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
+              <div className="w-10 h-10 bg-gray-100 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2"><div className="h-4 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/2" /></div>
+            </div>
+          ))}
+        </div>
+      ) : extras.length === 0 ? (
+        <div className={cn(cardCls, 'flex flex-col items-center px-6 py-16 text-center')}>
+          <p className="font-semibold text-gray-900 mb-1">Aucun extra pour le moment</p>
+          <p className="text-sm text-gray-500 max-w-sm">Ajoutez vos serveurs, cuisiniers et barmans : vous les affectez ensuite à vos événements, et chacun reçoit le lien de sa page.</p>
+        </div>
+      ) : viewMode === 'agenda' ? (
+        <AgendaView extras={extras} assignments={assignments} onTagClick={(a, e) => setOpenSheet({ assignment: a, extra: e })} />
       ) : (
-        <div className="space-y-3">
+        <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
           {extras.map((extra) => (
-            <ExtraCard
+            <ExtraRow
               key={extra.id}
               extra={extra}
               assignments={assignmentsByExtra[extra.id] ?? []}
               onEdit={() => { setEditing(extra); setShowModal(true); }}
-              onDelete={() => handleDelete(extra.id)}
+              onDelete={() => handleDelete(extra)}
               onAssign={() => setAssignFor(extra)}
               onCopyLink={() => copyLink(extra.access_token, extra.id)}
               copied={copied === extra.id}
               onTagClick={(a) => setOpenSheet({ assignment: a, extra })}
             />
           ))}
-        </div>
+        </ul>
       )}
 
-      {/* Modals */}
       {showModal && (
         <ExtraModal
           initial={editing ?? undefined}
@@ -850,10 +722,8 @@ export default function ExtrasPage() {
           onClose={() => setAssignFor(null)}
         />
       )}
-
-      {/* Event sheet */}
       {openSheet && (
-        <EventSheet
+        <MissionModal
           assignment={openSheet.assignment}
           extra={openSheet.extra}
           onClose={() => setOpenSheet(null)}

@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ShoppingBasket, Printer, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingBasket, Printer, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
+import { cn } from '@/lib/utils';
+import { btnPrimary, btnSecondary, cardCls, inputCls, labelCls } from '@/components/ui/kit';
+import { ErrorBanner, esc, printDocument } from '@/components/evenements/shared';
 
 interface IngredientRow {
   ingredient_id: string;
@@ -14,28 +17,35 @@ interface IngredientRow {
   event_dates: string[];
 }
 
+const fmtQty = (n: number) => (Math.round(n * 100) / 100).toLocaleString('fr-FR');
+const fmtDay = (d: string) => new Date(d + 'T00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+const fmtFull = (d: string) => new Date(d + 'T00:00').toLocaleDateString('fr-FR');
+
 export default function CoursesGlobalesPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate]     = useState('');
   const [rows, setRows]           = useState<IngredientRow[]>([]);
   const [loading, setLoading]     = useState(false);
   const [searched, setSearched]   = useState(false);
+  const [error, setError]         = useState<string | null>(null);
   const [expandedSuppliers, setExpandedSuppliers] = useState<Record<string, boolean>>({});
 
   const search = async () => {
     if (!startDate || !endDate) return;
     setLoading(true);
     setSearched(true);
+    setError(null);
     const supabase = createClient();
 
-    // Fetch accepted quotes in date range
-    const { data: quotes } = await supabase
+    // Devis confirmés de la période
+    const { data: quotes, error: quotesErr } = await supabase
       .from('quotes')
       .select('id, event_date, client_name')
       .in('status', CONFIRMED_STATUSES)
       .gte('event_date', startDate)
       .lte('event_date', endDate);
 
+    if (quotesErr) setError('Les besoins n’ont pas pu être calculés. Réessayez.');
     if (!quotes || quotes.length === 0) {
       setRows([]);
       setLoading(false);
@@ -45,21 +55,21 @@ export default function CoursesGlobalesPage() {
     const quoteIds = quotes.map((q) => q.id);
     const dateByQuoteId = Object.fromEntries(quotes.map((q) => [q.id, q.event_date ?? '']));
 
-    // Fetch event_ingredients for those quotes
-    const { data: ingredients } = await supabase
+    // Listes de courses de ces événements
+    const { data: ingredients, error: ingErr } = await supabase
       .from('event_ingredients')
       .select('quote_id, ingredient_id, quantity, unit, ingredient:ingredients(id, name, unit), supplier:suppliers(id, name)')
       .in('quote_id', quoteIds);
 
+    if (ingErr) setError('Les besoins n’ont pas pu être calculés. Réessayez.');
     if (!ingredients || ingredients.length === 0) {
       setRows([]);
       setLoading(false);
       return;
     }
 
-    // Aggregate by ingredient_id + supplier
-    type AggKey = string;
-    const agg: Record<AggKey, IngredientRow> = {};
+    // Regroupement par ingrédient et par fournisseur
+    const agg: Record<string, IngredientRow> = {};
     for (const item of ingredients) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ing = item.ingredient as any;
@@ -78,16 +88,14 @@ export default function CoursesGlobalesPage() {
       }
       agg[key].total_qty += item.quantity;
       const d = dateByQuoteId[item.quote_id];
-      if (d && !agg[key].event_dates.includes(d)) {
-        agg[key].event_dates.push(d);
-      }
+      if (d && !agg[key].event_dates.includes(d)) agg[key].event_dates.push(d);
     }
+    for (const r of Object.values(agg)) r.event_dates.sort();
 
     setRows(Object.values(agg).sort((a, b) => a.supplier_name.localeCompare(b.supplier_name, 'fr') || a.ingredient_name.localeCompare(b.ingredient_name, 'fr')));
     setLoading(false);
   };
 
-  // Group by supplier
   const grouped = useMemo(() =>
     rows.reduce<Record<string, IngredientRow[]>>((acc, r) => {
       if (!acc[r.supplier_name]) acc[r.supplier_name] = [];
@@ -105,149 +113,99 @@ export default function CoursesGlobalesPage() {
   [grouped]);
 
   const toggleSupplier = (key: string) =>
-    setExpandedSuppliers((p) => ({ ...p, [key]: !p[key] }));
+    setExpandedSuppliers((p) => ({ ...p, [key]: p[key] === false }));
 
   const handlePrint = () => {
     const today = new Date().toLocaleDateString('fr-FR');
-    const rows_html = supplierKeys.map((sup) => {
-      const items = grouped[sup];
-      const itemsHtml = items.map((r) => `
-        <tr style="border-bottom:1px solid #f3e5f5;">
-          <td style="padding:6px 8px;">${r.ingredient_name}</td>
-          <td style="text-align:right;padding:6px 8px;font-weight:bold;color:#9c27b0;">${Math.round(r.total_qty * 100) / 100} ${r.unit ?? ''}</td>
-          <td style="padding:6px 8px;color:#888;font-size:11px;">${r.event_dates.sort().map((d) => new Date(d + 'T00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })).join(', ')}</td>
-        </tr>`).join('');
-      return `
-        <h3 style="color:#9c27b0;margin:18px 0 6px;font-size:14px;border-bottom:1px solid #e9d5ff;padding-bottom:4px;">${sup}</h3>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="background:#f3e5f5;">
-            <th style="text-align:left;padding:6px 8px;">Ingrédient</th>
-            <th style="text-align:right;padding:6px 8px;width:120px;">Quantité totale</th>
-            <th style="text-align:left;padding:6px 8px;width:120px;">Événements</th>
-          </tr></thead>
-          <tbody>${itemsHtml}</tbody>
-        </table>`;
-    }).join('');
-
-    const win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Courses Globales</title>
-      <style>@page{size:A4;margin:20mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Georgia,serif;color:#1a1a1a;margin:0;}</style></head>
-      <body>
-        <h1 style="color:#9c27b0;font-size:18px;margin:0 0 4px;">Liste de Courses Globale</h1>
-        <p style="color:#888;font-size:11px;margin:0 0 20px;">Du ${new Date(startDate + 'T00:00').toLocaleDateString('fr-FR')} au ${new Date(endDate + 'T00:00').toLocaleDateString('fr-FR')} — Imprimé le ${today}</p>
-        ${rows_html}
-      </body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+    const blocks = supplierKeys.map((sup) => `
+      <h2>${esc(sup)}</h2>
+      <table>
+        <thead><tr><th>Ingrédient</th><th class="r" style="width:130px">Quantité totale</th><th style="width:150px">Événements</th></tr></thead>
+        <tbody>${grouped[sup].map((r) => `<tr>
+          <td>${esc(r.ingredient_name)}</td>
+          <td class="r"><strong>${fmtQty(r.total_qty)} ${esc(r.unit)}</strong></td>
+          <td class="muted">${r.event_dates.map(fmtDay).join(', ')}</td>
+        </tr>`).join('')}</tbody>
+      </table>`).join('');
+    const ok = printDocument('Liste de courses globale',
+      `<p class="muted" style="margin:0 0 12px">Du ${fmtFull(startDate)} au ${fmtFull(endDate)}. Imprimé le ${today}.</p>${blocks}`);
+    if (!ok) setError('Votre navigateur a bloqué l’ouverture de la liste. Autorisez les fenêtres pour ce site, puis réessayez.');
   };
 
   return (
-    <div className="px-4 md:px-6 pb-8 space-y-6">
-      {/* Header */}
-      <div>
+    <div className="px-4 md:px-6 pb-8">
+      <div className="mb-5">
         <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Courses globales</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Agrégez les besoins en ingrédients de tous vos événements sur une période.
+        <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">
+          Additionnez les listes de courses de vos événements confirmés sur une période, fournisseur par fournisseur.
         </p>
       </div>
 
-      {/* Date range picker */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Date de début</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Date de fin</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-            />
-          </div>
+      <form onSubmit={(e) => { e.preventDefault(); search(); }}
+        className={cn(cardCls, 'p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto] items-end gap-3 mb-5')}>
+        <div className="min-w-0">
+          <label htmlFor="cg-start" className={labelCls}>Date de début</label>
+          <input id="cg-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={cn(inputCls, 'px-3')} />
         </div>
-        <button
-          onClick={search}
-          disabled={!startDate || !endDate || loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
-        >
+        <div className="min-w-0">
+          <label htmlFor="cg-end" className={labelCls}>Date de fin</label>
+          <input id="cg-end" type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} className={cn(inputCls, 'px-3')} />
+        </div>
+        <button type="submit" disabled={!startDate || !endDate || loading} className={cn(btnPrimary, 'col-span-2 sm:col-span-1 h-12')}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBasket className="h-4 w-4" />}
           Calculer les besoins
         </button>
-      </div>
+      </form>
 
-      {/* Results */}
-      {searched && !loading && (
-        rows.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-            <ShoppingBasket className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-400">Aucun ingrédient trouvé sur cette période.</p>
-            <p className="text-xs text-gray-400 mt-1">Vérifiez que vos événements ont une liste de courses remplie.</p>
+      {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+
+      {!searched ? (
+        <p className="px-1 text-[15px] text-gray-600">Choisissez une période : la liste réunit les ingrédients de tous les événements confirmés qui s’y déroulent.</p>
+      ) : loading ? null : rows.length === 0 ? (
+        <div className={cn(cardCls, 'px-6 py-14 text-center')}>
+          <p className="font-semibold text-gray-900">Aucun ingrédient sur cette période</p>
+          <p className="text-sm text-gray-500 mt-1">Vérifiez que vos événements confirmés ont une liste de courses remplie.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
+              {rows.length} ingrédient{rows.length !== 1 ? 's' : ''} chez {supplierKeys.length} fournisseur{supplierKeys.length !== 1 ? 's' : ''}
+            </p>
+            <button onClick={handlePrint} className={btnSecondary}><Printer className="h-4 w-4" />Imprimer</button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-500">{rows.length} ingrédient{rows.length !== 1 ? 's' : ''} — {supplierKeys.length} fournisseur{supplierKeys.length !== 1 ? 's' : ''}</p>
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Imprimer
-              </button>
-            </div>
 
-            {supplierKeys.map((sup) => {
-              const isOpen = expandedSuppliers[sup] !== false; // default open
-              return (
-                <div key={sup} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => toggleSupplier(sup)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">{sup}</span>
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {grouped[sup].length} article{grouped[sup].length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    {isOpen
-                      ? <ChevronUp className="h-4 w-4 text-gray-400" />
-                      : <ChevronDown className="h-4 w-4 text-gray-400" />}
+          {supplierKeys.map((sup) => {
+            const isOpen = expandedSuppliers[sup] !== false; // ouvert par défaut
+            return (
+              <section key={sup}>
+                <h2>
+                  <button onClick={() => toggleSupplier(sup)} aria-expanded={isOpen}
+                    className="flex items-center gap-2 min-h-10 px-1 mb-1 text-[15px] font-semibold text-gray-900 text-left">
+                    {isOpen ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+                    {sup}
+                    <span className="text-sm font-normal text-gray-500">{grouped[sup].length}</span>
                   </button>
-                  {isOpen && (
-                    <div className="border-t border-gray-100 divide-y divide-gray-50">
-                      {grouped[sup].map((r) => (
-                        <div key={r.ingredient_id} className="flex items-center gap-3 px-4 py-2.5">
-                          <span className="flex-1 text-sm text-gray-800">{r.ingredient_name}</span>
-                          <span className="text-sm font-bold text-primary tabular-nums bg-primary-50 px-2 py-0.5 rounded-lg">
-                            {Math.round(r.total_qty * 100) / 100} {r.unit ?? ''}
+                </h2>
+                {isOpen && (
+                  <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+                    {grouped[sup].map((r) => (
+                      <li key={r.ingredient_id} className="flex flex-wrap sm:flex-nowrap items-baseline gap-x-4 gap-y-0.5 px-4 sm:px-5 py-3">
+                        <span className="flex-1 min-w-0 text-[15px] text-gray-900 break-words">{r.ingredient_name}</span>
+                        <span className="font-semibold text-gray-900 tabular-nums whitespace-nowrap">{fmtQty(r.total_qty)} {r.unit ?? ''}</span>
+                        {r.event_dates.length > 0 && (
+                          <span className="basis-full sm:basis-40 sm:text-right text-sm text-gray-500 tabular-nums">
+                            {r.event_dates.map(fmtDay).join(', ')}
                           </span>
-                          {r.event_dates.length > 0 && (
-                            <span className="text-[10px] text-gray-400 flex-shrink-0">
-                              {r.event_dates.sort().map((d) =>
-                                new Date(d + 'T00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-                              ).join(', ')}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
     </div>
   );

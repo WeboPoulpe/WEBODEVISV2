@@ -182,7 +182,7 @@ export const evenements: HelpGuide[] = [
     steps: [
       { title: 'Ouvrez « Courses globales » dans le menu « Catalogue »' },
       { title: 'Choisissez la « Date de début » et la « Date de fin »' },
-      { title: 'Cliquez sur « Calculer les besoins »', text: 'Les quantités de chaque ingrédient sont additionnées et rangées par fournisseur. À droite de chaque ligne figurent les dates des événements concernés.' },
+      { title: 'Cliquez sur « Calculer les besoins »', text: 'Les quantités de chaque ingrédient sont additionnées et rangées par fournisseur. Chaque ligne rappelle aussi les dates des événements concernés.' },
       { title: 'Imprimez la liste', text: '« Imprimer » sort la liste complète, fournisseur par fournisseur.' },
     ],
     notes: [
@@ -199,9 +199,9 @@ export const evenements: HelpGuide[] = [
     href: '/location-globale',
     steps: [
       { title: 'Ouvrez « Location » dans le menu « Catalogue »', text: 'La page s’intitule « Location globale ».' },
-      { title: 'Choisissez les dates, puis cliquez sur « Calculer les besoins »', text: 'Les événements de la période sont rappelés en tête, avec leur date et leur nombre de convives.' },
+      { title: 'Choisissez les dates, puis cliquez sur « Calculer les besoins »', text: 'Les événements de la période sont rappelés en tête, avec leur date et leur nombre de couverts.' },
       { title: 'Lisez les totaux par fournisseur', text: 'Pour chaque article : la quantité totale, le coût, et le détail par date d’événement.' },
-      { title: 'Sortez les bons', text: '« Bon fournisseur » prépare le bon de commande d’un seul loueur. « Bon général PDF » réunit tous les fournisseurs.' },
+      { title: 'Sortez les bons', text: '« Bon fournisseur » prépare le bon de commande d’un seul loueur. « Bon général » réunit tous les fournisseurs. Chaque bon s’imprime ou s’enregistre en PDF.' },
     ],
     notes: [
       'Seuls les événements confirmés sont comptés.',

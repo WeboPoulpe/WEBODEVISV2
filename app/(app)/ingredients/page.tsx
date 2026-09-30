@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Carrot, Plus, Pencil, Trash2, Search, Loader2, Check,
-  ChevronDown, ChevronUp, Truck, X, UploadCloud, AlertCircle, ImagePlus,
+  ChevronDown, ChevronRight, X, UploadCloud, ImagePlus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { cn } from '@/lib/utils';
+import Modal from '@/components/ui/Modal';
+import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
+import { ErrorBanner } from '@/components/evenements/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Ingredient {
@@ -37,7 +41,7 @@ interface OFFResult {
   id?: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────────────────────
 const CATEGORIES = [
   'Crèmerie', 'Épicerie', 'Viandes', 'Charcuterie',
   'Poissons', 'Fruits & Légumes', 'Herbes & Épices',
@@ -45,24 +49,7 @@ const CATEGORIES = [
 ];
 const UNITS = ['kg', 'L', 'g', 'cl', 'Unité', 'boîte', 'pack', 'bouquet', 'tranche', 'portion', 'Botte', 'Bouteille', 'Rouleau', 'Douzaine', 'Pot', 'Barquette', 'Tube', 'Paquet'];
 
-const CAT_COLORS: Record<string, string> = {
-  'Crèmerie':         'bg-yellow-50 text-yellow-700 border-yellow-200',
-  'Épicerie':         'bg-orange-50 text-orange-700 border-orange-200',
-  'Viandes':          'bg-red-50 text-red-700 border-red-200',
-  'Charcuterie':      'bg-rose-50 text-rose-700 border-rose-200',
-  'Poissons':         'bg-blue-50 text-blue-700 border-blue-200',
-  'Fruits & Légumes': 'bg-green-50 text-green-700 border-green-200',
-  'Herbes & Épices':  'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'Pâtisserie':       'bg-primary-50 text-pink-700 border-pink-200',
-  'Boissons':         'bg-primary-50 text-primary-700 border-primary-200',
-  'Boulangerie':      'bg-amber-50 text-amber-700 border-amber-200',
-  'Surgelés Pro':     'bg-cyan-50 text-cyan-700 border-cyan-200',
-  'Divers':           'bg-gray-100 text-gray-600 border-gray-200',
-  // Rétrocompatibilité pour données existantes
-  'Herbes':           'bg-emerald-50 text-emerald-700 border-emerald-200',
-};
-
-// Mapping des catégories CSV → catégories internes
+// Correspondance des catégories d'un fichier CSV avec celles de l'app
 const CSV_CAT_MAP: Record<string, string> = {
   'Crémerie':        'Crèmerie',
   'Boucherie':       'Viandes',
@@ -71,13 +58,13 @@ const CSV_CAT_MAP: Record<string, string> = {
   'Herbes & Épices': 'Herbes & Épices',
 };
 
-// ── CSV helpers ───────────────────────────────────────────────────────────────
+// ── CSV ───────────────────────────────────────────────────────────────────────
 interface CsvRow { name: string; category: string; sub_category: string; unit: string; }
 
 /**
- * Parse CSV avec auto-détection du format :
+ * Lecture d'un CSV, format détecté d'après l'en-tête :
  *  - 3 colonnes : Catégorie, Nom, Unité
- *  - 4 colonnes : Catégorie, Sous-Catégorie, Nom, Unité
+ *  - 4 colonnes : Catégorie, Sous-catégorie, Nom, Unité
  */
 function parseCsv(text: string): CsvRow[] {
   const lines = text.trim().split(/\r?\n/);
@@ -102,11 +89,7 @@ function parseCsv(text: string): CsvRow[] {
 }
 
 function CsvImportModal({
-  rows,
-  existingNames,
-  onConfirm,
-  onClose,
-  importing,
+  rows, existingNames, onConfirm, onClose, importing,
 }: {
   rows: CsvRow[];
   existingNames: Set<string>;
@@ -115,94 +98,46 @@ function CsvImportModal({
   importing: boolean;
 }) {
   const toImport  = rows.filter((r) => !existingNames.has(r.name.toLowerCase()));
-  const duplicate = rows.filter((r) =>  existingNames.has(r.name.toLowerCase()));
+  const duplicate = rows.length - toImport.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[80vh] flex flex-col">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <UploadCloud className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-gray-900">Import CSV</h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Stats */}
-        <div className="flex gap-0 border-b border-gray-100">
-          <div className="flex-1 py-3 text-center">
-            <p className="text-2xl font-bold text-primary">{toImport.length}</p>
-            <p className="text-xs text-gray-500">à importer</p>
-          </div>
-          <div className="w-px bg-gray-100" />
-          <div className="flex-1 py-3 text-center">
-            <p className="text-2xl font-bold text-gray-300">{duplicate.length}</p>
-            <p className="text-xs text-gray-400">déjà existants</p>
-          </div>
-          <div className="w-px bg-gray-100" />
-          <div className="flex-1 py-3 text-center">
-            <p className="text-2xl font-bold text-gray-700">{rows.length}</p>
-            <p className="text-xs text-gray-500">total CSV</p>
-          </div>
-        </div>
-
-        {/* Warning si tous doublons */}
-        {toImport.length === 0 && (
-          <div className="flex items-center gap-2 mx-5 mt-4 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            Tous les ingrédients du fichier existent déjà.
-          </div>
-        )}
-
-        {/* Liste */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+    <Modal
+      title="Importer un CSV"
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className={btnGhost}>Annuler</button>
+        <button onClick={onConfirm} disabled={toImport.length === 0 || importing} className={btnPrimary}>
+          {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          Importer {toImport.length} ingrédient{toImport.length > 1 ? 's' : ''}
+        </button>
+      </>}
+    >
+      <div className="pb-3">
+        <p className="text-[15px] text-gray-700 mb-3">
+          {rows.length} ligne{rows.length > 1 ? 's' : ''} dans le fichier : {toImport.length} à importer
+          {duplicate > 0 && `, ${duplicate} déjà présente${duplicate > 1 ? 's' : ''} et laissée${duplicate > 1 ? 's' : ''} de côté`}.
+        </p>
+        {toImport.length === 0 && <p className={cn(errorCls, 'mb-3')}>Tous les ingrédients du fichier existent déjà.</p>}
+        <ul className="divide-y divide-gray-100 border-y border-gray-100">
           {rows.map((r, i) => {
             const isDup = existingNames.has(r.name.toLowerCase());
             return (
-              <div key={i} className={['flex items-center gap-2 px-2 py-1.5 rounded-lg', isDup ? 'opacity-40' : 'hover:bg-gray-50'].join(' ')}>
-                <div className="flex flex-col gap-0.5 flex-shrink-0">
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${CAT_COLORS[r.category] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                    {r.category || '—'}
-                  </span>
-                  {r.sub_category && (
-                    <span className="text-[9px] text-gray-400 px-1.5">{r.sub_category}</span>
-                  )}
-                </div>
-                <span className={`text-sm flex-1 min-w-0 truncate ${isDup ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                  {r.name}
+              <li key={i} className={cn('flex items-center gap-3 py-2.5', isDup && 'opacity-50')}>
+                <span className="flex-1 min-w-0">
+                  <span className={cn('block text-[15px] truncate', isDup ? 'line-through text-gray-500' : 'text-gray-900')}>{r.name}</span>
+                  <span className="block text-sm text-gray-500 truncate">{[r.category, r.sub_category].filter(Boolean).join(', ') || 'Sans catégorie'}</span>
                 </span>
-                <span className="text-xs text-gray-400 flex-shrink-0">{r.unit}</span>
-                {isDup && <span className="text-[10px] text-gray-400 italic flex-shrink-0">doublon</span>}
-              </div>
+                <span className="text-sm text-gray-500 flex-shrink-0">{isDup ? 'déjà présent' : r.unit}</span>
+              </li>
             );
           })}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            Annuler
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={toImport.length === 0 || importing}
-            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
-          >
-            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            Importer {toImport.length} ingrédient{toImport.length > 1 ? 's' : ''}
-          </button>
-        </div>
+        </ul>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// ── Open Food Facts search ─────────────────────────────────────────────────────
+// ── Recherche Open Food Facts ─────────────────────────────────────────────────
 async function searchOFF(query: string): Promise<OFFResult[]> {
   try {
     const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,image_url,code`;
@@ -217,14 +152,13 @@ async function searchOFF(query: string): Promise<OFFResult[]> {
   }
 }
 
-// ── Ingredient Modal ───────────────────────────────────────────────────────────
+// ── Fiche d'un ingrédient ─────────────────────────────────────────────────────
 function IngredientModal({
-  initial,
-  onSave,
-  onClose,
+  initial, onSave, onClose,
 }: {
   initial: Partial<Ingredient> | null;
-  onSave: (data: Partial<Ingredient>) => Promise<void>;
+  /** Renvoie un message d'erreur, ou null si l'enregistrement a réussi. */
+  onSave: (data: Partial<Ingredient>) => Promise<string | null>;
   onClose: () => void;
 }) {
   const [name,        setName]        = useState(initial?.name         ?? '');
@@ -245,10 +179,10 @@ function IngredientModal({
       setSuppliersList((data as { id: string; name: string }[]) ?? []);
     });
   }, []);
-  const [saving,      setSaving]      = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState<string | null>(null);
 
-  // OFF autocomplete
-  const [offQuery,   setOffQuery]   = useState('');
+  // Suggestions Open Food Facts pendant la saisie du nom
   const [offResults, setOffResults] = useState<OFFResult[]>([]);
   const [offLoading, setOffLoading] = useState(false);
   const [showOff,    setShowOff]    = useState(false);
@@ -256,7 +190,6 @@ function IngredientModal({
 
   const handleNameChange = (v: string) => {
     setName(v);
-    setOffQuery(v);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (v.length < 3) { setOffResults([]); setShowOff(false); return; }
     debounceRef.current = setTimeout(async () => {
@@ -276,209 +209,146 @@ function IngredientModal({
     setOffResults([]);
   };
 
+  const photoChanged = imageUrl !== (initial?.image_url ?? '');
+
   const handleSave = async () => {
     if (!name.trim()) return;
-    setSaving(true);
-    await onSave({
+    setSaving(true); setError(null);
+    const err = await onSave({
       name: name.trim(),
       category: category || null,
       sub_category: subCategory || null,
       unit: unit || 'Unité',
       image_url: imageUrl || null,
       // Une photo remplacée perd le crédit de l'ancienne.
-      ...(imageUrl !== (initial?.image_url ?? '') ? { image_credit: null } : {}),
+      ...(photoChanged ? { image_credit: null } : {}),
       off_product_id: offId || null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       min_stock_alert: parseFloat(minStockAlert) || 0,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       volume_unit_price: parseFloat(volumeUnitPrice) || 0,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       preferred_supplier_id: preferredSupplierId || null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
     setSaving(false);
+    if (err) setError(err);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[92dvh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">
-            {initial?.id ? 'Modifier' : 'Ajouter'} un ingrédient
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* Nom + autocomplete OFF */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              onBlur={() => setTimeout(() => setShowOff(false), 200)}
-              placeholder="Ex. : Crème fraîche épaisse…"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-              autoFocus
-            />
-            {offLoading && (
-              <div className="absolute right-3 top-9">
-                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-              </div>
-            )}
-            {/* OFF dropdown */}
-            {showOff && offResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 overflow-hidden max-h-64 overflow-y-auto">
-                <p className="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide border-b border-gray-100 font-semibold">
-                  Open Food Facts
-                </p>
-                {offResults.map((r, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onMouseDown={() => selectOFF(r)}
-                    className="flex items-center gap-3 w-full px-3 py-2 hover:bg-gray-50 transition-colors text-left"
-                  >
-                    {r.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.image_url} alt="" className="h-8 w-8 object-contain rounded flex-shrink-0" />
-                    ) : (
-                      <div className="h-8 w-8 bg-gray-100 rounded flex-shrink-0" />
-                    )}
-                    <span className="text-sm text-gray-800 truncate">{r.product_name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Aperçu image si importée */}
-          {imageUrl && (
-            <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageUrl} alt="" className="h-12 w-12 object-contain rounded" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 truncate">Photo importée depuis Open Food Facts</p>
-              </div>
-              <button onClick={() => { setImageUrl(''); setOffId(''); }} className="text-gray-400 hover:text-red-500 transition-colors">
-                <X className="h-4 w-4" />
-              </button>
+    <Modal
+      title={initial?.id ? 'Modifier l’ingrédient' : 'Nouvel ingrédient'}
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className={btnGhost}>Annuler</button>
+        <button onClick={handleSave} disabled={!name.trim() || saving} className={btnPrimary}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}{initial?.id ? 'Enregistrer' : 'Ajouter'}
+        </button>
+      </>}
+    >
+      <div className="space-y-4 pb-3">
+        <div className="relative">
+          <label htmlFor="ing-name" className={labelCls}>Nom</label>
+          <input
+            id="ing-name"
+            type="text"
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onBlur={() => setTimeout(() => setShowOff(false), 200)}
+            placeholder="Crème fraîche épaisse"
+            className={cn(inputCls, 'pr-10')}
+            autoFocus
+            autoComplete="off"
+          />
+          {offLoading && <Loader2 className="absolute right-4 top-[46px] h-4 w-4 animate-spin text-gray-400" />}
+          {showOff && offResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-float overflow-hidden max-h-64 overflow-y-auto">
+              <p className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">Suggestions d’Open Food Facts</p>
+              {offResults.map((r, i) => (
+                <button key={i} type="button" onMouseDown={() => selectOFF(r)}
+                  className="flex items-center gap-3 w-full px-4 min-h-12 py-2 hover:bg-gray-50 transition-colors text-left">
+                  {r.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={r.image_url} alt="" className="h-9 w-9 object-contain rounded-lg flex-shrink-0" />
+                  ) : (
+                    <span className="h-9 w-9 bg-gray-100 rounded-lg flex-shrink-0" />
+                  )}
+                  <span className="text-[15px] text-gray-900 truncate">{r.product_name}</span>
+                </button>
+              ))}
             </div>
           )}
+        </div>
 
-          {/* Catégorie + Unité */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Catégorie</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
-              >
-                <option value="">— Choisir —</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Unité</label>
-              <select
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
-              >
-                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
+        {imageUrl && (
+          <div className="flex items-center gap-3 p-2 rounded-2xl bg-gray-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" className="h-14 w-14 object-contain rounded-xl bg-white" />
+            <p className="flex-1 min-w-0 text-sm text-gray-600 truncate">
+              {!photoChanged && initial?.image_credit ? `Photo : ${initial.image_credit}` : 'Photo de l’ingrédient'}
+            </p>
+            <button type="button" onClick={() => { setImageUrl(''); setOffId(''); }} className={iconBtnDanger} aria-label="Retirer la photo"><X className="h-4 w-4" /></button>
           </div>
+        )}
 
-          {/* Sous-catégorie */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Sous-catégorie <span className="text-gray-400 font-normal">(optionnel)</span>
-            </label>
-            <input
-              type="text"
-              value={subCategory}
-              onChange={(e) => setSubCategory(e.target.value)}
-              placeholder="Ex. : Volaille, Fromage, Champignons…"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-            />
-          </div>
-
-          {/* Fournisseur préféré */}
-          <div className="pt-3 border-t border-gray-100">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Fournisseur préféré <span className="text-gray-400 font-normal">(pour calcul auto commandes)</span>
-            </label>
-            <select value={preferredSupplierId} onChange={(e) => setPreferredSupplierId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-              <option value="">— Aucun —</option>
-              {suppliersList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <label htmlFor="ing-cat" className={labelCls}>Catégorie</label>
+            <select id="ing-cat" value={category} onChange={(e) => setCategory(e.target.value)} className={cn(inputCls, 'px-3')}>
+              <option value="">Aucune</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-
-          {/* Stock + Prix */}
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Seuil d&apos;alerte <span className="text-gray-400 font-normal">(optionnel)</span>
-              </label>
-              <input
-                type="number" min={0} step={0.01}
-                value={minStockAlert}
-                onChange={(e) => setMinStockAlert(e.target.value)}
-                placeholder="10"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
-              <p className="text-[10px] text-gray-400 mt-1">Alerte si stock ≤ ce seuil</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Prix unitaire (€) <span className="text-gray-400 font-normal">(optionnel)</span>
-              </label>
-              <input
-                type="number" min={0} step={0.01}
-                value={volumeUnitPrice}
-                onChange={(e) => setVolumeUnitPrice(e.target.value)}
-                placeholder="2.50"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
-              <p className="text-[10px] text-gray-400 mt-1">€ par {unit || 'unité'}</p>
-            </div>
+          <div>
+            <label htmlFor="ing-unit" className={labelCls}>Unité</label>
+            <select id="ing-unit" value={unit} onChange={(e) => setUnit(e.target.value)} className={cn(inputCls, 'px-3')}>
+              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            Annuler
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || saving}
-            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            {initial?.id ? 'Modifier' : 'Ajouter'}
-          </button>
+        <div>
+          <label htmlFor="ing-sub" className={labelCls}>Sous-catégorie (facultatif)</label>
+          <input id="ing-sub" type="text" value={subCategory} onChange={(e) => setSubCategory(e.target.value)}
+            placeholder="Volaille, Fromage, Champignons" className={inputCls} />
         </div>
+
+        <div>
+          <label htmlFor="ing-supplier" className={labelCls}>Fournisseur préféré</label>
+          <select id="ing-supplier" value={preferredSupplierId} onChange={(e) => setPreferredSupplierId(e.target.value)} className={inputCls}>
+            <option value="">Aucun</option>
+            {suppliersList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <p className="text-sm text-gray-500 mt-2">Repris dans les listes de courses et les commandes.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="ing-alert" className={labelCls}>Seuil d’alerte</label>
+            <input id="ing-alert" type="number" inputMode="decimal" min={0} step={0.01} value={minStockAlert}
+              onChange={(e) => setMinStockAlert(e.target.value)} placeholder="10" className={inputCls} />
+            <p className="text-sm text-gray-500 mt-2">Stock bas à partir de ce seuil</p>
+          </div>
+          <div>
+            <label htmlFor="ing-price" className={labelCls}>Prix unitaire</label>
+            <input id="ing-price" type="number" inputMode="decimal" min={0} step={0.01} value={volumeUnitPrice}
+              onChange={(e) => setVolumeUnitPrice(e.target.value)} placeholder="2,50" className={inputCls} />
+            <p className="text-sm text-gray-500 mt-2">En euros, par {unit || 'unité'}</p>
+          </div>
+        </div>
+
+        {error && <p role="alert" className={errorCls}>{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// ── Supplier Row (inline edit) ─────────────────────────────────────────────────
+// ── Fournisseur (modifiable sur place) ────────────────────────────────────────
+const smallInput = cn(inputCls, 'h-11');
+
 function SupplierRow({
-  supplier,
-  onUpdate,
-  onDelete,
+  supplier, onUpdate, onDelete,
 }: {
   supplier: Supplier;
-  onUpdate: (id: string, data: Partial<Supplier>) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onUpdate: (id: string, data: Partial<Supplier>) => Promise<boolean>;
+  onDelete: (s: Supplier) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [name,  setName]  = useState(supplier.name);
@@ -490,60 +360,88 @@ function SupplierRow({
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onUpdate(supplier.id, { name: name.trim(), email: email || null, phone: phone || null, notes: notes || null });
+    const ok = await onUpdate(supplier.id, { name: name.trim(), email: email || null, phone: phone || null, notes: notes || null });
     setSaving(false);
-    setEditing(false);
+    if (ok) setEditing(false);
   };
 
   if (!editing) {
     return (
-      <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+      <li className="flex items-center gap-1 pl-4 sm:pl-5 pr-2 py-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">{supplier.name}</p>
-          <p className="text-xs text-gray-400 truncate">
-            {[supplier.email, supplier.phone].filter(Boolean).join(' · ') || 'Aucune coordonnée'}
-          </p>
+          <p className="font-medium text-gray-900 truncate">{supplier.name}</p>
+          <p className="text-sm text-gray-500 truncate">{[supplier.phone, supplier.email].filter(Boolean).join(', ') || 'Aucune coordonnée'}</p>
         </div>
-        <button onClick={() => setEditing(true)} className="p-1.5 text-gray-400 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button onClick={() => onDelete(supplier.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+        <button onClick={() => setEditing(true)} className={iconBtn} aria-label={`Modifier ${supplier.name}`}><Pencil className="h-4 w-4" /></button>
+        <button onClick={() => onDelete(supplier)} className={iconBtnDanger} aria-label={`Supprimer ${supplier.name}`}><Trash2 className="h-4 w-4" /></button>
+      </li>
     );
   }
 
   return (
-    <div className="bg-white border border-primary/30 rounded-xl p-4 space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom *"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+    <li className="px-4 sm:px-5 py-4 space-y-3 bg-gray-50">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom" aria-label="Nom du fournisseur" className={smallInput} />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" aria-label="Email" type="email" className={smallInput} />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone" aria-label="Téléphone" type="tel" className={smallInput} />
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" aria-label="Notes" className={smallInput} />
       </div>
       <div className="flex gap-2 justify-end">
-        <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Annuler</button>
-        <button onClick={save} disabled={!name.trim() || saving}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-white font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60">
-          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-          Enregistrer
+        <button onClick={() => setEditing(false)} className={btnGhost}>Annuler</button>
+        <button onClick={save} disabled={!name.trim() || saving} className={btnPrimary}>
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}Enregistrer
         </button>
       </div>
-    </div>
+    </li>
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Ligne d'un ingrédient ─────────────────────────────────────────────────────
+function IngredientRow({ ing, onEdit, onDelete }: { ing: Ingredient; onEdit: () => void; onDelete: () => void }) {
+  const mine = ing.user_id !== null;
+  const meta = [ing.sub_category, ing.unit].filter(Boolean).join(', ');
+  const content = (
+    <>
+      <span className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+        {ing.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={ing.image_url} alt="" loading="lazy" title={ing.image_credit ? `Photo : ${ing.image_credit}` : undefined}
+            className={ing.image_credit ? 'h-full w-full object-cover' : 'h-full w-full object-contain p-1'} />
+        ) : (
+          <Carrot className="h-5 w-5 text-gray-400" />
+        )}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-2">
+          <span className="font-semibold text-gray-900 truncate">{ing.name}</span>
+          {!mine && <span className={cn(pill, 'bg-gray-100 text-gray-600')}>Bibliothèque</span>}
+        </span>
+        {meta && <span className="block text-sm text-gray-500 truncate">{meta}</span>}
+      </span>
+      {ing.category && <span className="hidden lg:block w-40 text-sm text-gray-500 truncate">{ing.category}</span>}
+    </>
+  );
+  return (
+    <li className="flex items-center gap-1 pr-2">
+      <div className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 pl-4 sm:pl-5 py-2.5">{content}</div>
+      {mine && (
+        <>
+          <button onClick={onEdit} className={iconBtn} aria-label={`Modifier ${ing.name}`} title="Modifier"><Pencil className="h-4 w-4" /></button>
+          <button onClick={onDelete} className={iconBtnDanger} aria-label={`Supprimer ${ing.name}`} title="Supprimer"><Trash2 className="h-4 w-4" /></button>
+        </>
+      )}
+    </li>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function IngredientsPage() {
   const { user } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers,   setSuppliers]   = useState<Supplier[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+  const [notice,      setNotice]      = useState<string | null>(null);
   const [search,      setSearch]      = useState('');
   const [catFilter,   setCatFilter]   = useState('Tous');
   const [modal,       setModal]       = useState<{ open: boolean; item: Partial<Ingredient> | null }>({ open: false, item: null });
@@ -561,11 +459,12 @@ export default function IngredientsPage() {
   const [seeding, setSeeding] = useState(false);
   const [seedProgress, setSeedProgress] = useState({ done: 0, total: 0, found: 0 });
 
-  // ── Seed images from Open Food Facts ───────────────────────────────────────
+  // ── Photos manquantes, cherchées sur Open Food Facts ────────────────────────
   const seedImages = async () => {
     if (!user) return;
     const missing = ingredients.filter((i) => !i.image_url && i.user_id === user.id);
-    if (missing.length === 0) { alert('Tous les ingrédients ont déjà une image !'); return; }
+    setNotice(null);
+    if (missing.length === 0) { setNotice('Tous vos ingrédients ont déjà une photo.'); return; }
     setSeeding(true);
     setSeedProgress({ done: 0, total: missing.length, found: 0 });
     const supabase = createClient();
@@ -577,67 +476,74 @@ export default function IngredientsPage() {
         const results = await searchOFF(ing.name);
         const withImg = results.find((r) => r.image_url);
         if (withImg?.image_url) {
-          await supabase.from('ingredients').update({ image_url: withImg.image_url }).eq('id', ing.id);
-          setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, image_url: withImg.image_url! } : i));
-          found++;
+          const { error: err } = await supabase.from('ingredients').update({ image_url: withImg.image_url }).eq('id', ing.id);
+          if (!err) {
+            setIngredients((prev) => prev.map((i) => i.id === ing.id ? { ...i, image_url: withImg.image_url! } : i));
+            found++;
+          }
         }
-      } catch { /* skip on error */ }
+      } catch { /* on passe à l'ingrédient suivant */ }
       setSeedProgress({ done: idx + 1, total: missing.length, found });
-      // Small delay to avoid rate-limiting
+      // Petite pause pour ne pas saturer Open Food Facts
       if (idx < missing.length - 1) await new Promise((r) => setTimeout(r, 400));
     }
     setSeeding(false);
-    alert(`Terminé ! ${found} image${found > 1 ? 's' : ''} trouvée${found > 1 ? 's' : ''} sur ${missing.length} ingrédient${missing.length > 1 ? 's' : ''}.`);
+    setNotice(`${found} photo${found > 1 ? 's' : ''} trouvée${found > 1 ? 's' : ''} pour ${missing.length} ingrédient${missing.length > 1 ? 's' : ''} sans photo.`);
   };
 
-  // ── Fetch ───────────────────────────────────────────────────────────────────
+  // ── Chargement ──────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const supabase = createClient();
-    const [{ data: ings }, { data: sups }] = await Promise.all([
+    const [ings, sups] = await Promise.all([
       supabase.from('ingredients').select('*')
         .or(`user_id.is.null,user_id.eq.${user.id}`)
         .order('category', { nullsFirst: false })
         .order('name'),
-      supabase.from('suppliers').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('suppliers').select('*').order('name'),
     ]);
-    setIngredients((ings as Ingredient[]) ?? []);
-    setSuppliers((sups as Supplier[]) ?? []);
+    if (ings.error || sups.error) setError('Vos ingrédients n’ont pas pu être chargés. Rechargez la page.');
+    setIngredients((ings.data as Ingredient[]) ?? []);
+    setSuppliers((sups.data as Supplier[]) ?? []);
     setLoading(false);
   }, [user]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // ── CRUD Ingredients ────────────────────────────────────────────────────────
-  const saveIngredient = async (data: Partial<Ingredient>) => {
-    if (!user) return;
+  // ── Ingrédients ─────────────────────────────────────────────────────────────
+  const saveIngredient = async (data: Partial<Ingredient>): Promise<string | null> => {
+    if (!user) return 'Votre session a expiré. Reconnectez-vous.';
     const supabase = createClient();
     if (modal.item?.id) {
-      const { data: updated } = await supabase.from('ingredients').update(data).eq('id', modal.item.id).select().single();
-      if (updated) setIngredients((prev) => prev.map((i) => i.id === updated.id ? (updated as Ingredient) : i));
+      const { data: updated, error: err } = await supabase.from('ingredients').update(data).eq('id', modal.item.id).select().single();
+      if (err || !updated) return 'L’ingrédient n’a pas pu être enregistré. Réessayez.';
+      setIngredients((prev) => prev.map((i) => i.id === updated.id ? (updated as Ingredient) : i));
     } else {
-      const { data: inserted } = await supabase.from('ingredients').insert([{ ...data, user_id: user.id }]).select().single();
-      if (inserted) setIngredients((prev) => [...prev, inserted as Ingredient]);
+      const { data: inserted, error: err } = await supabase.from('ingredients').insert([{ ...data, user_id: user.id }]).select().single();
+      if (err || !inserted) return 'L’ingrédient n’a pas pu être ajouté. Réessayez.';
+      setIngredients((prev) => [...prev, inserted as Ingredient]);
     }
     setModal({ open: false, item: null });
+    return null;
   };
 
-  const deleteIngredient = async (id: string) => {
-    if (!confirm('Supprimer cet ingrédient ?')) return;
-    await createClient().from('ingredients').delete().eq('id', id);
-    setIngredients((prev) => prev.filter((i) => i.id !== id));
+  const deleteIngredient = async (ing: Ingredient) => {
+    if (!confirm(`Supprimer « ${ing.name} » ?`)) return;
+    const { error: err } = await createClient().from('ingredients').delete().eq('id', ing.id);
+    if (err) { setError('L’ingrédient n’a pas pu être supprimé. Il est peut-être utilisé dans une prestation ou une commande.'); return; }
+    setError(null);
+    setIngredients((prev) => prev.filter((i) => i.id !== ing.id));
   };
 
-  // ── CSV import ──────────────────────────────────────────────────────────────
+  // ── Import CSV ──────────────────────────────────────────────────────────────
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const parsed = parseCsv(text);
-      setCsvRows(parsed);
+      setCsvRows(parseCsv(text));
       setShowCsvModal(true);
     };
     reader.readAsText(file, 'UTF-8');
@@ -650,8 +556,7 @@ export default function IngredientsPage() {
     const existingNames = new Set(ingredients.map((i) => i.name.toLowerCase()));
     const toInsert = csvRows.filter((r) => !existingNames.has(r.name.toLowerCase()));
     if (toInsert.length > 0) {
-      const supabase = createClient();
-      const { data: inserted } = await supabase.from('ingredients').insert(
+      const { data: inserted, error: err } = await createClient().from('ingredients').insert(
         toInsert.map((r) => ({
           user_id: user.id,
           name: r.name,
@@ -660,291 +565,204 @@ export default function IngredientsPage() {
           unit: r.unit || 'Unité',
         }))
       ).select();
-      if (inserted) setIngredients((prev) => [...prev, ...(inserted as Ingredient[])]);
+      if (err) setError('L’import n’a pas pu être enregistré. Vérifiez le fichier, puis réessayez.');
+      if (inserted) {
+        setIngredients((prev) => [...prev, ...(inserted as Ingredient[])]);
+        setNotice(`${inserted.length} ingrédient${inserted.length > 1 ? 's' : ''} importé${inserted.length > 1 ? 's' : ''}.`);
+      }
     }
     setImporting(false);
     setShowCsvModal(false);
     setCsvRows([]);
   };
 
-  // ── CRUD Suppliers ──────────────────────────────────────────────────────────
+  // ── Fournisseurs ────────────────────────────────────────────────────────────
   const addSupplier = async () => {
     if (!user || !nsName.trim()) return;
     setNsSaving(true);
-    const { data } = await createClient().from('suppliers').insert([{
-      user_id: user.id, name: nsName.trim(),
+    const { data, error: err } = await createClient().from('suppliers').insert([{
+      user_id: user.id, owner_user_id: user.id, name: nsName.trim(),
       email: nsEmail || null, phone: nsPhone || null, notes: nsNotes || null,
     }]).select().single();
-    if (data) setSuppliers((prev) => [...prev, data as Supplier]);
+    setNsSaving(false);
+    if (err || !data) { setError('Le fournisseur n’a pas pu être ajouté. Réessayez.'); return; }
+    setError(null);
+    setSuppliers((prev) => [...prev, data as Supplier]);
     setNsName(''); setNsEmail(''); setNsPhone(''); setNsNotes('');
     setNewSupplier(false);
-    setNsSaving(false);
   };
 
   const updateSupplier = async (id: string, data: Partial<Supplier>) => {
-    const { data: updated } = await createClient().from('suppliers').update(data).eq('id', id).select().single();
-    if (updated) setSuppliers((prev) => prev.map((s) => s.id === id ? (updated as Supplier) : s));
+    const { data: updated, error: err } = await createClient().from('suppliers').update(data).eq('id', id).select().single();
+    if (err || !updated) { setError('Le fournisseur n’a pas pu être enregistré. Réessayez.'); return false; }
+    setError(null);
+    setSuppliers((prev) => prev.map((s) => s.id === id ? (updated as Supplier) : s));
+    return true;
   };
 
-  const deleteSupplier = async (id: string) => {
-    if (!confirm('Supprimer ce fournisseur ?')) return;
-    await createClient().from('suppliers').delete().eq('id', id);
-    setSuppliers((prev) => prev.filter((s) => s.id !== id));
+  const deleteSupplier = async (s: Supplier) => {
+    if (!confirm(`Supprimer le fournisseur « ${s.name} » ?`)) return;
+    const { error: err } = await createClient().from('suppliers').delete().eq('id', s.id);
+    if (err) { setError('Le fournisseur n’a pas pu être supprimé. Réessayez.'); return; }
+    setError(null);
+    setSuppliers((prev) => prev.filter((x) => x.id !== s.id));
   };
 
-  // ── Filtered list ───────────────────────────────────────────────────────────
+  // ── Liste filtrée, rangée par catégorie ─────────────────────────────────────
   const filtered = ingredients.filter((i) => {
     const matchCat = catFilter === 'Tous' || i.category === catFilter;
     const matchSearch = !search || i.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const groups = useMemo(() => {
+    if (catFilter !== 'Tous' || search) return [{ label: '', items: filtered }];
+    const byLabel = new Map<string, Ingredient[]>();
+    for (const i of filtered) {
+      const key = i.category || 'Sans catégorie';
+      byLabel.set(key, [...(byLabel.get(key) ?? []), i]);
+    }
+    return [...byLabel.entries()]
+      .sort(([a], [b]) => Number(a === 'Sans catégorie') - Number(b === 'Sans catégorie') || a.localeCompare(b, 'fr'))
+      .map(([label, items]) => ({ label, items }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingredients, catFilter, search]);
+
+  const resetNewSupplier = () => { setNewSupplier(false); setNsName(''); setNsEmail(''); setNsPhone(''); setNsNotes(''); };
+
   return (
-    <div className="flex flex-col h-full">
-
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="px-4 md:px-6 pb-4 flex-shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Carrot className="h-5 w-5 text-primary" />
-            <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Ingrédients</h1>
-            {!loading && (
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                {filtered.length}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher…"
-                className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary w-48 transition-all"
-              />
-            </div>
-            {/* Hidden CSV file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              title="Importer depuis un fichier CSV (Catégorie, Nom, Unité)"
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <UploadCloud className="h-4 w-4" />
-              CSV
-            </button>
-            <button
-              onClick={seedImages}
-              disabled={seeding}
-              title="Rechercher automatiquement les images manquantes via Open Food Facts"
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
-            >
-              {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-              {seeding ? `${seedProgress.done}/${seedProgress.total}` : 'Trouver les photos'}
-            </button>
-            <button
-              onClick={() => setModal({ open: true, item: null })}
-              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Ajouter
-            </button>
-          </div>
+    <div className="px-4 md:px-6 pb-8">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
+        <div>
+          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Ingrédients</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {loading ? ' ' : `${ingredients.length} ingrédient${ingredients.length > 1 ? 's' : ''}`}
+          </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileSelect} />
+          <button onClick={() => fileInputRef.current?.click()} className={cn(btnSecondary, 'flex-1 sm:flex-none whitespace-nowrap px-3.5')}
+            title="Fichier à trois colonnes : catégorie, nom, unité" aria-label="Importer un CSV">
+            <UploadCloud className="h-4 w-4" />
+            <span className="sm:hidden">CSV</span><span className="hidden sm:inline">Importer un CSV</span>
+          </button>
+          <button onClick={seedImages} disabled={seeding} className={cn(btnSecondary, 'flex-1 sm:flex-none whitespace-nowrap px-3.5')}
+            title="Cherche sur Open Food Facts une photo pour vos ingrédients qui n’en ont pas" aria-label="Trouver les photos">
+            {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+            {seeding ? `${seedProgress.done} sur ${seedProgress.total}` : <><span className="sm:hidden">Photos</span><span className="hidden sm:inline">Trouver les photos</span></>}
+          </button>
+          <button onClick={() => setModal({ open: true, item: null })} className={cn(btnPrimary, 'w-full sm:w-auto order-first sm:order-none whitespace-nowrap px-4')}>
+            <Plus className="h-4 w-4" />Nouvel ingrédient
+          </button>
+        </div>
+      </div>
 
-        {/* Category tabs */}
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {['Tous', ...CATEGORIES].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCatFilter(cat)}
-              className={[
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-                catFilter === cat
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
-              ].join(' ')}
-            >
-              {cat}
-            </button>
+      {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+      {notice && <p role="status" className="text-sm text-sage bg-sage-100 rounded-xl px-4 py-3 mb-4">{notice}</p>}
+
+      <div className="relative mb-3">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un ingrédient"
+          aria-label="Rechercher un ingrédient" className={cn(inputCls, 'pl-11')} />
+      </div>
+
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-1 mb-3" role="tablist" aria-label="Catégories">
+        {['Tous', ...CATEGORIES].map((cat) => (
+          <button key={cat} role="tab" aria-selected={catFilter === cat} onClick={() => setCatFilter(cat)}
+            className={cn('flex-shrink-0 h-10 px-3.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
+              catFilter === cat ? 'bg-forest text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300')}>
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden mt-2')}>
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-3 animate-pulse">
+              <div className="w-12 h-12 bg-gray-100 rounded-xl flex-shrink-0" />
+              <div className="flex-1 space-y-2"><div className="h-4 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5" /></div>
+            </div>
           ))}
         </div>
-      </div>
-
-      {/* ── Content ───────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
-        {/* Loading */}
-        {loading ? (
-          <div className="flex items-center justify-center h-40 gap-2 text-gray-400">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Chargement…</span>
-          </div>
-        ) : (
-          <>
-            {/* Empty state */}
-            {filtered.length === 0 && (
-              <div className="text-center py-16">
-                <Carrot className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm font-medium">
-                  {search ? `Aucun résultat pour "${search}"` : 'Aucun ingrédient dans cette catégorie'}
-                </p>
-                <button
-                  onClick={() => setModal({ open: true, item: null })}
-                  className="mt-3 text-xs text-primary hover:underline font-medium"
-                >
-                  + Ajouter le premier ingrédient
-                </button>
-              </div>
-            )}
-
-            {/* Ingredients grid */}
-            {filtered.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                {filtered.map((ing) => (
-                  <div
-                    key={ing.id}
-                    className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm transition-all group"
-                  >
-                    {/* Photo */}
-                    <div className="h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
-                      {ing.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={ing.image_url} alt={ing.name} loading="lazy" title={ing.image_credit ? `Photo : ${ing.image_credit}` : undefined}
-                          className={ing.image_credit ? 'h-full w-full object-cover' : 'h-full w-full object-contain p-2'} />
-                      ) : (
-                        <Carrot className="h-8 w-8 text-gray-300" />
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="p-3">
-                      <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2">{ing.name}</p>
-                      {ing.sub_category && (
-                        <p className="text-[10px] text-gray-400 mt-0.5 truncate">{ing.sub_category}</p>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        {ing.category && (
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${CAT_COLORS[ing.category] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                            {ing.category}
-                          </span>
-                        )}
-                        {ing.unit && (
-                          <span className="text-[10px] text-gray-400">{ing.unit}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions (shown on hover, hidden for global ingredients) */}
-                    {ing.user_id !== null && (
-                      <div className="border-t border-gray-100 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setModal({ open: true, item: ing })}
-                          className="flex-1 flex items-center justify-center py-2 text-gray-400 hover:text-primary hover:bg-gray-50 transition-colors text-xs gap-1"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => deleteIngredient(ing.id)}
-                          className="flex-1 flex items-center justify-center py-2 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors text-xs gap-1"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    )}
-                    {ing.user_id === null && (
-                      <div className="border-t border-gray-100 px-3 py-1.5">
-                        <span className="text-[9px] text-gray-400 italic">Bibliothèque globale</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── Suppliers section (accordéon) ──────────────────────────────── */}
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <button
-            onClick={() => setShowSuppliers((v) => !v)}
-            className="flex items-center justify-between w-full px-5 py-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-primary" />
-              <span className="font-semibold text-gray-900 text-sm">
-                Fournisseurs
-              </span>
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                {suppliers.length}
-              </span>
-            </div>
-            {showSuppliers
-              ? <ChevronUp className="h-4 w-4 text-gray-400" />
-              : <ChevronDown className="h-4 w-4 text-gray-400" />}
-          </button>
-
-          {showSuppliers && (
-            <div className="border-t border-gray-100 p-5 space-y-3">
-              {suppliers.length === 0 && !newSupplier && (
-                <p className="text-sm text-gray-400 italic text-center py-2">
-                  Aucun fournisseur — ajoutez-en un pour pouvoir les lier à vos ingrédients d&apos;événement.
-                </p>
-              )}
-
-              {suppliers.map((s) => (
-                <SupplierRow key={s.id} supplier={s} onUpdate={updateSupplier} onDelete={deleteSupplier} />
-              ))}
-
-              {/* Add new supplier form */}
-              {newSupplier ? (
-                <div className="bg-primary-50/20 border border-primary/20 rounded-xl p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <input value={nsName} onChange={(e) => setNsName(e.target.value)} placeholder="Nom du fournisseur *"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" autoFocus />
-                    <input value={nsEmail} onChange={(e) => setNsEmail(e.target.value)} placeholder="Email"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-                    <input value={nsPhone} onChange={(e) => setNsPhone(e.target.value)} placeholder="Téléphone"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-                    <input value={nsNotes} onChange={(e) => setNsNotes(e.target.value)} placeholder="Notes (optionnel)"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => { setNewSupplier(false); setNsName(''); setNsEmail(''); setNsPhone(''); setNsNotes(''); }}
-                      className="px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      Annuler
-                    </button>
-                    <button onClick={addSupplier} disabled={!nsName.trim() || nsSaving}
-                      className="flex items-center gap-1 px-4 py-1.5 text-xs bg-primary text-white font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60">
-                      {nsSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                      Ajouter
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setNewSupplier(true)}
-                  className="flex items-center gap-2 text-sm text-primary hover:text-primary-dark font-medium transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  Ajouter un fournisseur
-                </button>
-              )}
-            </div>
-          )}
+      ) : filtered.length === 0 ? (
+        <div className={cn(cardCls, 'flex flex-col items-center px-6 py-16 text-center mt-2')}>
+          <p className="font-semibold text-gray-900 mb-1">
+            {search ? `Aucun ingrédient ne correspond à « ${search} »` : catFilter !== 'Tous' ? 'Aucun ingrédient dans cette catégorie' : 'Aucun ingrédient pour le moment'}
+          </p>
+          <p className="text-sm text-gray-500 max-w-sm">
+            {search || catFilter !== 'Tous' ? 'Essayez un autre mot ou une autre catégorie.' : 'Vos ingrédients servent aux prestations, aux listes de courses, au stock et aux commandes.'}
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-6 mt-2">
+          {groups.map((g) => (
+            <section key={g.label || 'liste'}>
+              {g.label && (
+                <h2 className="flex items-baseline gap-2 px-1 mb-2 text-[15px] font-semibold text-gray-900">
+                  {g.label}<span className="text-sm font-normal text-gray-500">{g.items.length}</span>
+                </h2>
+              )}
+              <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+                {g.items.map((ing) => (
+                  <IngredientRow key={ing.id} ing={ing} onEdit={() => setModal({ open: true, item: ing })} onDelete={() => deleteIngredient(ing)} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
 
-      {/* ── Ingredient modal ──────────────────────────────────────────────── */}
+      {/* Fournisseurs, dépliables en bas de page */}
+      <section className={cn(cardCls, 'overflow-hidden mt-8')}>
+        <h2>
+          <button onClick={() => setShowSuppliers((v) => !v)} aria-expanded={showSuppliers}
+            className="flex items-center gap-2 w-full min-h-14 px-4 sm:px-5 text-left text-[15px] font-semibold text-gray-900 hover:bg-gray-50 transition-colors">
+            {showSuppliers ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+            Fournisseurs
+            <span className="text-sm font-normal text-gray-500">{suppliers.length}</span>
+          </button>
+        </h2>
+
+        {showSuppliers && (
+          <div className="border-t border-gray-100">
+            {suppliers.length === 0 && !newSupplier && (
+              <p className="px-5 py-4 text-[15px] text-gray-600">Aucun fournisseur. Ajoutez-en un pour le relier à vos ingrédients.</p>
+            )}
+            {suppliers.length > 0 && (
+              <ul className="divide-y divide-gray-100">
+                {suppliers.map((s) => (
+                  <SupplierRow key={s.id} supplier={s} onUpdate={updateSupplier} onDelete={deleteSupplier} />
+                ))}
+              </ul>
+            )}
+
+            {newSupplier ? (
+              <form onSubmit={(e) => { e.preventDefault(); addSupplier(); }} className="px-4 sm:px-5 py-4 space-y-3 border-t border-gray-100 bg-gray-50">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input value={nsName} onChange={(e) => setNsName(e.target.value)} placeholder="Nom du fournisseur" aria-label="Nom du fournisseur" className={smallInput} autoFocus />
+                  <input value={nsEmail} onChange={(e) => setNsEmail(e.target.value)} placeholder="Email" aria-label="Email" type="email" className={smallInput} />
+                  <input value={nsPhone} onChange={(e) => setNsPhone(e.target.value)} placeholder="Téléphone" aria-label="Téléphone" type="tel" className={smallInput} />
+                  <input value={nsNotes} onChange={(e) => setNsNotes(e.target.value)} placeholder="Notes (facultatif)" aria-label="Notes" className={smallInput} />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={resetNewSupplier} className={btnGhost}>Annuler</button>
+                  <button type="submit" disabled={!nsName.trim() || nsSaving} className={btnPrimary}>
+                    {nsSaving && <Loader2 className="h-4 w-4 animate-spin" />}Ajouter
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="px-2 sm:px-3 py-2 border-t border-gray-100">
+                <button onClick={() => setNewSupplier(true)} className={cn(btnGhost, 'text-primary-700')}>
+                  <Plus className="h-4 w-4" />Ajouter un fournisseur
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
       {modal.open && (
         <IngredientModal
           initial={modal.item}
@@ -953,7 +771,6 @@ export default function IngredientsPage() {
         />
       )}
 
-      {/* ── CSV import modal ───────────────────────────────────────────────── */}
       {showCsvModal && (
         <CsvImportModal
           rows={csvRows}
