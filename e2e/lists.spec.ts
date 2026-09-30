@@ -1,43 +1,8 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { test, expect, type Browser, type Page } from '@playwright/test';
-import { encode } from 'next-auth/jwt';
-import { Client } from 'pg';
+import { test, expect } from '@playwright/test';
+import { sql, withAccount } from './helpers';
 
 // Listes de base (modèles de location, page Matériel) et raccourcis vers un nouveau devis.
 // Chaque test travaille sur un compte d'essai créé pour lui, puis supprimé : aucun compte réel n'est touché.
-
-function envLocal(name: string): string {
-  const line = fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
-  return (line ?? '').slice(name.length + 1).trim().replace(/^["']|["']$/g, '');
-}
-
-async function sql<T>(query: string, params: unknown[] = []): Promise<T[]> {
-  const db = new Client({ connectionString: envLocal('DATABASE_URL').replace('sslmode=require', 'sslmode=verify-full') });
-  await db.connect();
-  try {
-    return (await db.query(query, params)).rows as T[];
-  } finally {
-    await db.end();
-  }
-}
-
-async function withAccount(browser: Browser, kind: string, run: (page: Page, userId: string) => Promise<void>) {
-  const email = `e2e-${kind}-${Date.now()}@test.webodevis.local`;
-  const [user] = await sql<{ id: string }>(`insert into public.users (email, password_hash) values ($1, 'x') returning id`, [email]);
-  await sql(`insert into public.profiles (id, email, first_name, role, is_active, has_completed_onboarding) values ($1, $2, 'Essai', 'user', true, true)`, [user.id, email]);
-  const token = await encode({ token: { sub: user.id, email }, secret: envLocal('NEXTAUTH_SECRET') });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
-  await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
-  try {
-    await run(await context.newPage(), user.id);
-  } finally {
-    await sql(`delete from public.quotes where owner_user_id = $1`, [user.id]);
-    await sql(`delete from public.customers where owner_user_id = $1`, [user.id]);
-    await sql(`delete from public.users where id = $1`, [user.id]);
-    await context.close();
-  }
-}
 
 test('modèle de location : la liste de base remplit unités et quantités par couvert', async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');

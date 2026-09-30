@@ -1,25 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect, type Browser } from '@playwright/test';
-import { encode } from 'next-auth/jwt';
-import { Client } from 'pg';
+import { createAccount, deleteAccount, openSession, sql } from './helpers';
 
 // Éditeur de devis : rien de ce qui est tapé ne se perd, rien de ce qui est saisi ailleurs ne s'exécute.
-
-function envLocal(name: string): string {
-  const line = fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
-  return (line ?? '').slice(name.length + 1).trim().replace(/^["']|["']$/g, '');
-}
-
-async function sql<T>(query: string, params: unknown[] = []): Promise<T[]> {
-  const db = new Client({ connectionString: envLocal('DATABASE_URL').replace('sslmode=require', 'sslmode=verify-full') });
-  await db.connect();
-  try {
-    return (await db.query(query, params)).rows as T[];
-  } finally {
-    await db.end();
-  }
-}
+// Chaque test travaille sur un compte d'essai créé pour lui, puis supprimé : aucun compte réel n'est touché.
 
 const LINES = [
   { id: 'l1', name: 'Dîner trois plats', description: '<p>Entrée, plat, dessert</p>', quantity: 40, unitPrice: 50 },
@@ -28,21 +13,16 @@ const LINES = [
 
 /** Un compte jetable avec un devis, et un navigateur connecté à ce compte. */
 async function setup(browser: Browser, quote: { client_name: string; content_html?: string | null }) {
-  const email = `e2e-weboword-${Date.now()}-${Math.floor(Math.random() * 1e6)}@test.webodevis.local`;
-  const [user] = await sql<{ id: string }>(`insert into public.users (email, password_hash) values ($1, 'x') returning id`, [email]);
-  await sql(`insert into public.profiles (id, email, first_name, company_name, role, is_active, has_completed_onboarding) values ($1, $2, 'Essai', 'Traiteur Essai', 'user', true, true)`, [user.id, email]);
+  const user = await createAccount('weboword', { companyName: 'Traiteur Essai' });
   const [q] = await sql<{ id: string }>(
     `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, services, vat_rate, content_html)
      values ($1, $1, $2, current_date + 60, 'Mariage', 40, 'devis_a_faire', $3::jsonb, 10, $4) returning id`,
     [user.id, quote.client_name, JSON.stringify(LINES), quote.content_html ?? null]);
-  const token = await encode({ token: { sub: user.id, email }, secret: envLocal('NEXTAUTH_SECRET') });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
-  await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
+  const context = await openSession(browser, user);
   const page = await context.newPage();
   const cleanup = async () => {
-    await context.close();
-    await sql(`delete from public.quotes where id = $1`, [q.id]);
-    await sql(`delete from public.users where id = $1`, [user.id]);
+    await context.close().catch(() => undefined);
+    await deleteAccount(user.id);
   };
   const html = async () => (await sql<{ content_html: string | null }>(`select content_html from public.quotes where id = $1`, [q.id]))[0].content_html;
   return { page, quoteId: q.id, cleanup, html };

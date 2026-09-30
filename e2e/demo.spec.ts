@@ -1,27 +1,7 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import { Client } from 'pg';
-import { shot, horizontalOverflow } from './helpers';
+import { DEMO_USER_ID, shot, horizontalOverflow, sql } from './helpers';
 
 // Démonstration : ouverte sans compte depuis /demo ; rien de ce qu'un visiteur y fait n'est enregistré.
-
-const DEMO_USER_ID = '0d3e0000-0000-4000-8000-000000000001';
-
-function envLocal(name: string): string {
-  const line = fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
-  return (line ?? '').slice(name.length + 1).trim().replace(/^["']|["']$/g, '');
-}
-
-async function sql<T>(query: string, params: unknown[] = []): Promise<T[]> {
-  const db = new Client({ connectionString: envLocal('DATABASE_URL').replace('sslmode=require', 'sslmode=verify-full') });
-  await db.connect();
-  try {
-    return (await db.query(query, params)).rows as T[];
-  } finally {
-    await db.end();
-  }
-}
 
 const NUMBERS = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze'];
 /** « Combien font sept plus cinq ? » → 12 */

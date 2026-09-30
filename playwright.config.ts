@@ -1,17 +1,8 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 
-// Seuls les identifiants du compte de test sont repris de .env.local : le serveur Next
-// lancé par Playwright hérite de cet environnement et lit lui-même le reste du fichier.
-const envFile = path.join(__dirname, '.env.local');
-if (fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
-    const m = /^(TEST_[A-Z0-9_]*)=(.*)$/.exec(line.trim());
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-}
-
+// Session commune des tests qui lisent : compte de démonstration (voir e2e/auth.setup.ts).
+// Aucun test ne se connecte à un compte réel ; ceux qui écrivent créent leur propre compte d'essai.
 export const AUTH_FILE = path.join(__dirname, 'e2e', '.auth', 'user.json');
 
 const VIEWPORTS = {

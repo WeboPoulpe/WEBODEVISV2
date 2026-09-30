@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 import { AUTH_FILE } from '../playwright.config';
 import { hasTestAccount, shot, horizontalOverflow, offscreenElements } from './helpers';
 
-// Tour de toutes les pages de l'app avec le compte de test : capture + débordement + erreurs console.
+// Tour de toutes les pages de l'app avec la session commune (compte de démonstration, lecture seule) :
+// capture + débordement + erreurs console. Aucun compte réel n'est ouvert.
 const PAGES: { name: string; path: string }[] = [
   { name: 'accueil', path: '/' },
   { name: 'devis', path: '/devis' },
