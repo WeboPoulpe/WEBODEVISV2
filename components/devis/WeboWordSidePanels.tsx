@@ -21,7 +21,8 @@ interface Props {
   quoteId: string;
   activePanel: PanelKey | null;
   onClose: () => void;
-  onApplied: () => void; // Called after any save — parent triggers reload
+  /** Après enregistrement : l'éditeur recharge le document, en affichant `notice` s'il y a lieu. */
+  onApplied: (notice?: string) => void;
   /** La feuille telle qu'elle est à l'écran, avec ce qui a été tapé depuis le dernier enregistrement. */
   getSheetHtml?: () => string | null;
   // Editor actions (top bar moved here)
@@ -423,6 +424,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // Appliquer enregistre aussi ce qui a été tapé dans la feuille : rien n'est perdu au rechargement.
     const sheetHtml = getSheetHtml?.() || null;
     if (sheetHtml) updatePayload.content_html = sheetHtml;
+    const kept: ('intro' | 'menuTitle')[] = [];
     if (finChanged || partiesChanged) {
       const { data: cur } = await supabase.from('quotes')
         .select('content_html, selected_font').eq('id', quoteId).maybeSingle();
@@ -448,6 +450,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
         const updated = syncWeboDocument(
           baseHtml,
           {
+            kept,
             all: {
               companyName: '',
               clientName: clientName.trim(),
@@ -485,8 +488,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
 
     setSaving(false);
-    if (error) { alert('Erreur: ' + error.message); return; }
-    onApplied();
+    if (error) { alert('Les modifications n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.'); return; }
+    const parts = [kept.includes('intro') && 'l’introduction', kept.includes('menuTitle') && 'le titre du menu'].filter(Boolean);
+    onApplied(partiesChanged && parts.length
+      ? `Client ou événement modifié : ${parts.join(' et ')}, réécrit${parts.length > 1 ? 's' : ''} à la main, n’${parts.length > 1 ? 'ont' : 'a'} pas été mis à jour. Relisez-l${parts.length > 1 ? 'es' : 'e'} dans le document.`
+      : undefined);
   };
 
   if (!activePanel) return null;

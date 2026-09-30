@@ -23,6 +23,8 @@ export interface WeboSyncInput {
   financials?: boolean;
   /** À activer quand le client ou l'événement ont changé. */
   parties?: boolean;
+  /** Rempli par la synchronisation : blocs de texte laissés tels quels parce que réécrits à la main. */
+  kept?: ('intro' | 'menuTitle')[];
 }
 
 /** Libellés des cartes, FR et EN (repli pour les documents antérieurs aux balises data-webo-*). */
@@ -152,6 +154,8 @@ export function syncWeboDocument(
       const target = doc.querySelector(sel) ?? doc.querySelector(fallback);
       if (target && looksGenerated(target.textContent, kind)) {
         if (replaceWithFresh(doc, target, fresh.querySelector(sel))) changed = true;
+      } else if (target) {
+        input.kept?.push(kind);
       }
     }
   }

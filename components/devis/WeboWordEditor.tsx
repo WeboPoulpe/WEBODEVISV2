@@ -7,7 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
-  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw, ScrollText,
+  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw, ScrollText, SeparatorHorizontal, Info,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -187,6 +187,28 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState<string | null>(null);
+  // Message laissé par un panneau avant le rechargement du document (ex. intro réécrite à la main non mise à jour).
+  const [notice, setNotice] = useState<string | null>(null);
+  // Session expirée pendant la saisie : le texte reste sur l'appareil, on attend la reconnexion.
+  const [sessionLost, setSessionLost] = useState(false);
+  useEffect(() => {
+    try {
+      const key = `weboword_notice_${quoteId}`;
+      const message = sessionStorage.getItem(key);
+      if (message) { setNotice(message); sessionStorage.removeItem(key); }
+    } catch { /* rien */ }
+  }, [quoteId]);
+  // De retour sur l'onglet après s'être reconnecté ailleurs : on le signale, l'enregistrement remarche.
+  useEffect(() => {
+    if (!sessionLost) return;
+    const check = () => {
+      fetch('/api/auth/session').then((r) => r.json()).then((s) => {
+        if (s?.user) { setSessionLost(false); setToast('Vous êtes reconnecté : enregistrez votre devis.'); }
+      }).catch(() => { /* toujours hors ligne */ });
+    };
+    window.addEventListener('focus', check);
+    return () => window.removeEventListener('focus', check);
+  }, [sessionLost]);
   const [toast,     setToast]     = useState<string | null>(null);
   const [showDesc,  setShowDesc]  = useState(initSettings?.showDesc !== false);
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
@@ -795,6 +817,20 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     document.execCommand(cmd, false, value ?? undefined);
   }, []);
 
+  // Saut de page à l'endroit du curseur : trait pointillé à l'écran, nouvelle page à l'impression et dans le PDF.
+  const insertPageBreak = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) {
+      setToast('Cliquez d’abord dans le document, à l’endroit où la nouvelle page doit commencer.');
+      return;
+    }
+    el.focus();
+    document.execCommand('insertHTML', false,
+      '<div class="screen-sep" contenteditable="false" style="page-break-after:always;break-after:page;margin:18px 0;border-top:2px dashed #E6DFD3;padding:6px 0;text-align:center;color:#B4502D;font-size:10px;letter-spacing:0.08em;user-select:none;">Saut de page</div><p><br></p>');
+  }, []);
+
   // Titres / paragraphe : formatBlock seul ne « prend » pas visuellement car le
   // document a des font-size INLINE sur chaque élément (qui écrasent le rendu h1/h2/h3).
   // On applique donc explicitement taille/graisse en inline sur le bloc obtenu, et on
@@ -857,6 +893,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       return q.select('id');
     };
     let { data: written, error: err } = await write(true);
+    if (err?.code === '401') {
+      try { localStorage.setItem(`weboword_draft_${quoteId}`, JSON.stringify({ html, savedAt: new Date().toISOString() })); } catch { /* rien */ }
+      setSessionLost(true);
+      setSaving(false);
+      return false;
+    }
     if (!err && loadedStamp.current && (!written || written.length === 0)) {
       const overwrite = confirm('Ce devis a été enregistré ailleurs (un autre onglet ou un autre appareil) depuis que vous l’avez ouvert.\n\nOK : enregistrer votre version à la place.\nAnnuler : ne rien enregistrer, pour recharger la page et voir l’autre version.');
       if (!overwrite) { setSaving(false); return false; }
@@ -1036,6 +1078,19 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm print:hidden">
 
+        {sessionLost && (
+          <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-amber-50 border-b border-amber-200 text-sm text-amber-900">
+            <span className="flex-1 min-w-0">Votre session a expiré. Votre texte est gardé sur cet appareil : reconnectez-vous dans un nouvel onglet, puis revenez ici et enregistrez.</span>
+            <a href="/login" target="_blank" rel="noopener" className="font-semibold underline underline-offset-2">Se reconnecter</a>
+          </div>
+        )}
+        {notice && (
+          <div role="status" className="flex items-start gap-2 px-4 py-2 bg-primary-50 border-b border-primary-100 text-sm text-gray-800">
+            <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+            <span className="flex-1 min-w-0">{notice}</span>
+            <button onClick={() => setNotice(null)} className="font-medium text-primary hover:underline">Compris</button>
+          </div>
+        )}
         {/* Error display (only when there's an error) */}
         {error && (
           <div className="px-4 py-1.5 bg-red-50 border-b border-red-100 text-xs text-red-700">
@@ -1091,6 +1146,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </TB>
           <TB onClick={() => exec('justifyRight')}  title="Aligner à droite">
             <span className="text-xs font-mono">≡→</span>
+          </TB>
+
+          <Sep />
+          <TB onClick={insertPageBreak} title="Saut de page : la suite commence sur une nouvelle page">
+            <SeparatorHorizontal className="h-3.5 w-3.5" />
           </TB>
 
           <Sep />
@@ -1424,8 +1484,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           window.history.replaceState(null, '', url.toString());
         }}
         getSheetHtml={() => editorRef.current?.innerHTML ?? null}
-        onApplied={() => {
+        onApplied={(message) => {
           setActivePanel(null);
+          try { if (message) sessionStorage.setItem(`weboword_notice_${quoteId}`, message); } catch { /* rien */ }
           // La feuille vient d'être enregistrée avec le panneau : plus de brouillon, plus d'avertissement à la sortie.
           try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* rien */ }
           savedHtml.current = editorRef.current?.innerHTML ?? '';
