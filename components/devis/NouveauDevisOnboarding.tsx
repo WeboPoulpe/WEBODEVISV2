@@ -2,30 +2,29 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   ArrowRight, Loader2, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
-  Users, MapPin, Calendar, User, ArrowLeft, Sparkles, Search, Building2,
+  User, ArrowLeft, Sparkles, Search, Building2, Baby,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 
 const EVENT_TYPES = [
-  { key: 'Mariage', label: 'Mariage', icon: Heart, color: 'from-pink-500 to-rose-500' },
-  { key: 'Cocktail', label: 'Cocktail', icon: Wine, color: 'from-amber-500 to-orange-500' },
-  { key: 'Anniversaire', label: 'Anniversaire', icon: PartyPopper, color: 'from-primary-500 to-fuchsia-500' },
-  { key: 'Séminaire', label: 'Séminaire', icon: Briefcase, color: 'from-slate-500 to-slate-700' },
-  { key: 'Gala', label: 'Gala', icon: Music, color: 'from-indigo-500 to-primary-600' },
-  { key: 'Communion', label: 'Communion', icon: UtensilsCrossed, color: 'from-sky-400 to-blue-600' },
-  { key: 'Baptême', label: 'Baptême', icon: UtensilsCrossed, color: 'from-cyan-400 to-teal-500' },
-  { key: 'Autre', label: 'Autre', icon: Sparkles, color: 'from-gray-400 to-gray-600' },
+  { key: 'Mariage', label: 'Mariage', icon: Heart },
+  { key: 'Cocktail', label: 'Cocktail', icon: Wine },
+  { key: 'Anniversaire', label: 'Anniversaire', icon: PartyPopper },
+  { key: 'Séminaire', label: 'Séminaire', icon: Briefcase },
+  { key: 'Gala', label: 'Gala', icon: Music },
+  { key: 'Communion', label: 'Communion', icon: UtensilsCrossed },
+  { key: 'Baptême', label: 'Baptême', icon: Baby },
+  { key: 'Autre', label: 'Autre', icon: Sparkles },
 ];
 
 const TEMPLATES = [
-  { key: 'standard', label: 'Standard', color: '#9c27b0', desc: 'Violet élégant' },
-  { key: 'mariage', label: 'Mariage', color: '#c8956c', desc: 'Doré chaleureux' },
-  { key: 'business', label: 'Business', color: '#1e293b', desc: 'Sobre et pro' },
+  { key: 'standard', label: 'Standard', color: '#9c27b0', desc: 'Classique, accent violet' },
+  { key: 'mariage', label: 'Mariage', color: '#c8956c', desc: 'Doré, chaleureux' },
+  { key: 'business', label: 'Business', color: '#1e293b', desc: 'Sobre, pour les entreprises' },
 ];
 
 export default function NouveauDevisOnboarding() {
@@ -33,6 +32,7 @@ export default function NouveauDevisOnboarding() {
   const { user } = useAuth();
   const [step, setStep] = useState(1); // 1 = event, 2 = client, 3 = template
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [eventType, setEventType] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -91,6 +91,7 @@ export default function NouveauDevisOnboarding() {
   const createQuote = async () => {
     if (!user || !canFinish) return;
     setCreating(true);
+    setError(null);
     const supabase = createClient();
     const nameParts = clientName.trim().split(' ');
     const cFirst = nameParts[0] || '';
@@ -106,6 +107,7 @@ export default function NouveauDevisOnboarding() {
       } else {
         const { data: newCustomer } = await supabase.from('customers').insert({
           user_id: user.id,
+          owner_user_id: user.id,
           first_name: cFirst,
           last_name: cLast,
           email: clientEmail.toLowerCase(),
@@ -142,7 +144,7 @@ export default function NouveauDevisOnboarding() {
     }).select('id').single();
 
     if (error || !data) {
-      alert('Erreur création devis: ' + (error?.message || 'inconnu'));
+      setError('Le devis n’a pas pu être créé. Vérifiez la date et le nombre de couverts, puis réessayez.');
       setCreating(false);
       return;
     }
@@ -150,414 +152,237 @@ export default function NouveauDevisOnboarding() {
     router.push(`/devis/${data.id}/modifier?mode=weboword`);
   };
 
+  const STEPS = ['Événement', 'Client', 'Style'];
+  const input = 'w-full h-12 px-4 bg-white border border-gray-200 rounded-xl text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-100 transition-colors';
+  const label = 'block text-sm font-medium text-gray-700 mb-2';
+  const choice = (active: boolean) => cn('border rounded-2xl transition-colors',
+    active ? 'border-primary bg-primary-50 ring-1 ring-primary' : 'border-gray-200 bg-white hover:border-gray-300');
+
   return (
-    <div className="min-h-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-[#fff7ed]">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="blob blob-1" />
-        <div className="blob blob-2" />
-        <div className="blob blob-3" />
-        <div className="blob blob-4" />
-        {/* Floating sparkles */}
-        <div className="sparkle sparkle-1">✨</div>
-        <div className="sparkle sparkle-2">⭐</div>
-        <div className="sparkle sparkle-3">💫</div>
-        <div className="sparkle sparkle-4">✨</div>
-        <div className="sparkle sparkle-5">⭐</div>
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: 'linear-gradient(#9c27b0 1px, transparent 1px), linear-gradient(90deg, #9c27b0 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-        }} />
-      </div>
-
-      <style>{`
-        .blob {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(60px);
-          opacity: 0.4;
-          mix-blend-mode: multiply;
-        }
-        .blob-1 {
-          width: 400px; height: 400px;
-          background: radial-gradient(circle, #ddb3f5 0%, #9c27b0 100%);
-          top: -100px; left: -100px;
-          animation: blob-float-1 20s ease-in-out infinite;
-        }
-        .blob-2 {
-          width: 350px; height: 350px;
-          background: radial-gradient(circle, #ffd4a8 0%, #ff9d3a 100%);
-          bottom: -80px; right: -80px;
-          animation: blob-float-2 25s ease-in-out infinite;
-        }
-        .blob-3 {
-          width: 300px; height: 300px;
-          background: radial-gradient(circle, #b3d9ff 0%, #4a90e2 100%);
-          top: 50%; left: 70%;
-          animation: blob-float-3 22s ease-in-out infinite;
-        }
-        .blob-4 {
-          width: 280px; height: 280px;
-          background: radial-gradient(circle, #ffd1e0 0%, #ec4899 100%);
-          bottom: 30%; left: 20%;
-          animation: blob-float-4 18s ease-in-out infinite;
-        }
-        @keyframes blob-float-1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(40px, 60px) scale(1.1); }
-          66% { transform: translate(-20px, 40px) scale(0.95); }
-        }
-        @keyframes blob-float-2 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-50px, -30px) scale(1.15); }
-        }
-        @keyframes blob-float-3 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-60px, 20px) scale(0.9); }
-          66% { transform: translate(30px, -40px) scale(1.1); }
-        }
-        @keyframes blob-float-4 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(50px, -50px) scale(1.05); }
-        }
-        .sparkle {
-          position: absolute;
-          font-size: 20px;
-          opacity: 0.6;
-          animation: sparkle-float 8s ease-in-out infinite;
-        }
-        .sparkle-1 { top: 15%; left: 10%; animation-delay: 0s; }
-        .sparkle-2 { top: 25%; right: 15%; animation-delay: 1.5s; font-size: 16px; }
-        .sparkle-3 { bottom: 20%; left: 8%; animation-delay: 3s; font-size: 22px; }
-        .sparkle-4 { bottom: 30%; right: 12%; animation-delay: 4.5s; }
-        .sparkle-5 { top: 60%; left: 5%; animation-delay: 2s; font-size: 18px; }
-        @keyframes sparkle-float {
-          0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.4; }
-          50% { transform: translateY(-30px) rotate(180deg); opacity: 0.8; }
-        }
-      `}</style>
-
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden relative z-10 backdrop-blur-sm">
-        {/* Top bar */}
-        <div className="bg-gradient-to-r from-primary to-primary-dark px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/devis" className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h1 className="text-white font-bold text-lg">Nouveau devis</h1>
-              <p className="text-white/70 text-xs">Étape {step}/3 — {step === 1 ? 'Événement' : step === 2 ? 'Client' : 'Style'}</p>
-            </div>
-          </div>
-          {/* Progress dots */}
-          <div className="flex gap-1.5">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className={cn('w-2 h-2 rounded-full transition-all', s === step ? 'bg-white w-6' : s < step ? 'bg-white/60' : 'bg-white/20')} />
-            ))}
-          </div>
+    <div className="px-4 md:px-6 pb-8">
+      <div className="w-full max-w-[680px] mx-auto">
+        {/* Titre et étapes */}
+        <div className="mb-5">
+          <h1 className="text-[28px] md:text-[36px] font-bold text-gray-900 leading-tight">Nouveau devis</h1>
+          <ol className="flex gap-2 mt-4" aria-label="Étapes">
+            {STEPS.map((name, i) => {
+              const n = i + 1;
+              return (
+                <li key={name} className="flex-1" aria-current={n === step ? 'step' : undefined}>
+                  <div className={cn('h-1.5 rounded-full transition-colors', n <= step ? 'bg-primary' : 'bg-gray-200')} />
+                  <p className={cn('text-sm mt-2', n === step ? 'font-semibold text-gray-900' : 'text-gray-500')}>{n}. {name}</p>
+                </li>
+              );
+            })}
+          </ol>
         </div>
 
-        <div className="p-8 min-h-[400px]">
-          {/* STEP 1 — Event */}
-          {step === 1 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-200">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Quel type d&apos;événement ?</h2>
-                <p className="text-sm text-gray-500 mt-1">Sélectionnez le type d&apos;événement que vous allez organiser</p>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {EVENT_TYPES.map(({ key, label, icon: Icon, color }) => (
-                  <button
-                    key={key}
-                    onClick={() => setEventType(key)}
-                    className={cn(
-                      'flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all',
-                      eventType === key ? 'border-primary bg-primary-50 shadow-sm scale-105' : 'border-gray-200 hover:border-gray-300',
-                    )}
-                  >
-                    <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br', color)}>
-                      <Icon className="h-5 w-5 text-white" />
-                    </div>
-                    <span className={cn('text-xs font-medium', eventType === key ? 'text-primary' : 'text-gray-700')}>{label}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-3">
+        <div className="bg-white border border-gray-200 rounded-3xl">
+          <div className="p-5 sm:p-8">
+            {/* ÉTAPE 1 — Événement */}
+            {step === 1 && (
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                    <Calendar className="h-3 w-3 inline mr-1" />
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
+                  <h2 className="text-xl font-semibold text-gray-900">Quel événement préparez-vous ?</h2>
+                  <p className="text-[15px] text-gray-600 mt-1">Le type, la date et le nombre de couverts suffisent pour commencer.</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                    <Users className="h-3 w-3 inline mr-1" />
-                    Couverts
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={guestCount}
-                    onChange={(e) => setGuestCount(e.target.value)}
-                    placeholder="120"
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {EVENT_TYPES.map(({ key, label: name, icon: Icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setEventType(key)}
+                      aria-pressed={eventType === key}
+                      className={cn(choice(eventType === key), 'flex items-center sm:flex-col sm:items-start gap-3 p-3.5 text-left')}
+                    >
+                      <Icon className={cn('h-5 w-5', eventType === key ? 'text-primary' : 'text-gray-500')} strokeWidth={1.8} />
+                      <span className={cn('text-[15px] font-medium', eventType === key ? 'text-primary' : 'text-gray-900')}>{name}</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  <MapPin className="h-3 w-3 inline mr-1" />
-                  Lieu (optionnel)
-                </label>
-                <input
-                  value={eventLocation}
-                  onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="Château de Villebougis"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2 — Client */}
-          {step === 2 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Pour quel client ?</h2>
-                <p className="text-sm text-gray-500 mt-1">Sélectionnez un client existant ou créez-en un nouveau.</p>
-              </div>
-
-              {/* Tabs: Existant vs Nouveau */}
-              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
-                <button
-                  onClick={() => { setMode('existing'); resetClient(); }}
-                  className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
-                    mode === 'existing' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700')}
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  Client existant
-                </button>
-                <button
-                  onClick={() => { setMode('new'); resetClient(); }}
-                  className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
-                    mode === 'new' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700')}
-                >
-                  <User className="h-3.5 w-3.5" />
-                  Nouveau client
-                </button>
-              </div>
-
-              {/* EXISTING CLIENT — Search */}
-              {mode === 'existing' && (
-                <>
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                      Rechercher un client
-                    </label>
-                    <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        autoFocus
-                        value={clientSearch}
-                        onChange={(e) => searchCustomers(e.target.value)}
-                        placeholder="Nom, email, entreprise…"
-                        className="w-full text-sm border border-gray-200 rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                      />
-                    </div>
-                    {showCustomerPicker && clientResults.length > 0 && (
-                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
-                        {clientResults.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => selectCustomer(c)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-primary-50 transition-colors text-left border-b border-gray-50 last:border-0"
-                          >
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
-                              {c.customer_type === 'entreprise'
-                                ? <Building2 className="h-4 w-4 text-white" />
-                                : <span className="text-sm font-bold text-white">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-gray-900 truncate">
-                                {c.customer_type === 'entreprise' && c.company_name
-                                  ? c.company_name
-                                  : [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email}
-                              </p>
-                              <p className="text-xs text-gray-400 truncate">{c.email}{c.phone ? ` · ${c.phone}` : ''}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {showCustomerPicker && clientResults.length === 0 && clientSearch.length >= 2 && (
-                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-4 text-center">
-                        <p className="text-xs text-gray-400">Aucun client trouvé.</p>
-                        <button onClick={() => { setMode('new'); setClientName(clientSearch); setClientSearch(''); setShowCustomerPicker(false); }}
-                          className="text-xs text-primary hover:underline mt-1 font-medium">
-                          Créer « {clientSearch} » comme nouveau client
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Selected client preview */}
-                  {selectedCustomerId && (
-                    <div className="bg-primary-50 border border-primary/20 rounded-xl p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
-                          <User className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-gray-900 truncate">{clientName}</p>
-                          <p className="text-xs text-gray-500 truncate">{clientEmail}{clientPhone ? ` · ${clientPhone}` : ''}</p>
-                        </div>
-                        <button onClick={resetClient} className="text-xs text-gray-400 hover:text-red-500">Changer</button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* NEW CLIENT — Form */}
-              {mode === 'new' && (
-                <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                      <User className="h-3 w-3 inline mr-1" />
-                      Nom complet *
-                    </label>
-                    <input
-                      autoFocus
-                      value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
-                      placeholder="Jean Dupont"
-                      className="w-full text-base border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    />
+                    <label htmlFor="nd-date" className={label}>Date</label>
+                    <input id="nd-date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={input} />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
-                      <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="jean@email.com"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Téléphone</label>
-                      <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="06 12 34 56 78"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
-                    </div>
+                  <div>
+                    <label htmlFor="nd-guests" className={label}>Couverts</label>
+                    <input id="nd-guests" type="number" inputMode="numeric" min={1} value={guestCount} onChange={(e) => setGuestCount(e.target.value)} placeholder="120" className={input} />
                   </div>
-                </>
-              )}
-
-              <p className="text-xs text-gray-400 italic">💡 Vous pourrez modifier ces infos et ajouter une adresse depuis le panneau Client du WeboWord.</p>
-            </div>
-          )}
-
-          {/* STEP 3 — Template */}
-          {step === 3 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-200">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Choisissez votre style</h2>
-                <p className="text-sm text-gray-500 mt-1">Vous pourrez le changer plus tard depuis le panneau Style.</p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                {TEMPLATES.map((t) => (
-                  <button
-                    key={t.key}
-                    onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business')}
-                    className={cn(
-                      'flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all',
-                      template === t.key ? 'border-primary shadow-md scale-105' : 'border-gray-200 hover:border-gray-300',
-                    )}
-                  >
-                    <div className="w-16 h-16 rounded-2xl shadow-md" style={{ background: t.color }} />
-                    <div>
-                      <p className="font-bold text-gray-900">{t.label}</p>
-                      <p className="text-xs text-gray-500">{t.desc}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Language selector */}
-              <div className="border-t border-gray-100 pt-5">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Langue du devis</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setLanguage('fr')}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all',
-                      language === 'fr' ? 'border-primary bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300',
-                    )}
-                  >
-                    <span className="text-2xl">🇫🇷</span>
-                    <span className={cn('font-semibold text-sm', language === 'fr' ? 'text-primary' : 'text-gray-600')}>Français</span>
-                  </button>
-                  <button
-                    onClick={() => setLanguage('en')}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all',
-                      language === 'en' ? 'border-primary bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300',
-                    )}
-                  >
-                    <span className="text-2xl">🇬🇧</span>
-                    <span className={cn('font-semibold text-sm', language === 'en' ? 'text-primary' : 'text-gray-600')}>English</span>
-                  </button>
                 </div>
-                <p className="text-[10px] text-gray-400 italic mt-2">Les prestations utiliseront leur version traduite si disponible.</p>
+
+                <div>
+                  <label htmlFor="nd-place" className={label}>Lieu <span className="font-normal text-gray-500">(facultatif)</span></label>
+                  <input id="nd-place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} placeholder="Château de Villebougis" className={input} />
+                </div>
               </div>
+            )}
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-                <Sparkles className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-800">
-                  Vous arriverez directement sur l&apos;éditeur WeboWord. Utilisez les onglets dans la sidebar pour ajouter vos prestations.
-                </p>
+            {/* ÉTAPE 2 — Client */}
+            {step === 2 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Pour quel client ?</h2>
+                  <p className="text-[15px] text-gray-600 mt-1">Choisissez un client de votre carnet ou créez-le maintenant.</p>
+                </div>
+
+                <div className="flex p-1 rounded-xl bg-gray-100" role="tablist">
+                  {([['existing', 'Client existant'], ['new', 'Nouveau client']] as ['existing' | 'new', string][]).map(([key, name]) => (
+                    <button key={key} role="tab" aria-selected={mode === key} onClick={() => { setMode(key); resetClient(); }}
+                      className={cn('flex-1 h-10 rounded-lg text-sm font-medium transition-colors', mode === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+
+                {mode === 'existing' && (
+                  <>
+                    <div className="relative">
+                      <label htmlFor="nd-search" className={label}>Rechercher un client</label>
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input id="nd-search" autoFocus value={clientSearch} onChange={(e) => searchCustomers(e.target.value)} placeholder="Nom, email ou entreprise" className={cn(input, 'pl-11')} />
+                      </div>
+                      {showCustomerPicker && clientResults.length > 0 && (
+                        <div className="absolute z-10 top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-float max-h-60 overflow-y-auto py-1.5">
+                          {clientResults.map((c) => (
+                            <button key={c.id} onClick={() => selectCustomer(c)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
+                              <span className="w-9 h-9 rounded-full bg-primary-100 text-primary flex items-center justify-center flex-shrink-0 text-sm font-semibold">
+                                {c.customer_type === 'entreprise' ? <Building2 className="h-4 w-4" /> : (c.first_name?.[0] || c.email[0]).toUpperCase()}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-medium text-gray-900 truncate">
+                                  {c.customer_type === 'entreprise' && c.company_name ? c.company_name : [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email}
+                                </span>
+                                <span className="block text-xs text-gray-500 truncate">{[c.email, c.phone].filter(Boolean).join(', ')}</span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showCustomerPicker && clientResults.length === 0 && clientSearch.length >= 2 && (
+                        <div className="absolute z-10 top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-float px-4 py-4">
+                          <p className="text-sm text-gray-600">Aucun client ne correspond à « {clientSearch} ».</p>
+                          <button onClick={() => { setMode('new'); setClientName(clientSearch); setClientSearch(''); setShowCustomerPicker(false); }}
+                            className="text-sm font-medium text-primary hover:underline mt-1">
+                            Créer ce client
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedCustomerId && (
+                      <div className="flex items-center gap-3 p-4 rounded-2xl bg-sage-100">
+                        <span className="w-11 h-11 rounded-full bg-white text-sage flex items-center justify-center flex-shrink-0"><User className="h-5 w-5" /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold text-gray-900 truncate">{clientName}</span>
+                          <span className="block text-sm text-gray-600 truncate">{[clientEmail, clientPhone].filter(Boolean).join(', ')}</span>
+                        </span>
+                        <button onClick={resetClient} className="text-sm font-medium text-primary hover:underline">Changer</button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {mode === 'new' && (
+                  <>
+                    <div>
+                      <label htmlFor="nd-name" className={label}>Nom complet</label>
+                      <input id="nd-name" autoFocus value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Jean Dupont" autoComplete="off" className={input} />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="nd-email" className={label}>Email</label>
+                        <input id="nd-email" type="email" inputMode="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="jean@email.com" className={input} />
+                      </div>
+                      <div>
+                        <label htmlFor="nd-phone" className={label}>Téléphone</label>
+                        <input id="nd-phone" type="tel" inputMode="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="06 12 34 56 78" className={input} />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <p className="text-sm text-gray-500">L’adresse et les autres informations se complètent ensuite dans le devis, panneau Client.</p>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-8 py-4 border-t border-gray-100 bg-gray-50">
-          <button
-            onClick={() => step > 1 ? setStep(step - 1) : router.push('/devis')}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {step === 1 ? 'Annuler' : 'Précédent'}
-          </button>
+            {/* ÉTAPE 3 — Style */}
+            {step === 3 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Quel style pour ce devis ?</h2>
+                  <p className="text-[15px] text-gray-600 mt-1">Vous pourrez en changer à tout moment dans le devis, panneau Style.</p>
+                </div>
 
-          {step < 3 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {TEMPLATES.map((t) => (
+                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business')} aria-pressed={template === t.key}
+                      className={cn(choice(template === t.key), 'flex items-center sm:flex-col sm:items-start gap-3 p-4 text-left')}>
+                      {/* Aperçu : une page avec la couleur d'accent du modèle */}
+                      <span className="w-12 h-16 sm:w-full sm:h-24 rounded-lg bg-gray-50 border border-gray-200 p-2 flex flex-col gap-1.5 flex-shrink-0">
+                        <span className="h-1.5 w-2/3 rounded-full" style={{ background: t.color }} />
+                        <span className="h-1 w-full rounded-full bg-gray-200" />
+                        <span className="h-1 w-5/6 rounded-full bg-gray-200" />
+                        <span className="hidden sm:block h-1 w-3/4 rounded-full bg-gray-200" />
+                      </span>
+                      <span>
+                        <span className="block font-semibold text-gray-900">{t.label}</span>
+                        <span className="block text-sm text-gray-600">{t.desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <p className={label}>Langue du devis</p>
+                  <div className="flex p-1 rounded-xl bg-gray-100" role="tablist">
+                    {([['fr', 'Français'], ['en', 'English']] as ['fr' | 'en', string][]).map(([key, name]) => (
+                      <button key={key} role="tab" aria-selected={language === key} onClick={() => setLanguage(key)}
+                        className={cn('flex-1 h-10 rounded-lg text-sm font-medium transition-colors', language === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">Les prestations utilisent leur traduction quand elle existe.</p>
+                </div>
+              </div>
+            )}
+
+            {error && <p role="alert" className="mt-6 text-sm text-danger bg-white border border-danger/30 rounded-xl px-4 py-3">{error}</p>}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between gap-3 px-5 sm:px-8 py-4 border-t border-gray-200">
             <button
-              onClick={() => setStep(step + 1)}
-              disabled={(step === 1 && !canNext1) || (step === 2 && !canNext2)}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
+              onClick={() => (step > 1 ? setStep(step - 1) : router.push('/devis'))}
+              className="flex items-center gap-2 h-11 px-3 -ml-3 rounded-xl text-[15px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Suivant
-              <ArrowRight className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
+              {step === 1 ? 'Annuler' : 'Précédent'}
             </button>
-          ) : (
-            <button
-              onClick={createQuote}
-              disabled={creating || !canFinish}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white text-sm font-semibold rounded-xl hover:from-primary-dark hover:to-primary-darker disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
-            >
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Créer et ouvrir WeboWord
-            </button>
-          )}
+
+            {step < 3 ? (
+              <button
+                onClick={() => setStep(step + 1)}
+                disabled={(step === 1 && !canNext1) || (step === 2 && !canNext2)}
+                className="flex items-center gap-2 h-11 px-6 bg-primary text-white text-[15px] font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Continuer
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={createQuote}
+                disabled={creating || !canFinish}
+                className="flex items-center gap-2 h-11 px-6 bg-primary text-white text-[15px] font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-40 transition-colors"
+              >
+                {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+                Créer le devis
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

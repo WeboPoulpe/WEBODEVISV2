@@ -6,7 +6,9 @@ import { ArrowRight, Euro, FilePlus2, FileText, TrendingUp, UserPlus, UtensilsCr
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { cn, formatCurrency } from '@/lib/utils';
-import { CONFIRMED_STATUSES, PENDING_STATUSES, isConfirmed } from '@/lib/quoteStatus';
+import { CONFIRMED_STATUSES, PENDING_STATUSES, isConfirmed, quoteStatusLabel } from '@/lib/quoteStatus';
+import StatusPill from '@/components/ui/StatusPill';
+import DateBlock from '@/components/ui/DateBlock';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UpcomingEvent {
@@ -20,6 +22,25 @@ interface UpcomingEvent {
 
 interface ConfirmedQuote { total_amount: number | null; created_at: string }
 
+interface PendingQuote {
+  id: string;
+  client_name: string;
+  event_type: string;
+  event_date: string | null;
+  status: string;
+  total_amount: number | null;
+}
+
+interface ProspectRequest {
+  id: string;
+  first_name: string;
+  last_name: string;
+  event_type: string | null;
+  event_date: string | null;
+  guest_count: number | null;
+  created_at: string;
+}
+
 type Period = 'month' | 'quarter' | 'year';
 
 const PERIODS: { key: Period; label: string; caLabel: string }[] = [
@@ -32,19 +53,6 @@ const MONTH_LABELS = ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Ao
 
 const card = 'bg-white border border-gray-200 rounded-2xl';
 
-/** Bloc date façon éphéméride : jour en grand, mois et année dessous. */
-function DateBlock({ iso }: { iso: string }) {
-  const d = new Date(iso.slice(0, 10) + 'T00:00:00');
-  return (
-    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-white border border-gray-200 flex flex-col items-center justify-center">
-      <span className="font-display text-xl font-bold text-gray-900 leading-none tabular-nums">{String(d.getDate()).padStart(2, '0')}</span>
-      <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mt-1 leading-none">
-        {MONTH_LABELS[d.getMonth()]} {String(d.getFullYear()).slice(2)}
-      </span>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { profile } = useAuth();
@@ -55,6 +63,9 @@ export default function DashboardPage() {
   const [devisEnCours, setDevisEnCours] = useState(0);
   const [tauxConversion, setTauxConversion] = useState(0);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
+  const [pendingQuotes, setPendingQuotes] = useState<PendingQuote[]>([]);
+  const [prospects, setProspects] = useState<ProspectRequest[]>([]);
+  const [pipeline, setPipeline] = useState<{ status: string; count: number }[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -67,7 +78,7 @@ export default function DashboardPage() {
         new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime(),
       )).toISOString();
 
-      const [confirmedRes, covertsRes, enCoursRes, totalRes, upcomingRes] = await Promise.all([
+      const [confirmedRes, covertsRes, enCoursRes, totalRes, upcomingRes, pendingRes, prospectsRes] = await Promise.all([
         supabase.from('quotes').select('total_amount, created_at').in('status', CONFIRMED_STATUSES).gte('created_at', since),
         supabase.from('quotes').select('guest_count').in('status', CONFIRMED_STATUSES).gte('event_date', today),
         supabase.from('quotes').select('id', { count: 'exact', head: true }).in('status', PENDING_STATUSES),
@@ -76,6 +87,15 @@ export default function DashboardPage() {
           .select('id, client_name, event_type, event_date, guest_count, total_amount')
           .in('status', CONFIRMED_STATUSES).gte('event_date', today)
           .order('event_date', { ascending: true }).limit(5),
+        // Devis en cours dont l'événement approche le plus
+        supabase.from('quotes')
+          .select('id, client_name, event_type, event_date, status, total_amount')
+          .in('status', PENDING_STATUSES).gte('event_date', today)
+          .order('event_date', { ascending: true }).limit(5),
+        // Dernières demandes reçues par le formulaire public
+        supabase.from('prospect_requests')
+          .select('id, first_name, last_name, event_type, event_date, guest_count, created_at')
+          .eq('status', 'nouveau').order('created_at', { ascending: false }).limit(4),
       ]);
 
       setConfirmed((confirmedRes.data ?? []) as ConfirmedQuote[]);
@@ -84,6 +104,12 @@ export default function DashboardPage() {
       const all = totalRes.data ?? [];
       setTauxConversion(all.length ? Math.round((all.filter((q) => isConfirmed(q.status)).length / all.length) * 100) : 0);
       setUpcomingEvents((upcomingRes.data ?? []) as UpcomingEvent[]);
+      setPendingQuotes((pendingRes.data ?? []) as PendingQuote[]);
+      setProspects((prospectsRes.data ?? []) as ProspectRequest[]);
+      // Nombre de devis à chaque étape de la prospection, dans l'ordre du parcours.
+      setPipeline(PENDING_STATUSES
+        .map((status) => ({ status, count: all.filter((q) => q.status === status).length }))
+        .filter((step) => step.count > 0));
       setLoading(false);
     };
     load();
@@ -184,7 +210,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-3">
         {/* Prochains événements */}
         <section className={cn(card, 'p-5')}>
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -233,7 +259,7 @@ export default function DashboardPage() {
             <span className="font-display text-[28px] font-bold text-gray-900 tabular-nums">{loading ? skeleton : formatCurrency(total6)}</span>
             <span className="ml-2 text-xs text-gray-500 lowercase">{months[0].label}. à {months[5].label}.</span>
           </p>
-          <div className="flex items-end gap-2 h-24 mt-5">
+          <div className="flex items-end gap-2 h-36 mt-5">
             {months.map((m) => (
               <div key={m.key} className="flex-1 h-full flex items-end" title={`${m.label} : ${formatCurrency(m.amount)}`}>
                 {m.amount > 0 ? (
@@ -250,6 +276,92 @@ export default function DashboardPage() {
               <p key={m.key} className={cn('flex-1 text-center text-xs', m.current ? 'font-semibold text-gray-900' : 'text-gray-500')}>{m.label}</p>
             ))}
           </div>
+        </section>
+      </div>
+
+      {/* Suivi commercial */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
+        <section className={cn(card, 'p-5')}>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Devis à suivre</h2>
+            <Link href="/devis" className="flex-shrink-0 flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              Tous les devis <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          {loading ? (
+            <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 rounded-xl bg-gray-50 animate-pulse" />)}</div>
+          ) : pendingQuotes.length === 0 ? (
+            <p className="rounded-2xl bg-gray-50 px-4 py-6 text-sm text-gray-600 text-center">Aucun devis en attente d’une réponse.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {pendingQuotes.map((q) => (
+                <li key={q.id}>
+                  <Link href={`/devis/${q.id}/modifier`} className="flex items-center gap-3 py-2.5 group">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate group-hover:text-primary transition-colors">{q.client_name || 'Sans nom'}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {q.event_date ? new Date(q.event_date.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Sans date'}
+                      </p>
+                    </div>
+                    <StatusPill status={q.status} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className={cn(card, 'p-5')}>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Nouvelles demandes</h2>
+            <Link href="/prospects" className="flex-shrink-0 flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              Les prospects <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          {loading ? (
+            <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 rounded-xl bg-gray-50 animate-pulse" />)}</div>
+          ) : prospects.length === 0 ? (
+            <p className="rounded-2xl bg-gray-50 px-4 py-6 text-sm text-gray-600 text-center">Aucune nouvelle demande. Elles arrivent ici depuis votre formulaire en ligne.</p>
+          ) : (
+            <ul className="space-y-2.5">
+              {prospects.map((p) => (
+                <li key={p.id}>
+                  <Link href="/prospects" className="flex items-center gap-3 p-2.5 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                    {p.event_date ? <DateBlock iso={p.event_date} className="w-12 h-12" /> : <div className="w-12 h-12 rounded-xl bg-white border border-dashed border-gray-300 flex-shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{p.first_name} {p.last_name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate first-letter:uppercase">
+                        {[p.event_type, p.guest_count ? `${p.guest_count} couverts` : null].filter(Boolean).join(', ') || 'Demande sans détail'}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className={cn(card, 'p-5')}>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Devis par étape</h2>
+          {loading ? (
+            <div className="space-y-3">{[0, 1, 2, 3].map((i) => <div key={i} className="h-8 rounded-lg bg-gray-50 animate-pulse" />)}</div>
+          ) : pipeline.length === 0 ? (
+            <p className="rounded-2xl bg-gray-50 px-4 py-6 text-sm text-gray-600 text-center">Aucun devis en cours.</p>
+          ) : (
+            <ul className="space-y-3">
+              {pipeline.map((step) => (
+                <li key={step.status}>
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span className="text-gray-700">{quoteStatusLabel(step.status)}</span>
+                    <span className="font-semibold text-gray-900 tabular-nums">{step.count}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 mt-1.5 overflow-hidden">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((step.count / Math.max(...pipeline.map((x) => x.count))) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
 
