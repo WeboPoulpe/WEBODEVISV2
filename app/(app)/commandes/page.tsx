@@ -73,10 +73,10 @@ export default function CommandesPage() {
   const totalSent = orders.filter((o) => o.status === 'sent').reduce((s, o) => s + (o.total_amount || 0), 0);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex-shrink-0 px-4 md:px-6 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl">
               <ShoppingCart className="h-4 w-4 text-white" />

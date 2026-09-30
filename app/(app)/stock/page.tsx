@@ -78,9 +78,9 @@ export default function StockPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 bg-white">
+      <div className="flex-shrink-0 px-4 md:px-6 pb-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
