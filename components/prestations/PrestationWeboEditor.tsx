@@ -277,14 +277,14 @@ export default function PrestationWeboEditor({
         .update({ gastro_card_html: htmlFrRef.current })
         .eq('id', prestationId);
       error = res.error;
-      if (!error) alert('⚠️ Version anglaise non sauvegardée — exécutez le SQL:\nALTER TABLE prestations ADD COLUMN gastro_card_html_en TEXT;');
+      if (!error) alert('La version française est enregistrée. La version anglaise n’a pas pu l’être : prévenez le support.');
     }
     setSaving(false);
     if (!error) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } else {
-      alert('Erreur: ' + error.message);
+      alert('La fiche n’a pas pu être enregistrée. Vérifiez votre connexion et réessayez.');
     }
   };
 

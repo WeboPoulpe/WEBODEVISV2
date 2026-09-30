@@ -113,7 +113,7 @@ export default function ParametresPage() {
       .eq('id', user.id);
     if (error) {
       console.error('Erreur sauvegarde identité:', error);
-      alert('Erreur : ' + error.message);
+      alert('Vos informations n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.');
       setSavingId(false);
       return;
     }
@@ -136,6 +136,8 @@ export default function ParametresPage() {
       const url = `${urlData.publicUrl}?t=${Date.now()}`;
       await supabase.from('profiles').update({ logo_url: url }).eq('id', user.id);
       setProfile((p) => ({ ...p, logo_url: url }));
+    } else {
+      alert('Le logo n’a pas pu être envoyé. Essayez avec une image JPG ou PNG de moins de 5 Mo.');
     }
     setUploadingLogo(false);
     e.target.value = '';
@@ -160,7 +162,7 @@ export default function ParametresPage() {
       .eq('id', user.id);
     if (error) {
       console.error('Erreur sauvegarde CGV:', error.message, error.code);
-      alert('Erreur sauvegarde CGV : ' + error.message + '\n\nVérifiez que la colonne cgv existe :\nALTER TABLE profiles ADD COLUMN cgv TEXT;');
+      alert('Vos conditions générales n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.');
       setSavingCgv(false);
       return;
     }
@@ -275,7 +277,7 @@ export default function ParametresPage() {
                 ? <Loader2 className="h-6 w-6 text-primary animate-spin" />
                 : <Upload className="h-6 w-6 text-gray-300" />}
               <span className="text-sm text-gray-500">
-                {uploadingLogo ? 'Upload en cours…' : 'Cliquer pour uploader votre logo'}
+                {uploadingLogo ? 'Envoi en cours…' : 'Cliquez pour ajouter votre logo'}
               </span>
             </button>
           )}

@@ -213,7 +213,7 @@ function CustomerSheet({
           <button onClick={handleSaveInfos} disabled={saving}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Sauvegarde…' : saveOk ? '✓ Sauvegardé' : 'Sauvegarder'}
+            {saving ? 'Sauvegarde…' : saveOk ? 'Enregistré' : 'Enregistrer'}
           </button>
         </div>
       )}

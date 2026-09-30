@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { CalendarDays, Clock, MapPin, Phone, Users } from 'lucide-react';
 import { adminSupabase } from '@/lib/supabase/admin';
 import ExtraPrintButton from './ExtraPrintButton';
 
@@ -30,9 +31,9 @@ const dateFr = (s?: string | null) => {
 };
 
 const statusLabel: Record<string, { label: string; color: string }> = {
-  a_solliciter: { label: 'À confirmer',  color: 'bg-amber-100 text-amber-700'   },
-  confirme:     { label: 'Confirmé',     color: 'bg-blue-100 text-blue-700'     },
-  present:      { label: 'Présent',      color: 'bg-emerald-100 text-emerald-700' },
+  a_solliciter: { label: 'En attente de confirmation', color: 'bg-amber-100 text-amber-800' },
+  confirme:     { label: 'Confirmée',                  color: 'bg-primary-50 text-primary-dark' },
+  present:      { label: 'Présence notée',             color: 'bg-emerald-100 text-emerald-800' },
 };
 
 export default async function ExtraPublicPage({
@@ -113,7 +114,7 @@ export default async function ExtraPublicPage({
           <div>
             <h1 className="text-xl font-bold">{extra.name}</h1>
             {extra.role && <p className="text-white/70 text-sm mt-0.5">{extra.role}</p>}
-            {extra.phone && <p className="text-white/60 text-xs mt-1">📞 {extra.phone}</p>}
+            {extra.phone && <p className="text-white/70 text-sm mt-1 flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" aria-hidden />{extra.phone}</p>}
           </div>
         </div>
       </div>
@@ -123,14 +124,14 @@ export default async function ExtraPublicPage({
 
       {/* Missions */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-widest">
+        <h2 className="text-lg font-semibold text-gray-900">
           Mes missions {upcoming.length > 0 && `(${upcoming.length})`}
         </h2>
 
         {upcoming.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-gray-400 font-medium">Aucune mission à venir</p>
-            <p className="text-sm text-gray-300 mt-1">Contactez votre traiteur pour plus d&apos;infos.</p>
+            <p className="text-gray-700 font-medium">Aucune mission à venir</p>
+            <p className="text-sm text-gray-500 mt-1">Les prochaines apparaîtront ici dès que votre traiteur vous les aura confiées.</p>
           </div>
         ) : (
           upcoming.map((m) => {
@@ -154,32 +155,33 @@ export default async function ExtraPublicPage({
                 <div className="px-5 py-4 space-y-2.5">
                   {m.quote.event_date && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-lg">📅</span>
+                      <CalendarDays className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
                       <span className="text-gray-700 capitalize">{dateFr(m.quote.event_date)}</span>
                     </div>
                   )}
                   {m.arrival_time && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-lg">⏰</span>
+                      <Clock className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
                       <span className="text-gray-700">Arrivée : <strong>{m.arrival_time}</strong></span>
                     </div>
                   )}
                   {m.quote.event_location && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-lg">📍</span>
-                      <span className="text-gray-700">{m.quote.event_location}</span>
-                    </div>
+                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(m.quote.event_location)}`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-gray-700 underline decoration-gray-300 underline-offset-2">
+                      <MapPin className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
+                      <span>{m.quote.event_location}<span className="sr-only"> (itinéraire)</span></span>
+                    </a>
                   )}
                   {m.quote.guest_count && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-lg">👥</span>
-                      <span className="text-gray-500">{m.quote.guest_count} invité{m.quote.guest_count > 1 ? 's' : ''}</span>
+                      <Users className="h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
+                      <span className="text-gray-700">{m.quote.guest_count} invité{m.quote.guest_count > 1 ? 's' : ''}</span>
                     </div>
                   )}
 
                   {m.mission_notes && (
                     <div className="mt-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                      <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-1.5">Notes de mission</p>
+                      <p className="text-sm font-semibold text-amber-800 mb-1">Consignes</p>
                       <p className="text-sm text-amber-800 whitespace-pre-line leading-relaxed">{m.mission_notes}</p>
                     </div>
                   )}
@@ -200,7 +202,7 @@ export default async function ExtraPublicPage({
       </div>
 
       {/* Footer */}
-      <p className="text-center text-xs text-gray-300 pb-4">
+      <p className="text-center text-xs text-gray-400 pb-4">
         WeboDevis — Espace Extra
       </p>
     </div>

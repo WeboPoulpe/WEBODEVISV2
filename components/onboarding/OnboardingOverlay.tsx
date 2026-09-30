@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ArrowRight, Check, Upload } from 'lucide-react';
+import { Loader2, ArrowRight, Check, Upload, FileText, CalendarDays, Users, UtensilsCrossed, type LucideIcon } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import ImageUpload from '@/components/ui/ImageUpload';
@@ -23,7 +23,7 @@ export default function OnboardingOverlay({ userId }: Props) {
   const [vatRate, setVatRate] = useState('20');
   const [logoUrls, setLogoUrls] = useState<string[]>([]);
 
-  const complete = async () => {
+  const complete = async (next?: string) => {
     setSaving(true);
     await createClient()
       .from('profiles')
@@ -37,6 +37,7 @@ export default function OnboardingOverlay({ userId }: Props) {
       .eq('id', userId);
     await refreshProfile();
     setSaving(false);
+    if (next) router.push(next);
   };
 
   return (
@@ -67,12 +68,12 @@ export default function OnboardingOverlay({ userId }: Props) {
             </div>
             <div className="grid grid-cols-3 gap-3 text-center animate-[fadeInUp_0.4s_ease-out_0.2s_both]">
               {[
-                { icon: '📋', label: 'Devis élégants' },
-                { icon: '📅', label: 'Suivi événements' },
-                { icon: '👨‍🍳', label: 'Gestion staffing' },
+                { icon: FileText, label: 'Devis soignés' },
+                { icon: CalendarDays, label: 'Suivi des événements' },
+                { icon: Users, label: 'Équipes d’extras' },
               ].map((f) => (
                 <div key={f.label} className="p-3 bg-primary-50 rounded-xl">
-                  <div className="text-2xl mb-1">{f.icon}</div>
+                  <f.icon className="h-6 w-6 mx-auto mb-1.5 text-primary" aria-hidden />
                   <p className="text-xs font-medium text-gray-700">{f.label}</p>
                 </div>
               ))}
@@ -166,42 +167,44 @@ export default function OnboardingOverlay({ userId }: Props) {
             <div>
               <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">Étape 3/3</p>
               <h2 className="text-xl font-bold text-gray-900">Prêt à démarrer !</h2>
-              <p className="text-sm text-gray-500 mt-1">Voici les 3 actions clés pour bien commencer.</p>
+              <p className="text-sm text-gray-500 mt-1">Par où commencer : choisissez, ou fermez pour arriver au tableau de bord.</p>
             </div>
 
             <div className="space-y-3">
               {[
                 {
-                  icon: '📄',
-                  title: 'Créer votre 1er devis',
-                  desc: 'Cliquez sur "Nouveau Devis" dans la barre de navigation.',
+                  icon: FileText,
+                  title: 'Créer votre premier devis',
+                  desc: 'Un modèle, votre client, vos prestations : le document se remplit tout seul.',
                   href: '/devis/nouveau',
                 },
                 {
-                  icon: '🍽️',
-                  title: 'Configurer votre catalogue',
-                  desc: 'Ajoutez vos prestations récurrentes pour les réutiliser facilement.',
+                  icon: UtensilsCrossed,
+                  title: 'Remplir votre catalogue',
+                  desc: 'Vos prestations habituelles, à ajouter ensuite à chaque devis en un clic.',
                   href: '/prestations',
                 },
                 {
-                  icon: '👨‍🍳',
-                  title: 'Gérer vos extras',
-                  desc: 'Enregistrez vos collaborateurs pour les assigner à vos événements.',
+                  icon: Users,
+                  title: 'Enregistrer vos extras',
+                  desc: 'Vos serveurs et cuisiniers, à affecter ensuite à vos événements.',
                   href: '/extras',
                 },
-              ].map((item) => (
-                <div key={item.title} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                  <span className="text-2xl flex-shrink-0">{item.icon}</span>
+              ].map((item: { icon: LucideIcon; title: string; desc: string; href: string }) => (
+                <button key={item.title} type="button" onClick={() => complete(item.href)} disabled={saving}
+                  className="w-full flex items-start gap-3 p-3 bg-gray-50 hover:bg-primary-50 rounded-xl text-left transition-colors disabled:opacity-60">
+                  <item.icon className="h-6 w-6 flex-shrink-0 text-primary mt-0.5" aria-hidden />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{item.desc}</p>
                   </div>
-                </div>
+                  <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" aria-hidden />
+                </button>
               ))}
             </div>
 
             <button
-              onClick={complete}
+              onClick={() => complete()}
               disabled={saving}
               className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
             >

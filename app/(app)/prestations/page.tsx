@@ -614,7 +614,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                 type="number" placeholder="50.00"
               />
             </div>
-            <p className="text-[10px] text-gray-400 italic -mt-2">💡 Prix enfant optionnel — utilisé si renseigné, sinon prix adulte appliqué pour tous</p>
+            <p className="text-sm text-gray-500 -mt-2">Prix enfant facultatif : sans lui, le prix adulte s’applique à tous.</p>
             <div className="grid grid-cols-2 gap-3">
               {/* Catégorie dynamique avec création inline */}
               <div>
@@ -650,10 +650,10 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                     }}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                   >
-                    <option value="">— Aucune —</option>
+                    <option value="">Sans catégorie</option>
                     {dbCategories.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.name}{c.user_id ? ' ⭐' : ''}
+                        {c.name}{c.user_id ? ' (la vôtre)' : ''}
                       </option>
                     ))}
                   </select>
@@ -695,10 +695,10 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                     disabled={!categoryId}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    <option value="">— Aucune —</option>
+                    <option value="">Sans sous-catégorie</option>
                     {subcategoriesFor(categoryId).map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name}{s.user_id ? ' ⭐' : ''}
+                        {s.name}{s.user_id ? ' (la vôtre)' : ''}
                       </option>
                     ))}
                   </select>
