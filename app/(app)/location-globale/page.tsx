@@ -308,31 +308,33 @@ export default function LocationGlobalePage() {
               const supTotal = grouped[sup].reduce((s, r) => s + r.total_cost, 0);
               return (
                 <div key={sup} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => toggleSupplier(sup)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">{sup}</span>
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {grouped[sup].length} article{grouped[sup].length !== 1 ? 's' : ''}
+                  {/* Deux boutons côte à côte : déplier le fournisseur, imprimer son bon. */}
+                  <div className="flex items-center gap-2 pr-3 hover:bg-gray-50 transition-colors">
+                    <button
+                      onClick={() => toggleSupplier(sup)}
+                      aria-expanded={isOpen}
+                      className="flex-1 min-w-0 flex items-center justify-between gap-2 pl-4 py-3 text-left"
+                    >
+                      <span className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="text-sm font-semibold text-gray-900">{sup}</span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                          {grouped[sup].length} article{grouped[sup].length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-xs font-bold text-primary">{money(supTotal)}</span>
                       </span>
-                      <span className="text-xs font-bold text-primary">{money(supTotal)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); printSupplier(sup); }}
-                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-primary border border-primary/20 rounded-lg hover:bg-primary-50 transition-colors"
-                        title={`Bon de commande ${sup}`}
-                      >
-                        <Printer className="h-3 w-3" />
-                        Bon fournisseur
-                      </button>
                       {isOpen
-                        ? <ChevronUp className="h-4 w-4 text-gray-400" />
-                        : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                    </div>
-                  </button>
+                        ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
+                    </button>
+                    <button
+                      onClick={() => printSupplier(sup)}
+                      className="flex-shrink-0 flex items-center gap-1.5 h-9 px-3 text-xs font-medium text-primary border border-primary/20 rounded-lg hover:bg-primary-50 transition-colors"
+                      title={`Bon de commande ${sup}`}
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      Bon fournisseur
+                    </button>
+                  </div>
                   {isOpen && (
                     <div className="border-t border-gray-100 divide-y divide-gray-50">
                       {grouped[sup].map((r, i) => (
