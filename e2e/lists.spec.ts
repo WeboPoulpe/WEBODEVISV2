@@ -178,3 +178,31 @@ test('dupliquer un devis pour un autre client, une autre date et un autre nombre
     expect(copy.services.map((s) => [s.name, s.quantity])).toEqual([['Menu Prestige', 60], ['Forfait livraison', 1]]);
   });
 });
+
+test('prestations : prix modifié dans la liste, révision de tous les prix en pourcentage', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+  await withAccount(browser, 'prix', async (page, userId) => {
+    await sql(`insert into public.prestations (user_id, name, unit_price) values ($1, 'Menu Terroir', 32), ($1, 'Cocktail dînatoire', 18.4), ($1, 'Forfait vaisselle', 0)`, [userId]);
+    const price = async (name: string) => Number((await sql<{ unit_price: string }>(`select unit_price from public.prestations where user_id = $1 and name = $2`, [userId, name]))[0].unit_price);
+
+    await page.goto('/prestations');
+    await page.waitForLoadState('networkidle');
+    const cell = page.getByLabel('Prix HT, Menu Terroir');
+    await expect(cell).toHaveValue('32,00');
+    await cell.fill('34,5');
+    await cell.press('Enter');
+    await expect.poll(() => price('Menu Terroir'), { timeout: 15_000 }).toBe(34.5);
+
+    // +10 %, arrondi aux 10 centimes ; la prestation sans prix n'est pas touchée.
+    await page.getByRole('button', { name: 'Réviser les prix' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Réviser les prix' });
+    await dialog.getByLabel('Variation en %').fill('10');
+    await dialog.getByRole('button', { name: 'Appliquer à 2 prestations' }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
+    expect(await price('Menu Terroir')).toBe(38);
+    expect(await price('Cocktail dînatoire')).toBe(20.2);
+    expect(await price('Forfait vaisselle')).toBe(0);
+    await expect(page.getByLabel('Prix HT, Cocktail dînatoire')).toHaveValue('20,20');
+    await sql(`delete from public.prestations where user_id = $1`, [userId]);
+  });
+});

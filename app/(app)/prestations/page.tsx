@@ -3,13 +3,14 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Plus, Wine, UtensilsCrossed, Coffee, Wrench, Users, Package,
-  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy,
+  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy, Percent,
 } from 'lucide-react';
+import Modal from '@/components/ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { PENDING_STATUSES } from '@/lib/quoteStatus';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { cn, formatCurrency } from '@/lib/utils';
-import { btnPrimary, btnSecondary, cardCls, iconBtn, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
+import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 import { usePrestationCategories } from '@/hooks/usePrestationCategories';
@@ -804,10 +805,40 @@ const plainText = (html: string | null) =>
   (html ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&(#39|rsquo|apos);/g, '’')
     .replace(/&[a-z0-9#]+;/gi, ' ').replace(/\s+/g, ' ').trim();
 
+const priceText = (n: number) => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Prix HT modifiable sur place : on tape, on quitte le champ (ou Entrée), c'est enregistré. */
+function PriceCell({ p, onPrice }: { p: Prestation; onPrice: (price: number) => Promise<boolean> }) {
+  const [value, setValue] = useState(priceText(p.unit_price));
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  useEffect(() => { setValue(priceText(p.unit_price)); }, [p.unit_price]);
+  const commit = async () => {
+    const n = parseFloat(value.replace(/\s/g, '').replace(',', '.'));
+    if (!Number.isFinite(n) || n < 0) { setValue(priceText(p.unit_price)); return; }
+    const rounded = Math.round(n * 100) / 100;
+    if (rounded === p.unit_price) { setValue(priceText(rounded)); return; }
+    setState('saving');
+    const ok = await onPrice(rounded);
+    setState(ok ? 'saved' : 'error');
+    if (!ok) setValue(priceText(p.unit_price));
+    setTimeout(() => setState('idle'), 1500);
+  };
+  return (
+    <span className="flex items-center gap-1 flex-shrink-0">
+      <input value={value} inputMode="decimal" aria-label={`Prix HT, ${p.name}`}
+        onChange={(e) => setValue(e.target.value)} onBlur={commit} onFocus={(e) => e.target.select()}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setValue(priceText(p.unit_price)); (e.target as HTMLInputElement).blur(); } }}
+        className={cn('w-[76px] sm:w-24 h-10 px-1.5 sm:px-2 text-right tabular-nums font-semibold text-gray-900 bg-transparent border rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors',
+          state === 'error' ? 'border-danger' : state === 'saved' ? 'border-sage' : 'border-transparent hover:border-gray-200 focus:border-primary')} />
+      <span className="hidden sm:inline text-xs text-gray-500 w-9">{state === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : state === 'saved' ? <Check className="h-4 w-4 text-sage" /> : '€ HT'}</span>
+    </span>
+  );
+}
+
 function PrestationRow({
-  p, onEdit, onDelete, onDuplicate,
+  p, onEdit, onDelete, onDuplicate, onPrice,
 }: {
-  p: Prestation; onEdit: () => void; onDelete: () => void; onDuplicate: () => void;
+  p: Prestation; onEdit: () => void; onDelete: () => void; onDuplicate: () => void; onPrice: (price: number) => Promise<boolean>;
 }) {
   const excerpt = plainText(p.description);
   return (
@@ -826,12 +857,9 @@ function PrestationRow({
           )}
         </span>
         {p.sub_category && <span className="hidden lg:block w-44 text-sm text-gray-500 truncate">{p.sub_category}</span>}
-        <span className="font-semibold text-gray-900 tabular-nums whitespace-nowrap">
-          {formatCurrency(p.unit_price)}
-          <span className="text-xs font-normal text-gray-500 ml-1">HT</span>
-        </span>
       </button>
-      <button onClick={onDuplicate} className={iconBtn} aria-label={`Dupliquer ${p.name}`}><Copy className="h-4 w-4" /></button>
+      <PriceCell p={p} onPrice={onPrice} />
+      <button onClick={onDuplicate} className={cn(iconBtn, 'hidden sm:inline-flex')} aria-label={`Dupliquer ${p.name}`}><Copy className="h-4 w-4" /></button>
       <button onClick={onDelete} className={iconBtnDanger} aria-label={`Supprimer ${p.name}`}><Trash2 className="h-4 w-4" /></button>
     </li>
   );
@@ -935,9 +963,34 @@ export default function PrestationsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Supprimer cette prestation ?')) return;
-    const supabase = createClient();
-    await supabase.from('prestations').delete().eq('id', id);
+    const { error } = await createClient().from('prestations').delete().eq('id', id);
+    if (error) { alert('La prestation n’a pas pu être supprimée. Réessayez.'); return; }
     setItems((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handlePrice = async (id: string, price: number) => {
+    const { error } = await createClient().from('prestations').update({ unit_price: price }).eq('id', id);
+    if (error) return false;
+    setItems((prev) => prev.map((p) => (p.id === id ? { ...p, unit_price: price } : p)));
+    return true;
+  };
+
+  // Révision des prix : un pourcentage appliqué aux prestations affichées (catégorie, recherche).
+  const [raise, setRaise] = useState<{ percent: string; rounding: 'cent' | 'dime' | 'half'; saving: boolean; error: string | null } | null>(null);
+  const roundPrice = (n: number, mode: 'cent' | 'dime' | 'half') =>
+    mode === 'half' ? Math.round(n * 2) / 2 : mode === 'dime' ? Math.round(n * 10) / 10 : Math.round(n * 100) / 100;
+  const applyRaise = async (targets: Prestation[]) => {
+    if (!raise) return;
+    const pct = parseFloat(raise.percent.replace(',', '.'));
+    if (!Number.isFinite(pct) || pct === 0) return;
+    setRaise({ ...raise, saving: true, error: null });
+    const supabase = createClient();
+    const updates = targets.filter((p) => p.unit_price > 0).map((p) => ({ id: p.id, price: roundPrice(p.unit_price * (1 + pct / 100), raise.rounding) }));
+    const results = await Promise.all(updates.map((u) => supabase.from('prestations').update({ unit_price: u.price }).eq('id', u.id)));
+    const done = new Map(updates.filter((_, i) => !results[i].error).map((u) => [u.id, u.price]));
+    setItems((prev) => prev.map((p) => (done.has(p.id) ? { ...p, unit_price: done.get(p.id)! } : p)));
+    if (done.size < updates.length) setRaise({ ...raise, saving: false, error: `${updates.length - done.size} prix n’ont pas pu être modifiés. Réessayez.` });
+    else setRaise(null);
   };
 
   const handleDuplicate = async (p: Prestation) => {
@@ -961,7 +1014,7 @@ export default function PrestationsPage() {
       gastro_card_html: full.gastro_card_html,
       gastro_card_html_en: full.gastro_card_html_en,
     }]).select().single();
-    if (error) { alert('Erreur: ' + error.message); return; }
+    if (error) { alert('La copie n’a pas pu être créée. Réessayez.'); return; }
     // Refetch pour que la copie apparaisse tout de suite, au bon endroit (tri/groupes).
     await load();
   };
@@ -1011,9 +1064,14 @@ export default function PrestationsPage() {
             <UploadCloud className="h-4 w-4" />
             <span className="sm:hidden">CSV</span><span className="hidden sm:inline">Importer un CSV</span>
           </button>
+          {items.length > 0 && (
+            <button onClick={() => setRaise({ percent: '', rounding: 'dime', saving: false, error: null })} className={cn(btnSecondary, 'whitespace-nowrap')} aria-label="Réviser les prix">
+              <Percent className="h-4 w-4" /><span className="hidden sm:inline">Réviser les prix</span>
+            </button>
+          )}
           <button onClick={() => setModal({ open: true, editing: null })} className={cn(btnPrimary, 'flex-1 sm:flex-none whitespace-nowrap')}>
             <Plus className="h-4 w-4" />
-            Nouvelle prestation
+            <span className="sm:hidden">Ajouter</span><span className="hidden sm:inline">Nouvelle prestation</span>
           </button>
         </div>
       </div>
@@ -1112,6 +1170,7 @@ export default function PrestationsPage() {
                     onEdit={() => setModal({ open: true, editing: p })}
                     onDelete={() => handleDelete(p.id)}
                     onDuplicate={() => handleDuplicate(p)}
+                    onPrice={(price) => handlePrice(p.id, price)}
                   />
                 ))}
               </ul>
@@ -1119,6 +1178,56 @@ export default function PrestationsPage() {
           ))}
         </div>
       )}
+
+      {raise && (() => {
+        const targets = filtered.filter((p) => p.unit_price > 0);
+        const pct = parseFloat(raise.percent.replace(',', '.'));
+        const valid = Number.isFinite(pct) && pct !== 0 && pct > -100;
+        const sample = targets.slice(0, 3);
+        const scope = search || activeTab !== 'all' ? 'affichées' : 'du catalogue';
+        return (
+          <Modal
+            title="Réviser les prix"
+            onClose={() => !raise.saving && setRaise(null)}
+            footer={<>
+              <button onClick={() => setRaise(null)} disabled={raise.saving} className={btnGhost}>Annuler</button>
+              <button onClick={() => applyRaise(targets)} disabled={!valid || raise.saving || targets.length === 0} className={btnPrimary}>
+                {raise.saving && <Loader2 className="h-4 w-4 animate-spin" />}Appliquer à {targets.length} prestation{targets.length > 1 ? 's' : ''}
+              </button>
+            </>}
+          >
+            <div className="space-y-4 pb-3">
+              <p className="text-sm text-gray-600">Le pourcentage s’applique aux {targets.length} prestations {scope} qui ont un prix. Pour une seule catégorie, choisissez-la avant d’ouvrir cette fenêtre. Les devis déjà faits ne changent pas.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="raise-pct" className={labelCls}>Variation en %</label>
+                  <input id="raise-pct" autoFocus inputMode="decimal" value={raise.percent} placeholder="4" onChange={(e) => setRaise({ ...raise, percent: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label htmlFor="raise-round" className={labelCls}>Arrondi</label>
+                  <select id="raise-round" value={raise.rounding} onChange={(e) => setRaise({ ...raise, rounding: e.target.value as 'cent' | 'dime' | 'half' })} className={inputCls}>
+                    <option value="cent">Au centime</option>
+                    <option value="dime">Aux 10 centimes</option>
+                    <option value="half">Aux 50 centimes</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500">Mettez un nombre négatif pour baisser les prix.</p>
+              {valid && sample.length > 0 && (
+                <ul className="rounded-2xl bg-gray-50 divide-y divide-gray-200 text-sm">
+                  {sample.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <span className="truncate text-gray-700">{p.name}</span>
+                      <span className="tabular-nums whitespace-nowrap text-gray-900">{formatCurrency(p.unit_price)} → <strong>{formatCurrency(roundPrice(p.unit_price * (1 + pct / 100), raise.rounding))}</strong></span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {raise.error && <p role="alert" className={errorCls}>{raise.error}</p>}
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Prestation modal */}
       {modal.open && (
