@@ -24,6 +24,7 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES } from '@/lib/quoteStatus';
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
 import FolderBar, { DragItem } from '@/components/devis/FolderBar';
+import TemplateThumb from '@/components/devis/TemplateThumb';
 import { sendQuoteToClient } from '@/server/quotes';
 import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
@@ -720,6 +721,8 @@ export default function DevisPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [creatingFromTpl, setCreatingFromTpl] = useState<string | null>(null);
   const [previewTpl, setPreviewTpl] = useState<{ id: string; name: string; template: string; content_html: string | null } | null>(null);
+  // Documents des modèles, pour leurs vignettes : chargés à l'ouverture de la fenêtre, pas avec la page.
+  const [tplDocs, setTplDocs] = useState<Record<string, string | null> | null>(null);
   const [renamingTpl, setRenamingTpl] = useState<string | null>(null);
   const [renameName, setRenameName] = useState('');
   const [importModal, setImportModal] = useState(false);
@@ -845,6 +848,13 @@ export default function DevisPage() {
     setTemplates((prev) => prev.filter((t) => t.id !== id));
     setPreviewTpl(null);
   }, []);
+
+  // Vignettes des modèles : leurs documents sont chargés en une fois, à la première ouverture de la fenêtre.
+  useEffect(() => {
+    if (!showTemplates || tplDocs !== null || !user) return;
+    createClient().from('devis_templates').select('id, content_html').eq('user_id', user.id)
+      .then(({ data }) => setTplDocs(Object.fromEntries(((data ?? []) as { id: string; content_html: string | null }[]).map((t) => [t.id, t.content_html]))));
+  }, [showTemplates, tplDocs, user]);
 
   const openPreview = useCallback(async (tplId: string) => {
     const { data } = await createClient().from('devis_templates').select('id, name, template, content_html').eq('id', tplId).single();
@@ -1272,12 +1282,20 @@ export default function DevisPage() {
 
       {/* ── Modèles enregistrés ────────────────────────────────────────── */}
       {showTemplates && (
-        <Modal title="Partir d’un modèle" onClose={() => setShowTemplates(false)}>
-          <ul className="pb-3 space-y-2">
+        <Modal title="Partir d’un modèle" onClose={() => setShowTemplates(false)} wide>
+          <ul className="pb-3 grid grid-cols-2 md:grid-cols-3 gap-3">
             {templates.map((tpl) => {
               const count = Array.isArray(tpl.services) ? tpl.services.filter((s: { name?: string; isPageBreak?: boolean }) => s.name && !s.isPageBreak).length : 0;
               return (
-                <li key={tpl.id} className="p-3 rounded-2xl bg-gray-50">
+                <li key={tpl.id} className="flex flex-col p-2.5 rounded-2xl bg-gray-50">
+                  <TemplateThumb
+                    html={tplDocs?.[tpl.id]}
+                    lines={Array.isArray(tpl.services) ? tpl.services.filter((s: { name?: string; isPageBreak?: boolean }) => s.name && !s.isPageBreak).map((s: { name: string }) => s.name) : []}
+                    loading={tplDocs === null}
+                    label={`Aperçu de ${tpl.name}`}
+                    onClick={() => { setShowTemplates(false); openPreview(tpl.id); }}
+                  />
+                  <div className="mt-2.5 px-0.5">
                   {renamingTpl === tpl.id ? (
                     <input autoFocus value={renameName} onChange={(e) => setRenameName(e.target.value)} onBlur={() => renameTemplate(tpl.id, renameName)}
                       onKeyDown={(e) => { if (e.key === 'Enter') renameTemplate(tpl.id, renameName); if (e.key === 'Escape') setRenamingTpl(null); }}
@@ -1286,11 +1304,11 @@ export default function DevisPage() {
                     <p className="font-semibold text-gray-900 break-words">{tpl.name}</p>
                   )}
                   <p className="text-sm text-gray-600 mt-0.5">{count} prestation{count > 1 ? 's' : ''}</p>
-                  <div className="flex flex-wrap items-center gap-1 mt-2">
-                    <button onClick={() => createFromTemplate(tpl.id)} disabled={creatingFromTpl === tpl.id} className={cn(btnPrimary, 'h-10')}>
+                  </div>
+                  <div className="flex items-center gap-0.5 mt-auto pt-2">
+                    <button onClick={() => createFromTemplate(tpl.id)} disabled={creatingFromTpl === tpl.id} className={cn(btnPrimary, 'h-10 px-4 flex-1 min-w-0')}>
                       {creatingFromTpl === tpl.id && <Loader2 className="h-4 w-4 animate-spin" />}Utiliser
                     </button>
-                    <button onClick={() => { setShowTemplates(false); openPreview(tpl.id); }} className={cn(btnGhost, 'h-10')}>Aperçu</button>
                     <button onClick={() => { setRenamingTpl(tpl.id); setRenameName(tpl.name); }} className={iconBtn} aria-label={`Renommer ${tpl.name}`}><Pencil className="h-4 w-4" /></button>
                     <button onClick={() => deleteTemplate(tpl.id)} className={iconBtnDanger} aria-label={`Supprimer ${tpl.name}`}><Trash2 className="h-4 w-4" /></button>
                   </div>
