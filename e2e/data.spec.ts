@@ -169,6 +169,39 @@ test.describe('envoi du devis au client', () => {
   });
 });
 
+test.describe('fichiers', () => {
+  test.use({ storageState: AUTH_FILE });
+
+  test('envoi dans son dossier, lecture publique, suppression ; refus hors de son dossier', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+    test.skip(!envLocal('BLOB_READ_WRITE_TOKEN'), 'stockage de fichiers non configuré');
+    const [owner] = await sql<{ id: string }>(
+      `select u.id from public.users u left join public.quotes q on q.owner_user_id = u.id group by u.id order by count(q.id) desc limit 1`);
+    const authorize = (pathname: string) => page.request.post('/api/files', {
+      data: { type: 'blob.generate-client-token', payload: { pathname, callbackUrl: 'http://localhost:3001/api/files', clientPayload: null, multipart: false } },
+    });
+
+    // Le dossier d'un autre compte est refusé.
+    const refused = await authorize(`00000000-0000-0000-0000-000000000000/e2e.txt`);
+    expect(refused.status()).toBe(400);
+
+    const pathname = `${owner.id}/e2e/essai-${Date.now()}.pdf`;
+    const granted = await authorize(pathname);
+    expect(granted.status()).toBe(200);
+    const { clientToken } = await granted.json();
+
+    const { put } = await import('@vercel/blob/client');
+    const content = `%PDF-1.4 essai e2e ${Date.now()}`;
+    const blob = await put(pathname, new Blob([content], { type: 'application/pdf' }), { access: 'public', token: clientToken });
+    expect(blob.pathname).toBe(pathname);
+    expect(await (await fetch(blob.url)).text()).toBe(content);
+
+    const removed = await page.request.delete('/api/files', { data: { paths: [pathname] } });
+    expect(removed.status()).toBe(200);
+    expect((await removed.json()).deleted).toBe(1);
+  });
+});
+
 test.describe('étanchéité entre comptes', () => {
   test('un nouveau compte ne voit aucune donnée des autres', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
