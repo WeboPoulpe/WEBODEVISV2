@@ -239,3 +239,42 @@ test('éditeur WeboWord : statut, envoi et copie sans repasser par la liste', as
     await expect(page.getByRole('dialog', { name: 'Dupliquer le devis' })).toBeVisible({ timeout: 20_000 });
   });
 });
+
+test('partir d’un modèle : le parcours de création remplit le modèle et l’adapte aux couverts', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+  await withAccount(browser, 'modele', async (page, userId) => {
+    const services = [
+      { id: 's1', name: 'Menu Prestige', quantity: 80, unitPrice: 30 },
+      { id: 's2', name: 'Vin d’honneur', quantity: 80, unitPrice: 6 },
+      { id: 's3', name: 'Forfait livraison', quantity: 1, unitPrice: 150 },
+    ];
+    const html = '<div data-webo-client><p>CLIENT</p><p>Ancien client</p></div><div data-webo-financials><table><tr><td>ancien tableau</td></tr></table></div><p>Texte du traiteur conservé</p>';
+    const [tpl] = await sql<{ id: string }>(
+      `insert into public.devis_templates (user_id, name, services, content_html, template) values ($1, 'Mariage champêtre', $2, $3, 'classique') returning id`,
+      [userId, JSON.stringify(services), html]);
+
+    await page.goto('/devis');
+    await page.waitForLoadState('networkidle');
+    await page.goto(`/devis/nouveau?modele=${tpl.id}`);
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Mariage' }).click();
+    await page.locator('#nd-date').fill('2027-07-03');
+    await page.locator('#nd-guests').fill('120');
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await page.getByRole('tab', { name: 'Nouveau client' }).click();
+    await page.locator('#nd-name').fill('Camille Bernard');
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await expect(page.locator('#nd-start')).toHaveValue(tpl.id);
+    await page.getByRole('button', { name: 'Créer le devis' }).click();
+    await expect(page).toHaveURL(/\/devis\/[^/]+\/modifier/, { timeout: 20_000 });
+
+    const [quote] = await sql<{ services: { name: string; quantity: number }[]; content_html: string; guest_count: number }>(
+      `select services, content_html, guest_count from public.quotes where owner_user_id = $1`, [userId]);
+    expect(quote.services.map((s) => [s.name, s.quantity])).toEqual([['Menu Prestige', 120], ['Vin d’honneur', 120], ['Forfait livraison', 1]]);
+    expect(quote.content_html).toContain('Camille Bernard');
+    expect(quote.content_html).toContain('Texte du traiteur conservé');
+    expect(quote.content_html).not.toContain('Ancien client');
+    expect(quote.content_html).not.toContain('ancien tableau');
+    await sql(`delete from public.devis_templates where user_id = $1`, [userId]);
+  });
+});

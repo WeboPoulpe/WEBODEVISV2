@@ -9,6 +9,9 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { syncWeboDocument } from '@/lib/weboFinancials';
+import { scaleToGuests } from '@/lib/quoteScale';
+import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 
 const EVENT_TYPES = [
   { key: 'Mariage', label: 'Mariage', icon: Heart },
@@ -62,6 +65,23 @@ export default function NouveauDevisOnboarding() {
     if (wanted && TEMPLATES.some((t) => t.key === wanted)) setTemplate(wanted as 'standard' | 'mariage' | 'business' | 'classique');
   }, [profile?.default_quote_style]);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
+  // Contenu de départ : un modèle enregistré (menus, textes, mise en page) plutôt qu'un document vierge.
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; template: string | null }[]>([]);
+  const [startFrom, setStartFrom] = useState<string>('');
+  useEffect(() => {
+    if (!user) return;
+    createClient().from('devis_templates').select('id, name, template').eq('user_id', user.id).order('name')
+      .then(({ data }) => {
+        const list = (data ?? []) as { id: string; name: string; template: string | null }[];
+        setSavedTemplates(list);
+        const wanted = new URLSearchParams(window.location.search).get('modele');
+        const tpl = wanted ? list.find((t) => t.id === wanted) : null;
+        if (tpl) {
+          setStartFrom(tpl.id);
+          if (tpl.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique');
+        }
+      });
+  }, [user]);
 
   // Arrivée depuis une fiche client (?client=), un jour du calendrier (?date=) ou avec un nombre de couverts (?couverts=) :
   // ces informations sont déjà remplies.
@@ -154,6 +174,33 @@ export default function NouveauDevisOnboarding() {
     // Dossier d'arrivée : celui ouvert dans la liste des devis (/devis/nouveau?dossier=…)
     const folderId = new URLSearchParams(window.location.search).get('dossier');
 
+    const guests = parseInt(guestCount) || 1;
+    const clientType = picked?.customer_type === 'entreprise' ? 'entreprise' : 'particulier';
+    let fromTemplate: Record<string, unknown> = {};
+    if (startFrom) {
+      const { data: tpl } = await supabase.from('devis_templates').select('*').eq('id', startFrom).maybeSingle();
+      if (tpl) {
+        const services = scaleToGuests((tpl.services ?? []) as Record<string, unknown>[], guests);
+        const html = tpl.content_html ? syncWeboDocument(tpl.content_html, {
+          all: {
+            companyName: '', clientName: clientName.trim(), clientEmail: clientEmail || null, clientPhone: clientPhone || null,
+            clientAddress: clientAddress || null, clientType, clientCompanyName: picked?.company_name ?? null, clientSiret: picked?.siret_number ?? null,
+            contactName: picked?.contact_person_name ?? null,
+            eventType, eventDate, eventLocation: eventLocation || null, guestCount: guests,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            services: services.filter((l) => !l.isPageBreak) as any,
+            vatRate: Number(tpl.vat_rate ?? 20), hidePrice: !!tpl.hide_price, language,
+          },
+          financials: true,
+          parties: true,
+        }, { template: template as QuoteHtmlOptions['template'], font: tpl.selected_font ?? undefined }) ?? tpl.content_html : null;
+        fromTemplate = {
+          services, content_html: html, remarks: tpl.remarks ?? null, vat_rate: tpl.vat_rate ?? 20, hide_price: tpl.hide_price ?? false,
+          selected_font_size: tpl.selected_font_size || 12, ...(tpl.selected_font ? { selected_font: tpl.selected_font } : {}),
+        };
+      }
+    }
+
     const { data, error } = await supabase.from('quotes').insert({
       user_id: user.id,
       owner_user_id: user.id,
@@ -176,12 +223,13 @@ export default function NouveauDevisOnboarding() {
       event_type: eventType,
       event_date: eventDate,
       event_location: eventLocation || '',
-      guest_count: parseInt(guestCount) || 1,
+      guest_count: guests,
       template,
       ...(profile?.default_quote_font ? { selected_font: profile.default_quote_font } : {}),
       language,
       vat_rate: 20,
       hide_price: false,
+      ...fromTemplate,
     }).select('id').single();
 
     if (error || !data) {
@@ -375,6 +423,22 @@ export default function NouveauDevisOnboarding() {
                     </button>
                   ))}
                 </div>
+
+                {savedTemplates.length > 0 && (
+                  <div>
+                    <label htmlFor="nd-start" className={label}>Contenu de départ</label>
+                    <select id="nd-start" value={startFrom} className={input}
+                      onChange={(e) => {
+                        setStartFrom(e.target.value);
+                        const tpl = savedTemplates.find((t) => t.id === e.target.value);
+                        if (tpl?.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique');
+                      }}>
+                      <option value="">Document vierge</option>
+                      {savedTemplates.map((t) => <option key={t.id} value={t.id}>Modèle : {t.name}</option>)}
+                    </select>
+                    <p className="text-sm text-gray-500 mt-2">Un modèle apporte ses prestations, ses textes et sa mise en page ; les quantités suivent vos {parseInt(guestCount) || 0} couverts.</p>
+                  </div>
+                )}
 
                 <div>
                   <p className={label}>Langue du devis</p>

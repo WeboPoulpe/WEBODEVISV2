@@ -782,43 +782,11 @@ export default function DevisPage() {
   }, [user]);
 
   // Create a devis from a template
-  const createFromTemplate = useCallback(async (tplId: string) => {
-    if (!user) return;
-    setCreatingFromTpl(tplId);
-    const supabase = createClient();
-    const { data: tpl } = await supabase.from('devis_templates').select('*').eq('id', tplId).single();
-    if (!tpl) { setCreatingFromTpl(null); return; }
-
-    // Build payload — match exact columns from quotes table
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload: Record<string, any> = {
-      user_id: user.id,
-      owner_user_id: user.id,
-      client_name: '',
-      status: 'devis_a_faire',
-      services: tpl.services || [],
-      content_html: tpl.content_html || null,
-      template: tpl.template || 'standard',
-      selected_font: tpl.selected_font || null,
-      selected_font_size: tpl.selected_font_size || 12,
-      remarks: tpl.remarks || null,
-      vat_rate: tpl.vat_rate ?? 20,
-      hide_price: tpl.hide_price ?? false,
-      event_type: '',
-      event_date: new Date().toISOString().slice(0, 10),
-      event_location: '',
-      guest_count: 1,
-      folder_id: currentFolder, // créé dans le dossier ouvert
-    };
-
-    const res = await supabase.from('quotes').insert(payload).select('id').single();
-    if (res.error) {
-      console.error('Erreur création devis depuis template:', res.error.message, res.error.code);
-      alert('Erreur: ' + res.error.message);
-    }
-    setCreatingFromTpl(null);
-    if (res.data) router.push(`/devis/${res.data.id}/modifier?mode=weboword`);
-  }, [user, router, currentFolder]);
+  // Un modèle passe par le parcours de création : événement et client d'abord, puis le document part du modèle,
+  // rempli et adapté au nombre de couverts.
+  const createFromTemplate = useCallback((tplId: string) => {
+    router.push(`/devis/nouveau?modele=${tplId}${currentFolder ? `&dossier=${currentFolder}` : ''}`);
+  }, [router, currentFolder]);
 
   const deleteTemplate = useCallback(async (id: string) => {
     if (!confirm('Supprimer ce modèle ?')) return;
