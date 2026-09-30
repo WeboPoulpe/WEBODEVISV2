@@ -257,3 +257,9 @@ h1, h2, .font-display {
 @media (max-width: 767px) {
   input, select, textarea { font-size: 16px !important; }
 }
+
+/* Écrans tactiles : les actions révélées au survol (modifier, supprimer…) restent visibles, sinon elles sont inaccessibles. */
+@media (hover: none) {
+  .group-hover\:opacity-100,
+  .hover\:opacity-100 { opacity: 1 !important; }
+}

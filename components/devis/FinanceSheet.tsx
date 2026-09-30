@@ -113,7 +113,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-40">
+    <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
         {/* Header */}
@@ -141,7 +141,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
           ) : (
             <>
               {/* KPIs */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-xl p-4">
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">
                     <Receipt className="h-3 w-3" />
@@ -174,7 +174,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
               {/* Détails par prestation */}
               <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Détail par prestation</h3>
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 rounded-xl overflow-x-auto"><div className="min-w-[460px]">
                   <div className="grid grid-cols-[1fr_70px_90px_70px_70px] gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                     <span>Prestation</span>
                     <span className="text-right">Vente</span>
@@ -242,8 +242,8 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                       <p className="px-4 py-6 text-center text-xs text-gray-400 italic">Aucune prestation</p>
                     )}
                   </div>
-                </div>
-                <p className="text-[10px] text-gray-400 italic mt-2">💡 Cliquez sur la colonne <strong className="text-amber-600 not-italic">Coût</strong> pour saisir le prix de revient unitaire HT (sauvegardé sur la prestation, partagé avec tous tes devis).</p>
+                </div></div>
+                <p className="text-sm text-gray-500 mt-2">Touchez la colonne Coût pour saisir le prix de revient unitaire HT. Il est enregistré sur la prestation et sert à tous vos devis.</p>
               </div>
 
               {/* Frais additionnels */}

@@ -743,7 +743,7 @@ export default function QuoteInlineEditor({
       {/* ── WeboWord sync modal ── */}
       {webowordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[92dvh] overflow-y-auto">
 
             {/* Header */}
             <div className="p-5 border-b border-gray-100">

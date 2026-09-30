@@ -41,7 +41,7 @@ export default function OnboardingOverlay({ userId }: Props) {
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92dvh] overflow-y-auto">
 
         {/* Progress bar */}
         <div className="h-1 bg-gray-100">
