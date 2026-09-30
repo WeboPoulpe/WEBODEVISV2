@@ -22,7 +22,8 @@ const EVENT_TYPES = [
 ];
 
 const TEMPLATES = [
-  { key: 'standard', label: 'Standard', color: '#9c27b0', desc: 'Classique, accent violet' },
+  { key: 'classique', label: 'Classique', color: '#1C2621', desc: 'Vert sapin, touches terracotta' },
+  { key: 'standard', label: 'Violet', color: '#9c27b0', desc: 'Bandeaux violets' },
   { key: 'mariage', label: 'Mariage', color: '#c8956c', desc: 'Doré, chaleureux' },
   { key: 'business', label: 'Business', color: '#1e293b', desc: 'Sobre, pour les entreprises' },
 ];
@@ -47,7 +48,7 @@ export default function NouveauDevisOnboarding() {
   const [clientResults, setClientResults] = useState<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; customer_type: string }[]>([]);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
-  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
+  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('classique');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
 
   const canNext1 = !!eventType && !!eventDate && !!guestCount;
@@ -318,7 +319,7 @@ export default function NouveauDevisOnboarding() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {TEMPLATES.map((t) => (
-                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business')} aria-pressed={template === t.key}
+                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique')} aria-pressed={template === t.key}
                       className={cn(choice(template === t.key), 'flex items-center sm:flex-col sm:items-start gap-3 p-4 text-left')}>
                       {/* Aperçu : une page avec la couleur d'accent du modèle */}
                       <span className="w-12 h-16 sm:w-full sm:h-24 rounded-lg bg-gray-50 border border-gray-200 p-2 flex flex-col gap-1.5 flex-shrink-0">

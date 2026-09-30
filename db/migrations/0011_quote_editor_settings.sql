@@ -1,0 +1,1 @@
+ALTER TABLE "quotes" ADD COLUMN "editor_settings" jsonb;

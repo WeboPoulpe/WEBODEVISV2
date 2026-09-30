@@ -136,7 +136,7 @@ test.describe('éditeur de devis', () => {
       await t.page.waitForTimeout(6500);
       await t.page.reload();
       await expect(t.page.locator('#weboword-sheet')).toContainText('Enregistré au clavier.', { timeout: 20_000 });
-      await expect(t.page.getByText(/Brouillon local/)).toHaveCount(0);
+      await expect(t.page.getByText(/modifications non enregistrées ont été retrouvées/)).toHaveCount(0);
     } finally { await t.cleanup(); }
   });
 
@@ -149,7 +149,7 @@ test.describe('éditeur de devis', () => {
       await t.page.waitForTimeout(5500);
       t.page.on('dialog', (d) => d.accept());
       await t.page.reload();
-      await expect(t.page.getByText(/Brouillon local/)).toBeVisible({ timeout: 20_000 });
+      await expect(t.page.getByText(/modifications non enregistrées ont été retrouvées/)).toBeVisible({ timeout: 20_000 });
     } finally { await t.cleanup(); }
   });
 
@@ -170,6 +170,109 @@ test.describe('éditeur de devis', () => {
       expect(after).not.toBeNull();
       expect(after).toContain('Phrase du traiteur.');
       expect(after).toContain('Dîner trois plats');
+    } finally { await t.cleanup(); }
+  });
+
+  test('impression, page d’impression et lien public : même document, même nombre de pages, police choisie', async ({ browser }, testInfo) => {
+    const t = await setup(browser, { client_name: 'Client Sorties' });
+    const out = path.join(__dirname, '.results', 'pdf');
+    fs.mkdirSync(out, { recursive: true });
+    try {
+      // Un devis long : 30 prestations avec description, pour plusieurs pages.
+      const lines = Array.from({ length: 30 }, (_, i) => ({
+        id: `p${i}`, name: `Prestation numéro ${i + 1}`, quantity: 40, unitPrice: 12 + i,
+        description: '<p>Une description de deux lignes pour occuper de la place sur la carte, avec des produits de saison et une cuisson lente.</p>',
+      }));
+      await sql(`update public.quotes set services = $2::jsonb, selected_font = 'Cormorant Garamond', share_token = $3 where id = $1`,
+        [t.quoteId, JSON.stringify(lines), `jeton-e2e-${Date.now()}-abcdefgh`]);
+      await t.page.goto(`/devis/${t.quoteId}/modifier?mode=weboword`);
+      await expect(t.page.locator('#weboword-sheet [data-webo-financials]')).toBeVisible({ timeout: 20_000 });
+      await t.page.keyboard.press('Control+s');
+      await expect(t.page.getByText('Devis enregistré')).toBeVisible({ timeout: 15_000 });
+
+      // 1. La fenêtre « Imprimer ou PDF » de l'éditeur.
+      const printed = await t.page.evaluate(() => {
+        const original = URL.createObjectURL;
+        let captured: Blob | null = null;
+        URL.createObjectURL = (b: Blob | MediaSource) => { captured = b as Blob; return 'blob:capture'; };
+        window.open = () => null;
+        window.dispatchEvent(new CustomEvent('weboword:print'));
+        URL.createObjectURL = original;
+        return captured ? (captured as Blob).text() : null;
+      });
+      expect(printed).not.toBeNull();
+      const pdfOptions = { printBackground: true, preferCSSPageSize: true } as const;
+      const printPage = await t.page.context().newPage();
+      await printPage.setContent((printed as string).replace('window.print()', 'void 0'), { waitUntil: 'networkidle' });
+      await printPage.evaluate(() => document.fonts.ready);
+      const fromEditor = await printPage.pdf({ ...pdfOptions, path: path.join(out, 'editeur.pdf') });
+      expect(await printPage.evaluate(() => getComputedStyle(document.querySelector('.quote-doc p')!).fontFamily)).toContain('Cormorant Garamond');
+
+      // 2. La page d'impression de l'app.
+      const appPrint = await t.page.context().newPage();
+      await appPrint.addInitScript(() => { window.print = () => {}; });
+      await appPrint.goto(`/devis/${t.quoteId}/imprimer`, { waitUntil: 'networkidle' });
+      await appPrint.evaluate(() => document.fonts.ready);
+      const fromApp = await appPrint.pdf({ ...pdfOptions, path: path.join(out, 'imprimer.pdf') });
+
+      // 3. Le lien envoyé au client, sans session.
+      const [{ share_token }] = await sql<{ share_token: string }>(`select share_token from public.quotes where id = $1`, [t.quoteId]);
+      const visitor = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const publicPage = await visitor.newPage();
+      await publicPage.goto(`/d/${share_token}`, { waitUntil: 'networkidle' });
+      await publicPage.evaluate(() => document.fonts.ready);
+      expect(await publicPage.evaluate(() => getComputedStyle(document.querySelector('.quote-doc p')!).fontFamily)).toContain('Cormorant Garamond');
+      const fromLink = await publicPage.pdf({ ...pdfOptions, path: path.join(out, 'lien.pdf') });
+      await visitor.close();
+
+      const pages = (pdf: Buffer) => (pdf.toString('latin1').match(new RegExp('/Type\\s*/Page[^s]', 'g')) ?? []).length;
+      const counts = { editeur: pages(fromEditor), imprimer: pages(fromApp), lien: pages(fromLink) };
+      testInfo.annotations.push({ type: 'pages', description: JSON.stringify(counts) });
+      console.log('pages par sortie', JSON.stringify(counts));
+      expect(counts.editeur).toBeGreaterThan(2);
+      expect(counts.imprimer).toBe(counts.editeur);
+      expect(counts.lien).toBe(counts.editeur);
+    } finally { await t.cleanup(); }
+  });
+
+  test('deux onglets : le second enregistrement prévient au lieu d’écraser', async ({ browser }) => {
+    const t = await setup(browser, { client_name: 'Client Onglets', content_html: '<div data-webo-intro="1"><p>Base.</p></div>' });
+    try {
+      const other = await t.page.context().newPage();
+      await t.page.goto(`/devis/${t.quoteId}/modifier?mode=weboword`);
+      await other.goto(`/devis/${t.quoteId}/modifier?mode=weboword`);
+      await expect(t.page.locator('#weboword-sheet')).toContainText('Base.', { timeout: 20_000 });
+      await expect(other.locator('#weboword-sheet')).toContainText('Base.', { timeout: 20_000 });
+      await typeInSheet(t.page, 'Version A.');
+      await t.page.keyboard.press('Control+s');
+      await expect(t.page.getByText('Devis enregistré')).toBeVisible({ timeout: 15_000 });
+      await typeInSheet(other, 'Version B.');
+      let asked = '';
+      other.once('dialog', (d) => { asked = d.message(); d.dismiss(); });
+      await other.keyboard.press('Control+s');
+      await expect.poll(() => asked, { timeout: 15_000 }).toContain('enregistré ailleurs');
+      // L'autre version n'a pas été écrasée.
+      expect(await t.html()).toContain('Version A.');
+      expect(await t.html()).not.toContain('Version B.');
+    } finally { await t.cleanup(); }
+  });
+
+  test('un collage venant de Word ne garde que la structure du texte', async ({ browser }) => {
+    const t = await setup(browser, { client_name: 'Client Collage', content_html: '<div data-webo-intro="1"><p>Base.</p></div>' });
+    try {
+      await t.page.goto(`/devis/${t.quoteId}/modifier?mode=weboword`);
+      await expect(t.page.locator('#weboword-sheet')).toContainText('Base.', { timeout: 20_000 });
+      await t.page.locator('#weboword-sheet [data-webo-intro] p').click();
+      await t.page.evaluate(() => {
+        const data = new DataTransfer();
+        data.setData('text/html', '<p class="MsoNormal" style="font-family:Comic Sans MS;color:red;font-size:16pt;background:yellow"><b>Menu</b> du chef <img src="data:image/png;base64,AAAA"></p><table style="width:900px"><tr><td>A</td></tr></table>');
+        data.setData('text/plain', 'Menu du chef');
+        document.querySelector('#weboword-sheet [data-webo-intro] p')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+      });
+      const sheet = t.page.locator('#weboword-sheet');
+      await expect(sheet).toContainText('Menu du chef');
+      expect(await sheet.locator('b', { hasText: 'Menu' }).count()).toBeGreaterThan(0);
+      expect(await sheet.evaluate((el) => el.innerHTML)).not.toMatch(/Comic Sans|MsoNormal|background:s*yellow|data:image|900px/);
     } finally { await t.cleanup(); }
   });
 });

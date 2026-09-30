@@ -57,7 +57,11 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
     // Chemin préfixé par l'uid (1er segment) → requis par les policies storage par propriétaire.
     const path = `${user.id}/cover-photos/${Date.now()}-${crypto.randomUUID()}.${ext}`
     const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: false })
-    if (error) { console.error(error); setIsUploading(false); return }
+    if (error) {
+      setIsUploading(false)
+      alert('La photo n’a pas pu être envoyée. Vérifiez votre connexion et le poids du fichier, puis réessayez.')
+      return
+    }
     const { data: { publicUrl } } = supabase.storage.from('storage').getPublicUrl(path)
     setUrl(publicUrl)
     setTransform(DEFAULT_TRANSFORM)

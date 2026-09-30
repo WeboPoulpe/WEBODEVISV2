@@ -131,7 +131,7 @@ export default async function ModifierPage({
         contactPhone:      (quote as { recipient_contact_phone?: string | null }).recipient_contact_phone ?? null,
       },
       {
-        template: (quote.template as 'standard' | 'mariage' | 'business') ?? 'standard',
+        template: (quote.template as 'standard' | 'mariage' | 'business' | 'classique') ?? 'standard',
         font:     (quote.selected_font as string | null) ?? undefined,
       },
     );
@@ -143,6 +143,8 @@ export default async function ModifierPage({
         clientName={clientName || undefined}
         selectedFont={(quote.selected_font as string | null) ?? undefined}
         selectedFontSize={(quote.selected_font_size as number | null) ?? 12}
+        editorSettings={(quote.editor_settings as Record<string, unknown> | null) ?? null}
+        updatedAt={(quote.updated_at as string | null) ?? null}
       />
     );
   }

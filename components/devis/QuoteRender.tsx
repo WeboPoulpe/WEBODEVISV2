@@ -6,6 +6,7 @@ import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvH
 import { DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG } from '@/components/devis/weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/weboword/weboword.types';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 
 export interface QuoteRenderProfile {
   company_name?: string | null;
@@ -23,67 +24,30 @@ export interface QuoteRenderProfile {
 export default function QuoteRender({ quote, profile }: { quote: any; profile: QuoteRenderProfile | null }) {
   // ── Devis rédigé dans l'éditeur : son contenu est rendu tel quel ─────────────
   if (quote.content_html) {
-    const selectedFont = (quote.selected_font as string | null) ?? 'Georgia';
-    const googleFonts = ['Playfair Display', 'Montserrat', 'Roboto', 'Open Sans'];
-    const isGoogleFont = googleFonts.includes(selectedFont);
+    const settings = outputSettings(quote);
+    const fontHref = googleFontHref(settings.font);
+    const content = quote.content_html as string;
 
     const coverHtml = buildCoverPageHtml((quote.cover_page_config as CoverPageConfig) ?? DEFAULT_COVER_CONFIG);
     const photosHtml = buildPhotosPageHtml((quote.photos_page_config as PhotosPageConfig) ?? DEFAULT_PHOTOS_CONFIG);
     const logoHtml = buildLogoHeaderHtml(profile?.logo_url);
     const cgvHtml = buildCgvHtml(profile?.cgv);
+    // Les conditions de vente ne sont ajoutées que si le document ne les contient pas déjà.
+    const hasCgv = content.includes('data-webo-cgv') || (!!profile?.cgv && content.includes(profile.cgv as string));
 
     return (
       <>
-        {isGoogleFont && (
+        {fontHref && (
           // eslint-disable-next-line @next/next/no-page-custom-font
-          <link
-            rel="stylesheet"
-            href={`https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@400;600;700&display=swap`}
-          />
+          <link rel="stylesheet" href={fontHref} />
         )}
-        <style>{`
-          @page { size: A4; margin: 0; }
-          .quote-render, .quote-render * {
-            box-sizing: border-box;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .quote-render { font-family: '${selectedFont}', Georgia, serif; }
-          .quote-render ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
-          .quote-render ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
-          .quote-render li { display: list-item; }
-          .quote-render .screen-sep {
-            page-break-after: always !important;
-            break-after: page !important;
-            border: none !important;
-            background: transparent !important;
-            color: transparent !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            height: 0 !important;
-            overflow: hidden !important;
-            font-size: 0 !important;
-            line-height: 0 !important;
-          }
-        `}</style>
-        <div className="quote-render">
+        <style>{quoteOutputCss(settings)}</style>
+        <div className="quote-render quote-out">
           {coverHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(coverHtml) }} />}
           {!coverHtml && logoHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(logoHtml) }} />}
-          <div
-            className="prose prose-sm max-w-none"
-            style={{ padding: '20mm', fontFamily: `'${selectedFont}', Georgia, serif` }}
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(quote.content_html as string) }}
-          />
+          <div dangerouslySetInnerHTML={{ __html: wrapQuoteDoc(sanitizeHtml(content)) }} />
           {photosHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(photosHtml) }} />}
-          {/* Les CGV sont déjà incluses dans content_html (générées par generateQuoteHtml).
-              On ne les ré-ajoute QUE si le document ne les contient pas déjà (évite le doublon
-              + le saut de page vide entre signature et CGV). */}
-          {cgvHtml
-            && !(quote.content_html as string).includes('data-webo-cgv')
-            && !(profile?.cgv && (quote.content_html as string).includes(profile.cgv as string))
-            && (
-              <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />
-            )}
+          {cgvHtml && !hasCgv && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />}
         </div>
       </>
     );

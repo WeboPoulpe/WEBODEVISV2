@@ -133,12 +133,21 @@ export function templateLuxe(c: CoverPageConfig): string {
 </div>`
 }
 
+/** Les champs texte de la page de garde sont des textes, pas du HTML : ils sont échappés avant d'entrer dans le modèle. */
+function escapedConfig(c: CoverPageConfig): CoverPageConfig {
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  const out = { ...c } as Record<string, unknown>
+  for (const [k, v] of Object.entries(c)) if (typeof v === 'string') out[k] = esc(v)
+  return out as unknown as CoverPageConfig
+}
+const safe = (tpl: (c: CoverPageConfig) => string) => (c: CoverPageConfig) => tpl(escapedConfig(c))
+
 export const COVER_TEMPLATES: Record<CoverPageConfig['template'], (c: CoverPageConfig) => string> = {
-  mariage: templateMariage,
-  gastronomique: templateGastronomique,
-  business: templateBusiness,
-  provence: templateProvence,
-  luxe: templateLuxe,
+  mariage: safe(templateMariage),
+  gastronomique: safe(templateGastronomique),
+  business: safe(templateBusiness),
+  provence: safe(templateProvence),
+  luxe: safe(templateLuxe),
 }
 
 export const TEMPLATE_LABELS: Record<CoverPageConfig['template'], string> = {

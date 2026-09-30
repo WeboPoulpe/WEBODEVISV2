@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { buildQuotePrintPage, DEFAULT_LINE_HEIGHT, type QuoteEditorSettings } from '@/lib/quoteOutput';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { useAuth } from '@/context/AuthContext';
@@ -39,6 +40,10 @@ interface Props {
   selectedFont?: string;
   /** Pre-selected font size in px (from saved quote) */
   selectedFontSize?: number;
+  /** Interligne, descriptions affichées et largeur de la carte, gardés avec le devis. */
+  editorSettings?: QuoteEditorSettings | null;
+  /** Date du dernier enregistrement, pour repérer une version enregistrée ailleurs entre-temps. */
+  updatedAt?: string | null;
 }
 
 // ── Gastronomic menu width options ────────────────────────────────────────────
@@ -108,7 +113,11 @@ function TB({
   return (
     <button
       onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      // Au clavier, le clic n'a pas de souris (detail = 0) : la commande part aussi.
+      onClick={(e) => { if (e.detail === 0) onClick(); }}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       className={cn(
         'p-1.5 rounded-lg transition-colors text-sm',
         active
@@ -141,6 +150,23 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   );
 }
 
+/** Rend le tableau des prix et les totaux non modifiables à la main : ils suivent les prestations du devis. */
+function lockFinancials(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>('[data-webo-financials]').forEach((el) => {
+    el.setAttribute('contenteditable', 'false');
+    el.title = 'Les prix et les totaux se modifient dans le panneau Prestations.';
+    el.style.cursor = 'default';
+  });
+}
+
+/** Collage : seule la structure du texte est gardée (gras, italique, listes, tableaux simples), pas les polices, couleurs ni images. */
+function cleanPastedHtml(html: string): string {
+  return sanitizeHtml(html, {
+    ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'h2', 'h3', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'a', 'span', 'div'],
+    ALLOWED_ATTR: ['href'],
+  });
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 const FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
 const LINE_HEIGHTS = [
@@ -152,7 +178,7 @@ const LINE_HEIGHTS = [
   { label: '2.0', value: '2' },
 ];
 
-export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize }: Props) {
+export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt }: Props) {
   const router = useRouter();
   const { profile, user } = useAuth();
   const editorRef  = useRef<HTMLDivElement>(null);
@@ -162,10 +188,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [toast,     setToast]     = useState<string | null>(null);
-  const [showDesc,  setShowDesc]  = useState(true);
+  const [showDesc,  setShowDesc]  = useState(initSettings?.showDesc !== false);
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
-  const [lineHeight, setLineHeight] = useState('1.4');
+  const [lineHeight, setLineHeight] = useState(initSettings?.lineHeight ?? DEFAULT_LINE_HEIGHT);
   const [adminModal, setAdminModal] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [companyAssets, setCompanyAssets] = useState<{ logo_url: string | null; cgv: string | null }>({ logo_url: null, cgv: null });
@@ -245,7 +271,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     descItalic: boolean;
   }>({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true });
   const [showFontMenu, setShowFontMenu] = useState(false);
-  const [menuWidth, setMenuWidth] = useState('100%');
+  const [menuWidth, setMenuWidth] = useState(initSettings?.menuWidth ?? '100%');
   const [coverConfig, setCoverConfig] = useState<CoverPageConfig>(DEFAULT_COVER_CONFIG);
   const [photosConfig, setPhotosConfig] = useState<PhotosPageConfig>(DEFAULT_PHOTOS_CONFIG);
   const [showPhotoBlockPicker, setShowPhotoBlockPicker] = useState(false);
@@ -253,6 +279,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const savedRange = useRef<Range | null>(null);
   /** La feuille telle qu'enregistrée : sert à savoir s'il reste des modifications à enregistrer. */
   const savedHtml = useRef('');
+  const loadedStamp = useRef<string | null>(updatedAt ?? null);
   const handlePrintRef = useRef<() => void>(() => {});
   const handleSavePdfRef = useRef<() => void>(() => {});
   const handleSaveRef = useRef<() => void>(() => {});
@@ -296,7 +323,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       editorRef.current.innerHTML = sanitizeHtml(initialHtml);
       initDone.current = true;
       const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
-      if (menu) menu.style.maxWidth = '100%';
+      if (menu) menu.style.maxWidth = initSettings?.menuWidth ?? '100%';
+      lockFinancials(editorRef.current);
       // Référence de « rien à enregistrer » : la feuille telle qu'elle vient d'être chargée.
       savedHtml.current = editorRef.current.innerHTML;
       // Le brouillon n'est proposé que s'il diffère vraiment de ce qui est enregistré.
@@ -454,7 +482,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   // couverts, prix enfant…). Explicite et destructif : remplace la mise en forme
   // manuelle. Aucune autre action ne régénère automatiquement.
   const regenerateDocument = useCallback(async () => {
-    if (!confirm('Régénérer le document depuis les données du devis ?\n\n⚠️ La mise en forme manuelle actuelle du texte sera remplacée.')) return;
+    if (!confirm('Régénérer le document depuis les données du devis ?\n\nLe texte retouché à la main sera remplacé.')) return;
     setSaving(true);
     const supabase = createClient();
     const [{ data: q }, profRes] = await Promise.all([
@@ -465,7 +493,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         ? supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
-    if (!q) { setSaving(false); alert('Devis introuvable'); return; }
+    if (!q) { setSaving(false); setError('Devis introuvable.'); return; }
 
     const cName = (q.client_first_name && q.client_last_name)
       ? `${q.client_first_name} ${q.client_last_name}`.trim()
@@ -507,15 +535,15 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         cgv: companyAssets.cgv,
         language: (q.language as 'fr' | 'en') ?? 'fr',
       },
-      { template: (q.template as 'standard' | 'mariage' | 'business') ?? 'standard', font },
+      { template: (q.template as 'standard' | 'mariage' | 'business' | 'classique') ?? 'standard', font },
     );
 
-    if (editorRef.current) editorRef.current.innerHTML = fresh;
+    if (editorRef.current) { editorRef.current.innerHTML = fresh; lockFinancials(editorRef.current); }
     // Efface le brouillon local pour ne pas restaurer l'ancien texte au rechargement.
     try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
     setLocalDraft(null);
     setSaving(false);
-    setToast('Document régénéré ✓ — pense à sauvegarder');
+    setToast('Document régénéré. Pensez à enregistrer.');
   }, [quoteId, user, companyAssets.cgv, font]);
 
   // ── Admin fields: load from database ────────────────────────────────────────
@@ -802,14 +830,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const insertCgv = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
-    if (!companyAssets.cgv) { setToast('Aucune CGV enregistrée — ajoute-les dans Paramètres → CGV.'); return; }
+    if (!companyAssets.cgv) { setToast('Aucune condition de vente enregistrée. Ajoutez-les dans Paramètres, Mon entreprise.'); return; }
     if (el.innerHTML.includes('data-webo-cgv') || (companyAssets.cgv && el.innerHTML.includes(companyAssets.cgv))) {
       setToast('Les CGV sont déjà présentes dans le document.');
       return;
     }
-    const block = `<div data-webo-cgv="1" style="page-break-before:always;break-before:page;margin-top:24px;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;"><div style="flex:1;height:1px;background:#e0e0e0;"></div><p style="font-size:9px;font-weight:bold;color:#9c27b0;text-transform:uppercase;letter-spacing:2px;margin:0;">Conditions Générales de Vente</p><div style="flex:1;height:1px;background:#e0e0e0;"></div></div><div style="font-size:10px;color:#555;line-height:1.6;">${companyAssets.cgv}</div></div>`;
+    const block = `<div data-webo-cgv="1" style="page-break-before:always;break-before:page;margin-top:24px;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;"><div style="flex:1;height:1px;background:#e0e0e0;"></div><p style="font-size:9px;font-weight:bold;color:#666;text-transform:uppercase;letter-spacing:2px;margin:0;">Conditions Générales de Vente</p><div style="flex:1;height:1px;background:#e0e0e0;"></div></div><div style="font-size:10px;color:#555;line-height:1.6;">${companyAssets.cgv}</div></div>`;
     el.insertAdjacentHTML('beforeend', block);
-    setToast('CGV ajoutées en fin de document ✓ — pense à sauvegarder');
+    setToast('Conditions de vente ajoutées en fin de document. Pensez à enregistrer.');
   }, [companyAssets.cgv]);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
@@ -818,19 +846,22 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const html = editorRef.current?.innerHTML ?? '';
     setSaving(true); setError(null);
     const supabase = createClient();
-    let { error: err } = await supabase
-      .from('quotes')
-      .update({ content_html: html, selected_font: font, selected_font_size: fontSize, cover_page_config: coverConfig, photos_page_config: photosConfig })
-      .eq('id', quoteId);
-    if (err?.message?.includes('selected_font_size') || err?.code === '42703') {
-      const res = await supabase
-        .from('quotes')
-        .update({ content_html: html, selected_font: font, cover_page_config: coverConfig, photos_page_config: photosConfig })
-        .eq('id', quoteId);
-      err = res.error;
+    const stamp = new Date().toISOString();
+    const payload = { content_html: html, selected_font: font, selected_font_size: fontSize, cover_page_config: coverConfig, photos_page_config: photosConfig, editor_settings: { lineHeight, showDesc, menuWidth }, updated_at: stamp };
+    const write = (guarded: boolean) => {
+      let q = supabase.from('quotes').update(payload).eq('id', quoteId);
+      if (guarded && loadedStamp.current) q = q.eq('updated_at', loadedStamp.current);
+      return q.select('id');
+    };
+    let { data: written, error: err } = await write(true);
+    if (!err && loadedStamp.current && (!written || written.length === 0)) {
+      const overwrite = confirm('Ce devis a été enregistré ailleurs (un autre onglet ou un autre appareil) depuis que vous l’avez ouvert.\n\nOK : enregistrer votre version à la place.\nAnnuler : ne rien enregistrer, pour recharger la page et voir l’autre version.');
+      if (!overwrite) { setSaving(false); return; }
+      ({ data: written, error: err } = await write(false));
     }
     setSaving(false);
-    if (err) { setError(err.message); return; }
+    if (err) { setError('L’enregistrement a échoué. Vérifiez votre connexion, puis réessayez.'); return; }
+    loadedStamp.current = stamp;
     // Clear local draft — content is safely in DB
     try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
     setLocalDraft(null);
@@ -838,166 +869,34 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setToast('Devis enregistré');
   };
 
-  // ── Build print HTML (shared by print + PDF) ──────────────────────────────────
-  const buildPrintHtml = () => {
-    // La fenêtre d'impression est de la même origine que l'app : le contenu y entre nettoyé.
-    const content = sanitizeHtml(editorRef.current?.innerHTML ?? '');
-    const fontEntry = FONTS.find((x) => x.value === font);
-    const fontImport = fontEntry?.google
-      ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
-      : '';
-    const coverHtml = buildCoverPageHtml(coverConfig)
-    const photosHtml = buildPhotosPageHtml(photosConfig)
-    const logoHtml = buildLogoHeaderHtml(companyAssets.logo_url)
-    const cgvHtml = buildCgvHtml(companyAssets.cgv)
-    return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Devis</title>
-  ${fontImport}
-  <style>
-    @page { size: A4; margin: 0; }
-    html, body { color-scheme: light; }
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    body { margin: 0; padding: 0; font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; line-height: ${lineHeight}; background: #fff; }
-    body * { min-height: 0 !important; }
-    .screen-sep { visibility: hidden !important; height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; font-size: 0 !important; line-height: 0 !important; page-break-after: always !important; break-after: page !important; }
-    .gastro-page { page-break-before: always !important; break-before: page !important; }
-    tr { page-break-inside: avoid; }
-    thead { display: table-header-group; }
-    p, li { orphans: 2; widows: 2; }
-    ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
-    ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
-    li { display: list-item; }
-    ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
-  </style>
-</head>
-<body>
-  ${coverHtml}
-  ${coverHtml ? '' : logoHtml}
-  <div style="padding:20mm;">${content}</div>
-  ${photosHtml}
-  ${(content.includes('data-webo-cgv') || (companyAssets.cgv && content.includes(companyAssets.cgv))) ? '' : cgvHtml}
-  <script>
-    var els = document.querySelectorAll('[style]');
-    var sep = false;
-    for (var i = 0; i < els.length; i++) {
-      if (els[i].style.minHeight) els[i].style.minHeight = '0';
-      if (els[i].classList.contains('screen-sep')) { els[i].style.display = 'none'; sep = true; }
-      if (sep && els[i].style.marginTop && parseFloat(els[i].style.marginTop) < 0) els[i].style.marginTop = '24px';
-    }
-  </script>
-</body>
-</html>`;
-  };
-
-  // ── Print (WYSIWYG) ───────────────────────────────────────────────────────────
-  const handlePrint = () => {
-    const html = buildPrintHtml();
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const win  = window.open(url, '_blank');
-    if (!win) { URL.revokeObjectURL(url); return; }
-    win.onload = () => { setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 600); };
-  };
-
-  // ── Save PDF — uses browser print (reliable, no html2canvas issues) ─────────
-  const handleSavePdf = () => {
+  // ── Sortie papier : une seule mise en page pour « Imprimer » et « Enregistrer en PDF » ─────────
+  // La fenêtre d'impression du navigateur propose les deux ; le document y est le même que sur le lien envoyé au client.
+  const openPrintWindow = () => {
+    // La fenêtre est de la même origine que l'app : le contenu y entre nettoyé.
     const content = sanitizeHtml(editorRef.current?.innerHTML ?? '');
     if (!content) return;
-
-    // Build a clean filename
     const safeName = (clientName ?? 'client').replace(/[^a-zA-ZÀ-ÿ0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 40);
-    const dateStr  = new Date().toISOString().slice(0, 10);
-    const filename = `Devis-${safeName}-${dateStr}`;
-
-    // Font import
-    const fontEntry = FONTS.find((x) => x.value === font);
-    const fontImport = fontEntry?.google
-      ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap">`
-      : '';
-
-    const coverHtml = buildCoverPageHtml(coverConfig)
-    const photosHtml = buildPhotosPageHtml(photosConfig)
-    const logoHtml = buildLogoHeaderHtml(companyAssets.logo_url)
-    const cgvHtml = buildCgvHtml(companyAssets.cgv)
-
-    // Build a self-contained HTML document optimized for PDF printing
-    const html = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>${filename}</title>
-  ${fontImport}
-  <style>
-    @page { size: A4; margin: 8mm 12mm; }
-    html, body { margin: 0; padding: 0; background: #fff; color-scheme: light; }
-    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { font-family: '${font}', Georgia, serif; font-size: ${fontSize}px; line-height: ${lineHeight}; color: #1a1a1a; }
-
-    /* Page wrapper — compact padding */
-    .pdf-wrap { padding: 6mm 10mm; }
-
-    /* Kill min-height from old saved HTML (was 257mm, forces blank space) */
-    .pdf-wrap * { min-height: 0 !important; }
-
-    /* Hide separator text but force page break */
-    .screen-sep { visibility: hidden !important; height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; font-size: 0 !important; line-height: 0 !important; page-break-after: always !important; break-after: page !important; }
-
-    /* Gastro page also forces new page (for new HTML without .screen-sep) */
-    .gastro-page { page-break-before: always !important; break-before: page !important; }
-
-    tr { page-break-inside: avoid; }
-    thead { display: table-header-group; }
-    p, li { orphans: 2; widows: 2; }
-    ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
-    ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
-    li { display: list-item; }
-
-    ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
-  </style>
-</head>
-<body>
-  ${coverHtml}
-  ${coverHtml ? '' : logoHtml}
-  <div class="pdf-wrap">${content}</div>
-  ${photosHtml}
-  ${(content.includes('data-webo-cgv') || (companyAssets.cgv && content.includes(companyAssets.cgv))) ? '' : cgvHtml}
-  <script>
-    window.onload = function() {
-      var els = document.querySelectorAll('[style]');
-      var screenSepSeen = false;
-      for (var i = 0; i < els.length; i++) {
-        var el = els[i];
-        // Kill min-height (old HTML: min-height:257mm)
-        if (el.style.minHeight) el.style.minHeight = '0';
-        // Track when we pass the screen separator
-        if (el.classList.contains('screen-sep')) {
-          el.style.display = 'none';
-          screenSepSeen = true;
-        }
-        // After the separator, fix negative top margins (gastro header overlap)
-        if (screenSepSeen && el.style.marginTop && parseFloat(el.style.marginTop) < 0) {
-          el.style.marginTop = '24px';
-        }
-      }
-      setTimeout(function() { window.print(); }, 500);
-    };
-  </script>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const win  = window.open(url, '_blank');
-    if (!win) { URL.revokeObjectURL(url); return; }
-    win.onafterprint = () => { URL.revokeObjectURL(url); };
+    const alreadyHasCgv = content.includes('data-webo-cgv') || (!!companyAssets.cgv && content.includes(companyAssets.cgv));
+    const html = buildQuotePrintPage({
+      title: `Devis-${safeName}-${new Date().toISOString().slice(0, 10)}`,
+      content,
+      settings: { font, fontSize, lineHeight, showDesc },
+      coverHtml: sanitizeHtml(buildCoverPageHtml(coverConfig)),
+      logoHtml: sanitizeHtml(buildLogoHeaderHtml(companyAssets.logo_url)),
+      photosHtml: sanitizeHtml(buildPhotosPageHtml(photosConfig)),
+      cgvHtml: alreadyHasCgv ? '' : sanitizeHtml(buildCgvHtml(companyAssets.cgv)),
+    });
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    const win = window.open(url, '_blank');
+    if (!win) {
+      URL.revokeObjectURL(url);
+      setError('Le navigateur a bloqué la fenêtre d’impression. Autorisez les fenêtres pour ce site, puis recommencez.');
+      return;
+    }
+    win.onafterprint = () => URL.revokeObjectURL(url);
   };
+  const handlePrint = openPrintWindow;
+  const handleSavePdf = openPrintWindow;
 
   // Keep refs up-to-date so the event listeners (registered once) always call the latest handler
   handleSaveRef.current = handleSave;
@@ -1388,13 +1287,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         {localDraft && (
           <div className="mx-auto mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl text-sm print:hidden" style={{ width: '210mm' }}>
             <span className="text-amber-600 font-medium flex-1">
-              💾 Brouillon local trouvé — sauvegardé le {new Date(localDraft.savedAt).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              Des modifications non enregistrées ont été retrouvées (le {new Date(localDraft.savedAt).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}).
             </span>
             <button
               onClick={() => {
                 if (editorRef.current) editorRef.current.innerHTML = sanitizeHtml(localDraft.html);
                 setLocalDraft(null);
-                setToast('Brouillon restauré — pense à sauvegarder !');
+                setToast('Modifications restaurées. Pensez à enregistrer.');
               }}
               className="px-3 py-1.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors flex-shrink-0"
             >
@@ -1475,6 +1374,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             style={{ padding: '20mm', fontSize: `${fontSize}px`, lineHeight: lineHeight }}
             className="outline-none min-h-[120px] prose prose-sm max-w-none focus:ring-2 focus:ring-primary/20 rounded-lg"
             data-placeholder="Cliquez ici pour commencer à modifier votre devis…"
+            onPaste={(e) => {
+              const html = e.clipboardData.getData('text/html');
+              const text = e.clipboardData.getData('text/plain');
+              e.preventDefault();
+              if (html) document.execCommand('insertHTML', false, cleanPastedHtml(html));
+              else if (text) document.execCommand('insertText', false, text);
+              else if (e.clipboardData.files.length > 0) setToast('Les photos se placent avec la page photos ou la page de garde.');
+            }}
           />
         </div>
 

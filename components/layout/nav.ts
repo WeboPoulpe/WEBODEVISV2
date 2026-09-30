@@ -129,7 +129,6 @@ export const WEBO_PANELS: { key: string; label: string }[] = [
   { key: 'services', label: 'Prestations' },
   { key: 'event', label: 'Événement' },
   { key: 'style', label: 'Style' },
-  { key: 'images', label: 'Images' },
   { key: 'cover', label: 'Page de garde' },
   { key: 'photos', label: 'Page photos' },
 ];

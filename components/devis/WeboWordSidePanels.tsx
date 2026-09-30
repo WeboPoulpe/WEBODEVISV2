@@ -44,7 +44,7 @@ const MENU_WIDTHS = [
   { label: 'Plein', value: '100%' },
 ];
 
-interface Client { id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; }
+interface Client { id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; customer_type?: 'particulier' | 'entreprise' | null; address?: string | null; siret_number?: string | null; contact_person_name?: string | null; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; photo_url?: string; [key: string]: any; }
@@ -79,9 +79,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [remarks, setRemarks] = useState('');
   const [vatRate, setVatRate] = useState(20);
   const [hidePrice, setHidePrice] = useState(false);
-  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business'>('standard');
+  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
+  // Couverts au chargement : les lignes qui en avaient la quantité suivent un changement de couverts.
+  const initialGuestTotal = useRef(0);
+  const [syncQuantities, setSyncQuantities] = useState(true);
   // Empreinte des champs qui alimentent le bloc financier, capturée au chargement.
   // Sert à ne rafraîchir le tableau/totaux du document QUE s'ils ont réellement changé.
   const initialFinancials = useRef<string>('');
@@ -204,12 +207,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           const loadedEventDate = data.event_date || '';
           const loadedEventLocation = data.event_location || '';
           const loadedGuestCount = data.guest_count ? String(data.guest_count) : '';
-          const loadedGuestAdults = data.guest_count_adults ? String(data.guest_count_adults) : '';
+          const loadedGuestAdults = data.guest_count_adults ? String(data.guest_count_adults)
+            : (data.guest_count && !data.guest_count_children ? String(data.guest_count) : '');
+          initialGuestTotal.current = data.guest_count || 0;
           const loadedGuestChildren = data.guest_count_children ? String(data.guest_count_children) : '';
           const loadedRemarks = data.remarks || '';
           const loadedVatRate = data.vat_rate ?? 20;
           const loadedHidePrice = data.hide_price ?? false;
-          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business') || 'standard';
+          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business' | 'classique') || 'standard';
           const loadedLanguage = (data.language as 'fr' | 'en') || 'fr';
           const loadedServices = Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : [];
 
@@ -265,7 +270,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     setClientSearch(q);
     if (!q.trim() || q.length < 2) { setClientResults([]); setShowPicker(false); return; }
     const { data } = await supabase.from('customers')
-      .select('id, first_name, last_name, email, phone, company_name')
+      .select('id, first_name, last_name, email, phone, company_name, customer_type, address, siret_number, contact_person_name')
       .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,company_name.ilike.%${q}%`)
       .limit(6);
     setClientResults(data || []);
@@ -273,7 +278,15 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   }, [supabase]);
 
   const selectClient = (c: Client) => {
-    setClientName([c.first_name, c.last_name].filter(Boolean).join(' '));
+    const person = [c.first_name, c.last_name].filter(Boolean).join(' ');
+    const isCompany = c.customer_type === 'entreprise' && !!c.company_name;
+    // La fiche du client est rattachée au devis : une entreprise apparaît sous son nom, avec son contact.
+    setCustomerId(c.id);
+    setClientType(isCompany ? 'entreprise' : 'particulier');
+    setClientName(isCompany ? (c.company_name as string) : person);
+    setClientSiret(isCompany ? (c.siret_number ?? '') : '');
+    setRecipientContactName(isCompany ? (c.contact_person_name || person) : '');
+    setClientAddress(c.address || '');
     setClientEmail(c.email || '');
     setClientPhone(c.phone || '');
     setShowPicker(false);
@@ -294,11 +307,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addPrestation = (p: any) => {
+    const category = String(p.category ?? '').toLowerCase();
+    const perGuest = !['matériel', 'materiel', 'personnel', 'logistique'].includes(category)
+      && !/forfait/i.test(p.name ?? '') && Number(p.unit_price ?? 0) < 150;
     const newSvc: Service = {
       id: crypto.randomUUID(),
       name: p.name,
       description: p.description || '',
-      quantity: parseInt(guestCount) || 1,
+      quantity: perGuest ? (parseInt(guestCount) || 1) : 1,
       unitPrice: p.unit_price,
       childUnitPrice: p.child_unit_price ?? null,
       category: p.category,
@@ -326,6 +342,13 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   // ── Save (all panels save all fields) ──
   const save = async () => {
     setSaving(true);
+    const newGuestTotal = (parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0) || parseInt(guestCount) || 0;
+    const previousGuests = initialGuestTotal.current;
+    if (syncQuantities && previousGuests > 0 && newGuestTotal > 0 && newGuestTotal !== previousGuests) {
+      const updatedLines = services.map((s) => (s.quantity === previousGuests ? { ...s, quantity: newGuestTotal } : s));
+      services.splice(0, services.length, ...updatedLines);
+      setServices(updatedLines);
+    }
     const clientParts = clientName.trim().split(' ');
     const cFirst = clientParts[0] || '';
     const cLast = clientParts.slice(1).join(' ') || '';
@@ -359,6 +382,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       recipient_contact_email: recipientContactEmail || null,
       recipient_contact_phone: recipientContactPhone || null,
       client_siret: clientSiret || null,
+      customer_id: customerId,
+      client_type: clientType,
+      company_name: clientType === 'entreprise' ? (clientName.trim() || null) : null,
       event_type: eventType || '',
       event_date: eventDate || new Date().toISOString().slice(0, 10),
       event_location: eventLocation || '',
@@ -595,7 +621,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       <p className="text-xs text-gray-400 italic text-center py-4">Aucune prestation</p>
                     ) : (
                       <>
-                        <p className="text-[10px] text-gray-400 italic">💡 Glissez les prestations pour réordonner</p>
+                        <p className="text-xs text-gray-500">Glissez une prestation pour changer son ordre.</p>
                         {services.map((svc, idx) => (
                         <div
                           key={svc.id || idx}
@@ -643,14 +669,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               />
                             </div>
                             <div>
-                              <label className="text-[9px] text-gray-400">Statut</label>
+                              <label className="text-[10px] text-gray-500">Statut</label>
                               <select
                                 value={svc.removed ? 'removed' : svc.isFree ? 'free' : svc.isOption ? 'option' : 'normal'}
                                 onChange={(e) => {
                                   const v = e.target.value;
                                   setServices((prev) => prev.map((s, i) => i === idx ? { ...s, removed: v === 'removed', isFree: v === 'free', isOption: v === 'option' } : s));
                                 }}
-                                className={`${inputCls} text-[10px] py-1`}
+                                className={`${inputCls} text-xs py-1 min-w-[92px]`}
                               >
                                 <option value="normal">Normal</option>
                                 <option value="free">Inclus</option>
@@ -705,16 +731,22 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                 <>
                   <div><label className={labelCls}>Type d&apos;événement</label>
                     <select value={eventType} onChange={(e) => setEventType(e.target.value)} className={inputCls}>
-                      <option value="">— Choisir —</option>
+                      <option value="">Choisir</option>
                       {['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'].map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div><label className={labelCls}>Date</label><input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputCls} /></div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div><label className={labelCls}>👤 Adultes</label><input type="number" min={0} value={guestAdults} onChange={(e) => { setGuestAdults(e.target.value); setGuestCount(String((parseInt(e.target.value) || 0) + (parseInt(guestChildren) || 0))); }} className={inputCls} placeholder="120" /></div>
-                    <div><label className={labelCls}>🧒 Enfants</label><input type="number" min={0} value={guestChildren} onChange={(e) => { setGuestChildren(e.target.value); setGuestCount(String((parseInt(guestAdults) || 0) + (parseInt(e.target.value) || 0))); }} className={inputCls} placeholder="0" /></div>
+                    <div><label className={labelCls}>Adultes</label><input type="number" min={0} value={guestAdults} onChange={(e) => { setGuestAdults(e.target.value); setGuestCount(String((parseInt(e.target.value) || 0) + (parseInt(guestChildren) || 0))); }} className={inputCls} placeholder="120" /></div>
+                    <div><label className={labelCls}>Enfants</label><input type="number" min={0} value={guestChildren} onChange={(e) => { setGuestChildren(e.target.value); setGuestCount(String((parseInt(guestAdults) || 0) + (parseInt(e.target.value) || 0))); }} className={inputCls} placeholder="0" /></div>
                   </div>
-                  <p className="text-[10px] text-gray-400 italic -mt-2">Total couverts : {(parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0)}</p>
+                  <p className="text-xs text-gray-500 -mt-2">Total : {(parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0)} couverts</p>
+                  {initialGuestTotal.current > 0 && ((parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0)) !== initialGuestTotal.current && (
+                    <label className="flex items-start gap-2 text-xs text-gray-700">
+                      <input type="checkbox" checked={syncQuantities} onChange={(e) => setSyncQuantities(e.target.checked)} className="mt-0.5" />
+                      Mettre à jour les prestations comptées pour {initialGuestTotal.current} couverts
+                    </label>
+                  )}
                   <div><label className={labelCls}>Lieu</label><input value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} className={inputCls} placeholder="Château de Villebougis" /></div>
                   <div className="border-t border-gray-100 pt-3 space-y-3">
                     <div><label className={labelCls}>TVA (%)</label>
@@ -742,12 +774,13 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   <div><label className={labelCls}>Modèle</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { key: 'standard', label: 'Standard', color: '#9c27b0', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
+                        { key: 'classique', label: 'Classique', color: '#1C2621', gradient: '#1C2621' },
+                        { key: 'standard', label: 'Violet', color: '#9c27b0', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
                         { key: 'mariage', label: 'Mariage', color: '#c8956c', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
                         { key: 'business', label: 'Business', color: '#1e293b', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
                       ].map((t) => (
-                        <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business')}
-                          className={cn('py-2 px-3 rounded-lg text-xs font-semibold border transition-all',
+                        <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique')}
+                          className={cn('py-2 px-2 rounded-lg text-xs font-semibold border transition-all',
                             template === t.key ? 'border-gray-900 shadow-sm' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
                           <span className="block w-4 h-4 rounded-full mx-auto mb-1" style={{ background: t.color }} />
                           {t.label}
@@ -763,12 +796,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       <button onClick={() => setLanguage('fr')}
                         className={cn('py-2 px-2 text-xs font-semibold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5',
                           language === 'fr' ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
-                        🇫🇷 Français
+                        Français
                       </button>
                       <button onClick={() => setLanguage('en')}
                         className={cn('py-2 px-2 text-xs font-semibold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5',
                           language === 'en' ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
-                        🇬🇧 English
+                        English
                       </button>
                     </div>
                     <p className="text-[10px] text-gray-400 italic mt-1.5">Cartes gastronomiques affichées dans cette langue (si dispo).</p>
@@ -797,7 +830,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       {(() => {
                         const tpl = { standard: { color: '#9c27b0', bg: '#faf5ff', border: '#e9d5ff', font: 'Georgia,serif', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
                                       mariage:  { color: '#c8956c', bg: '#fffdf7', border: '#f5e6d3', font: '"Playfair Display",serif', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
-                                      business: { color: '#1e293b', bg: '#f8fafc', border: '#e2e8f0', font: 'Montserrat,sans-serif', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' } }[template];
+                                      business: { color: '#1e293b', bg: '#f8fafc', border: '#e2e8f0', font: 'Montserrat,sans-serif', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
+                                      classique: { color: '#B4502D', bg: '#F7F3EC', border: '#E6DFD3', font: 'Georgia,serif', gradient: '#1C2621' } }[template];
                         return (
                           <div style={{ fontFamily: tpl.font, fontSize: 9 }}>
                             {/* Mini header */}
@@ -864,12 +898,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         <button
                           onClick={() => onCoverChange({ ...coverConfig, mode: 'template' })}
                           className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'template' ? 'bg-primary text-white' : 'hover:bg-gray-50'}`}>
-                          Templates
+                          Modèles
                         </button>
                         <button
                           onClick={() => onCoverChange({ ...coverConfig, mode: 'builder' })}
                           className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'builder' ? 'bg-primary text-white' : 'hover:bg-gray-50'}`}>
-                          Builder libre
+                          Mise en page libre
                         </button>
                       </div>
 
@@ -882,7 +916,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       {coverConfig.mode === 'template' && (
                         <>
                           <div>
-                            <p className={labelCls}>Template</p>
+                            <p className={labelCls}>Modèle</p>
                             <div className="grid grid-cols-2 gap-2">
                               {(['mariage', 'gastronomique', 'business', 'provence', 'luxe'] as const).map(t => (
                                 <button key={t}

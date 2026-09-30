@@ -29,7 +29,7 @@ export interface ServiceLine {
   gastroCardHtmlEn?: string | null;
 }
 
-export type QuoteTemplate = 'standard' | 'mariage' | 'business';
+export type QuoteTemplate = 'standard' | 'mariage' | 'business' | 'classique';
 
 export interface DevisState {
   currentStep: number;

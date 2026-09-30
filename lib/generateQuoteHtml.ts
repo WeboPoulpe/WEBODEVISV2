@@ -53,7 +53,7 @@ export interface QuoteHtmlData {
 
 export interface QuoteHtmlOptions {
   font?: string;
-  template?: 'standard' | 'mariage' | 'business';
+  template?: 'standard' | 'mariage' | 'business' | 'classique';
 }
 
 const money = (n: number, lang: 'fr' | 'en' = 'fr') =>
@@ -255,6 +255,13 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     lightBorder = '#f5e6d3';
     fontFamily = opts.font ? `'${opts.font}',serif` : "'Playfair Display',Georgia,serif";
     menuItemColor = '#a0522d';
+  } else if (tmpl === 'classique') {
+    headerGradient = 'background:#1C2621;';
+    accentColor = '#B4502D';
+    lightBg = '#F7F3EC';
+    lightBorder = '#E6DFD3';
+    fontFamily = opts.font ? `'${opts.font}',serif` : "'Georgia',serif";
+    menuItemColor = '#1C2621';
   } else if (tmpl === 'business') {
     headerGradient = 'background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#334155 100%);';
     accentColor = '#1e293b';
@@ -436,7 +443,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 </div>
 
 <!-- ─── SÉPARATEUR : visible écran · page-break à l'impression ─── -->
-<div class="screen-sep" style="page-break-after:always;break-after:page;margin:26px -20mm;border-top:2px dashed #e9d5ff;padding:7px 20mm;text-align:center;color:#9c27b0;font-size:10px;letter-spacing:0.08em;user-select:none;">
+<div class="screen-sep" style="page-break-after:always;break-after:page;margin:26px -20mm;border-top:2px dashed ${lightBorder};padding:7px 20mm;text-align:center;color:${accentColor};font-size:10px;letter-spacing:0.08em;user-select:none;">
   ${t.sautPage.replace('✂  ', '✂&nbsp;&nbsp;')}
 </div>
 
@@ -459,7 +466,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   </div>
 
   <!-- ── Pied de carte ── -->
-  <div style="margin-top:28px;text-align:center;padding-top:14px;border-top:1px solid #f3e5f5;">
+  <div style="margin-top:28px;text-align:center;padding-top:14px;border-top:1px solid ${lightBorder};">
     <p style="font-size:11px;color:#ccc;font-style:italic;margin:0;">${d.companyName} — ${t.traiteurChef}</p>
   </div>
 </div>

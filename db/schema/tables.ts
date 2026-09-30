@@ -157,6 +157,8 @@ export const quotes = pgTable("quotes", {
 	// Lignes « matériel » et « personnel » du devis déjà préparées (identifiants de lignes).
 	event_material_checks: jsonb().default([]),
 	// Lien public envoyé au client pour consulter le devis, et date du dernier envoi.
+	// Réglages de l'éditeur de document : interligne, descriptions affichées, largeur de la carte.
+	editor_settings: jsonb(),
 	share_token: text().unique(),
 	sent_at: timestamp({ withTimezone: true, mode: 'string' }),
 	selected_font: varchar({ length: 100 }).default('Georgia'),

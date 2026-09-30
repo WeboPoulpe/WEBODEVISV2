@@ -91,13 +91,10 @@ export default function Sidebar({ badges }: { badges: Badges }) {
             </button>
             {editor.isQuoteEditor && (
               <>
-                <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))} title="Enregistrer en PDF" className={cn(itemBase, itemIdle, 'w-full')}>
-                  <Download className="h-[18px] w-[18px] flex-shrink-0" />
-                  <span className="sb-label">Enregistrer en PDF</span>
-                </button>
-                <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:print'))} title="Imprimer" className={cn(itemBase, itemIdle, 'w-full')}>
+                {/* Une seule sortie : la fenêtre d'impression du navigateur propose l'imprimante ou le PDF. */}
+                <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:print'))} title="Imprimer ou enregistrer en PDF" className={cn(itemBase, itemIdle, 'w-full')}>
                   <Printer className="h-[18px] w-[18px] flex-shrink-0" />
-                  <span className="sb-label">Imprimer</span>
+                  <span className="sb-label">Imprimer ou PDF</span>
                 </button>
               </>
             )}

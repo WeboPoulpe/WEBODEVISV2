@@ -19,7 +19,7 @@ const CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
 };
 
 /** Nettoie une chaîne HTML avant injection via dangerouslySetInnerHTML. */
-export function sanitizeHtml(html?: string | null): string {
+export function sanitizeHtml(html?: string | null, config?: Parameters<typeof DOMPurify.sanitize>[1]): string {
   if (!html) return '';
-  return DOMPurify.sanitize(html, CONFIG) as unknown as string;
+  return DOMPurify.sanitize(html, config ?? CONFIG) as unknown as string;
 }

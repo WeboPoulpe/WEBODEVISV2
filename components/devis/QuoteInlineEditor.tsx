@@ -62,7 +62,7 @@ interface Options {
   images: string[];
 }
 
-type QuoteTemplate = 'standard' | 'mariage' | 'business';
+type QuoteTemplate = 'standard' | 'mariage' | 'business' | 'classique';
 
 interface Props {
   quoteId: string;
@@ -86,7 +86,8 @@ function totalHT(services: ServiceLine[]) {
 const EVENT_TYPES = ['Mariage', 'Anniversaire', 'Cocktail', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
 const VAT_RATES   = [20, 10, 5.5, 0];
 const TEMPLATES: { key: QuoteTemplate; label: string }[] = [
-  { key: 'standard', label: 'Standard' },
+  { key: 'classique', label: 'Classique' },
+  { key: 'standard', label: 'Violet' },
   { key: 'mariage',  label: 'Mariage'  },
   { key: 'business', label: 'Business' },
 ];
