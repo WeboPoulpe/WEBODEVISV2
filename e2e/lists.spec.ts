@@ -206,3 +206,36 @@ test('prestations : prix modifié dans la liste, révision de tous les prix en p
     await sql(`delete from public.prestations where user_id = $1`, [userId]);
   });
 });
+
+test('éditeur WeboWord : statut, envoi et copie sans repasser par la liste', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+  await withAccount(browser, 'editeur-actions', async (page, userId) => {
+    const [quote] = await sql<{ id: string }>(
+      `insert into public.quotes (owner_user_id, user_id, client_name, client_email, event_date, event_type, guest_count, status, services, template)
+       values ($1, $1, 'Paul Durand', 'paul.durand@essai.test', '2027-05-01', 'Mariage', 40, 'devis_a_faire', '[{"id":"s1","name":"Menu Prestige","quantity":40,"unitPrice":30}]', 'classique') returning id`, [userId]);
+    const status = async () => (await sql<{ status: string }>(`select status from public.quotes where id = $1`, [quote.id]))[0].status;
+
+    await page.goto(`/devis/${quote.id}/modifier?mode=weboword`);
+    await page.waitForLoadState('networkidle');
+    const sidebar = page.locator('aside');
+
+    // Envoi : le document est enregistré, le devis part et passe en « Devis envoyé ».
+    await sidebar.getByRole('button', { name: 'Envoyer au client' }).click();
+    const send = page.getByRole('dialog', { name: 'Envoyer le devis au client' });
+    await expect(send.locator('#send-to')).toHaveValue('paul.durand@essai.test', { timeout: 20_000 });
+    await send.getByRole('button', { name: 'Envoyer' }).click();
+    await expect(page.getByRole('dialog', { name: 'Devis envoyé' })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('dialog', { name: 'Devis envoyé' }).getByRole('button', { name: 'Fermer', exact: true }).last().click();
+    expect(await status()).toBe('devis_envoye');
+    await expect(sidebar.getByLabel('Statut du devis')).toHaveValue('devis_envoye');
+
+    // Statut changé depuis l'éditeur ; un devis validé mène à son événement.
+    await sidebar.getByLabel('Statut du devis').selectOption('valide');
+    await expect.poll(status, { timeout: 15_000 }).toBe('valide');
+    await expect(sidebar.getByRole('link', { name: 'Préparer l’événement' })).toHaveAttribute('href', `/evenements/${quote.id}`);
+
+    // Copie depuis l'éditeur.
+    await sidebar.getByRole('button', { name: 'Dupliquer' }).click();
+    await expect(page.getByRole('dialog', { name: 'Dupliquer le devis' })).toBeVisible({ timeout: 20_000 });
+  });
+});

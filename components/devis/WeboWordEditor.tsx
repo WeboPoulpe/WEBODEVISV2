@@ -237,7 +237,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   // Listen for action events from sidebar (Save / Print / PDF buttons)
   // Refs are updated on every render so listeners always call the latest version of each handler
   useEffect(() => {
-    const onSaveEvt = () => handleSaveRef.current();
+    const onSaveEvt = (e: Event) => {
+      const done = (e as CustomEvent<{ done?: (ok: boolean) => void } | null>).detail?.done;
+      handleSaveRef.current().then((ok) => done?.(ok));
+    };
     const onPrintEvt = () => handlePrintRef.current();
     const onSavePdfEvt = () => handleSavePdfRef.current();
     window.addEventListener('weboword:save', onSaveEvt);
@@ -282,7 +285,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const loadedStamp = useRef<string | null>(updatedAt ?? null);
   const handlePrintRef = useRef<() => void>(() => {});
   const handleSavePdfRef = useRef<() => void>(() => {});
-  const handleSaveRef = useRef<() => void>(() => {});
+  const handleSaveRef = useRef<() => Promise<boolean>>(async () => false);
 
   // ── Load Google Font when font changes ────────────────────────────────────
   useEffect(() => {
@@ -841,8 +844,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, [companyAssets.cgv]);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (saving) return;
+  const handleSave = async (): Promise<boolean> => {
+    if (saving) return false;
     const html = editorRef.current?.innerHTML ?? '';
     setSaving(true); setError(null);
     const supabase = createClient();
@@ -856,17 +859,18 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     let { data: written, error: err } = await write(true);
     if (!err && loadedStamp.current && (!written || written.length === 0)) {
       const overwrite = confirm('Ce devis a été enregistré ailleurs (un autre onglet ou un autre appareil) depuis que vous l’avez ouvert.\n\nOK : enregistrer votre version à la place.\nAnnuler : ne rien enregistrer, pour recharger la page et voir l’autre version.');
-      if (!overwrite) { setSaving(false); return; }
+      if (!overwrite) { setSaving(false); return false; }
       ({ data: written, error: err } = await write(false));
     }
     setSaving(false);
-    if (err) { setError('L’enregistrement a échoué. Vérifiez votre connexion, puis réessayez.'); return; }
+    if (err) { setError('L’enregistrement a échoué. Vérifiez votre connexion, puis réessayez.'); return false; }
     loadedStamp.current = stamp;
     // Clear local draft — content is safely in DB
     try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
     setLocalDraft(null);
     savedHtml.current = html;
     setToast('Devis enregistré');
+    return true;
   };
 
   // ── Sortie papier : une seule mise en page pour « Imprimer » et « Enregistrer en PDF » ─────────

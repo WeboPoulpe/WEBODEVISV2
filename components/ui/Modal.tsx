@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { iconBtn } from './kit';
 
@@ -16,6 +17,7 @@ interface ModalProps {
 
 // Fenêtre de dialogue : feuille qui monte du bas sur téléphone, fenêtre centrée sur grand écran.
 // Le contenu défile à l'intérieur ; le pied reste accessible, au-dessus de la barre d'onglets.
+// Rendue à la racine du document : ouverte depuis la barre latérale ou un panneau, elle passe au-dessus de tout.
 export default function Modal({ title, onClose, children, footer, wide }: ModalProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -25,7 +27,7 @@ export default function Modal({ title, onClose, children, footer, wide }: ModalP
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previous; };
   }, [onClose]);
 
-  return (
+  const dialog = (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-gray-900/40" onClick={onClose} />
       <div className={`relative w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-md'} max-h-[92dvh] flex flex-col bg-white rounded-t-3xl sm:rounded-3xl shadow-float animate-sheet-up sm:animate-none`}>
@@ -42,4 +44,5 @@ export default function Modal({ title, onClose, children, footer, wide }: ModalP
       </div>
     </div>
   );
+  return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body);
 }

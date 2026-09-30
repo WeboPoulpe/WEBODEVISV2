@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import Wordmark from '@/components/brand/Wordmark';
 import { useAuth } from '@/context/AuthContext';
 import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
+import QuoteEditorActions from '@/components/devis/QuoteEditorActions';
 
 const PANEL_ICONS: Record<string, React.ElementType> = {
   client: User, services: Package, event: CalendarIcon, style: Palette, images: ImageIcon, cover: LayoutTemplate, photos: ImageIcon,
@@ -96,6 +97,7 @@ export default function Sidebar({ badges }: { badges: Badges }) {
                   <Printer className="h-[18px] w-[18px] flex-shrink-0" />
                   <span className="sb-label">Imprimer ou PDF</span>
                 </button>
+                {editor.quoteId && <QuoteEditorActions quoteId={editor.quoteId} itemBase={itemBase} itemIdle={itemIdle} />}
               </>
             )}
           </div>
