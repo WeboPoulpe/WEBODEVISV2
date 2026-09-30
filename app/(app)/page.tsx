@@ -371,7 +371,7 @@ export default function DashboardPage() {
           <span className="w-12 h-12 rounded-xl bg-primary-100 text-primary flex items-center justify-center flex-shrink-0"><FilePlus2 className="h-5 w-5" /></span>
           <span className="flex-1 min-w-0">
             <span className="block font-semibold text-gray-900">Créer un devis</span>
-            <span className="block text-sm text-gray-600">Assistant en 4 étapes avec aperçu en temps réel</span>
+            <span className="block text-sm text-gray-600">Création guidée en trois étapes</span>
           </span>
           <ArrowRight className="h-5 w-5 text-gray-500 group-hover:translate-x-0.5 transition-transform" />
         </Link>

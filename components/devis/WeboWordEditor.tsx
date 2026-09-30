@@ -167,33 +167,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [lineHeight, setLineHeight] = useState('1.4');
   const [adminModal, setAdminModal] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
-  const [celebrate, setCelebrate] = useState(false);
-  const [celebrateMsgIdx, setCelebrateMsgIdx] = useState(0);
   const [companyAssets, setCompanyAssets] = useState<{ logo_url: string | null; cgv: string | null }>({ logo_url: null, cgv: null });
-
-  // Carousel of compliments
-  const CELEBRATE_MSGS = [
-    "Bravo Francis, ça fonctionne champion ! 🏆",
-    "T'es le boss du devis ! 💪",
-    "Carton plein, mon Francis ! 🎯",
-    "Le maître de la sauvegarde ! 👑",
-    "Francis, tu dépotes ! 🚀",
-    "ChampION du week-end ! 🥇",
-    "On applaudit Francis ! 👏",
-    "Magnifique, Francis ! ✨",
-    "Trop fort le Francis ! 💯",
-    "Francis, tu gères grave ! 🔥",
-  ];
-
-  // Cycle through messages while celebrating
-  useEffect(() => {
-    if (!celebrate) return;
-    const interval = setInterval(() => {
-      setCelebrateMsgIdx((i) => (i + 1) % CELEBRATE_MSGS.length);
-    }, 1500);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [celebrate]);
 
   // Load logo + CGV from profiles
   useEffect(() => {
@@ -838,52 +812,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     // Clear local draft — content is safely in DB
     try { localStorage.removeItem(`weboword_draft_${quoteId}`); } catch { /* ignore */ }
     setLocalDraft(null);
-    setToast('Devis enregistré avec succès 🎉');
-    // 🎊 Confetti explosion!
-    triggerConfetti();
-    // 🏆 Celebration popup (TROLL — à supprimer plus tard)
-    setCelebrateMsgIdx(0);
-    setCelebrate(true);
-    setTimeout(() => setCelebrate(false), 6000);
-  };
-
-  // ── Confetti explosion ────────────────────────────────────────────────────
-  const triggerConfetti = () => {
-    const colors = ['#9c27b0', '#FF2400', '#FFD700', '#1565c0', '#2e7d32', '#FF6B6B', '#4ECDC4', '#FFE66D'];
-    const count = 80;
-    const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
-    document.body.appendChild(container);
-
-    for (let i = 0; i < count; i++) {
-      const confetti = document.createElement('div');
-      const size = Math.random() * 8 + 6;
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const shape = Math.random() > 0.5 ? '50%' : '0';
-      const startX = 50 + (Math.random() - 0.5) * 30; // Center spread
-      const angle = (Math.random() - 0.5) * Math.PI; // -90° to +90°
-      const velocity = 200 + Math.random() * 400;
-      const tx = Math.cos(angle - Math.PI / 2) * velocity;
-      const ty = Math.sin(angle - Math.PI / 2) * velocity - 200;
-
-      confetti.style.cssText = `
-        position:absolute;left:${startX}%;top:60%;
-        width:${size}px;height:${size}px;background:${color};
-        border-radius:${shape};
-        transform:translate(-50%,-50%) rotate(${Math.random() * 360}deg);
-        animation:confetti-fly 1.8s cubic-bezier(.2,.6,.4,1) forwards;
-        --tx:${tx}px;--ty:${ty}px;--rot:${Math.random() * 720 - 360}deg;
-      `;
-      container.appendChild(confetti);
-    }
-    // Add keyframes if not present
-    if (!document.getElementById('confetti-style')) {
-      const style = document.createElement('style');
-      style.id = 'confetti-style';
-      style.textContent = `@keyframes confetti-fly { 0%{opacity:1;transform:translate(-50%,-50%) rotate(0deg);} 100%{opacity:0;transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty) + 600px)) rotate(var(--rot));} }`;
-      document.head.appendChild(style);
-    }
-    setTimeout(() => container.remove(), 2000);
+    setToast('Devis enregistré');
   };
 
   // ── Build print HTML (shared by print + PDF) ──────────────────────────────────
@@ -1065,62 +994,6 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       {/* ── Toast ────────────────────────────────────────────────────────────── */}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
 
-      {/* 🏆 Celebration troll popup (à supprimer plus tard) */}
-      {celebrate && (
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 pointer-events-none animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto" onClick={() => setCelebrate(false)} />
-          <div
-            className="relative pointer-events-auto bg-gradient-to-br from-[#ffe5f6] via-white to-[#fff5d4] rounded-[40px] shadow-2xl px-10 py-10 max-w-md w-full text-center animate-in zoom-in-95 duration-500"
-            style={{ boxShadow: '0 0 60px 10px rgba(156, 39, 176, 0.4), 0 20px 50px rgba(0,0,0,0.3)' }}
-          >
-            <button onClick={() => setCelebrate(false)} className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <X className="h-4 w-4" />
-            </button>
-
-            {/* Animated trophy / photo */}
-            <div className="mx-auto mb-6 relative" style={{ width: 160, height: 160 }}>
-              <div
-                className="absolute inset-0 rounded-full bg-gradient-to-br from-yellow-300 via-orange-400 to-pink-500 animate-pulse"
-                style={{ filter: 'blur(20px)', opacity: 0.6 }}
-              />
-              <div className="relative w-full h-full rounded-full bg-gradient-to-br from-yellow-200 via-amber-300 to-orange-400 flex items-center justify-center text-8xl shadow-2xl border-4 border-white"
-                style={{ animation: 'celebrate-bounce 0.8s ease-in-out infinite alternate' }}
-              >
-                🏆
-              </div>
-              {/* Stars floating around */}
-              <span className="absolute -top-2 -left-2 text-2xl animate-ping" style={{ animationDuration: '1.5s' }}>⭐</span>
-              <span className="absolute -bottom-2 -right-2 text-2xl animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.3s' }}>✨</span>
-              <span className="absolute top-1/2 -right-4 text-2xl animate-bounce" style={{ animationDelay: '0.5s' }}>💫</span>
-              <span className="absolute top-1/2 -left-4 text-2xl animate-bounce" style={{ animationDelay: '0.2s' }}>🎊</span>
-            </div>
-
-            {/* Carousel message */}
-            <div className="h-16 flex items-center justify-center overflow-hidden">
-              <p
-                key={celebrateMsgIdx}
-                className="text-2xl font-black bg-gradient-to-r from-primary-600 via-pink-500 to-orange-500 bg-clip-text text-transparent px-4"
-                style={{ animation: 'celebrate-slide 0.4s ease-out' }}
-              >
-                {CELEBRATE_MSGS[celebrateMsgIdx]}
-              </p>
-            </div>
-
-            <p className="text-xs text-gray-400 mt-4 italic">Devis enregistré avec succès · Clique pour fermer</p>
-          </div>
-
-          <style>{`
-            @keyframes celebrate-bounce {
-              0% { transform: scale(1) rotate(-5deg); }
-              100% { transform: scale(1.08) rotate(5deg); }
-            }
-            @keyframes celebrate-slide {
-              0% { opacity: 0; transform: translateY(20px) scale(0.9); }
-              100% { opacity: 1; transform: translateY(0) scale(1); }
-            }
-          `}</style>
-        </div>
-      )}
 
       {/* ── Structure modal ─────────────────────────────────────────────────── */}
       {structureModal.open && (
