@@ -193,4 +193,55 @@ test.describe('administration', () => {
       await context.close();
     }
   });
+
+  test('matériel à préparer : choisi dans la liste, quantité par couvert, saisie à la main retenue', async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+    const email = `e2e-materiel-${Date.now()}@test.webodevis.local`;
+    const [user] = await sql<{ id: string }>(`insert into public.users (email, password_hash) values ($1, 'x') returning id`, [email]);
+    await sql(`insert into public.profiles (id, email, first_name, role, is_active, has_completed_onboarding) values ($1, $2, 'Matériel', 'user', true, true)`, [user.id, email]);
+    const [quote] = await sql<{ id: string }>(
+      `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status)
+       values ($1, $1, 'Client matériel', current_date + 30, 'Mariage', 40, 'valide') returning id`, [user.id]);
+    const token = await encode({ token: { sub: user.id, email }, secret: envLocal('NEXTAUTH_SECRET') });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
+    await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
+    const page = await context.newPage();
+    try {
+      await page.goto(`/evenements/${quote.id}`);
+      await page.getByRole('tab', { name: 'Matériel' }).click();
+      await page.getByRole('button', { name: 'Choisir dans ma liste' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Ma liste de matériel' });
+      await expect(dialog.getByText('Votre liste est vide')).toBeVisible({ timeout: 15_000 });
+
+      // Deux articles ajoutés à la liste : l'un en quantité fixe, l'autre par couvert (1,5 × 40 couverts = 60).
+      await dialog.getByLabel('Nom du matériel').fill('Chafing dish');
+      await dialog.getByLabel('Quantité', { exact: true }).fill('2');
+      await dialog.getByRole('button', { name: 'Ajouter à ma liste' }).click();
+      await expect(dialog.getByLabel('Quantité de Chafing dish')).toHaveValue('2', { timeout: 15_000 });
+      await dialog.getByLabel('Nom du matériel').fill('Verre à pied');
+      await dialog.getByLabel('Quantité', { exact: true }).fill('1.5');
+      await dialog.getByLabel('Cette quantité est par couvert').check();
+      await dialog.getByRole('button', { name: 'Ajouter à ma liste' }).click();
+      await expect(dialog.getByLabel('Quantité de Verre à pied')).toHaveValue('60', { timeout: 15_000 });
+      await dialog.getByRole('button', { name: 'Ajouter 2 articles' }).click();
+
+      await expect(page.getByText('Verre à pied')).toBeVisible();
+      await expect.poll(async () => (await sql<{ m: { name: string; qty: number }[] }>(`select event_materials as m from public.quotes where id = $1`, [quote.id]))[0].m.map((x) => [x.name, x.qty]), { timeout: 15_000 })
+        .toEqual([['Chafing dish', 2], ['Verre à pied', 60]]);
+
+      // Un article tapé à la main rejoint la liste.
+      await page.getByLabel('Nom du matériel').fill('Nappe blanche');
+      await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
+      await expect.poll(async () => (await sql<{ name: string }>(`select name from public.material_presets where user_id = $1 order by name`, [user.id])).map((r) => r.name), { timeout: 15_000 })
+        .toEqual(['Chafing dish', 'Nappe blanche', 'Verre à pied']);
+
+      // À la réouverture, ce qui est déjà dans l'événement est signalé.
+      await page.getByRole('button', { name: 'Choisir dans ma liste' }).click();
+      await expect(dialog.getByText('Déjà ajouté')).toHaveCount(3);
+    } finally {
+      await sql(`delete from public.quotes where id = $1`, [quote.id]);
+      await sql(`delete from public.users where id = $1`, [user.id]);
+      await context.close();
+    }
+  });
 });

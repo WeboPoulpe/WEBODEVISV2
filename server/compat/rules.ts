@@ -85,4 +85,5 @@ export const RULES: Record<string, TableRule> = {
   event_ingredients: both(viaQuote),
   rental_items: both(viaQuote),
   rental_templates: both(own('user_id')),
+  material_presets: both(own('user_id')),
 };

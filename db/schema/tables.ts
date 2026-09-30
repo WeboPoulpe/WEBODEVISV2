@@ -1480,3 +1480,23 @@ export const app_settings = pgTable("app_settings", {
 	value: jsonb().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
+
+// Liste de matériel du traiteur (ce qu'il possède et emporte) : sert à remplir « À préparer » d'un événement
+// sans tout retaper. La quantité est fixe, ou calculée par couvert.
+export const material_presets = pgTable("material_presets", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	name: text().notNull(),
+	unit: text(),
+	default_qty: numeric().default('1').notNull(),
+	// Renseigné : la quantité proposée est ce nombre × le nombre de couverts, arrondi à l'unité supérieure.
+	qty_per_guest: numeric(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_material_presets_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "material_presets_user_id_fkey"
+		}).onDelete("cascade"),
+]);

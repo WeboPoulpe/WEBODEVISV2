@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Pencil, Plus, Printer, Trash2, Wand2 } from 'lucide-react';
+import { ListChecks, Loader2, Pencil, Plus, Printer, Trash2, Wand2 } from 'lucide-react';
+import MaterialPicker, { rememberMaterial } from './MaterialPicker';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/ui/Modal';
@@ -51,6 +52,7 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   const [name, setName] = useState('');
   const [qty, setQty] = useState('1');
   const [unit, setUnit] = useState('');
+  const [picking, setPicking] = useState(false);
 
   const saveMaterials = async (next: MaterialItem[]) => {
     const previous = materials;
@@ -72,6 +74,8 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
     if (!value) return;
     setName(''); setQty('1'); setUnit('');
     saveMaterials([...materials, { id: crypto.randomUUID(), name: value, qty: parseFloat(qty) || 1, unit: unit.trim(), checked: false }]);
+    // Ce qui est saisi à la main rejoint la liste de matériel : la prochaine fois, il suffira de le cocher.
+    if (user) rememberMaterial(user.id, value, parseFloat(qty) || 1, unit.trim());
   };
 
   // ── Location ───────────────────────────────────────────────────────────────
@@ -187,7 +191,10 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
 
       {/* ── À préparer ───────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-gray-900">À préparer</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-gray-900">À préparer</h3>
+          <button onClick={() => setPicking(true)} className={btnSecondary}><ListChecks className="h-4 w-4" />Choisir dans ma liste</button>
+        </div>
 
         <form onSubmit={(e) => { e.preventDefault(); addMaterial(); }} className="flex flex-wrap gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Matériel à emporter" aria-label="Nom du matériel" className={cn(inputCls, 'flex-1 min-w-[200px]')} />
@@ -197,7 +204,7 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
         </form>
 
         {materials.length === 0 && quoteLines.length === 0 ? (
-          <EmptyState title="Rien à préparer pour l’instant" hint="Ajoutez ici ce que vous emportez : chafing dishes, nappes, caisses isothermes…" />
+          <EmptyState title="Rien à préparer pour l’instant" hint="Cochez ce que vous emportez dans votre liste de matériel, ou ajoutez un article ci-dessus : il rejoindra la liste." />
         ) : (
           <ul className="space-y-2">
             {materials.map((item) => (
@@ -284,6 +291,16 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
           La quantité par couvert de chaque article se règle dans <Link href="/location-templates" className="font-medium text-primary hover:underline">vos modèles de location</Link>.
         </p>
       </section>
+
+      {picking && user && (
+        <MaterialPicker
+          userId={user.id}
+          guests={quote.guest_count ?? 0}
+          already={materials.map((m) => m.name)}
+          onClose={() => setPicking(false)}
+          onAdd={(items) => saveMaterials([...materials, ...items.map((i) => ({ id: crypto.randomUUID(), name: i.name, qty: i.qty, unit: i.unit, checked: false }))])}
+        />
+      )}
 
       {form && (
         <Modal
