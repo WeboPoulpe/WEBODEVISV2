@@ -77,8 +77,13 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
       page-break-after: always !important; break-after: page !important;
     }
     .quote-doc .gastro-page { page-break-before: always !important; break-before: page !important; }
-    /* Un plat, une ligne du tableau ou le bloc des totaux ne sont jamais coupés entre deux pages. */
-    .quote-doc .gastro-menu > div, .quote-doc tr, .quote-doc [data-webo-financials] > div { page-break-inside: avoid; break-inside: avoid; }
+    /* Une ligne du tableau ou le bloc des totaux ne sont jamais coupés entre deux pages. Un plat peut l'être : une
+       fiche longue qui ne tient pas sous le bandeau du menu laisserait sinon une page presque vide. Ses lignes, elles,
+       restent entières, et le bandeau reste collé au premier plat. */
+    .quote-doc tr, .quote-doc [data-webo-financials] > div { page-break-inside: avoid; break-inside: avoid; }
+    .quote-doc .gastro-menu p, .quote-doc .gastro-menu li, .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3 { page-break-inside: avoid; break-inside: avoid; }
+    .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3 { page-break-after: avoid; break-after: avoid; }
+    .quote-doc .gastro-header { page-break-after: avoid; break-after: avoid; }
     .quote-doc thead { display: table-header-group; }
     .quote-doc p, .quote-doc li { orphans: 2; widows: 2; }
     ${s.showDesc ? '' : '.quote-doc .svc-desc { display: none !important; }'}
