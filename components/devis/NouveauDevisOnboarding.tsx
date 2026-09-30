@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight, Loader2, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
@@ -30,7 +30,7 @@ const TEMPLATES = [
 
 export default function NouveauDevisOnboarding() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [step, setStep] = useState(1); // 1 = event, 2 = client, 3 = template
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +49,11 @@ export default function NouveauDevisOnboarding() {
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('classique');
+  // Style de départ : celui demandé dans l'adresse (/devis/nouveau?style=…), sinon celui choisi pour le compte.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('style') ?? profile?.default_quote_style ?? null;
+    if (wanted && TEMPLATES.some((t) => t.key === wanted)) setTemplate(wanted as 'standard' | 'mariage' | 'business' | 'classique');
+  }, [profile?.default_quote_style]);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
 
   const canNext1 = !!eventType && !!eventDate && !!guestCount;
@@ -139,6 +144,7 @@ export default function NouveauDevisOnboarding() {
       event_location: eventLocation || '',
       guest_count: parseInt(guestCount) || 1,
       template,
+      ...(profile?.default_quote_font ? { selected_font: profile.default_quote_font } : {}),
       language,
       vat_rate: 20,
       hide_price: false,
@@ -317,7 +323,7 @@ export default function NouveauDevisOnboarding() {
                   <p className="text-[15px] text-gray-600 mt-1">Vous pourrez en changer à tout moment dans le devis, panneau Style.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {TEMPLATES.map((t) => (
                     <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique')} aria-pressed={template === t.key}
                       className={cn(choice(template === t.key), 'flex items-center sm:flex-col sm:items-start gap-3 p-4 text-left')}>

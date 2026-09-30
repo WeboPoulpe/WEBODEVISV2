@@ -65,7 +65,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/parametres', icon: Building2, label: 'Mon entreprise', exact: true },
       { href: '/parametres/categories', icon: FolderTree, label: 'Catégories', exact: false },
-      { href: '/modeles', icon: LayoutTemplate, label: 'Modèles de devis', exact: false },
+      { href: '/modeles', icon: LayoutTemplate, label: 'Styles de devis', exact: false },
       { href: '/location-templates', icon: Wrench, label: 'Modèles de location', exact: false },
     ],
   },

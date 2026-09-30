@@ -80,19 +80,17 @@ export const catalogue: HelpGuide[] = [
   {
     id: 'modeles-presentation',
     category: 'catalogue',
-    title: 'Parcourir les modèles de devis',
-    summary: 'La page « Modèles de devis » présente trois modèles prédéfinis et les vôtres.',
-    keywords: ['modèles', 'modèle de devis', 'présentation', 'mise en page', 'style', 'couleur', 'standard', 'mariage', 'business'],
+    title: 'Choisir le style de vos devis',
+    summary: 'Le style et la police proposés à chaque nouveau devis, vus sur un devis d’exemple.',
+    keywords: ['style', 'présentation', 'couleur', 'police', 'modèle', 'mise en page', 'charte', 'apparence'],
     href: '/modeles',
     steps: [
-      { title: 'Ouvrez « Modèles de devis » dans le menu « Paramètres »', text: 'Trois modèles prédéfinis sont présentés : « Standard », « Mariage & Réceptions » et « Business & Corporate ».' },
-      { title: 'Retrouvez les vôtres sous « Mes modèles »', text: 'Chacun porte un nom, une couleur et le modèle de base dont il part.' },
-      { title: 'Cliquez sur « Utiliser »', text: 'L’app ouvre la création d’un nouveau devis.' },
+      { title: 'Ouvrez « Styles de devis »', text: 'Dans le menu, rubrique Paramètres.' },
+      { title: 'Comparez les styles', text: 'Chaque vignette montre un devis d’exemple avec le nom de votre entreprise. Cliquez dessus pour la voir en grand.' },
+      { title: 'Choisissez un style et une police', text: 'Cliquez sur « Choisir » sous le style voulu, puis sélectionnez la police.' },
+      { title: 'Cliquez sur « Enregistrer mes choix »', text: 'Vos prochains devis partiront avec ce style et cette police.' },
     ],
-    notes: [
-      'La présentation d’un devis (style, images, page de garde) se règle dans le devis lui-même.',
-      'Pour repartir d’un devis type avec ses prestations, utilisez « Partir d’un modèle » dans la page « Devis ».',
-    ],
+    notes: ['Un devis déjà créé garde son style. Pour le changer, ouvrez-le dans l’éditeur, panneau Style.', '« Nouveau devis » sous un style crée un devis dans ce style, sans changer votre choix par défaut.'],
   },
   {
     id: 'modeles-location',

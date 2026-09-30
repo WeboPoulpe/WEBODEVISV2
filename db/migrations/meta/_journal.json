@@ -92,6 +92,13 @@
       "when": 1790787885747,
       "tag": "0012_notification_links",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790788163586,
+      "tag": "0013_profile_quote_defaults",
+      "breakpoints": true
     }
   ]
 }

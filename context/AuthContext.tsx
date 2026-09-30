@@ -26,6 +26,9 @@ export interface Profile {
   default_vat_rate: number | null;
   /** Options activées pour le compte (voir lib/modules.ts). */
   modules: unknown;
+  /** Style et police proposés à chaque nouveau devis (page Styles de devis). */
+  default_quote_style?: string | null;
+  default_quote_font?: string | null;
 }
 
 export interface AuthUser {

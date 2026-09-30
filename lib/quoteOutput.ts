@@ -4,6 +4,13 @@
 /** Polices présentes sur les appareils ; toutes les autres viennent de Google Fonts. */
 const SYSTEM_FONTS = ['Georgia', 'Times New Roman', 'Arial', 'Helvetica', 'Verdana', 'Courier New', 'Trebuchet MS', 'Garamond'];
 
+/** Polices proposées pour un devis (les mêmes que dans l'éditeur). */
+export const QUOTE_FONTS = [
+  'Georgia', 'Times New Roman', 'Garamond', 'Playfair Display', 'Merriweather', 'Lora', 'Cormorant Garamond', 'EB Garamond',
+  'Crimson Text', 'Libre Baskerville', 'Spectral', 'Arial', 'Helvetica', 'Montserrat', 'Roboto', 'Open Sans', 'Lato', 'Poppins',
+  'Inter', 'Raleway', 'Nunito', 'Source Sans 3', 'Work Sans',
+];
+
 export interface QuoteOutputSettings {
   font: string;
   /** Taille de base du texte, en pixels. */

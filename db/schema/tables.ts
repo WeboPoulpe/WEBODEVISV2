@@ -831,6 +831,9 @@ export const profiles = pgTable("profiles", {
 	has_completed_onboarding: boolean().default(false),
 	// Options activées pour ce compte (voir lib/modules.ts). Vide : les options standard.
 	modules: jsonb(),
+	// Style et police proposés à la création d'un devis (page Styles de devis).
+	default_quote_style: text(),
+	default_quote_font: text(),
 	default_vat_rate: integer().default(20),
 	cgv: text(),
 	siret: text(),
