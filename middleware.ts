@@ -10,7 +10,12 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/p/') ||
     pathname.startsWith('/e/') ||
-    pathname.startsWith('/reset-password');
+    pathname.startsWith('/reset-password') ||
+    // Fichiers de l'app installable : ils doivent se charger sans session.
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/sw.js' ||
+    pathname === '/hors-ligne' ||
+    pathname.startsWith('/icons/');
 
   // Public routes — no auth required
   if (isPublicRoute) return NextResponse.next();

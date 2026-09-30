@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Instrument_Sans, Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
+import RegisterServiceWorker from '@/components/pwa/RegisterServiceWorker';
 
 // Interface : Instrument Sans. Titres et grands chiffres : Bricolage Grotesque.
 const ui = Instrument_Sans({ subsets: ['latin'], variable: '--font-ui' });
@@ -20,6 +21,11 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: 'WeboDevis',
   description: 'Devis, événements et production pour les traiteurs',
+  applicationName: 'WeboDevis',
+  // Installation sur l'écran d'accueil d'un iPhone ou d'un iPad.
+  appleWebApp: { capable: true, title: 'WeboDevis', statusBarStyle: 'default' },
+  icons: { icon: '/icons/192', apple: '/icons/180' },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -34,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={`${ui.variable} ${display.variable} ${brand.variable} ${playfair.variable}`}>
       <body>
         <AuthProvider>{children}</AuthProvider>
+        <RegisterServiceWorker />
       </body>
     </html>
   );
