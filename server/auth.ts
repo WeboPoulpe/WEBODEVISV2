@@ -2,13 +2,14 @@
 
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { getServerSession } from 'next-auth';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '@/db';
 import { password_reset_tokens, profiles, users, type ProfileRow } from '@/db/schema';
-import { normalizeEmail } from '@/lib/auth';
-import { isDemoUser } from '@/lib/demo';
+import { authOptions, normalizeEmail } from '@/lib/auth';
+import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
-import { passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
+import { passwordChangedEmail, passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
 import { getSessionUser } from './session';
 import { isSignupOpen } from './settings';
 
@@ -95,5 +96,36 @@ export async function resetPassword(token: string, password: string): Promise<{ 
     await tx.update(users).set({ password_hash }).where(eq(users.id, row.user_id));
     await tx.update(password_reset_tokens).set({ used_at: new Date().toISOString() }).where(eq(password_reset_tokens.token_hash, tokenHash));
   });
+  return { error: null };
+}
+
+/**
+ * Changement de mot de passe par l'utilisateur connecté : l'ancien est redemandé.
+ * Fermé à la démonstration et à un administrateur entré dans le compte d'un client.
+ */
+export async function changePassword(input: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<{ error: string | null }> {
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  if (!userId) return { error: 'Votre session a expiré. Reconnectez-vous puis recommencez.' };
+  if (isDemoUser(userId)) return { error: DEMO_BLOCKED };
+  if (session.actingAsAdmin) return { error: 'Vous êtes dans le compte d’un client : seul son titulaire peut changer son mot de passe.' };
+
+  if (!input.currentPassword) return { error: 'Saisissez votre mot de passe actuel.' };
+  if (input.newPassword.length < MIN_PASSWORD) return { error: 'Le nouveau mot de passe doit faire au moins 6 caractères.' };
+  if (input.newPassword !== input.confirmPassword) return { error: 'Les deux nouveaux mots de passe ne correspondent pas.' };
+  if (input.newPassword === input.currentPassword) return { error: 'Le nouveau mot de passe est identique à l’actuel.' };
+
+  const [user] = await db.select({ email: users.email, password_hash: users.password_hash }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return { error: 'Votre session a expiré. Reconnectez-vous puis recommencez.' };
+  if (!(await bcrypt.compare(input.currentPassword, user.password_hash))) return { error: 'Le mot de passe actuel n’est pas le bon.' };
+
+  const password_hash = await bcrypt.hash(input.newPassword, 10);
+  await db.update(users).set({ password_hash }).where(eq(users.id, userId));
+  // L'email de confirmation ne bloque pas le changement s'il ne part pas.
+  await sendMail({ to: user.email, ...passwordChangedEmail({ loginUrl: `${await appOrigin()}/login` }) });
   return { error: null };
 }

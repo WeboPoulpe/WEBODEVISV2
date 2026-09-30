@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Check, Building2, Upload, X, FileText } from 'lucide-react';
+import { Loader2, Check, Building2, Upload, X, FileText, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fileToWebp } from '@/lib/imageToWebp';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
+import { errorCls } from '@/components/ui/kit';
+import { isDemoUser } from '@/lib/demo';
+import { changePassword } from '@/server/auth';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Profile {
@@ -54,9 +57,111 @@ function SaveBtn({ loading, saved, onClick }: { loading: boolean; saved: boolean
   );
 }
 
+// ── Mot de passe ──────────────────────────────────────────────────────────────
+function PasswordSection({ locked }: { locked: string | null }) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null); setDone(false);
+    if (!current) { setError('Saisissez votre mot de passe actuel.'); return; }
+    if (next.length < 6) { setError('Le nouveau mot de passe doit faire au moins 6 caractères.'); return; }
+    if (next !== confirm) { setError('Les deux nouveaux mots de passe ne correspondent pas.'); return; }
+    setSaving(true);
+    try {
+      const { error: err } = await changePassword({ currentPassword: current, newPassword: next, confirmPassword: confirm });
+      if (err) { setError(err); return; }
+      setCurrent(''); setNext(''); setConfirm('');
+      setDone(true);
+    } catch {
+      setError('Le mot de passe n’a pas pu être changé. Vérifiez votre connexion et réessayez.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputType = show ? 'text' : 'password';
+  const fieldCls = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors';
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+        <div className="p-2 bg-primary-50 rounded-lg">
+          <KeyRound className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-gray-900 text-sm">Mot de passe</h2>
+          <p className="text-xs text-gray-400">Celui que vous utilisez pour vous connecter</p>
+        </div>
+      </div>
+      {locked ? (
+        <p className="p-6 text-sm text-gray-500">{locked}</p>
+      ) : (
+        <form onSubmit={submit} className="p-6 space-y-4" aria-label="Changer le mot de passe">
+          <div>
+            <label htmlFor="pwd-current" className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe actuel</label>
+            <div className="relative">
+              <input
+                id="pwd-current" type={inputType} autoComplete="current-password"
+                value={current} onChange={(e) => setCurrent(e.target.value)}
+                className={`${fieldCls} pr-12`}
+              />
+              <button
+                type="button"
+                onClick={() => setShow((s) => !s)}
+                aria-label={show ? 'Masquer les mots de passe' : 'Afficher les mots de passe'}
+                className="absolute right-0 top-0 w-10 h-full flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900"
+              >
+                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="pwd-new" className="block text-sm font-medium text-gray-700 mb-1.5">Nouveau mot de passe</label>
+              <input
+                id="pwd-new" type={inputType} autoComplete="new-password"
+                value={next} onChange={(e) => setNext(e.target.value)}
+                className={fieldCls}
+              />
+              <p className="text-xs text-gray-400 mt-1">6 caractères au moins.</p>
+            </div>
+            <div>
+              <label htmlFor="pwd-confirm" className="block text-sm font-medium text-gray-700 mb-1.5">Confirmer le nouveau mot de passe</label>
+              <input
+                id="pwd-confirm" type={inputType} autoComplete="new-password"
+                value={confirm} onChange={(e) => setConfirm(e.target.value)}
+                className={fieldCls}
+              />
+            </div>
+          </div>
+          {error && <p role="alert" className={errorCls}>{error}</p>}
+          {done && <p role="status" className="text-sm text-forest">Mot de passe changé. Un email de confirmation vous a été envoyé.</p>}
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 min-h-[40px] bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? 'Changement…' : 'Changer le mot de passe'}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ParametresPage() {
-  const { user } = useAuth();
+  const { user, actingAsAdmin } = useAuth();
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -319,6 +424,15 @@ export default function ParametresPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Section 4: Mot de passe ─────────────────────────────────────────── */}
+      <PasswordSection
+        locked={
+          isDemoUser(user?.id) ? 'Le mot de passe ne se change pas dans la démonstration.'
+            : actingAsAdmin ? 'Vous êtes dans le compte d’un client : seul son titulaire peut changer son mot de passe.'
+            : null
+        }
+      />
     </div>
   );
 }

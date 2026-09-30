@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Plus, Wine, UtensilsCrossed, Coffee, Wrench, Users, Package,
-  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy, Percent,
+  Search, X, Loader2, Check, Pencil, Trash2, UploadCloud, Truck, AlertCircle, Carrot, LayoutTemplate, Copy, Percent, FolderInput,
 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { createClient } from '@/lib/supabase/client';
@@ -835,15 +835,29 @@ function PriceCell({ p, onPrice }: { p: Prestation; onPrice: (price: number) => 
   );
 }
 
+/** Case à cocher avec une cible tactile de 40 px. */
+function SelectBox({ checked, onChange, label, indeterminate }: { checked: boolean; onChange: () => void; label: string; indeterminate?: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (ref.current) ref.current.indeterminate = !!indeterminate; }, [indeterminate]);
+  return (
+    <span className="w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-xl hover:bg-gray-100">
+      <input ref={ref} type="checkbox" checked={checked} onChange={onChange} aria-label={label}
+        className="h-5 w-5 rounded border-gray-300 accent-primary cursor-pointer" />
+    </span>
+  );
+}
+
 function PrestationRow({
-  p, onEdit, onDelete, onDuplicate, onPrice,
+  p, onEdit, onDelete, onDuplicate, onPrice, selected, onToggle,
 }: {
   p: Prestation; onEdit: () => void; onDelete: () => void; onDuplicate: () => void; onPrice: (price: number) => Promise<boolean>;
+  selected: boolean; onToggle: () => void;
 }) {
   const excerpt = plainText(p.description);
   return (
-    <li className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition-colors">
-      <button onClick={onEdit} className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1 text-left pl-4 sm:pl-5 py-3.5">
+    <li className={cn('flex items-center gap-1 pr-2 transition-colors', selected ? 'bg-primary-50' : 'hover:bg-gray-50')}>
+      <label className="pl-1 sm:pl-2 cursor-pointer"><SelectBox checked={selected} onChange={onToggle} label={`Sélectionner ${p.name}`} /></label>
+      <button onClick={onEdit} className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1 text-left pl-1 py-3.5">
         <span className="sm:flex-1 min-w-0 w-full">
           <span className="flex items-center gap-2">
             <span className="font-semibold text-gray-900 line-clamp-2">{p.name}</span>
@@ -881,6 +895,11 @@ export default function PrestationsPage() {
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [importing, setImporting] = useState(false);
   const { categories: dbCategories, subcategoriesFor } = usePrestationCategories();
+
+  // ── Sélection (actions groupées) ───────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCat, setBulkCat] = useState<{ categoryId: string; subCategoryId: string; saving: boolean; error: string | null } | null>(null);
+  const [bulkDelete, setBulkDelete] = useState<{ saving: boolean; error: string | null } | null>(null);
 
   // Sous-catégories disponibles pour l'onglet actif
   const currentSubList = useMemo(() => {
@@ -993,6 +1012,39 @@ export default function PrestationsPage() {
     else setRaise(null);
   };
 
+  // Changer de catégorie : identifiants et libellés texte restent cohérents, comme dans la fiche prestation.
+  const applyBulkCategory = async (targets: Prestation[]) => {
+    if (!bulkCat || targets.length === 0) return;
+    setBulkCat({ ...bulkCat, saving: true, error: null });
+    const cat = dbCategories.find((c) => c.id === bulkCat.categoryId);
+    const sub = subcategoriesFor(bulkCat.categoryId).find((x) => x.id === bulkCat.subCategoryId);
+    const patch = {
+      category_id: cat?.id ?? null,
+      category: cat?.name ?? null,
+      sub_category_id: cat && sub ? sub.id : null,
+      sub_category: cat && sub ? sub.name : null,
+    };
+    const ids = targets.map((p) => p.id);
+    const { error } = await createClient().from('prestations').update(patch).in('id', ids);
+    if (error) { setBulkCat({ ...bulkCat, saving: false, error: 'La catégorie n’a pas pu être changée. Vérifiez votre connexion et réessayez.' }); return; }
+    const idSet = new Set(ids);
+    setItems((prev) => prev.map((p) => (idSet.has(p.id) ? { ...p, ...patch } : p)));
+    setBulkCat(null);
+    setSelectedIds(new Set());
+  };
+
+  const applyBulkDelete = async (targets: Prestation[]) => {
+    if (targets.length === 0) return;
+    setBulkDelete({ saving: true, error: null });
+    const ids = targets.map((p) => p.id);
+    const { error } = await createClient().from('prestations').delete().in('id', ids);
+    if (error) { setBulkDelete({ saving: false, error: 'Les prestations n’ont pas pu être supprimées. Réessayez.' }); return; }
+    const idSet = new Set(ids);
+    setItems((prev) => prev.filter((p) => !idSet.has(p.id)));
+    setBulkDelete(null);
+    setSelectedIds(new Set());
+  };
+
   const handleDuplicate = async (p: Prestation) => {
     if (!user) return;
     const supabase = createClient();
@@ -1033,6 +1085,16 @@ export default function PrestationsPage() {
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
     return matchTab && matchSub && matchSearch;
   });
+
+  // Seules les prestations affichées comptent : un filtre ou une recherche ne laisse pas d'action cachée.
+  const selected = filtered.filter((p) => selectedIds.has(p.id));
+  const allSelected = filtered.length > 0 && selected.length === filtered.length;
+  const toggleOne = (id: string) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(filtered.map((p) => p.id)));
 
   // Sans filtre, le catalogue est rangé par catégorie ; une catégorie choisie ou une recherche donne une liste simple.
   const groups = useMemo(() => {
@@ -1093,7 +1155,7 @@ export default function PrestationsPage() {
             key={key}
             role="tab"
             aria-selected={activeTab === key}
-            onClick={() => { setActiveTab(key); setActiveSub(null); }}
+            onClick={() => { setActiveTab(key); setActiveSub(null); setSelectedIds(new Set()); }}
             className={cn(
               'flex items-center gap-1.5 flex-shrink-0 h-10 px-3.5 rounded-full text-sm font-medium transition-colors',
               activeTab === key ? 'bg-forest text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300',
@@ -1154,6 +1216,28 @@ export default function PrestationsPage() {
         </div>
       ) : (
         <div className="space-y-6 mt-2">
+          {/* Sélection : tout cocher, puis actions sur les prestations cochées */}
+          <div className={cn('flex flex-wrap items-center gap-2 rounded-2xl', selected.length > 0 ? 'p-2 bg-white border border-primary-200' : 'pl-1 sm:pl-2')}
+            role="toolbar" aria-label="Actions sur la sélection">
+            <label className="flex items-center gap-1 pr-2 text-sm text-gray-700 cursor-pointer select-none">
+              <SelectBox checked={allSelected} indeterminate={selected.length > 0 && !allSelected} onChange={toggleAll}
+                label={allSelected ? 'Tout décocher' : 'Tout cocher'} />
+              {selected.length > 0
+                ? <span className="font-semibold text-gray-900">{selected.length} sélectionnée{selected.length > 1 ? 's' : ''}</span>
+                : <span>Tout cocher ({filtered.length})</span>}
+            </label>
+            {selected.length > 0 && (
+              <>
+                <button onClick={() => setBulkCat({ categoryId: '', subCategoryId: '', saving: false, error: null })} className={btnSecondary}>
+                  <FolderInput className="h-4 w-4" />Changer de catégorie
+                </button>
+                <button onClick={() => setBulkDelete({ saving: false, error: null })} className={cn(btnSecondary, 'text-danger')}>
+                  <Trash2 className="h-4 w-4" />Supprimer
+                </button>
+                <button onClick={() => setSelectedIds(new Set())} className={btnGhost}>Annuler</button>
+              </>
+            )}
+          </div>
           {groups.map((g) => (
             <section key={g.label || 'liste'}>
               {g.label && (
@@ -1171,6 +1255,8 @@ export default function PrestationsPage() {
                     onDelete={() => handleDelete(p.id)}
                     onDuplicate={() => handleDuplicate(p)}
                     onPrice={(price) => handlePrice(p.id, price)}
+                    selected={selectedIds.has(p.id)}
+                    onToggle={() => toggleOne(p.id)}
                   />
                 ))}
               </ul>
@@ -1228,6 +1314,68 @@ export default function PrestationsPage() {
           </Modal>
         );
       })()}
+
+      {bulkCat && (() => {
+        const subs = subcategoriesFor(bulkCat.categoryId);
+        return (
+          <Modal
+            title="Changer de catégorie"
+            onClose={() => !bulkCat.saving && setBulkCat(null)}
+            footer={<>
+              <button onClick={() => setBulkCat(null)} disabled={bulkCat.saving} className={btnGhost}>Annuler</button>
+              <button onClick={() => applyBulkCategory(selected)} disabled={bulkCat.saving || selected.length === 0} className={btnPrimary}>
+                {bulkCat.saving && <Loader2 className="h-4 w-4 animate-spin" />}Appliquer à {selected.length} prestation{selected.length > 1 ? 's' : ''}
+              </button>
+            </>}
+          >
+            <div className="space-y-4 pb-3">
+              <p className="text-sm text-gray-600">
+                {selected.length > 1 ? `Les ${selected.length} prestations cochées passent` : 'La prestation cochée passe'} dans la catégorie choisie. Les devis déjà faits ne changent pas.
+              </p>
+              <div>
+                <label htmlFor="bulk-cat" className={labelCls}>Catégorie</label>
+                <select id="bulk-cat" value={bulkCat.categoryId} onChange={(e) => setBulkCat({ ...bulkCat, categoryId: e.target.value, subCategoryId: '' })} className={inputCls}>
+                  <option value="">Sans catégorie</option>
+                  {dbCategories.map((c) => <option key={c.id} value={c.id}>{c.name}{c.user_id ? ' (la vôtre)' : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="bulk-subcat" className={labelCls}>Sous-catégorie</label>
+                <select id="bulk-subcat" value={bulkCat.subCategoryId} disabled={!bulkCat.categoryId || subs.length === 0}
+                  onChange={(e) => setBulkCat({ ...bulkCat, subCategoryId: e.target.value })} className={cn(inputCls, 'disabled:bg-gray-50 disabled:text-gray-400')}>
+                  <option value="">Sans sous-catégorie</option>
+                  {subs.map((x) => <option key={x.id} value={x.id}>{x.name}{x.user_id ? ' (la vôtre)' : ''}</option>)}
+                </select>
+              </div>
+              {bulkCat.error && <p role="alert" className={errorCls}>{bulkCat.error}</p>}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {bulkDelete && (
+        <Modal
+          title={`Supprimer ${selected.length} prestation${selected.length > 1 ? 's' : ''} ?`}
+          onClose={() => !bulkDelete.saving && setBulkDelete(null)}
+          footer={<>
+            <button onClick={() => setBulkDelete(null)} disabled={bulkDelete.saving} className={btnGhost}>Annuler</button>
+            <button onClick={() => applyBulkDelete(selected)} disabled={bulkDelete.saving || selected.length === 0} className={cn(btnPrimary, 'bg-danger hover:bg-danger/90')}>
+              {bulkDelete.saving && <Loader2 className="h-4 w-4 animate-spin" />}Supprimer {selected.length} prestation{selected.length > 1 ? 's' : ''}
+            </button>
+          </>}
+        >
+          <div className="space-y-3 pb-3 text-[15px] text-gray-700">
+            <p>{selected.length > 1 ? `Les ${selected.length} prestations cochées seront retirées` : 'La prestation cochée sera retirée'} de votre catalogue. Les devis où elles figurent déjà ne changent pas.</p>
+            {selected.length <= 5 && (
+              <ul className="rounded-2xl bg-gray-50 divide-y divide-gray-200 text-sm">
+                {selected.map((p) => <li key={p.id} className="px-4 py-2.5 truncate">{p.name}</li>)}
+              </ul>
+            )}
+            <p>La suppression est définitive.</p>
+            {bulkDelete.error && <p role="alert" className={errorCls}>{bulkDelete.error}</p>}
+          </div>
+        </Modal>
+      )}
 
       {/* Prestation modal */}
       {modal.open && (

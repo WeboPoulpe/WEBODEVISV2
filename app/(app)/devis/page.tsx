@@ -21,7 +21,7 @@ import ImportDevisModal from '@/components/devis/ImportDevisModal';
 import FinanceSheet from '@/components/devis/FinanceSheet';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES } from '@/lib/quoteStatus';
+import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES, QUOTE_STATUSES, QUOTE_STATUS_LABELS } from '@/lib/quoteStatus';
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
 import FolderBar, { DragItem } from '@/components/devis/FolderBar';
 import TemplateThumb from '@/components/devis/TemplateThumb';
@@ -504,9 +504,26 @@ function DevisSheet({
   );
 }
 
+/** Brouillon (ou import) : ce qu'on supprime sans hésiter. Le reste a déjà été envoyé ou traité. */
+const isDraftQuote = (q: { status: string; imported?: boolean | null }) =>
+  ['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(q.status) || !!q.imported;
+
+/** Case à cocher avec une cible tactile de 40 px. */
+function SelectBox({ checked, onChange, label, indeterminate }: { checked: boolean; onChange: () => void; label: string; indeterminate?: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (ref.current) ref.current.indeterminate = !!indeterminate; }, [indeterminate]);
+  return (
+    <span className="w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-xl hover:bg-gray-100">
+      <input ref={ref} type="checkbox" checked={checked} onChange={onChange} aria-label={label}
+        className="h-5 w-5 rounded border-gray-300 accent-primary cursor-pointer" />
+    </span>
+  );
+}
+
 // ── Ligne de devis ────────────────────────────────────────────────────────────
-function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, folderLabel }: {
+function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, folderLabel, selected, onToggle }: {
   quote: Quote; onOpen: () => void; onMenu: () => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; dragging: boolean; folderLabel: string;
+  selected: boolean; onToggle: () => void;
 }) {
   const total = computeQuoteTotal(quote);
   return (
@@ -514,9 +531,10 @@ function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, fol
       draggable
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', quote.id); onDragStart({ type: 'quote', id: quote.id }); }}
       onDragEnd={onDragEnd}
-      className={cn('flex items-center gap-1 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition-colors', dragging && 'opacity-40')}
+      className={cn('flex items-center gap-1 border rounded-2xl transition-colors', selected ? 'border-primary-400 bg-primary-50' : 'bg-white border-gray-200 hover:border-gray-300', dragging && 'opacity-40')}
     >
-      <button onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 p-3 sm:p-4 text-left rounded-2xl">
+      <label className="pl-1 sm:pl-2 cursor-pointer"><SelectBox checked={selected} onChange={onToggle} label={`Sélectionner ${quoteDisplayName(quote)}`} /></label>
+      <button onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 py-3 pr-1 sm:py-4 sm:pr-2 text-left rounded-2xl">
         {quote.event_date
           ? <DateBlock iso={quote.event_date} />
           : <div className="w-14 h-14 rounded-xl border border-dashed border-gray-300 flex-shrink-0" aria-hidden />}
@@ -711,6 +729,13 @@ export default function DevisPage() {
   const [folders, setFolders] = useState<QuoteFolder[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [moveQuote, setMoveQuote] = useState<Quote | null>(null);
+
+  // ── Sélection (actions groupées de la vue Liste) ───────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
   // useRef pour que les handlers de drop lisent toujours la valeur courante
   const dragItemRef = useRef<DragItem>(null);
   const [dragItem, setDragItem] = useState<DragItem>(null);
@@ -915,6 +940,57 @@ export default function DevisPage() {
     else moveFolderTo(item.id, target);
   }, [endDrag, moveQuoteToFolder, moveFolderTo]);
 
+  // ── Actions groupées ───────────────────────────────────────────────────────
+  const clearSelection = useCallback(() => { setSelectedIds(new Set()); setBulkError(null); }, []);
+
+  const bulkSetStatus = useCallback(async (targets: Quote[], status: string) => {
+    if (targets.length === 0 || !status) return;
+    setBulkBusy(true); setBulkError(null);
+    const supabase = createClient();
+    const ids = targets.map((q) => q.id);
+    const { error } = await supabase.from('quotes').update({ status }).in('id', ids);
+    if (error) {
+      setBulkBusy(false);
+      setBulkError('Le statut n’a pas pu être changé. Vérifiez votre connexion et réessayez.');
+      return;
+    }
+    // Comme sur la fiche : la demande rattachée suit le statut du devis.
+    const prospectIds = targets.map((q) => q.prospect_id).filter((id): id is string => !!id);
+    if (prospectIds.length > 0) await supabase.from('prospect_requests').update({ status }).in('id', prospectIds);
+    const idSet = new Set(ids);
+    setQuotes((prev) => prev.map((q) => (idSet.has(q.id) ? { ...q, status } : q)));
+    setBulkBusy(false);
+    clearSelection();
+  }, [clearSelection]);
+
+  const bulkMove = useCallback(async (targets: Quote[], folderId: string | null) => {
+    if (targets.length === 0) return;
+    setBulkError(null);
+    const ids = targets.map((q) => q.id);
+    const { error } = await createClient().from('quotes').update({ folder_id: folderId }).in('id', ids);
+    if (error) { setBulkError('Les devis n’ont pas pu être déplacés. Vérifiez votre connexion et réessayez.'); return; }
+    const idSet = new Set(ids);
+    setQuotes((prev) => prev.map((q) => (idSet.has(q.id) ? { ...q, folder_id: folderId } : q)));
+    clearSelection();
+  }, [clearSelection]);
+
+  const bulkDelete = useCallback(async (targets: Quote[]) => {
+    if (targets.length === 0) return;
+    setBulkBusy(true); setBulkError(null);
+    const ids = targets.map((q) => q.id);
+    const { error } = await createClient().from('quotes').delete().in('id', ids);
+    setBulkBusy(false);
+    setBulkDeleteOpen(false);
+    if (error) { setBulkError('Les devis n’ont pas pu être supprimés. Vérifiez votre connexion et réessayez.'); return; }
+    const idSet = new Set(ids);
+    setQuotes((prev) => prev.filter((q) => !idSet.has(q.id)));
+    setSheetQuote((prev) => (prev && idSet.has(prev.id) ? null : prev));
+    clearSelection();
+  }, [clearSelection]);
+
+  // Changer de volet, de dossier ou de vue repart d'une sélection vide.
+  useEffect(() => { clearSelection(); }, [scope, currentFolder, view, clearSelection]);
+
   // ── Portée du dossier courant ──────────────────────────────────────────────
   const searching = search.trim().length > 0;
   const scopeIds = useMemo(() => descendantIds(folders, currentFolder), [folders, currentFolder]);
@@ -965,6 +1041,20 @@ export default function DevisPage() {
   const listed = base
     .filter((q) => activeScope.statuses.includes(q.status) && (!statusFilter || q.status === statusFilter))
     .sort(sortFn);
+
+  // Seuls les devis visibles comptent : un filtre ou une recherche ne laisse pas d'action cachée.
+  const selectedQuotes = listed.filter((q) => selectedIds.has(q.id));
+  const allSelected = listed.length > 0 && selectedQuotes.length === listed.length;
+  const toggleOne = (id: string) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(listed.map((q) => q.id)));
+  const nonDraftSelected = selectedQuotes.filter((q) => !isDraftQuote(q)).length;
+  // Dossier commun aux devis cochés (coché dans la fenêtre), sinon aucun.
+  const commonFolder = selectedQuotes.length > 0 && selectedQuotes.every((q) => (q.folder_id ?? null) === (selectedQuotes[0].folder_id ?? null))
+    ? selectedQuotes[0].folder_id ?? null : '__plusieurs__';
 
   const controlCls = 'h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-100';
   const segment = (active: boolean) => cn('h-9 px-3 sm:px-4 rounded-lg text-sm font-medium whitespace-nowrap transition-colors',
@@ -1075,13 +1165,45 @@ export default function DevisPage() {
               </p>
             </div>
           ) : (
-            <ul className="space-y-2.5">
-              {listed.map((q) => (
-                <QuoteRow key={q.id} quote={q} onOpen={() => setSheetQuote(q)} onMenu={() => setMenuQuote(q)}
-                  onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id}
-                  folderLabel={currentFolder ? '' : folderLabelOf(q)} />
-              ))}
-            </ul>
+            <>
+              {/* Sélection : tout cocher, puis actions sur les devis cochés */}
+              <div className={cn('flex flex-wrap items-center gap-2 mb-2.5 rounded-2xl', selectedQuotes.length > 0 ? 'p-2 bg-white border border-primary-200' : 'pl-1 sm:pl-2')}
+                role="toolbar" aria-label="Actions sur la sélection">
+                <label className="flex items-center gap-1 pr-2 text-sm text-gray-700 cursor-pointer select-none">
+                  <SelectBox checked={allSelected} indeterminate={selectedQuotes.length > 0 && !allSelected} onChange={toggleAll}
+                    label={allSelected ? 'Tout décocher' : 'Tout cocher'} />
+                  {selectedQuotes.length > 0
+                    ? <span className="font-semibold text-gray-900">{selectedQuotes.length} sélectionné{selectedQuotes.length > 1 ? 's' : ''}</span>
+                    : <span>Tout cocher ({listed.length})</span>}
+                </label>
+                {selectedQuotes.length > 0 && (
+                  <>
+                    <select value="" disabled={bulkBusy} onChange={(e) => bulkSetStatus(selectedQuotes, e.target.value)}
+                      aria-label="Changer le statut des devis sélectionnés" className={cn(controlCls, 'basis-full sm:basis-auto min-w-0')}>
+                      <option value="">Changer le statut…</option>
+                      {QUOTE_STATUSES.map((s) => <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>)}
+                    </select>
+                    <button onClick={() => setBulkMoveOpen(true)} disabled={bulkBusy} className={btnSecondary}>
+                      <FolderInput className="h-4 w-4" />Déplacer
+                    </button>
+                    <button onClick={() => setBulkDeleteOpen(true)} disabled={bulkBusy} className={cn(btnSecondary, 'text-danger')}>
+                      <Trash2 className="h-4 w-4" />Supprimer
+                    </button>
+                    <button onClick={clearSelection} className={btnGhost}>Annuler</button>
+                    {bulkBusy && <Loader2 className="h-4 w-4 animate-spin text-primary" aria-label="En cours" />}
+                  </>
+                )}
+              </div>
+              {bulkError && <p role="alert" className={cn(errorCls, 'mb-2.5')}>{bulkError}</p>}
+              <ul className="space-y-2.5">
+                {listed.map((q) => (
+                  <QuoteRow key={q.id} quote={q} onOpen={() => setSheetQuote(q)} onMenu={() => setMenuQuote(q)}
+                    onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id}
+                    folderLabel={currentFolder ? '' : folderLabelOf(q)}
+                    selected={selectedIds.has(q.id)} onToggle={() => toggleOne(q.id)} />
+                ))}
+              </ul>
+            </>
           )}
         </>
       )}
@@ -1186,6 +1308,47 @@ export default function DevisPage() {
         onClose={() => setMoveQuote(null)}
         onMove={(folderId) => { if (moveQuote) return moveQuoteToFolder(moveQuote.id, folderId); }}
       />
+
+      {/* ── Déplacer les devis sélectionnés ───────────────────────────── */}
+      <MoveToFolderModal
+        open={bulkMoveOpen}
+        folders={folders}
+        currentFolderId={commonFolder}
+        quoteName={`${selectedQuotes.length} devis sélectionné${selectedQuotes.length > 1 ? 's' : ''}`}
+        onClose={() => setBulkMoveOpen(false)}
+        onMove={(folderId) => bulkMove(selectedQuotes, folderId)}
+      />
+
+      {/* ── Supprimer les devis sélectionnés ──────────────────────────── */}
+      {bulkDeleteOpen && (
+        <Modal
+          title={`Supprimer ${selectedQuotes.length} devis ?`}
+          onClose={() => { if (!bulkBusy) setBulkDeleteOpen(false); }}
+          footer={(
+            <>
+              <button onClick={() => setBulkDeleteOpen(false)} disabled={bulkBusy} className={btnSecondary}>Annuler</button>
+              <button onClick={() => bulkDelete(selectedQuotes)} disabled={bulkBusy}
+                className={cn(btnPrimary, 'bg-danger hover:bg-danger/90')}>
+                {bulkBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                Supprimer {selectedQuotes.length} devis
+              </button>
+            </>
+          )}
+        >
+          <div className="pb-3 space-y-3 text-[15px] text-gray-700">
+            {nonDraftSelected > 0 ? (
+              <p className="rounded-xl bg-danger/5 border border-danger/30 px-4 py-3 text-gray-900 font-semibold">
+                {nonDraftSelected === selectedQuotes.length
+                  ? (nonDraftSelected > 1 ? `Aucun n’est un brouillon : les ${nonDraftSelected} devis ont déjà été envoyés ou traités.` : 'Ce n’est pas un brouillon : ce devis a déjà été envoyé ou traité.')
+                  : `Dont ${nonDraftSelected} qui ${nonDraftSelected > 1 ? 'ne sont pas des brouillons (déjà envoyés ou traités)' : 'n’est pas un brouillon (déjà envoyé ou traité)'}.`}
+              </p>
+            ) : (
+              <p>{selectedQuotes.length > 1 ? 'Ce sont tous des brouillons.' : 'C’est un brouillon.'}</p>
+            )}
+            <p>La suppression est définitive : les devis et leur contenu ne pourront pas être récupérés.</p>
+          </div>
+        </Modal>
+      )}
 
       {/* ── Duplication modal ─────────────────────────────────────────────── */}
       {/* ── Template preview sheet ─────────────────────────────────────── */}

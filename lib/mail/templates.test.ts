@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { passwordResetEmail, prospectAckEmail, prospectNotificationEmail, quoteProposalEmail, welcomeEmail } from './templates';
+import { passwordChangedEmail, passwordResetEmail,prospectAckEmail, prospectNotificationEmail, quoteProposalEmail, welcomeEmail } from './templates';
 
 const prospect = {
   firstName: 'Claire',
@@ -26,6 +26,13 @@ describe('emails', () => {
     const mail = passwordResetEmail({ link: 'https://webodevis.fr/reset-password?token=abc' });
     expect(mail.html).toContain('href="https://webodevis.fr/reset-password?token=abc"');
     expect(mail.html).toContain('valable une heure');
+  });
+
+  it('mot de passe changé : prévient et renvoie vers la connexion', () => {
+    const mail = passwordChangedEmail({ loginUrl: 'https://webodevis.fr/login' });
+    expect(mail.subject).toBe('Votre mot de passe WeboDevis a été changé');
+    expect(mail.html).toContain('href="https://webodevis.fr/login"');
+    expect(mail.html).toContain('Mot de passe oublié');
   });
 
   it('nouvelle demande : détail de la demande et lien vers les prospects', () => {

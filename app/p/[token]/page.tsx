@@ -33,7 +33,7 @@ function Field({
   );
 }
 
-const inputCls = 'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white';
+const inputCls = 'w-full px-4 py-3 border border-gray-200 rounded-xl text-base sm:text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white';
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ProspectFormPage() {
@@ -80,7 +80,7 @@ export default function ProspectFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-      setError('Prénom, nom et email sont requis.');
+      setError('Indiquez votre prénom, votre nom et votre email.');
       return;
     }
     setSubmitting(true);
@@ -109,7 +109,7 @@ export default function ProspectFormPage() {
 
     setSubmitting(false);
     if (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
+      setError('Votre demande n’a pas pu être envoyée. Vérifiez votre connexion et réessayez.');
     } else {
       setStage('success');
     }
@@ -118,7 +118,7 @@ export default function ProspectFormPage() {
   // ── Loading ──
   if (stage === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center">
+      <div className="min-h-screen bg-page flex items-center justify-center">
         <Loader2 className="h-8 w-8 text-primary animate-spin" />
       </div>
     );
@@ -127,13 +127,13 @@ export default function ProspectFormPage() {
   // ── Invalid token ──
   if (stage === 'invalid') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="h-7 w-7 text-red-500" />
+      <div className="min-h-screen bg-page flex items-center justify-center p-4">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-card p-8 max-w-md w-full text-center">
+          <div className="w-14 h-14 bg-danger/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="h-7 w-7 text-danger" />
           </div>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Lien invalide</h2>
-          <p className="text-sm text-gray-500">Ce lien de formulaire n&apos;existe pas ou a été désactivé. Contactez directement le prestataire.</p>
+          <p className="text-sm text-gray-500">Ce lien de formulaire n&apos;existe pas ou a été désactivé. Contactez directement le traiteur.</p>
         </div>
       </div>
     );
@@ -142,14 +142,14 @@ export default function ProspectFormPage() {
   // ── Success ──
   if (stage === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="h-7 w-7 text-emerald-500" />
+      <div className="min-h-screen bg-page flex items-center justify-center p-4">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-card p-8 max-w-md w-full text-center">
+          <div className="w-14 h-14 bg-sage-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="h-7 w-7 text-sage" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Demande envoyée !</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Demande envoyée</h2>
           <p className="text-sm text-gray-500 leading-relaxed mb-6">
-            Votre demande de devis a bien été reçue. Nous vous contacterons sous 48h pour vous proposer une offre personnalisée.
+            Votre demande de devis est bien arrivée. Nous revenons vers vous rapidement avec une proposition.
           </p>
           {tokenData?.brochure_url && (
             <a
@@ -168,23 +168,20 @@ export default function ProspectFormPage() {
 
   // ── Form ──
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 py-10 px-4">
+    <div className="min-h-screen bg-page py-10 px-4">
       <div className="max-w-xl mx-auto">
 
         {/* Header */}
         <div className="text-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: 'linear-gradient(135deg, #ce93d8, #9c27b0)', boxShadow: '0 8px 24px rgba(156,39,176,0.3)' }}
-          >
-            <ChefHat className="h-7 w-7 text-white" />
+          <div className="w-14 h-14 rounded-2xl bg-forest flex items-center justify-center mx-auto mb-4 shadow-card">
+            <ChefHat className="h-7 w-7 text-primary-300" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Demande de devis</h1>
           <p className="text-sm text-gray-500">Remplissez ce formulaire et nous vous recontacterons rapidement.</p>
         </div>
 
         {/* Form card */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-5">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-card p-6 sm:p-8 space-y-5">
 
           {/* Section: Contact */}
           <div>
@@ -271,11 +268,11 @@ export default function ProspectFormPage() {
                   onChange={(e) => setEventType(e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">— Sélectionner —</option>
+                  <option value="">Choisir</option>
                   {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 items-end gap-3">
                 <Field label="Date prévue">
                   <input
                     type="date"
@@ -313,7 +310,7 @@ export default function ProspectFormPage() {
               </div>
               <Field label="Lieu de l'événement">
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-primary/60" />
+                  <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
                   <input
                     value={serviceAddress}
                     onChange={(e) => setServiceAddress(e.target.value)}
@@ -340,7 +337,7 @@ export default function ProspectFormPage() {
 
           {/* Error */}
           {error && (
-            <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">
+            <div role="alert" className="flex items-center gap-2 px-4 py-3 bg-white border border-danger/30 rounded-xl text-sm text-danger">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               {error}
             </div>

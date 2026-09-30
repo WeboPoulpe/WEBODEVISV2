@@ -42,6 +42,20 @@ export function passwordResetEmail({ link }: { link: string }): Email {
   };
 }
 
+/** Après un changement de mot de passe depuis les Paramètres : prévient la personne, au cas où ce ne serait pas elle. */
+export function passwordChangedEmail({ loginUrl }: { loginUrl: string }): Email {
+  return {
+    subject: 'Votre mot de passe WeboDevis a été changé',
+    html: renderEmail({
+      preheader: 'Le mot de passe de votre compte vient d’être modifié.',
+      title: 'Mot de passe changé',
+      paragraphs: ['Le mot de passe de votre compte WeboDevis vient d’être changé depuis les Paramètres. Utilisez-le désormais pour vous connecter.'],
+      button: { label: 'Ouvrir WeboDevis', url: loginUrl },
+      note: 'Si vous n’êtes pas à l’origine de ce changement, choisissez tout de suite un nouveau mot de passe avec « Mot de passe oublié » sur la page de connexion, puis écrivez-nous.',
+    }),
+  };
+}
+
 // ── Demandes reçues par le formulaire ─────────────────────────────────────────
 export interface ProspectDetails {
   firstName: string;
