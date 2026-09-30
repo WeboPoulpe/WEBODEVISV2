@@ -1,0 +1,212 @@
+{
+  "ajouter-client": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/ajouter-client-bf0edccc2a.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/ajouter-client-77e91b2f0c.jpg",
+    "seconds": 24
+  },
+  "calendrier": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/calendrier-25be1fcd17.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/calendrier-b0fb6b091c.jpg",
+    "seconds": 14
+  },
+  "categories": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/categories-232b861a57.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/categories-5da29f5fe6.jpg",
+    "seconds": 13
+  },
+  "commande-fournisseur": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/commande-fournisseur-daf17781e8.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/commande-fournisseur-c61ad652e6.jpg",
+    "seconds": 26
+  },
+  "commande-suivi": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/commande-suivi-965beabfae.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/commande-suivi-6be0f43353.jpg",
+    "seconds": 19
+  },
+  "courses-globales": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/courses-globales-8ef7f494fd.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/courses-globales-156266314d.jpg",
+    "seconds": 10
+  },
+  "demandes-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/demandes-devis-05f7c83488.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/demandes-devis-f93e005842.jpg",
+    "seconds": 15
+  },
+  "dossiers-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/dossiers-devis-664ede2e2f.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/dossiers-devis-2dabac82cd.jpg",
+    "seconds": 18
+  },
+  "dupliquer-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/dupliquer-devis-1fc55c2b65.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/dupliquer-devis-aeb60cd9d0.jpg",
+    "seconds": 17
+  },
+  "entreprise": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/entreprise-3e0e22a818.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/entreprise-c9964956e9.jpg",
+    "seconds": 23
+  },
+  "envoyer-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/envoyer-devis-49a05e8093.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/envoyer-devis-75db3131ef.jpg",
+    "seconds": 13
+  },
+  "evenement-checklist": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-checklist-99c35ee56c.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-checklist-22aea94ece.jpg",
+    "seconds": 23
+  },
+  "evenement-courses": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-courses-7b6ec2602e.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-courses-15a9c2e9a5.jpg",
+    "seconds": 27
+  },
+  "evenement-extras": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-extras-f328f814c8.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-extras-a3f24629eb.jpg",
+    "seconds": 22
+  },
+  "evenement-location": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-location-98e8cec513.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-location-a4ca7cab98.jpg",
+    "seconds": 28
+  },
+  "evenement-materiel": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-materiel-2dfa18a7ab.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-materiel-80d14b12a2.jpg",
+    "seconds": 23
+  },
+  "evenement-mode-courses": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-mode-courses-227d5069a0.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-mode-courses-877cc19558.jpg",
+    "seconds": 23
+  },
+  "evenement-modifier": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-modifier-1f049c59f4.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenement-modifier-132ea871e4.jpg",
+    "seconds": 18
+  },
+  "evenements-liste": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenements-liste-1baf0db2df.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/evenements-liste-65abecba32.jpg",
+    "seconds": 16
+  },
+  "extras": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/extras-8ba390558f.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/extras-b7c1290013.jpg",
+    "seconds": 27
+  },
+  "fiche-client": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/fiche-client-b978e4553e.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/fiche-client-060ea4f01c.jpg",
+    "seconds": 20
+  },
+  "formulaire-demande": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/formulaire-demande-95cf6700dd.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/formulaire-demande-fb432b242f.jpg",
+    "seconds": 19
+  },
+  "fournisseurs": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/fournisseurs-e3fd58de32.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/fournisseurs-68ef631178.jpg",
+    "seconds": 23
+  },
+  "importer-clients": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/importer-clients-9434b48fea.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/importer-clients-dacac72139.jpg",
+    "seconds": 15
+  },
+  "importer-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/importer-devis-02ddbe9e13.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/importer-devis-048a26e994.jpg",
+    "seconds": 27
+  },
+  "imprimer-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/imprimer-devis-fc949e9690.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/imprimer-devis-44acd388e7.jpg",
+    "seconds": 10
+  },
+  "ingredients": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/ingredients-47fcd1e671.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/ingredients-fff75dbe23.jpg",
+    "seconds": 19
+  },
+  "location-globale": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/location-globale-096d7ebe78.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/location-globale-25ec3bf809.jpg",
+    "seconds": 12
+  },
+  "marge-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/marge-devis-e57d5f8378.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/marge-devis-ce08a75c0b.jpg",
+    "seconds": 22
+  },
+  "modeles-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/modeles-devis-076cbd1e28.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/modeles-devis-f94b338158.jpg",
+    "seconds": 12
+  },
+  "modeles-location": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/modeles-location-f4ccbd8925.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/modeles-location-5f066ca526.jpg",
+    "seconds": 20
+  },
+  "modifier-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/modifier-devis-e87775fa4e.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/modifier-devis-5c4879e8b4.jpg",
+    "seconds": 24
+  },
+  "notifications": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/notifications-1337465d3b.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/notifications-065a05af05.jpg",
+    "seconds": 14
+  },
+  "page-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/page-devis-4572369940.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/page-devis-e1f70c799b.jpg",
+    "seconds": 19
+  },
+  "pipeline-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/pipeline-devis-05473e6192.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/pipeline-devis-a435f06aa8.jpg",
+    "seconds": 14
+  },
+  "premier-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/premier-devis-e05137c31e.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/premier-devis-08a31604e0.jpg",
+    "seconds": 23
+  },
+  "prestation-creer": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/prestation-creer-768860f33b.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/prestation-creer-9bd513d483.jpg",
+    "seconds": 27
+  },
+  "prestation-ingredients": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/prestation-ingredients-9e9dd8b7fc.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/prestation-ingredients-e111d2d618.jpg",
+    "seconds": 20
+  },
+  "statut-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/statut-devis-2091f52fe6.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/statut-devis-05027e3514.jpg",
+    "seconds": 15
+  },
+  "stock": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/stock-2ee460d062.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/stock-a297f92336.jpg",
+    "seconds": 18
+  },
+  "suivi-devis": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/suivi-devis-b7254992a6.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/suivi-devis-526212aa7c.jpg",
+    "seconds": 15
+  },
+  "tableau-de-bord": {
+    "video": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/tableau-de-bord-5377a9bb4a.mp4",
+    "poster": "https://7ap9p341os96o8u8.public.blob.vercel-storage.com/help/tableau-de-bord-c42ea59a0c.jpg",
+    "seconds": 13
+  }
+}

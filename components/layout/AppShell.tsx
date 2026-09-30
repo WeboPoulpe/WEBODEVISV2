@@ -6,7 +6,7 @@ import Header from './Header';
 import MobileTabBar from './MobileTabBar';
 import { useNavBadges } from './nav';
 import OnboardingOverlay from '@/components/onboarding/OnboardingOverlay';
-import HelpWidget from '@/components/help/HelpWidget';
+import HelpCenter from '@/components/help/HelpCenter';
 import { useAuth } from '@/context/AuthContext';
 import { isDemoUser } from '@/lib/demo';
 import { signOut as endSession } from 'next-auth/react';
@@ -44,11 +44,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         {isDemoUser(user?.id) && (
-          <div role="status" className="flex items-center justify-between gap-3 mx-4 md:mx-6 mt-3 px-4 py-2.5 rounded-2xl bg-forest text-white text-sm">
+          <div role="status" data-demo-banner className="flex items-center justify-between gap-3 mx-4 md:mx-6 mt-3 px-4 py-2.5 rounded-2xl bg-forest text-white text-sm">
             <p className="min-w-0">
               <span className="font-semibold">Démonstration.</span>{' '}
               <span className="text-white/75">Essayez tout : rien de ce que vous modifiez n’est enregistré.</span>
             </p>
+            <a href="/contact?objet=devis" className="hidden sm:inline-flex flex-shrink-0 items-center h-8 px-3 ml-auto rounded-lg bg-primary font-semibold hover:bg-primary-dark transition-colors">
+              Demander un devis
+            </a>
             <button onClick={() => endSession({ callbackUrl: '/' })} className="flex-shrink-0 font-semibold underline underline-offset-4 hover:no-underline">
               Quitter
             </button>
@@ -60,8 +63,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <MobileTabBar badges={badges} />
-      <HelpWidget open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <MobileTabBar badges={badges} onHelp={() => setHelpOpen(true)} />
+      <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

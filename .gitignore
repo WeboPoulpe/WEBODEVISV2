@@ -8,3 +8,6 @@ e2e/.auth
 e2e/.results
 e2e/screenshots
 .migration
+
+# Enregistrements du centre d'aide avant envoi
+.help-media

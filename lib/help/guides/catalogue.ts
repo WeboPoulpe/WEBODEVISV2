@@ -1,0 +1,115 @@
+import type { HelpGuide } from '../types';
+
+export const catalogue: HelpGuide[] = [
+  {
+    id: 'prestation-creer',
+    category: 'catalogue',
+    title: 'Créer une prestation et son prix',
+    summary: 'Ajoutez vos plats, vos boissons, votre matériel et votre personnel au catalogue : ils se glissent ensuite dans chaque devis, avec leur prix.',
+    keywords: ['prestation', 'plat', 'menu', 'tarif', 'prix', 'catalogue', 'carte', 'produit', 'service', 'description', 'prix de revient', 'prix enfant'],
+    href: '/prestations',
+    steps: [
+      { title: 'Ouvrez « Prestations », puis cliquez sur « Nouvelle prestation »' },
+      { title: 'Donnez un nom et un « Prix unitaire HT »', text: 'Ce sont les deux champs obligatoires. « Prix enfant » et « Prix de revient » sont facultatifs.' },
+      { title: 'Choisissez la catégorie et la sous-catégorie', text: 'Elles rangent la prestation dans le catalogue.' },
+      { title: 'Rédigez la description', text: 'L’« Aperçu dans un devis », à droite, montre la ligne telle que le client la lira.' },
+      { title: 'Cliquez sur « Ajouter »', text: 'La prestation est créée et l’app ouvre l’écran de mise en forme de sa carte. « Retour aux prestations » ramène au catalogue.' },
+    ],
+    notes: [
+      'Pour corriger une prestation, cliquez sur sa ligne dans le catalogue. Les deux icônes à droite de la ligne la dupliquent ou la suppriment.',
+      '« Importer un CSV » ajoute plusieurs prestations d’un coup. Celles qui existent déjà sont ignorées, et le prix des nouvelles reste à compléter.',
+    ],
+  },
+  {
+    id: 'prestation-ingredients',
+    category: 'catalogue',
+    title: 'Relier des ingrédients à une prestation',
+    summary: 'Indiquez la quantité de chaque ingrédient par convive : c’est ce qui permet de calculer les listes de courses.',
+    keywords: ['ingrédients', 'recette', 'fiche technique', 'grammage', 'quantité par personne', 'par convive', 'composition', 'courses', 'lier'],
+    href: '/prestations',
+    steps: [
+      { title: 'Cliquez sur une prestation du catalogue', text: 'La fenêtre « Modifier la prestation » s’ouvre. Le bloc « Ingrédients (par personne) » se trouve en bas.' },
+      { title: 'Cliquez sur « Ajouter » dans ce bloc' },
+      { title: 'Cherchez l’ingrédient', text: 'Tapez au moins deux lettres dans « Rechercher un ingrédient… » et cliquez sur le bon.' },
+      { title: 'Indiquez la quantité par personne', text: 'Elle s’exprime dans l’unité de l’ingrédient : 0,03 pour 30 g d’un ingrédient compté en kg.' },
+      { title: 'Cliquez sur « Lier »', text: 'L’ingrédient rejoint la liste avec sa quantité par personne. Le lien est enregistré aussitôt.' },
+    ],
+    notes: [
+      'Le bloc n’apparaît que sur une prestation déjà créée : créez d’abord la prestation, puis rouvrez-la depuis le catalogue.',
+      'Seuls vos propres ingrédients sont proposés. Créez ceux qui manquent dans la page « Ingrédients ».',
+      'Dans la liste de courses d’un événement, chaque quantité est multipliée par le nombre de couverts.',
+    ],
+  },
+  {
+    id: 'categories',
+    category: 'catalogue',
+    title: 'Organiser vos catégories de prestations',
+    summary: 'Les catégories et les sous-catégories rangent votre catalogue de prestations.',
+    keywords: ['catégories', 'sous-catégories', 'familles', 'classement', 'rangement', 'catalogue', 'organiser', 'rubriques'],
+    href: '/parametres/categories',
+    steps: [
+      { title: 'Ouvrez « Catégories » dans le menu « Paramètres »', text: 'La page « Mes catégories » liste chaque catégorie et ses sous-catégories.' },
+      { title: 'Repérez les catégories marquées « Globale »', text: 'Elles sont fournies avec l’app et ne se modifient pas.' },
+      { title: 'Cliquez sur « Catégorie » pour en créer une', text: 'Saisissez son nom, puis validez avec la coche ou la touche Entrée.' },
+      { title: 'Complétez vos propres catégories', text: 'Dans une catégorie que vous avez créée, « + Sous-catégorie » ajoute un niveau. Le crayon renomme, la corbeille supprime.' },
+    ],
+    notes: [
+      'Supprimer une catégorie supprime aussi ses sous-catégories.',
+      'Dans la fenêtre d’une prestation, le lien « + Nouvelle » crée aussi une catégorie sans quitter la saisie.',
+    ],
+  },
+  {
+    id: 'extras',
+    category: 'catalogue',
+    title: 'Gérer votre carnet d’extras',
+    summary: 'Enregistrez vos serveurs, vos cuisiniers et vos barmans, et retrouvez leurs missions.',
+    keywords: ['extras', 'personnel', 'serveurs', 'cuisiniers', 'barman', 'équipe', 'vacataires', 'staff', 'agenda', 'mission', 'carnet', 'assigner'],
+    href: '/extras',
+    steps: [
+      { title: 'Ouvrez « Extras » dans le menu « Catalogue »' },
+      { title: 'Cliquez sur « Ajouter un extra »', text: 'Le nom est obligatoire. Le téléphone, l’email et le rôle (Cuisinier, Sous-chef, Serveur, Barman, Aide, Autre) sont facultatifs.' },
+      { title: 'Affectez la personne avec « Assigner »', text: 'Choisissez l’événement, le statut de départ et l’heure d’arrivée. La mission s’affiche sous son nom.' },
+      { title: 'Cliquez sur une mission pour la compléter', text: 'Un panneau s’ouvre à droite : statut, heure d’arrivée, notes de mission, et « Retirer » pour annuler l’affectation.' },
+      { title: 'Passez en vue « Agenda »', text: 'Un tableau de huit semaines montre qui travaille quand, avec la couleur du statut.' },
+    ],
+    notes: [
+      'L’icône de lien copie l’adresse de la page personnelle de l’extra, à lui transmettre par SMS ou par email.',
+      'La même affectation se fait depuis la fiche d’un événement, onglet « Extras ».',
+    ],
+  },
+  {
+    id: 'modeles-presentation',
+    category: 'catalogue',
+    title: 'Parcourir les modèles de devis',
+    summary: 'La page « Modèles de devis » présente trois modèles prédéfinis et les vôtres.',
+    keywords: ['modèles', 'modèle de devis', 'présentation', 'mise en page', 'style', 'couleur', 'standard', 'mariage', 'business'],
+    href: '/modeles',
+    steps: [
+      { title: 'Ouvrez « Modèles de devis » dans le menu « Paramètres »', text: 'Trois modèles prédéfinis sont présentés : « Standard », « Mariage & Réceptions » et « Business & Corporate ».' },
+      { title: 'Retrouvez les vôtres sous « Mes modèles »', text: 'Chacun porte un nom, une couleur et le modèle de base dont il part.' },
+      { title: 'Cliquez sur « Utiliser »', text: 'L’app ouvre la création d’un nouveau devis.' },
+    ],
+    notes: [
+      'La présentation d’un devis (style, images, page de garde) se règle dans le devis lui-même.',
+      'Pour repartir d’un devis type avec ses prestations, utilisez « Partir d’un modèle » dans la page « Devis ».',
+    ],
+  },
+  {
+    id: 'modeles-location',
+    category: 'catalogue',
+    title: 'Préparer vos modèles de location',
+    summary: 'Fixez une fois la vaisselle nécessaire par convive : la location de chaque événement se calcule ensuite d’un clic.',
+    keywords: ['location', 'modèles de location', 'templates', 'vaisselle', 'verres', 'assiettes', 'couverts', 'nappes', 'par convive', 'loueur'],
+    href: '/location-templates',
+    steps: [
+      { title: 'Ouvrez « Modèles de location » dans le menu « Paramètres »', text: 'La page s’intitule « Templates de location ».' },
+      { title: 'Cliquez sur « Ajouter »', text: 'Le formulaire « Nouveau template » s’ouvre sous la liste.' },
+      { title: 'Décrivez le matériel', text: 'Son nom, la « Quantité / convive » (1,1 pour prévoir 10 % de marge), l’unité, le fournisseur par défaut et le prix unitaire HT.' },
+      { title: 'Cliquez sur « Enregistrer »', text: 'Le modèle rejoint la liste. Le crayon le modifie, la corbeille le supprime.' },
+      { title: 'Utilisez vos modèles dans un événement', text: 'Dans l’onglet « Matériel », « Générer depuis mes modèles » multiplie chaque quantité par le nombre de couverts et arrondit à l’unité supérieure.' },
+    ],
+    notes: [
+      'Modifier un modèle ne change pas les locations déjà générées : relancez la génération dans l’événement.',
+    ],
+  },
+];

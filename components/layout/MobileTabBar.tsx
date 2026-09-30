@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeft, CalendarRange, Download, FileText, Home, LayoutGrid, LogOut, PanelLeft, Plus, Save, X } from 'lucide-react';
+import { ArrowLeft, CalendarRange, Download, FileText, HelpCircle, Home, LayoutGrid, LogOut, PanelLeft, Plus, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
@@ -24,7 +24,7 @@ function Tab({ href, icon: Icon, label, active, dot }: { href: string; icon: Rea
 }
 
 // Navigation sur téléphone : quatre destinations, un bouton central pour créer, et « Plus » pour tout le reste.
-export default function MobileTabBar({ badges }: { badges: Badges }) {
+export default function MobileTabBar({ badges, onHelp }: { badges: Badges; onHelp: () => void }) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const groups = useNavGroups();
@@ -129,6 +129,11 @@ export default function MobileTabBar({ badges }: { badges: Badges }) {
                   </div>
                 </section>
               ))}
+
+              <button onClick={() => { setMenuOpen(false); onHelp(); }} className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl border border-gray-200 bg-white text-[15px] font-medium text-gray-700">
+                <HelpCircle className="h-5 w-5" strokeWidth={1.8} />
+                Aide
+              </button>
 
               <button onClick={signOut} className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl border border-gray-200 bg-white text-[15px] font-medium text-gray-700">
                 <LogOut className="h-5 w-5" strokeWidth={1.8} />

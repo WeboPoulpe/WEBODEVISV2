@@ -1,0 +1,100 @@
+import type { HelpGuide } from '../types';
+
+export const clients: HelpGuide[] = [
+  {
+    id: 'ajouter-client',
+    category: 'clients',
+    title: 'Ajouter un client',
+    summary: 'Créez la fiche d’un particulier ou d’une entreprise, avant même son premier devis.',
+    keywords: ['nouveau client', 'créer', 'ajouter', 'particulier', 'entreprise', 'société', 'contact', 'coordonnées', 'carnet', 'siret'],
+    href: '/clients/nouveau',
+    steps: [
+      { title: 'Dans « Clients », cliquez sur « Nouveau client »' },
+      { title: 'Choisissez « Particulier » ou « Entreprise »' },
+      { title: 'Renseignez l’identité et les coordonnées', text: 'L’email est obligatoire. Le téléphone et les adresses peuvent attendre.' },
+      { title: 'Cliquez sur « Créer le client »', text: 'Vous revenez à la liste des clients.' },
+    ],
+    notes: [
+      'Pour une entreprise, ajoutez ses interlocuteurs sous « Contacts ».',
+      'Un client saisi avec son email pendant la création d’un devis est ajouté tout seul à vos clients.',
+    ],
+  },
+  {
+    id: 'fiche-client',
+    category: 'clients',
+    title: 'Retrouver un client et ouvrir sa fiche',
+    summary: 'Filtrez et cherchez dans la liste, puis ouvrez la fiche qui réunit les coordonnées, les notes et les devis.',
+    keywords: ['fiche client', 'chercher', 'rechercher', 'retrouver', 'filtrer', 'habitué', 'fidèle', 'notes', 'historique', 'coordonnées', 'modifier', 'contacts'],
+    href: '/clients',
+    steps: [
+      { title: 'Filtrez la liste', text: '« Tous », « Particuliers », « Entreprises » ou « Habitués ».' },
+      { title: 'Cherchez par nom ou par email' },
+      { title: 'Cliquez sur le client', text: 'Sa fiche s’ouvre à droite, sur l’onglet « Infos ».' },
+      { title: 'Corrigez ses coordonnées', text: 'Puis cliquez sur « Sauvegarder ».' },
+      { title: 'Notez le suivi dans l’onglet « Notes »', text: 'Puis cliquez sur « Sauvegarder les notes ».' },
+    ],
+    notes: [
+      '« Habitués » regroupe les clients qui ont au moins trois devis.',
+      'L’onglet « Historique » liste les devis du client, avec leur date et leur montant.',
+    ],
+  },
+  {
+    id: 'importer-clients',
+    category: 'clients',
+    title: 'Importer vos clients en une fois',
+    summary: 'Collez une liste copiée depuis Excel ou Google Sheets, ou choisissez un fichier CSV.',
+    keywords: ['importer', 'import', 'excel', 'google sheets', 'tableur', 'csv', 'fichier', 'copier', 'coller', 'liste', 'carnet', 'doublon', 'en masse'],
+    href: '/clients',
+    steps: [
+      { title: 'Dans « Clients », cliquez sur « Importer »' },
+      { title: 'Copiez vos lignes dans votre tableur', text: 'Avec les titres de colonnes : prénom, nom, entreprise, email, téléphone, adresse.' },
+      { title: 'Collez-les dans la fenêtre', text: 'Vous pouvez aussi cliquer sur « Choisir un fichier CSV ».' },
+      { title: 'Vérifiez l’aperçu', text: 'Il annonce le nombre de clients prêts à importer et explique chaque ligne laissée de côté.' },
+      { title: 'Cliquez sur le bouton « Importer »', text: 'Il rappelle le nombre de clients, par exemple « Importer 3 clients ».' },
+    ],
+    notes: [
+      'L’email est obligatoire : une ligne sans adresse, ou avec une adresse invalide, est laissée de côté.',
+      'Un client dont l’email est déjà dans vos clients n’est pas ajouté une seconde fois.',
+      'Une ligne qui porte un nom d’entreprise crée un client de type entreprise.',
+    ],
+  },
+  {
+    id: 'demandes-devis',
+    category: 'clients',
+    title: 'Traiter une demande de devis',
+    summary: 'Suivez chaque demande reçue par votre formulaire, puis transformez-la en devis.',
+    keywords: ['demande', 'demandes', 'prospect', 'prospects', 'formulaire', 'contact', 'lead', 'nouveau', 'brochure', 'statut', 'créer un devis', 'transformer', 'convertir'],
+    href: '/prospects',
+    steps: [
+      { title: 'Ouvrez « Prospects »', text: 'Les demandes les plus récentes sont en haut de la page « Demandes de devis ».' },
+      { title: 'Cliquez sur une demande', text: 'Ses coordonnées, son événement et son message s’affichent à droite.' },
+      { title: 'Mettez son statut à jour', text: 'Sous « Statut », choisissez l’étape, par exemple « Brochure envoyée ».' },
+      { title: 'Cliquez sur « Créer un devis »', text: 'La fenêtre reprend le client et l’événement de la demande. Corrigez-les si besoin.' },
+      { title: 'Validez avec « Créer le devis »', text: 'Le devis s’ouvre, relié à la demande.' },
+    ],
+    notes: [
+      'Une fois le devis créé, son statut et celui de la demande avancent ensemble.',
+      '« Enregistrer en client » ajoute la personne à vos clients sans créer de devis.',
+      'Les demandes sans devis figurent aussi dans la page Devis, volet « Prospects ».',
+    ],
+  },
+  {
+    id: 'formulaire-demande',
+    category: 'clients',
+    title: 'Recevoir des demandes depuis votre site',
+    summary: 'Placez le lien de votre formulaire sur votre site pour recevoir les demandes de devis dans WeboDevis.',
+    keywords: ['formulaire', 'site', 'site internet', 'lien', 'demande de devis', 'contact', 'réseaux sociaux', 'signature', 'brochure', 'partager', 'installer'],
+    href: '/prospects',
+    steps: [
+      { title: 'Dans « Prospects », cliquez sur « Mon formulaire »', text: 'La première fois, cliquez sur « Créer mon lien ».' },
+      { title: 'Copiez le lien', text: 'Le bouton « Copier » le place dans votre presse-papiers.' },
+      { title: 'Placez le lien sur votre site', text: 'Sur un bouton « Demander un devis », par exemple. Il fonctionne aussi dans une signature d’email ou sur vos réseaux sociaux.' },
+      { title: 'Regardez ce que voit votre client', text: '« Voir le formulaire » ouvre la page : ses coordonnées, son événement, son message.' },
+    ],
+    notes: [
+      'Chaque demande envoyée arrive dans « Prospects » avec le statut « Nouveau ».',
+      'Si vous indiquez l’adresse de votre brochure, elle est proposée au client une fois sa demande envoyée.',
+      '« Régénérer le lien » crée un nouveau lien : l’ancien ne fonctionne plus, pensez à le remplacer partout.',
+    ],
+  },
+];

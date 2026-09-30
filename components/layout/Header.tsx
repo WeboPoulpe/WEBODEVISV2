@@ -344,7 +344,7 @@ export default function Header({ onHelp }: HeaderProps) {
         <button
           onClick={onHelp}
           className="hidden sm:flex w-10 h-10 items-center justify-center rounded-xl text-gray-500 hover:bg-white hover:text-gray-900 transition-colors"
-          aria-label="Centre d'aide"
+          aria-label="Aide"
         >
           <HelpCircle className="h-5 w-5" />
         </button>
