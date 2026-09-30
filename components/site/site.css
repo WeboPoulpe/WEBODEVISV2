@@ -7,7 +7,7 @@
 
 .site {
   /* Une section visée par une ancre ne colle pas au bord de l'écran. */
-  --anchor-offset: 32px;
+  --anchor-offset: 104px;
 }
 .site [id] { scroll-margin-top: var(--anchor-offset); }
 
@@ -19,7 +19,7 @@
   position: absolute;
   left: 16px;
   top: -64px;
-  z-index: 50;
+  z-index: 60;
   padding: 10px 16px;
   border-radius: 12px;
   background: #fff;
@@ -113,3 +113,152 @@
 .site-legal dl { display: grid; gap: 0.625rem; }
 .site-legal dt { font-size: 0.9375rem; color: rgb(var(--n-500)); }
 .site-legal dd { font-size: 1.0625rem; line-height: 1.6; color: rgb(var(--n-900)); margin-bottom: 0.5rem; }
+
+/* ── Version multi-pages ───────────────────────────────────────────────────── */
+
+/* Dans un panneau clair posé sur le vert (mégamenu), l'anneau de focus redevient terracotta. */
+@media (min-width: 1024px) {
+  .site-dark .site-light :focus-visible { outline-color: rgb(var(--p-500)); }
+}
+
+/* Titre d'ouverture : sur téléphone il prend toute la largeur, deux lignes très serrées. */
+.site-hero-title {
+  font-size: clamp(2.9rem, 14.4vw, 7rem);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  font-weight: 700;
+}
+/* À côté de la colonne de texte (grand écran), il se règle sur la largeur qui lui reste. */
+@media (min-width: 1024px) {
+  .site-hero-title { font-size: clamp(5rem, 8.4vw, 7rem); }
+}
+/* Titre d'ouverture des pages intérieures : plus long, donc un cran en dessous. */
+.site-page-title {
+  font-size: clamp(2.35rem, 1.2rem + 5.6vw, 4.75rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+/* Phrase de marque sous le titre. */
+.site-tagline {
+  font-size: clamp(1.375rem, 1.1rem + 1.4vw, 2rem);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+/* Très grands chiffres (le calcul des courses) : ils occupent la largeur du téléphone. */
+.site-figure {
+  font-size: clamp(4.5rem, 21.5vw, 9.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .site-figure { font-size: clamp(6rem, 10vw, 9.5rem); }
+}
+
+/* Rangée d'écrans qu'on fait défiler au doigt : accroche par écran, sans script.
+   Sur grand écran, la rangée devient une grille (classes Tailwind) et ne défile plus. */
+@media (max-width: 1023.98px) {
+  .site-rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .site-rail::-webkit-scrollbar { display: none; }
+  .site-rail > * { scroll-snap-align: center; flex-shrink: 0; }
+}
+
+/* Barre d'action fixe du téléphone : laisse la place à la zone de geste du système. */
+.site-actionbar { bottom: max(12px, env(safe-area-inset-bottom)); }
+/* La page garde de la marge sous le pied de page pour que la barre ne recouvre rien. */
+@media (max-width: 767px) {
+  .site-with-bar { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Questions fréquentes : <details> natif, le « + » tourne en « × ». */
+.site-faq summary { list-style: none; cursor: pointer; }
+.site-faq summary::-webkit-details-marker { display: none; }
+.site-faq details[open] .site-faq-mark { transform: rotate(45deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .site-faq-mark { transition: transform 0.2s ease; }
+}
+
+/* Corps d'un guide : une colonne de lecture. */
+.site-prose { font-size: 1.125rem; line-height: 1.7; color: rgb(var(--n-700)); }
+.site-prose > * + * { margin-top: 1.15em; }
+.site-prose h2 {
+  font-size: clamp(1.6rem, 1.3rem + 1.4vw, 2.125rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  color: rgb(var(--n-900));
+  margin-top: 2.2em;
+  text-wrap: balance;
+}
+.site-prose h3 {
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-size: 1.3rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--n-900));
+  margin-top: 1.8em;
+}
+.site-prose h2 + *, .site-prose h3 + * { margin-top: 0.7em; }
+.site-prose strong { color: rgb(var(--n-900)); font-weight: 600; }
+.site-prose a { color: rgb(var(--p-700)); text-decoration: underline; text-underline-offset: 3px; }
+.site-prose a:hover { color: rgb(var(--p-800)); }
+.site-prose ul, .site-prose ol { padding-left: 1.3em; }
+.site-prose ul { list-style: disc; }
+.site-prose ol { list-style: decimal; }
+.site-prose li + li { margin-top: 0.45em; }
+.site-prose li::marker { color: rgb(var(--p-500)); }
+.site-prose table { width: 100%; border-collapse: collapse; font-size: 1rem; line-height: 1.4; }
+.site-prose th { text-align: left; font-weight: 500; color: rgb(var(--n-500)); padding: 0 0.75rem 0.6rem 0; font-size: 0.9375rem; }
+.site-prose td { padding: 0.75rem 0.75rem 0.75rem 0; border-top: 1px solid rgb(var(--n-200)); vertical-align: top; color: rgb(var(--n-800)); }
+.site-prose th:last-child, .site-prose td:last-child { padding-right: 0; }
+.site-prose td.num, .site-prose th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Une formule, dans un guide. */
+.site-prose .site-formula {
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgb(var(--n-200));
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-weight: 600;
+  font-size: 1.125rem;
+  line-height: 1.4;
+  color: rgb(var(--n-900));
+}
+
+/* ── En-tête collant et mégamenu ───────────────────────────────────────────── */
+
+/* L'en-tête passe du haut de panneau à la barre flottante sans saut. */
+.site-header { transition: border-radius 0.2s ease, box-shadow 0.2s ease; }
+
+@keyframes site-menu-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes site-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Le panneau apparaît (à l'ouverture seulement, pas en passant d'une entrée à l'autre). */
+  .site-menu-in { animation: site-menu-in 0.15s ease-out both; }
+  /* Le bouton « Essayer la démo » de l'en-tête, quand l'ouverture de la page a quitté l'écran. */
+  .site-header-demo { animation: site-fade-in 0.2s ease-out both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header { transition: none; }
+}

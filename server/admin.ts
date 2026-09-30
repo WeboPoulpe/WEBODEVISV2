@@ -10,7 +10,8 @@ import { DEMO_USER_ID } from '@/lib/demo';
 import { enabledModules } from '@/lib/modules';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { accountInviteEmail, passwordResetEmail } from '@/lib/mail/templates';
-import { getAppSettings, setAppSetting, type AppSettings } from './settings';
+import { revalidateTag } from 'next/cache';
+import { getAppSettings, SETTINGS_TAG, setAppSetting, type AppSettings } from './settings';
 import { requireAdmin } from './session';
 
 // Espace d'administration de la plateforme. Chaque action commence par requireAdmin() :
@@ -243,5 +244,7 @@ export async function getAdminSettings(): Promise<AppSettings> {
 export async function setSignupOpen(open: boolean): Promise<Result> {
   await requireAdmin();
   await setAppSetting('signup_open', !!open);
+  // Le site public affiche ou retire « Créer un compte » aussitôt.
+  revalidateTag(SETTINGS_TAG);
   return { error: null };
 }

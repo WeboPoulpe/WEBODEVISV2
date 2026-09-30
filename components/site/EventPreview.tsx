@@ -1,10 +1,11 @@
-import { Check, Link2, MapPin } from 'lucide-react';
+import { Check, MapPin } from 'lucide-react';
 import DateBlock from '@/components/ui/DateBlock';
 import { cn } from '@/lib/utils';
 import { Pill, Preview, previewCard } from './preview-kit';
 
 // La fiche d'un événement : ses onglets, la liste de courses calculée (quantité par convive × convives),
 // la checklist et les extras. Données inventées.
+// Les rôles sont ceux de la fiche d'un extra dans l'app (cuisinier, serveur, barman…).
 
 const GUESTS = 120;
 
@@ -35,7 +36,7 @@ const TASKS = [
 const courseRow = 'grid grid-cols-[minmax(0,1fr)_5rem_4.75rem] sm:grid-cols-[minmax(0,1fr)_7rem_7rem] items-baseline gap-x-2';
 
 const EXTRAS = [
-  { initials: 'JM', name: 'Julie Moreau', role: 'Maître d’hôtel' },
+  { initials: 'JM', name: 'Julie Moreau', role: 'Serveuse' },
   { initials: 'KH', name: 'Karim Haddad', role: 'Cuisinier' },
 ];
 
@@ -120,9 +121,7 @@ export default function EventPreview({ className }: { className?: string }) {
               </li>
             ))}
           </ul>
-          <p className="flex items-center gap-2 mt-4 pt-3.5 border-t border-gray-100 text-sm text-sage">
-            <Link2 className="h-4 w-4 flex-shrink-0" />Lien de mission envoyé
-          </p>
+          <p className="mt-4 pt-3.5 border-t border-gray-100 text-sm text-sage">2 confirmés sur 2</p>
         </div>
       </div>
     </Preview>

@@ -37,7 +37,7 @@ export default function RequestPreview({ className }: { className?: string }) {
     >
       {/* Sur le site du traiteur */}
       <div>
-        <p className="text-sm text-gray-500 mb-2">Sur votre site</p>
+        <p className="text-sm text-gray-500 mb-2">Votre formulaire</p>
         <div className="rounded-2xl bg-gray-50 border border-gray-200 p-4 sm:p-5">
           <p className="font-menu text-[22px] lg:text-[19px] text-gray-900 leading-tight whitespace-nowrap">Demander un devis</p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-3 mt-4">
@@ -45,7 +45,7 @@ export default function RequestPreview({ className }: { className?: string }) {
             <Field label="Nom" value="Roussel" />
             <Field label="Type d’événement" value="Mariage" className="col-span-2" />
             <Field label="Date" value="12/06/2027" />
-            <Field label="Couverts" value="120" />
+            <Field label="Personnes" value="120" />
           </div>
           <p className="flex items-center justify-center h-10 mt-4 rounded-lg bg-gray-900 text-white text-sm font-semibold">Envoyer la demande</p>
         </div>
