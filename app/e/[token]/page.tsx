@@ -186,10 +186,10 @@ export default async function ExtraPublicPage({
 
                   {m.assign_courses && (
                     <Link
-                      href={`/evenements/${m.quote.id}/courses`}
+                      href={`/e/${token}/courses/${m.quote.id}`}
                       className="flex items-center justify-center gap-2 mt-2 w-full py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
                     >
-                      🛒 Voir la liste de courses
+                      Voir la liste de courses
                     </Link>
                   )}
                 </div>

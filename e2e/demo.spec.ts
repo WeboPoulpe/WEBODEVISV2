@@ -122,4 +122,31 @@ test.describe('démonstration', () => {
     await expect(page.getByText('Démonstration.')).toBeVisible({ timeout: 30_000 });
     await sql(`delete from public.site_requests where email = $1`, [email]);
   });
+
+  test('un extra ouvre la liste de courses de sa mission sans compte, et coche un article', async ({ page }, testInfo) => {
+    const [mission] = await sql<{ token: string; quote_id: string; checked: number }>(
+      `select x.access_token as token, ee.quote_id,
+              (select count(*)::int from public.event_ingredients ei where ei.quote_id = ee.quote_id and ei.checked) as checked
+       from public.event_extras ee join public.extras x on x.id = ee.extra_id
+       where x.user_id = $1 and ee.assign_courses
+         and exists (select 1 from public.event_ingredients ei where ei.quote_id = ee.quote_id and not ei.checked) limit 1`, [DEMO_USER_ID]);
+    test.skip(!mission, 'aucun extra de démonstration chargé des courses');
+
+    await page.goto(`/e/${mission.token}`);
+    await page.getByRole('link', { name: 'Voir la liste de courses' }).first().click();
+    await expect(page).toHaveURL(new RegExp('/e/[^/]+/courses/'), { timeout: 20_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Liste de courses' })).toBeVisible();
+    const before = await page.getByRole('checkbox', { checked: true }).count();
+    await page.getByRole('checkbox', { checked: false }).first().click();
+    await expect(page.getByText(`${before + 1} sur`)).toBeVisible();
+    await shot(page, testInfo, 'mission-courses');
+    expect(await horizontalOverflow(page)).toBe(0);
+    // Événement du compte de démonstration : la coche n'est pas enregistrée.
+    const [after] = await sql<{ n: number }>(`select count(*)::int as n from public.event_ingredients where quote_id = $1 and checked`, [mission.quote_id]);
+    expect(after.n).toBe(mission.checked);
+
+    // Un autre événement, ou un mauvais lien, ne donne rien.
+    const denied = await page.goto(`/e/${mission.token}/courses/00000000-0000-4000-8000-000000000000`);
+    expect(denied?.status()).toBe(404);
+  });
 });
