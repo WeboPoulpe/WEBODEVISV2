@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   User, Package, Calendar, Palette, Image as ImageIcon,
   X, Search, Loader2, Check, Plus, Trash2, Wand2, ChevronLeft,
@@ -48,7 +48,8 @@ interface Client { id: string; first_name: string | null; last_name: string | nu
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; photo_url?: string; [key: string]: any; }
 
 export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
-  const supabase = createClient();
+  // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
+  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

@@ -7,7 +7,7 @@ import {
   TrendingUp, StickyNote, Save, Loader2, CalendarDays, ChevronRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { isConfirmed } from '@/lib/quoteStatus';
+import { isConfirmed, QUOTE_STATUS_LABELS } from '@/lib/quoteStatus';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
@@ -94,13 +94,11 @@ function MiniBarChart({ quotes }: { quotes: QuoteSummary[] }) {
 }
 
 // ── Status config ─────────────────────────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft:    { label: 'Brouillon',  cls: 'bg-gray-100 text-gray-600' },
-  sent:     { label: 'Envoyé',     cls: 'bg-blue-50 text-blue-700' },
-  accepted: { label: 'Accepté',    cls: 'bg-emerald-50 text-emerald-700' },
-  rejected: { label: 'Refusé',     cls: 'bg-red-50 text-red-700' },
-  pending:  { label: 'En attente', cls: 'bg-amber-50 text-amber-700' },
-};
+/** Statut d'un devis dans l'historique du client, avec les libellés de la page Devis. */
+const statusOf = (status: string) => ({
+  label: QUOTE_STATUS_LABELS[status as keyof typeof QUOTE_STATUS_LABELS] ?? status,
+  cls: isConfirmed(status) ? 'bg-sage-100 text-sage' : 'bg-gray-100 text-gray-700',
+});
 
 // ── Customer CRM Sheet ─────────────────────────────────────────────────────────
 function CustomerSheet({
@@ -252,7 +250,7 @@ function CustomerSheet({
               ) : (
                 <div className="space-y-2">
                   {quotes.map((q) => {
-                    const st = STATUS_MAP[q.status] ?? STATUS_MAP.draft;
+                    const st = statusOf(q.status);
                     return (
                       <div key={q.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
                         <div className="flex-1 min-w-0">
