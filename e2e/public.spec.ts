@@ -29,6 +29,20 @@ test.describe('pages publiques', () => {
     expect(response?.status()).toBe(404);
   });
 
+  test('site de présentation : visible à la racine sans compte, sans débordement', async ({ page }, testInfo) => {
+    await page.goto('/');
+    await expect(page).not.toHaveURL(/\/login/);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Du premier devis');
+    await expect(page.getByRole('link', { name: 'Créer un compte' }).first()).toHaveAttribute('href', '/register');
+    await shot(page, testInfo, 'site');
+    expect(await horizontalOverflow(page)).toBe(0);
+  });
+
+  test('app installée : sans session, elle s\'ouvre sur la connexion', async ({ page }) => {
+    await page.goto('/?source=pwa');
+    await expect(page).toHaveURL(/\/login/);
+  });
+
   test('une page privée renvoie vers /login', async ({ page }) => {
     await page.goto('/evenements');
     await expect(page).toHaveURL(/\/login/);

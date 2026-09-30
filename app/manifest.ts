@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'WeboDevis',
     short_name: 'WeboDevis',
     description: 'Devis, événements et production pour les traiteurs',
-    start_url: '/',
+    start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',

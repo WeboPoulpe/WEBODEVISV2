@@ -1,0 +1,115 @@
+/* Styles propres au site de présentation. Les couleurs et les polices viennent de app/globals.css. */
+
+/* Les ancres du menu défilent en douceur, sauf si la personne a demandé moins d'animations. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.site) { scroll-behavior: smooth; }
+}
+
+.site {
+  /* Une section visée par une ancre ne colle pas au bord de l'écran. */
+  --anchor-offset: 32px;
+}
+.site [id] { scroll-margin-top: var(--anchor-offset); }
+
+/* Sur le vert sapin, l'anneau de focus passe en terracotta clair pour rester lisible. */
+.site-dark :focus-visible { outline-color: rgb(var(--p-300)); }
+
+/* Lien d'évitement : visible seulement au clavier. */
+.site-skip {
+  position: absolute;
+  left: 16px;
+  top: -64px;
+  z-index: 50;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #fff;
+  color: rgb(var(--n-900));
+  font-weight: 600;
+  font-size: 15px;
+}
+.site-skip:focus { top: 16px; }
+
+/* Grand titre : la taille suit la largeur de l'écran, sans jamais déborder. */
+.site-h1 {
+  font-size: clamp(2.5rem, 1.1rem + 6.2vw, 5.75rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.site-h2 {
+  font-size: clamp(1.75rem, 1.2rem + 2.3vw, 2.875rem);
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.site-lead {
+  font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+.site-body {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* Seul mouvement de la page : l'aperçu du tableau de bord se pose à l'ouverture. */
+@keyframes site-settle {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .site-settle { animation: site-settle 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
+}
+
+/* Feuille du devis : le papier, légèrement plus chaud que le blanc des cartes. */
+.site-paper {
+  background: #fffdf9;
+  box-shadow: 0 1px 2px rgb(var(--n-900) / 0.05), 0 24px 48px -24px rgb(var(--n-900) / 0.28);
+}
+
+/* Points de conduite entre un intitulé et son prix, comme sur une carte. */
+.site-leader {
+  flex: 1;
+  min-width: 12px;
+  margin: 0 8px;
+  border-bottom: 1px dotted rgb(var(--n-300));
+  transform: translateY(-4px);
+}
+
+/* Pages légales : information manquante, à remplir par l'éditeur avant la mise en ligne. */
+.site-todo {
+  display: inline;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px dashed rgb(var(--p-500));
+  background: rgb(var(--p-100));
+  color: rgb(var(--p-900));
+  font-weight: 600;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.site-legal h2 {
+  font-size: 1.375rem;
+  line-height: 1.2;
+  font-weight: 700;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  color: rgb(var(--n-900));
+}
+.site-legal p,
+.site-legal li {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: rgb(var(--n-700));
+}
+.site-legal p + p { margin-top: 0.75rem; }
+.site-legal ul { margin-top: 0.5rem; padding-left: 1.25rem; list-style: disc; }
+.site-legal li + li { margin-top: 0.375rem; }
+.site-legal a { color: rgb(var(--p-700)); text-decoration: underline; text-underline-offset: 3px; }
+.site-legal dl { display: grid; gap: 0.625rem; }
+.site-legal dt { font-size: 0.9375rem; color: rgb(var(--n-500)); }
+.site-legal dd { font-size: 1.0625rem; line-height: 1.6; color: rgb(var(--n-900)); margin-bottom: 0.5rem; }

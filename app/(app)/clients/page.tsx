@@ -13,6 +13,9 @@ import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 import ContactsEditor from '@/components/clients/ContactsEditor';
 import { listContacts, saveContacts, type ContactDraft } from '@/lib/customerContacts';
+import { cn } from '@/lib/utils';
+import { FilePlus2 } from 'lucide-react';
+import { btnPrimary, cardCls, iconBtn, inputCls, pill } from '@/components/ui/kit';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Customer {
@@ -231,7 +234,6 @@ function CustomerSheet({
             {savingNotes ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {savingNotes ? 'Sauvegarde…' : 'Sauvegarder les notes'}
           </button>
-          <p className="text-[10px] text-gray-400">Nécessite une colonne <code className="bg-gray-100 px-1 rounded">notes</code> (text) dans la table <code className="bg-gray-100 px-1 rounded">customers</code>.</p>
         </div>
       )}
 
@@ -279,64 +281,37 @@ function CustomerSheet({
   );
 }
 
-// ── Customer card ─────────────────────────────────────────────────────────────
-function CustomerCard({ c, onOpen }: { c: Customer; onOpen: () => void }) {
+// ── Ligne de la liste ─────────────────────────────────────────────────────────
+function CustomerRow({ c, onOpen }: { c: Customer; onOpen: () => void }) {
   const isEntreprise = c.customer_type === 'entreprise';
-  const displayName = isEntreprise ? c.company_name : `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
-  const isHabitual = (c.quote_count ?? 0) >= 3;
+  const displayName = (isEntreprise ? c.company_name : `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()) || 'Sans nom';
+  const initials = displayName.split(/\s+/).filter((w) => /^[\p{L}]/u.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
+  const count = c.quote_count ?? 0;
 
   return (
-    <div onClick={onOpen} className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
-      <div className="flex items-start gap-3">
-        <div className={['w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0', isEntreprise ? 'bg-blue-50' : 'bg-primary-50'].join(' ')}>
-          {isEntreprise ? <Building2 className="h-5 w-5 text-blue-500" /> : <User className="h-5 w-5 text-primary" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-900 truncate">{displayName || '—'}</p>
-            {isHabitual && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-full flex-shrink-0">
-                <Star className="h-2.5 w-2.5" />Habitué
-              </span>
-            )}
-          </div>
-          <p className={`text-xs mt-0.5 capitalize font-medium ${isEntreprise ? 'text-blue-500' : 'text-primary'}`}>{c.customer_type}</p>
-        </div>
-        <div className="flex-shrink-0 text-center">
-          <div className={['w-10 h-10 rounded-xl flex flex-col items-center justify-center', (c.quote_count ?? 0) > 0 ? 'bg-primary-50' : 'bg-gray-100'].join(' ')}>
-            <FileText className={`h-3.5 w-3.5 ${(c.quote_count ?? 0) > 0 ? 'text-primary' : 'text-gray-400'}`} />
-            <span className={`text-[10px] font-bold leading-none mt-0.5 ${(c.quote_count ?? 0) > 0 ? 'text-primary' : 'text-gray-400'}`}>{c.quote_count ?? 0}</span>
-          </div>
-          <p className="text-[10px] text-gray-400 mt-0.5">devis</p>
-        </div>
-      </div>
-      <div className="mt-3.5 space-y-1.5">
-        {c.email && <p className="flex items-center gap-2 text-sm text-gray-500 min-w-0"><Mail className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" /><span className="truncate">{c.email}</span></p>}
-        {c.phone && <p className="flex items-center gap-2 text-sm text-gray-500"><Phone className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" /><span>{c.phone}</span></p>}
-      </div>
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-        <span className="text-xs text-primary font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <TrendingUp className="h-3 w-3" />Ouvrir la fiche
+    <li className="flex items-center gap-1 pr-2 sm:pr-3 hover:bg-gray-50 transition-colors">
+      <button onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 text-left pl-4 sm:pl-5 py-3.5">
+        <span aria-hidden className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 text-sm font-semibold flex items-center justify-center flex-shrink-0">
+          {isEntreprise ? <Building2 className="h-[18px] w-[18px]" /> : initials || <User className="h-[18px] w-[18px]" />}
         </span>
-        <Link href={`/devis/nouveau?client=${c.id}`} onClick={(e) => e.stopPropagation()}
-          className="text-xs font-medium text-gray-500 hover:text-primary flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Plus className="h-3 w-3" />Nouveau devis
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 animate-pulse">
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 bg-gray-100 rounded-xl flex-shrink-0" />
-        <div className="flex-1 space-y-2"><div className="h-4 bg-gray-100 rounded w-2/3" /><div className="h-3 bg-gray-100 rounded w-1/4" /></div>
-        <div className="w-10 h-10 bg-gray-100 rounded-xl" />
-      </div>
-      <div className="mt-4 space-y-2"><div className="h-3 bg-gray-100 rounded w-3/4" /><div className="h-3 bg-gray-100 rounded w-1/2" /></div>
-    </div>
+        <span className="flex-1 min-w-0">
+          <span className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 truncate">{displayName}</span>
+            {count >= 3 && <span className={cn(pill, 'bg-primary-50 text-primary-700')}>Habitué</span>}
+          </span>
+          <span className="block text-sm text-gray-500 truncate mt-0.5 lg:hidden">{c.email || c.phone || (isEntreprise ? 'Entreprise' : 'Particulier')}</span>
+          <span className="hidden lg:block text-sm text-gray-500 mt-0.5">{isEntreprise ? 'Entreprise' : 'Particulier'}</span>
+        </span>
+        <span className="hidden lg:block w-64 text-sm text-gray-700 truncate">{c.email}</span>
+        <span className="hidden xl:block w-32 text-sm text-gray-700 tabular-nums whitespace-nowrap">{c.phone}</span>
+        <span className={cn('w-16 text-right text-sm whitespace-nowrap', count ? 'text-gray-900 font-medium' : 'text-gray-400')}>
+          {count} devis
+        </span>
+      </button>
+      <Link href={`/devis/nouveau?client=${c.id}`} className={iconBtn} aria-label={`Nouveau devis pour ${displayName}`} title="Nouveau devis">
+        <FilePlus2 className="h-[18px] w-[18px]" />
+      </Link>
+    </li>
   );
 }
 
@@ -382,29 +357,29 @@ export default function ClientsPage() {
 
   return (
     <div className="px-4 md:px-6 pb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
         <div>
           <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Clients</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {loading ? '…' : `${customers.length} client${customers.length !== 1 ? 's' : ''}`}
-            {!loading && habitualsCount > 0 && <span className="ml-2 text-amber-600 font-medium">· {habitualsCount} habitué{habitualsCount > 1 ? 's' : ''} ⭐</span>}
+            {loading ? ' ' : `${customers.length} client${customers.length !== 1 ? 's' : ''}${habitualsCount > 0 ? `, dont ${habitualsCount} habitué${habitualsCount > 1 ? 's' : ''}` : ''}`}
           </p>
         </div>
-        <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors self-start sm:self-auto">
+        <Link href="/clients/nouveau" className={btnPrimary}>
           <Plus className="h-4 w-4" />Nouveau client
         </Link>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom ou email…"
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom ou email" aria-label="Rechercher un client"
+            className={cn(inputCls, 'pl-11')} />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        <div className="flex p-1 rounded-xl bg-gray-200/70 overflow-x-auto scrollbar-none" role="tablist" aria-label="Clients affichés">
           {FILTERS.map((f) => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={['flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', filter === f ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
+            <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
+              className={cn('flex-1 lg:flex-none flex-shrink-0 h-10 px-3.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
+                filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
               {f}
             </button>
           ))}
@@ -412,18 +387,26 @@ export default function ClientsPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
+        <div className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-3.5 animate-pulse">
+              <div className="w-10 h-10 bg-gray-100 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2"><div className="h-4 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/2" /></div>
+            </div>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center py-20 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4"><Users className="h-8 w-8 text-gray-400" /></div>
-          <p className="text-gray-500 font-medium mb-1">Aucun client trouvé</p>
-          <p className="text-sm text-gray-400 mb-4">{search ? 'Essayez d\'autres termes.' : 'Ajoutez votre premier client pour commencer.'}</p>
-          {!search && <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"><Plus className="h-4 w-4" />Ajouter un client</Link>}
+        <div className={cn(cardCls, 'flex flex-col items-center px-6 py-16 text-center')}>
+          <p className="font-semibold text-gray-900 mb-1">{search || filter !== 'Tous' ? 'Aucun client ne correspond' : 'Aucun client pour le moment'}</p>
+          <p className="text-sm text-gray-500 mb-5 max-w-sm">
+            {search || filter !== 'Tous' ? 'Essayez un autre nom ou un autre filtre.' : 'Un client est créé à chaque nouveau devis. Vous pouvez aussi en ajouter un à la main.'}
+          </p>
+          {!search && filter === 'Tous' && <Link href="/clients/nouveau" className={btnPrimary}><Plus className="h-4 w-4" />Nouveau client</Link>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-          {filtered.map((c) => <CustomerCard key={c.id} c={c} onOpen={() => setSheetCustomer(c)} />)}
-        </div>
+        <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {filtered.map((c) => <CustomerRow key={c.id} c={c} onOpen={() => setSheetCustomer(c)} />)}
+        </ul>
       )}
 
       {sheetCustomer && (

@@ -27,6 +27,14 @@ export async function middleware(request: NextRequest) {
 
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
+  // Sans session, l'adresse du site montre la présentation du logiciel. L'app installée s'ouvre avec
+  // ?source=pwa : elle va droit à la connexion.
+  if (!token && pathname === '/' && !request.nextUrl.searchParams.has('source')) {
+    const siteUrl = request.nextUrl.clone();
+    siteUrl.pathname = '/site';
+    return NextResponse.rewrite(siteUrl);
+  }
+
   // Redirect unauthenticated users to /login
   if (!token && !isAuthRoute) {
     const loginUrl = request.nextUrl.clone();
