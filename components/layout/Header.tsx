@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { cn, formatDate } from '@/lib/utils';
 import { isConfirmed } from '@/lib/quoteStatus';
+import { notificationHref } from '@/lib/notifications';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type NotifType = 'prospect_request' | 'upcoming_event' | 'invoice_due' | 'support_ticket' | 'system_update' | 'task_reminder';
@@ -84,7 +85,7 @@ function NotificationBell() {
 
   const unread = notifications.filter((n) => !n.is_read);
 
-  const markRead = async (id: string, actionUrl: string | null) => {
+  const markRead = async (id: string, target: string) => {
     const supabase = createClient();
     await supabase
       .from('notifications')
@@ -92,7 +93,7 @@ function NotificationBell() {
       .eq('id', id);
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
     setOpen(false);
-    if (actionUrl) router.push(actionUrl);
+    router.push(target);
   };
 
   const markAllRead = async () => {
@@ -167,7 +168,7 @@ function NotificationBell() {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => markRead(n.id, n.action_url)}
+                    onClick={() => markRead(n.id, notificationHref(n))}
                     className={cn(
                       'w-full text-left flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 transition-colors hover:bg-gray-50',
                       !n.is_read && 'bg-primary-50'

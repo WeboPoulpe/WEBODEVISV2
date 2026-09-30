@@ -308,4 +308,38 @@ test.describe('administration', () => {
       await context.close();
     }
   });
+
+  test('notifications : chacune mène à une page qui existe, y compris les anciens liens', async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+    const email = `e2e-notif-${Date.now()}@test.webodevis.local`;
+    const [user] = await sql<{ id: string }>(`insert into public.users (email, password_hash) values ($1, 'x') returning id`, [email]);
+    await sql(`insert into public.profiles (id, email, first_name, role, is_active, has_completed_onboarding) values ($1, $2, 'Notif', 'user', true, true)`, [user.id, email]);
+    const cases = [
+      ['prospect_request', 'Ancienne demande', '/prospect-requests', new RegExp('/prospects$')],
+      ['stock_alert', 'Stock bas', '/stock?ing=00000000-0000-4000-8000-000000000000', new RegExp('/stock')],
+      ['task_reminder', 'Relance', '/devis', new RegExp('/devis$')],
+      ['system_update', 'Lien perdu', '/page-qui-n-existe-pas', new RegExp('/notifications$')],
+    ] as const;
+    for (const [type, title, url] of cases) {
+      await sql(`insert into public.notifications (user_id, title, message, type, priority, action_url) values ($1, $2, 'Essai', $3, 'medium', $4)`, [user.id, title, type, url]);
+    }
+    const token = await encode({ token: { sub: user.id, email }, secret: envLocal('NEXTAUTH_SECRET') });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
+    await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
+    const page = await context.newPage();
+    try {
+      for (const [, title, , expected] of cases) {
+        await page.goto('/notifications');
+        await page.getByRole('button', { name: new RegExp('^' + title) }).click();
+        await expect(page).toHaveURL(expected, { timeout: 20_000 });
+        await expect(page.getByText(/introuvable|could not be found|404/i)).toHaveCount(0);
+      }
+      // Ouvertes, elles sont marquées comme lues.
+      expect((await sql<{ n: number }>(`select count(*)::int as n from public.notifications where user_id = $1 and not is_read`, [user.id]))[0].n).toBe(0);
+    } finally {
+      await sql(`delete from public.notifications where user_id = $1`, [user.id]);
+      await sql(`delete from public.users where id = $1`, [user.id]);
+      await context.close();
+    }
+  });
 });
