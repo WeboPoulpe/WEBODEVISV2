@@ -36,7 +36,11 @@ export async function middleware(request: NextRequest) {
   if (!token && pathname === '/' && !request.nextUrl.searchParams.has('source')) {
     const siteUrl = request.nextUrl.clone();
     siteUrl.pathname = '/site';
-    return NextResponse.rewrite(siteUrl);
+    // La même adresse montre l'app une fois connecté : cette réponse ne doit jamais être resservie depuis un cache
+    // (sinon, après « Quitter » puis une reconnexion, le navigateur réaffiche le site au lieu de l'app).
+    const res = NextResponse.rewrite(siteUrl);
+    res.headers.set('Cache-Control', 'private, no-store');
+    return res;
   }
 
   // Redirect unauthenticated users to /login

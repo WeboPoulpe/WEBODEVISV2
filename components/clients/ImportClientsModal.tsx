@@ -64,7 +64,7 @@ export default function ImportClientsModal({ existingEmails, onClose, onImported
       onClose={onClose}
       footer={<>
         <button onClick={onClose} className={btnGhost}>Annuler</button>
-        <button onClick={submit} disabled={busy || ready === 0} className={btnPrimary}>
+        <button onClick={submit} disabled={busy || ready === 0 || !user} className={btnPrimary}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           {ready > 0 ? `Importer ${ready} client${ready > 1 ? 's' : ''}` : 'Importer'}
         </button>
