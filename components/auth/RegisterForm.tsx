@@ -106,7 +106,7 @@ export default function RegisterForm() {
 
       {error && <p role="alert" className={authError}>{error}</p>}
 
-      <button type="submit" disabled={loading || !email || !password} className={authButton}>
+      <button type="submit" disabled={loading} className={authButton}>
         {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Création…</> : 'Créer mon compte'}
       </button>
     </form>

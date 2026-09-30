@@ -8,12 +8,7 @@ export default function RegisterPage() {
   return (
     <AuthShell
       title="Créer un compte"
-      subtitle="Quelques informations et vous pouvez commencer."
-      points={[
-        "14 jours d'essai gratuit",
-        'Aucune carte bancaire requise',
-        'Support inclus dès le premier jour',
-      ]}
+      subtitle="14 jours d'essai gratuit, sans carte bancaire."
       footer={<>Déjà un compte ? <Link href="/login" className="font-medium text-primary hover:underline">Se connecter</Link></>}
     >
       <RegisterForm />

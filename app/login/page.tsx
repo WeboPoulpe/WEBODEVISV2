@@ -9,11 +9,6 @@ export default function LoginPage() {
     <AuthShell
       title="Connexion"
       subtitle="Retrouvez vos devis et vos événements."
-      points={[
-        'Des devis soignés, prêts à envoyer',
-        'Vos événements, courses et extras au même endroit',
-        'Vos clients et prospects suivis sans tableur',
-      ]}
       footer={<>Pas encore de compte ? <Link href="/register" className="font-medium text-primary hover:underline">Créer un compte</Link></>}
     >
       <LoginForm />

@@ -31,7 +31,7 @@ export default function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email || !password) { setError('Saisissez votre adresse email et votre mot de passe.'); return; }
 
     setLoading(true);
     setError(null);
@@ -99,7 +99,7 @@ export default function LoginForm() {
       {error && <p role="alert" className={authError}>{error}</p>}
       {info && <p role="status" className={authInfo}>{info}</p>}
 
-      <button type="submit" disabled={loading || !email || !password} className={authButton}>
+      <button type="submit" disabled={loading} className={authButton}>
         {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Connexion…</> : 'Se connecter'}
       </button>
     </form>

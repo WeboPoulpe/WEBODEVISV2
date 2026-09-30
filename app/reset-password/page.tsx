@@ -40,7 +40,6 @@ export default function ResetPasswordPage() {
     <AuthShell
       title="Nouveau mot de passe"
       subtitle="Choisissez le mot de passe que vous utiliserez désormais."
-      points={['Le lien reçu par email est valable une heure', 'Il ne peut servir qu’une seule fois']}
       footer={<Link href="/login" className="font-medium text-primary hover:underline">Retour à la connexion</Link>}
     >
       {done ? (

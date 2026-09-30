@@ -8,6 +8,7 @@ import {
   User, Package, Calendar as CalendarIcon, Palette, Image as ImageIcon, LayoutTemplate,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Wordmark from '@/components/brand/Wordmark';
 import { useAuth } from '@/context/AuthContext';
 import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
 
@@ -46,11 +47,10 @@ export default function Sidebar({ badges }: { badges: Badges }) {
       style={{ width: 'calc(var(--shell-left) - 16px)' }}
     >
       {/* Marque */}
-      <div className="flex items-center gap-3 h-[68px] px-[18px] flex-shrink-0">
-        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-          <span className="font-display text-white font-bold text-base select-none">W</span>
-        </div>
-        <span className="sb-label font-display font-semibold text-white text-[19px] truncate select-none">WeboDevis</span>
+      <div className="flex items-center h-[72px] px-6 flex-shrink-0">
+        <span className="sb-label"><Wordmark className="text-[24px] text-white" /></span>
+        {/* Sur le rail d'icônes, il n'y a la place que pour l'initiale. */}
+        <span className="sb-rail-only w-full text-center"><Wordmark short className="text-[24px] text-white" /></span>
       </div>
 
       {editor.isQuoteEditor || editor.isPrestationEditor ? (
