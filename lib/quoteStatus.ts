@@ -49,3 +49,25 @@ export const isConfirmed = (status?: string | null): boolean =>
 
 export const isPending = (status?: string | null): boolean =>
   !!status && (PENDING_STATUSES as string[]).includes(status);
+
+/** Libellés affichés à l'utilisateur, identiques sur toutes les pages. */
+export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
+  nouveau: 'Nouveau',
+  broch_envoyee: 'Brochure envoyée',
+  devis_a_faire: 'Devis à faire',
+  devis_envoye: 'Devis envoyé',
+  rdv_deg_a_venir: 'RDV/Dég à venir',
+  rdv_deg_fait: 'RDV/Dég fait',
+  devis_final: 'Devis final',
+  valide: 'Validé',
+  acompte: 'Acompte reçu',
+  paye: 'Payé',
+  refus_client: 'Refus client',
+  refus_traiteur: 'Refus traiteur',
+};
+
+export const quoteStatusLabel = (status?: string | null): string =>
+  QUOTE_STATUS_LABELS[status as QuoteStatus] ?? status ?? '';
+
+export const isRejected = (status?: string | null): boolean =>
+  !!status && (REJECTED_STATUSES as string[]).includes(status);

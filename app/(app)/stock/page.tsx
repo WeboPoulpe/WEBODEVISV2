@@ -137,7 +137,7 @@ export default function StockPage() {
             <p className="text-sm text-gray-500">Aucun ingrédient {filter === 'alert' ? 'en alerte' : filter === 'empty' ? 'épuisé' : 'trouvé'}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
             {filtered.map((ing) => {
               const stock = ing.stock_quantity ?? 0;
               const alert = ing.min_stock_alert ?? 0;

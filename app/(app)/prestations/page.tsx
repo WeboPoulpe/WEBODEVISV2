@@ -1011,7 +1011,7 @@ export default function PrestationsPage() {
   });
 
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-6xl">
+    <div className="px-4 md:px-6 pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -1099,7 +1099,7 @@ export default function PrestationsPage() {
 
       {/* Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 animate-pulse space-y-3">
               <div className="h-4 bg-gray-100 rounded w-3/4" />
@@ -1131,7 +1131,7 @@ export default function PrestationsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {filtered.map((p) => (
             <PrestationCard
               key={p.id}

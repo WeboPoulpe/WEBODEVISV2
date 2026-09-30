@@ -381,7 +381,7 @@ export default function ClientsPage() {
   const habitualsCount = customers.filter((c) => (c.quote_count ?? 0) >= 3).length;
 
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-6xl">
+    <div className="px-4 md:px-6 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Clients</h1>
@@ -412,7 +412,7 @@ export default function ClientsPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center py-20 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4"><Users className="h-8 w-8 text-gray-400" /></div>
@@ -421,7 +421,7 @@ export default function ClientsPage() {
           {!search && <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"><Plus className="h-4 w-4" />Ajouter un client</Link>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {filtered.map((c) => <CustomerCard key={c.id} c={c} onOpen={() => setSheetCustomer(c)} />)}
         </div>
       )}

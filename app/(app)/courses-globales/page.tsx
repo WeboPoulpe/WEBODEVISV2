@@ -144,7 +144,7 @@ export default function CoursesGlobalesPage() {
   };
 
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-3xl space-y-6">
+    <div className="px-4 md:px-6 pb-8 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Courses globales</h1>

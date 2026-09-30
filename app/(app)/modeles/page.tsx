@@ -498,7 +498,7 @@ export default function ModelesPage() {
   };
 
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-5xl space-y-10">
+    <div className="px-4 md:px-6 pb-8 space-y-10">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
@@ -607,7 +607,7 @@ export default function ModelesPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
             {customs.map((t) => (
               <CustomTemplateCard
                 key={t.id}

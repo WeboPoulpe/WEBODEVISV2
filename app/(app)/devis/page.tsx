@@ -1223,7 +1223,7 @@ export default function DevisPage() {
   ];
 
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-7xl">
+    <div className="px-4 md:px-6 pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -1271,7 +1271,7 @@ export default function DevisPage() {
             <span className={`text-xs transition-transform ${showTemplates ? 'rotate-180' : ''}`}>▾</span>
           </button>
           {showTemplates && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
               {templates.map((tpl) => {
                 const svcCount = Array.isArray(tpl.services) ? tpl.services.length : 0;
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1414,7 +1414,7 @@ export default function DevisPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
       ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
@@ -1433,7 +1433,7 @@ export default function DevisPage() {
       ) : view === 'grid' ? (
         <div className="space-y-3">
           <AccordionSection title="Prospection" count={gridProspects.length} tone="amber" open={sec.prospection} onToggle={() => toggleSec('prospection')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-3">
               {gridProspects.map((p) => (
                 <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
               ))}
@@ -1441,19 +1441,19 @@ export default function DevisPage() {
           </AccordionSection>
 
           <AccordionSection title="Devis en cours" count={secEncours.length} tone="purple" open={sec.encours} onToggle={() => toggleSec('encours')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {secEncours.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
             </div>
           </AccordionSection>
 
           <AccordionSection title="Confirmés / Événements" count={secConfirmes.length} tone="emerald" open={sec.confirmes} onToggle={() => toggleSec('confirmes')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {secConfirmes.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
             </div>
           </AccordionSection>
 
           <AccordionSection title="Archivés / Refusés" count={secRefuses.length} tone="gray" open={sec.refuses} onToggle={() => toggleSec('refuses')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {secRefuses.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
             </div>
           </AccordionSection>
@@ -1470,7 +1470,7 @@ export default function DevisPage() {
             return visibleProspects.length > 0 ? (
               <div className="mb-5">
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({visibleProspects.length})</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                   {visibleProspects.map((p) => (
                     <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
                   ))}

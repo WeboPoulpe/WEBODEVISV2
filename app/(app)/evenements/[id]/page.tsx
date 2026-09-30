@@ -1912,7 +1912,7 @@ export default function EvenementPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50/30">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-5xl px-4 md:px-6 pb-8 space-y-5">
 
         {/* ── Back ──────────────────────────────────────────────────────────── */}
         <Link href="/calendrier" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-primary transition-colors group">

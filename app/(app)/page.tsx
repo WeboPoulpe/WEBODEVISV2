@@ -117,7 +117,7 @@ export default function DashboardPage() {
   const skeleton = <span className="inline-block h-8 w-24 rounded-lg bg-current opacity-10 animate-pulse align-middle" />;
 
   return (
-    <div className="px-4 md:px-6 pb-6 max-w-[1240px]">
+    <div className="px-4 md:px-6 pb-6">
       {/* Accueil + période */}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 mb-5">
         <div>
