@@ -163,7 +163,7 @@ test.describe('éditeur de devis', () => {
       await t.page.keyboard.press('Control+s');
       await expect(t.page.getByText('Devis enregistré')).toBeVisible({ timeout: 15_000 });
 
-      await t.page.goto(`/devis/${t.quoteId}/modifier?mode=wizard`);
+      await t.page.goto(`/devis/${t.quoteId}/modifier?mode=wizard`, { waitUntil: 'networkidle' });
       await t.page.getByRole('button', { name: /^Enregistrer/ }).first().click();
       await expect(t.page.getByText(/Enregistré/).first()).toBeVisible({ timeout: 15_000 });
       const after = await t.html();

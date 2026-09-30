@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { useHydrated } from '@/lib/useHydrated';
 import { Eye, X, ChefHat } from 'lucide-react';
 import { useState } from 'react';
 import { useDevis } from '@/context/DevisContext';
@@ -66,6 +67,7 @@ function useQuoteHtml() {
 // ── Desktop panel ─────────────────────────────────────────────────────────────
 export function LivePreview() {
   const html = useQuoteHtml();
+  const hydrated = useHydrated();
 
   return (
     <div className="h-full flex flex-col bg-gray-50/50">
@@ -80,7 +82,7 @@ export function LivePreview() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
         <div
           style={{ width: '794px', zoom: 0.55, transformOrigin: 'top left' }}
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
+          dangerouslySetInnerHTML={{ __html: hydrated ? sanitizeHtml(html) : '' }}
         />
       </div>
     </div>
@@ -91,6 +93,7 @@ export function LivePreview() {
 export function LivePreviewFAB() {
   const [open, setOpen] = useState(false);
   const html = useQuoteHtml();
+  const hydrated = useHydrated();
 
   return (
     <div className="lg:hidden print:hidden">
@@ -118,7 +121,7 @@ export function LivePreviewFAB() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
               <div
                 style={{ width: '794px', zoom: 0.42, transformOrigin: 'top left' }}
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
+                dangerouslySetInnerHTML={{ __html: hydrated ? sanitizeHtml(html) : '' }}
               />
             </div>
           </div>

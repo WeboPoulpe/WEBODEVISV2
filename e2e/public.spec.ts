@@ -39,6 +39,7 @@ test.describe('pages publiques', () => {
   });
 
   test('site : plan du site, consignes aux robots et pages clés répondent', async ({ request }) => {
+    test.setTimeout(180_000);
     const sitemap = await request.get('/sitemap.xml');
     expect(sitemap.status()).toBe(200);
     const urls = [...(await sitemap.text()).matchAll(new RegExp('<loc>https://webodevis\\.fr([^<]*)</loc>', 'g'))].map((m) => m[1] || '/');

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { useHydrated } from '@/lib/useHydrated';
 import {
   Save, Loader2, Plus, Trash2, Search, X, Eye,
   User, CalendarDays, ChefHat, Settings2, Scissors, PencilLine, Check, LayoutTemplate,
@@ -512,6 +513,7 @@ export default function QuoteInlineEditor({
   };
 
   const liveHtml = useLiveHtml(template, client, event, services, options, profile);
+  const hydrated = useHydrated();
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -767,7 +769,7 @@ export default function QuoteInlineEditor({
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
           <div
             style={{ width: '794px', zoom: 0.45, transformOrigin: 'top left' }}
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(liveHtml) }}
+            dangerouslySetInnerHTML={{ __html: hydrated ? sanitizeHtml(liveHtml) : '' }}
           />
         </div>
       </div>
@@ -880,7 +882,7 @@ export default function QuoteInlineEditor({
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
               <div
                 style={{ width: '794px', zoom: 0.42, transformOrigin: 'top left' }}
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(liveHtml) }}
+                dangerouslySetInnerHTML={{ __html: hydrated ? sanitizeHtml(liveHtml) : '' }}
               />
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { useHydrated } from '@/lib/useHydrated';
 
 // Vignette d'un modèle de devis : la première page du document, réduite. Un clic ouvre l'aperçu complet.
 // Le document est rendu à sa largeur réelle (A4 à l'écran) puis mis à l'échelle de la vignette.
@@ -19,7 +20,8 @@ export default function TemplateThumb({ html, lines, loading, label, onClick }: 
 }) {
   const box = useRef<HTMLButtonElement>(null);
   const [scale, setScale] = useState(0);
-  const clean = useMemo(() => (html ? sanitizeHtml(html) : null), [html]);
+  const hydrated = useHydrated();
+  const clean = useMemo(() => (html && hydrated ? sanitizeHtml(html) : null), [html, hydrated]);
 
   useLayoutEffect(() => {
     const el = box.current;
