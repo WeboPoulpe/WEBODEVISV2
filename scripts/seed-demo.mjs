@@ -32,7 +32,7 @@ const DEMO_EMAIL = 'demo@webodevis.fr';
 // Identifiants stables d'une exécution à l'autre : les adresses des fiches restent valables après un rejeu.
 const KINDS = ['supplier', 'ingredient', 'prestation', 'recipe', 'customer', 'contact', 'folder', 'token', 'prospect', 'quote',
   'line', 'task', 'material', 'cost', 'rental', 'rentalTpl', 'course', 'extra', 'mission', 'order', 'orderItem', 'movement',
-  'devisTpl', 'quoteTpl', 'notification'];
+  'devisTpl', 'quoteTpl', 'notification', 'rentalSet'];
 const seq = {};
 const uid = (kind) => {
   const k = KINDS.indexOf(kind);
@@ -660,6 +660,7 @@ try {
     'delete from public.service_ingredients where user_id = $1',
     'delete from public.service_materials where user_id = $1',
     'delete from public.rental_templates where user_id = $1',
+    'delete from public.rental_template_sets where user_id = $1',
     `delete from public.quote_status_history where quote_id in ${mine}`,
     // Les autres tables liées à un devis (pièces jointes, tâches, factures…) le suivent par leur clé étrangère.
     'delete from public.quotes where owner_user_id = $1',
@@ -707,9 +708,23 @@ try {
   await insert('service_ingredients', PRESTATIONS.flatMap((p) => p.recipe.map((r) => ({
     id: uid('recipe'), user_id: DEMO, service_id: p.id, ingredient_id: r.ingredient.id, qty_per_person: r.qty, quantity_per_guest: r.qty, unit: r.ingredient.unit,
   }))));
+  // Deux modèles : le dîner assis reprend toute la liste, le cocktail seulement la verrerie et le mobilier debout.
+  const SET_DINER = uid('rentalSet');
+  const SET_COCKTAIL = uid('rentalSet');
+  await insert('rental_template_sets', [
+    { id: SET_DINER, user_id: DEMO, name: 'Dîner assis', created_at: ts(-200, 9) },
+    { id: SET_COCKTAIL, user_id: DEMO, name: 'Cocktail', created_at: ts(-199, 9) },
+  ]);
   await insert('rental_templates', RENTAL_TEMPLATES.map((t) => ({
-    id: t.id, user_id: DEMO, material_name: t.material_name, qty_per_guest: t.qty_per_guest, unit: t.unit,
+    id: t.id, user_id: DEMO, set_id: SET_DINER, material_name: t.material_name, qty_per_guest: t.qty_per_guest, unit: t.unit,
     default_supplier_id: supplier('location').id, default_price_per_unit: t.price, sort_order: t.sort_order,
+  })));
+  await insert('rental_templates', [
+    ['Flûte 17 cl', 1.5, 'pièce', 0.25], ['Verre à vin 35 cl', 1.2, 'pièce', 0.25], ['Assiette cocktail 16 cm', 1.5, 'pièce', 0.22],
+    ['Mange-debout nappé', 0.1, 'pièce', 14], ['Vasque à glace', 0.04, 'pièce', 9],
+  ].map(([material_name, qty_per_guest, unit, price], i) => ({
+    id: uid('rentalTpl'), user_id: DEMO, set_id: SET_COCKTAIL, material_name, qty_per_guest, unit,
+    default_supplier_id: supplier('location').id, default_price_per_unit: price, sort_order: i,
   })));
 
   // 4. Clients et demandes

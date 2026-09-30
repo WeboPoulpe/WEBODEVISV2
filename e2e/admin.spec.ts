@@ -244,4 +244,68 @@ test.describe('administration', () => {
       await context.close();
     }
   });
+
+  test('modèles de location : plusieurs modèles, choix dans l’événement, quantités selon les couverts', async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'un seul passage suffit');
+    const email = `e2e-location-${Date.now()}@test.webodevis.local`;
+    const [user] = await sql<{ id: string }>(`insert into public.users (email, password_hash) values ($1, 'x') returning id`, [email]);
+    await sql(`insert into public.profiles (id, email, first_name, role, is_active, has_completed_onboarding) values ($1, $2, 'Location', 'user', true, true)`, [user.id, email]);
+    const [quote] = await sql<{ id: string }>(
+      `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status)
+       values ($1, $1, 'Client location', current_date + 30, 'Cocktail', 50, 'valide') returning id`, [user.id]);
+    const token = await encode({ token: { sub: user.id, email }, secret: envLocal('NEXTAUTH_SECRET') });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: { cookies: [], origins: [] } });
+    await context.addCookies([{ name: 'next-auth.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600 }]);
+    const page = await context.newPage();
+    const addItem = async (name: string, qty: string, price: string) => {
+      await page.getByRole('button', { name: 'Ajouter un article' }).click();
+      await page.locator('#tpl-name').fill(name);
+      await page.locator('#tpl-qty').fill(qty);
+      await page.locator('#tpl-price').fill(price);
+      await page.getByRole('button', { name: 'Enregistrer' }).click();
+      await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 15_000 });
+    };
+    const createSet = async (name: string) => {
+      await page.getByRole('button', { name: 'Nouveau modèle' }).first().click();
+      await page.locator('#set-name').fill(name);
+      await page.getByRole('button', { name: 'Créer le modèle' }).click();
+      await expect(page.getByRole('tab', { name: new RegExp(name) })).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 });
+    };
+    try {
+      await page.goto('/location-templates');
+      await expect(page.getByText('Aucun modèle de location')).toBeVisible({ timeout: 20_000 });
+      await createSet('Dîner assis');
+      await addItem('Assiette plate', '1', '0.3');
+      await createSet('Cocktail');
+      await addItem('Flûte', '1.5', '0.25');
+      await addItem('Mange-debout', '0.1', '14');
+      // 150 flûtes et 10 mange-debout pour 100 couverts : 37,50 + 140.
+      await expect(page.getByText('environ 177,50')).toBeVisible();
+      await testInfo.attach('modeles', { body: await page.screenshot(), contentType: 'image/png' });
+
+      // Dans l'événement : deux modèles, donc un choix ; le cocktail pour 50 couverts donne 75 flûtes et 5 mange-debout.
+      await page.goto(`/evenements/${quote.id}`);
+      await page.getByRole('tab', { name: 'Matériel' }).click();
+      await page.getByRole('button', { name: 'Appliquer un modèle' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Quel modèle appliquer ?' });
+      await expect(dialog.getByText('Quantités calculées pour 50 couverts.')).toBeVisible();
+      await dialog.getByRole('button', { name: /Cocktail/ }).click();
+      await expect(page.getByText('Mange-debout')).toBeVisible({ timeout: 15_000 });
+      const rows = await sql<{ material_name: string; qty: string; source: string }>(
+        `select material_name, qty, source from public.rental_items where quote_id = $1 order by material_name`, [quote.id]);
+      expect(rows.map((r) => [r.material_name, Number(r.qty), r.source])).toEqual([['Flûte', 75, 'template'], ['Mange-debout', 5, 'template']]);
+
+      // Changer d'avis : le dîner assis remplace ce qui avait été généré.
+      page.once('dialog', (d) => d.accept());
+      await page.getByRole('button', { name: 'Appliquer un modèle' }).click();
+      await dialog.getByRole('button', { name: /Dîner assis/ }).click();
+      await expect(page.getByText('Assiette plate')).toBeVisible({ timeout: 15_000 });
+      const after = await sql<{ material_name: string; qty: string }>(`select material_name, qty from public.rental_items where quote_id = $1`, [quote.id]);
+      expect(after.map((r) => [r.material_name, Number(r.qty)])).toEqual([['Assiette plate', 50]]);
+    } finally {
+      await sql(`delete from public.quotes where id = $1`, [quote.id]);
+      await sql(`delete from public.users where id = $1`, [user.id]);
+      await context.close();
+    }
+  });
 });

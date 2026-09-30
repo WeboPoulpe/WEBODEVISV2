@@ -1175,9 +1175,26 @@ export const service_ingredients = pgTable("service_ingredients", {
 ]);
 
 // Modèles de location : quantité de matériel par convive, utilisés pour générer la location d'un événement.
+// Modèles de location : un traiteur en a plusieurs (dîner assis, cocktail, séminaire…), chacun avec ses articles.
+export const rental_template_sets = pgTable("rental_template_sets", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	name: text().notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_rental_template_sets_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "rental_template_sets_user_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+// Articles d'un modèle de location, avec leur quantité par couvert.
 export const rental_templates = pgTable("rental_templates", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	user_id: uuid().notNull(),
+	set_id: uuid(),
 	material_name: text().notNull(),
 	qty_per_guest: numeric().default('1').notNull(),
 	unit: text(),
@@ -1196,6 +1213,12 @@ export const rental_templates = pgTable("rental_templates", {
 			foreignColumns: [suppliers.id],
 			name: "rental_templates_default_supplier_id_fkey"
 		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.set_id],
+			foreignColumns: [rental_template_sets.id],
+			name: "rental_templates_set_id_fkey"
+		}).onDelete("cascade"),
+	index("idx_rental_templates_set_id").using("btree", table.set_id.asc().nullsLast().op("uuid_ops")),
 ]);
 
 export const service_materials = pgTable("service_materials", {

@@ -64,6 +64,13 @@
       "when": 1790783129468,
       "tag": "0008_material_presets",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790784910141,
+      "tag": "0009_rental_template_sets",
+      "breakpoints": true
     }
   ]
 }

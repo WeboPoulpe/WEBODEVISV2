@@ -28,8 +28,11 @@ interface RentalItem {
   confirmed_individually: boolean | null;
 }
 
+interface RentalTemplateSet { id: string; name: string }
+
 interface RentalTemplate {
   id: string;
+  set_id: string | null;
   material_name: string;
   qty_per_guest: number;
   unit: string | null;
@@ -82,6 +85,8 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   const [rentals, setRentals] = useState<RentalItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [templates, setTemplates] = useState<RentalTemplate[]>([]);
+  const [templateSets, setTemplateSets] = useState<RentalTemplateSet[]>([]);
+  const [choosingSet, setChoosingSet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<typeof emptyForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -102,8 +107,11 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
 
   useEffect(() => {
     if (!user) return;
-    createClient().from('rental_templates').select('*').eq('user_id', user.id).order('sort_order')
+    const supabase = createClient();
+    supabase.from('rental_templates').select('*').eq('user_id', user.id).order('sort_order')
       .then(({ data }) => setTemplates((data ?? []) as RentalTemplate[]));
+    supabase.from('rental_template_sets').select('id, name').eq('user_id', user.id).order('created_at')
+      .then(({ data }) => setTemplateSets((data ?? []) as RentalTemplateSet[]));
   }, [user]);
 
   const saveRental = async () => {
@@ -143,17 +151,24 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
     if (!check(res, 'L’article n’a pas pu être supprimé. Réessayez.')) setRentals(previous);
   };
 
-  const generate = async () => {
-    const guests = quote.guest_count ?? 1;
-    if (!confirm(`Générer la location pour ${guests} couverts à partir de vos ${templates.length} modèles ?\nLes articles générés précédemment seront remplacés ; ceux ajoutés à la main sont conservés.`)) return;
+  // Les modèles qui ont au moins un article ; un seul : il s'applique directement, plusieurs : on choisit.
+  const usableSets = templateSets.filter((s) => templates.some((t) => t.set_id === s.id));
+  const guests = quote.guest_count ?? 1;
+  const setTotal = (setId: string) => templates.filter((t) => t.set_id === setId).reduce((sum, t) => sum + Math.ceil(Number(t.qty_per_guest) * guests) * Number(t.default_price_per_unit), 0);
+
+  const generate = async (set: RentalTemplateSet) => {
+    const chosen = templates.filter((t) => t.set_id === set.id);
+    const replaced = rentals.filter((r) => r.source === 'template').length;
+    if (replaced > 0 && !confirm(`Appliquer « ${set.name} » pour ${guests} couverts ?\nLes ${replaced} articles générés précédemment seront remplacés ; ceux ajoutés à la main sont conservés.`)) return;
+    setChoosingSet(false);
     setGenerating(true);
     const supabase = createClient();
     const generated = rentals.filter((r) => r.source === 'template').map((r) => r.id);
     const removed = generated.length ? await supabase.from('rental_items').delete().in('id', generated) : { error: null };
-    const inserted = removed.error ? removed : await supabase.from('rental_items').insert(templates.map((t) => ({
+    const inserted = removed.error ? removed : await supabase.from('rental_items').insert(chosen.map((t) => ({
       quote_id: quote.id,
       material_name: t.material_name,
-      qty: Math.ceil(t.qty_per_guest * guests),
+      qty: Math.ceil(Number(t.qty_per_guest) * guests),
       unit: t.unit,
       supplier_id: t.default_supplier_id,
       price_per_unit: t.default_price_per_unit,
@@ -235,9 +250,10 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-gray-900">Location</h3>
           <div className="flex flex-wrap gap-2">
-            {templates.length > 0 && (
-              <button onClick={generate} disabled={generating} className={btnSecondary}>
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}Générer depuis mes modèles
+            {usableSets.length > 0 && (
+              <button onClick={() => (usableSets.length === 1 ? generate(usableSets[0]) : setChoosingSet(true))} disabled={generating} className={btnSecondary}>
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                {usableSets.length === 1 ? `Appliquer « ${usableSets[0].name} »` : 'Appliquer un modèle'}
               </button>
             )}
             {rentals.length > 0 && <button onClick={print} className={btnSecondary}><Printer className="h-4 w-4" />Imprimer</button>}
@@ -250,7 +266,7 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
         ) : rentals.length === 0 ? (
           <EmptyState
             title="Aucun matériel à louer"
-            hint={templates.length === 0 ? 'Créez vos modèles de location pour générer la liste selon le nombre de couverts.' : undefined}
+            hint={usableSets.length === 0 ? 'Créez vos modèles de location (dîner assis, cocktail…) pour générer la liste selon le nombre de couverts.' : undefined}
           />
         ) : (
           <>
@@ -288,9 +304,32 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
           </>
         )}
         <p className="text-sm text-gray-500">
-          La quantité par couvert de chaque article se règle dans <Link href="/location-templates" className="font-medium text-primary hover:underline">vos modèles de location</Link>.
+          Les modèles et la quantité par couvert de chaque article se règlent dans <Link href="/location-templates" className="font-medium text-primary hover:underline">vos modèles de location</Link>.
         </p>
       </section>
+
+      {choosingSet && (
+        <Modal title="Quel modèle appliquer ?" onClose={() => setChoosingSet(false)}>
+          <p className="text-sm text-gray-500 mb-3">Quantités calculées pour {guests} couverts.</p>
+          <ul className="space-y-2 pb-3">
+            {usableSets.map((s) => {
+              const count = templates.filter((t) => t.set_id === s.id).length;
+              const total = setTotal(s.id);
+              return (
+                <li key={s.id}>
+                  <button onClick={() => generate(s)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-gray-50 hover:bg-gray-100 text-left transition-colors">
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-gray-900 break-words">{s.name}</span>
+                      <span className="block text-sm text-gray-600">{count} article{count > 1 ? 's' : ''}</span>
+                    </span>
+                    {total > 0 && <span className="font-display font-bold text-gray-900 tabular-nums whitespace-nowrap">{money(total)}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Modal>
+      )}
 
       {picking && user && (
         <MaterialPicker
