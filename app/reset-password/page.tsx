@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { resetPassword } from '@/server/auth';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -15,16 +16,10 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // La session de récupération est établie depuis le lien reçu par email.
+  // Le jeton de réinitialisation est porté par le lien reçu par email.
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
+    setToken(new URLSearchParams(window.location.search).get('token'));
+    setReady(true);
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -32,12 +27,13 @@ export default function ResetPasswordPage() {
     setError(null);
     if (password.length < 6) { setError('Le mot de passe doit faire au moins 6 caractères.'); return; }
     if (password !== confirm) { setError('Les deux mots de passe ne correspondent pas.'); return; }
+    if (!token) { setError('Lien de réinitialisation incomplet. Refaites une demande depuis la page de connexion.'); return; }
     setLoading(true);
-    const { error: err } = await createClient().auth.updateUser({ password });
+    const { error: err } = await resetPassword(token, password);
     setLoading(false);
-    if (err) { setError(err.message); return; }
+    if (err) { setError(err); return; }
     setDone(true);
-    setTimeout(() => { router.push('/'); router.refresh(); }, 1500);
+    setTimeout(() => { router.push('/login'); }, 1500);
   };
 
   return (
@@ -50,7 +46,7 @@ export default function ResetPasswordPage() {
 
         {done ? (
           <p className="text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100 flex items-center gap-2">
-            <Check className="h-4 w-4" /> Mot de passe mis à jour. Redirection…
+            <Check className="h-4 w-4" /> Mot de passe mis à jour. Redirection vers la connexion…
           </p>
         ) : !ready ? (
           <p className="text-sm text-gray-500 flex items-center gap-2">

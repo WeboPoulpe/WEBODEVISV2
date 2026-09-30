@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import type { User, Session } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { SessionProvider, signIn as nextAuthSignIn, signOut as nextAuthSignOut, useSession } from 'next-auth/react';
+import { getMyProfile, registerUser } from '@/server/auth';
 
 // ── Profile type (mirrors existing app profiles table) ──────────────────────
 export interface Profile {
@@ -26,10 +26,14 @@ export interface Profile {
   default_vat_rate: number | null;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
 // ── Context type ─────────────────────────────────────────────────────────────
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -40,98 +44,53 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+function AuthState({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    // maybeSingle : 0 ligne est un cas légitime (profil pas encore créé) → pas d'erreur.
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) console.error('fetchProfile:', error.message);
-    setProfile(data as Profile | null);
-  };
+  const userId = session?.user?.id ?? null;
+  const userEmail = session?.user?.email ?? null;
+  // Objet stable tant que l'utilisateur ne change pas : évite de relancer les effets qui en dépendent.
+  const userRef = useRef<AuthUser | null>(null);
+  if (!userId) userRef.current = null;
+  else if (userRef.current?.id !== userId) userRef.current = { id: userId, email: userEmail ?? '' };
+  const user = userRef.current;
 
-  // Mémorise le dernier user pour lequel le profil a été chargé → évite un refetch
-  // à chaque TOKEN_REFRESHED (~horaire) ou refocus qui n'a pas changé d'utilisateur.
-  const loadedProfileFor = useRef<string | null>(null);
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadedProfileFor.current = session.user.id;
-        fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // Ne refetch le profil que si l'utilisateur a réellement changé.
-        if (loadedProfileFor.current !== session.user.id) {
-          loadedProfileFor.current = session.user.id;
-          fetchProfile(session.user.id);
-        }
-      } else {
-        loadedProfileFor.current = null;
-        setProfile(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchProfile = useCallback(async () => {
+    setProfile((await getMyProfile()) as Profile | null);
   }, []);
 
+  useEffect(() => {
+    if (userId) fetchProfile();
+    else setProfile(null);
+  }, [userId, fetchProfile]);
+
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    const res = await nextAuthSignIn('credentials', { redirect: false, email, password });
+    return { error: res?.error ?? null };
   };
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (!error && data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        email,
-        first_name: firstName || null,
-        last_name: lastName || null,
-        role: 'user',
-        is_active: true,
-        has_completed_onboarding: false,
-      });
-    }
-    return { error: error?.message ?? null };
-  };
+  const signUp = (email: string, password: string, firstName: string, lastName: string) =>
+    registerUser({ email, password, firstName, lastName });
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
+    await nextAuthSignOut({ redirect: false });
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, loading, signIn, signUp, signOut, refreshProfile }}
+      value={{ user, profile, loading: status === 'loading', signIn, signUp, signOut, refreshProfile: fetchProfile }}
     >
       {children}
     </AuthContext.Provider>
+  );
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider refetchOnWindowFocus={false}>
+      <AuthState>{children}</AuthState>
+    </SessionProvider>
   );
 }
 

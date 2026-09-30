@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { createClient } from '@/lib/supabase/client';
+import { requestPasswordReset } from '@/server/auth';
 
 export default function LoginForm() {
   const { signIn } = useAuth();
@@ -22,11 +22,9 @@ export default function LoginForm() {
     setError(null); setInfo(null);
     if (!email.trim()) { setError('Entrez votre adresse email ci-dessus, puis cliquez sur « Mot de passe oublié ».'); return; }
     setResetting(true);
-    const { error: err } = await createClient().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error: err } = await requestPasswordReset(email);
     setResetting(false);
-    if (err) { setError(err.message); return; }
+    if (err) { setError(err); return; }
     setInfo('Si un compte existe pour cet email, un lien de réinitialisation vient d’être envoyé (pensez aux spams).');
   };
 

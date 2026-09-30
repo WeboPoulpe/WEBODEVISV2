@@ -36,7 +36,7 @@ export default function RegisterForm() {
 
     setSuccess(true);
     setLoading(false);
-    setTimeout(() => router.push('/login'), 3000);
+    setTimeout(() => router.push('/login'), 1500);
   };
 
   if (success) {
@@ -46,7 +46,7 @@ export default function RegisterForm() {
           <span className="text-2xl">✓</span>
         </div>
         <p className="text-sm font-semibold text-gray-900">Compte créé avec succès !</p>
-        <p className="text-xs text-gray-500">Vérifiez votre email pour confirmer votre compte. Redirection vers la connexion…</p>
+        <p className="text-xs text-gray-500">Vous pouvez maintenant vous connecter. Redirection vers la connexion…</p>
       </div>
     );
   }
