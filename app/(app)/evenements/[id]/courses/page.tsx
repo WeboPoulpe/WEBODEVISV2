@@ -35,7 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Viandes':          'bg-red-100 text-red-700 border-red-200',
   'Poissons':         'bg-blue-100 text-blue-700 border-blue-200',
   'Fruits & Légumes': 'bg-green-100 text-green-700 border-green-200',
-  'Boissons':         'bg-purple-100 text-purple-700 border-purple-200',
+  'Boissons':         'bg-primary-100 text-primary-700 border-primary-200',
 };
 
 function categoryColor(cat: string | null) {
@@ -215,7 +215,7 @@ export default function CoursesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -238,11 +238,11 @@ export default function CoursesPage() {
                 {meta?.client_name ?? 'Courses'}
               </h1>
               {displayDate && (
-                <p className="text-xs text-[#9c27b0] font-medium">{displayDate}</p>
+                <p className="text-xs text-primary font-medium">{displayDate}</p>
               )}
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-bold text-[#9c27b0]">{pct}%</p>
+              <p className="text-sm font-bold text-primary">{pct}%</p>
               <p className="text-xs text-gray-400">{doneCount}/{totalCount}</p>
             </div>
             <button
@@ -263,7 +263,7 @@ export default function CoursesPage() {
           {totalCount > 0 && (
             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-1.5 bg-[#9c27b0] rounded-full transition-all duration-500"
+                className="h-1.5 bg-primary rounded-full transition-all duration-500"
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -277,7 +277,7 @@ export default function CoursesPage() {
                 className={[
                   'flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors',
                   activeCategory === null
-                    ? 'bg-[#9c27b0] text-white border-[#9c27b0]'
+                    ? 'bg-primary text-white border-primary'
                     : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
                 ].join(' ')}
               >
@@ -290,7 +290,7 @@ export default function CoursesPage() {
                   className={[
                     'flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border transition-colors',
                     activeCategory === cat
-                      ? 'bg-[#9c27b0] text-white border-[#9c27b0]'
+                      ? 'bg-primary text-white border-primary'
                       : `${categoryColor(cat)} hover:opacity-80`,
                   ].join(' ')}
                 >
@@ -310,7 +310,7 @@ export default function CoursesPage() {
             <p className="text-sm text-gray-400 font-medium">Aucun ingrédient dans la liste.</p>
             <p className="text-xs text-gray-400 mt-1">
               Ajoutez des ingrédients depuis l&apos;onglet{' '}
-              <Link href={`/evenements/${id}`} className="text-[#9c27b0] hover:underline">
+              <Link href={`/evenements/${id}`} className="text-primary hover:underline">
                 Prépa & Achats
               </Link>.
             </p>
@@ -363,7 +363,7 @@ export default function CoursesPage() {
                       ].join(' ')}>
                         {item.ingredient.name}
                       </p>
-                      <p className="text-sm text-[#9c27b0] font-medium mt-0.5">
+                      <p className="text-sm text-primary font-medium mt-0.5">
                         {item.quantity} {item.unit ?? item.ingredient.unit ?? ''}
                       </p>
                     </div>
@@ -371,7 +371,7 @@ export default function CoursesPage() {
                     {/* Checkbox */}
                     <div className="flex-shrink-0">
                       {item.checked ? (
-                        <CheckCircle2 className="h-7 w-7 text-[#9c27b0]" />
+                        <CheckCircle2 className="h-7 w-7 text-primary" />
                       ) : (
                         <div className="h-7 w-7 rounded-full border-2 border-gray-300" />
                       )}

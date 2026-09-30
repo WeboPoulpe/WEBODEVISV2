@@ -29,7 +29,7 @@ export interface FolderColor {
 }
 
 export const FOLDER_COLORS: FolderColor[] = [
-  { key: 'purple',  label: 'Violet',   tile: 'bg-[#faf5ff] border-[#e9d5ff]', hover: 'hover:border-[#9c27b0]/50', iconBg: 'bg-[#f3e5f5]', iconText: 'text-[#9c27b0]', swatch: 'bg-[#9c27b0]', drop: 'border-[#9c27b0] bg-[#f3e5f5]' },
+  { key: 'purple',  label: 'Violet',   tile: 'bg-primary-50 border-[#e9d5ff]', hover: 'hover:border-primary/50', iconBg: 'bg-primary-50', iconText: 'text-primary', swatch: 'bg-primary', drop: 'border-primary bg-primary-50' },
   { key: 'blue',    label: 'Bleu',     tile: 'bg-sky-50/60 border-sky-200',   hover: 'hover:border-sky-400',      iconBg: 'bg-sky-100',   iconText: 'text-sky-600',   swatch: 'bg-sky-500',   drop: 'border-sky-500 bg-sky-100' },
   { key: 'emerald', label: 'Vert',     tile: 'bg-emerald-50/60 border-emerald-200', hover: 'hover:border-emerald-400', iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', swatch: 'bg-emerald-500', drop: 'border-emerald-500 bg-emerald-100' },
   { key: 'amber',   label: 'Ambre',    tile: 'bg-amber-50/60 border-amber-200', hover: 'hover:border-amber-400',  iconBg: 'bg-amber-100', iconText: 'text-amber-600', swatch: 'bg-amber-500', drop: 'border-amber-500 bg-amber-100' },
@@ -122,7 +122,7 @@ export function FolderStylePicker({
               className={[
                 'aspect-square flex items-center justify-center rounded-lg border transition-colors',
                 icon === key
-                  ? 'border-[#9c27b0] bg-[#f3e5f5] text-[#9c27b0]'
+                  ? 'border-primary bg-primary-50 text-primary'
                   : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600',
               ].join(' ')}
             >

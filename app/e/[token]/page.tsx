@@ -105,7 +105,7 @@ export default async function ExtraPublicPage({
     <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#6a1080] to-[#9c27b0] rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-br from-primary-darker to-primary rounded-2xl p-6 text-white">
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-xl">{initials}</span>
@@ -187,7 +187,7 @@ export default async function ExtraPublicPage({
                   {m.assign_courses && (
                     <Link
                       href={`/evenements/${m.quote.id}/courses`}
-                      className="flex items-center justify-center gap-2 mt-2 w-full py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+                      className="flex items-center justify-center gap-2 mt-2 w-full py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
                     >
                       🛒 Voir la liste de courses
                     </Link>

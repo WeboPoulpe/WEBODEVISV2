@@ -109,8 +109,8 @@ export default function FolderBar({
             {...dropProps(null)}
             className={[
               'flex items-center gap-1.5 px-2 py-1 rounded-lg font-medium transition-colors border',
-              isOver(null) ? 'border-[#9c27b0] bg-[#f3e5f5] text-[#9c27b0]' : 'border-transparent',
-              currentId === null ? 'text-gray-900' : 'text-gray-500 hover:text-[#9c27b0] hover:bg-gray-50',
+              isOver(null) ? 'border-primary bg-primary-50 text-primary' : 'border-transparent',
+              currentId === null ? 'text-gray-900' : 'text-gray-500 hover:text-primary hover:bg-gray-50',
             ].join(' ')}
           >
             <Home className="h-3.5 w-3.5" />
@@ -125,8 +125,8 @@ export default function FolderBar({
                 {...dropProps(f.id)}
                 className={[
                   'flex items-center gap-1.5 px-2 py-1 rounded-lg font-medium transition-colors border truncate max-w-[180px]',
-                  isOver(f.id) ? 'border-[#9c27b0] bg-[#f3e5f5]' : 'border-transparent',
-                  i === path.length - 1 ? 'text-gray-900' : 'text-gray-500 hover:text-[#9c27b0] hover:bg-gray-50',
+                  isOver(f.id) ? 'border-primary bg-primary-50' : 'border-transparent',
+                  i === path.length - 1 ? 'text-gray-900' : 'text-gray-500 hover:text-primary hover:bg-gray-50',
                 ].join(' ')}
               >
                 <FolderGlyph icon={f.icon} color={f.color} size="sm" />
@@ -139,7 +139,7 @@ export default function FolderBar({
 
         <button
           onClick={() => setForm({ mode: 'create', name: '', color: 'purple', icon: 'folder' })}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-[#9c27b0]/40 hover:text-[#9c27b0] transition-colors flex-shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:border-primary/40 hover:text-primary transition-colors flex-shrink-0"
         >
           <FolderPlus className="h-3.5 w-3.5" />
           Nouveau dossier
@@ -184,7 +184,7 @@ export default function FolderBar({
                   <button
                     onClick={(e) => { e.stopPropagation(); setForm({ mode: 'edit', id: f.id, name: f.name, color: f.color, icon: f.icon }); }}
                     title="Renommer / personnaliser"
-                    className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-white rounded-lg transition-colors"
+                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-white rounded-lg transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -206,7 +206,7 @@ export default function FolderBar({
       {subFolders.length === 0 && folders.length === 0 && (
         <button
           onClick={() => setForm({ mode: 'create', name: '', color: 'purple', icon: 'folder' })}
-          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-primary/40 hover:text-primary transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
           Créer un dossier pour organiser vos devis (mariages, entreprises, 2026…)
@@ -220,8 +220,8 @@ export default function FolderBar({
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-[#f3e5f5] rounded-xl">
-                  <FolderPlus className="h-4 w-4 text-[#9c27b0]" />
+                <div className="p-2 bg-primary-50 rounded-xl">
+                  <FolderPlus className="h-4 w-4 text-primary" />
                 </div>
                 <h2 className="font-semibold text-gray-900 text-sm">
                   {form.mode === 'create' ? 'Nouveau dossier' : 'Modifier le dossier'}
@@ -246,7 +246,7 @@ export default function FolderBar({
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   onKeyDown={(e) => { if (e.key === 'Enter') submitForm(); if (e.key === 'Escape') setForm(null); }}
                   placeholder="Nom du dossier"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 />
               </div>
 
@@ -264,7 +264,7 @@ export default function FolderBar({
                 Annuler
               </button>
               <button onClick={submitForm} disabled={saving || !form.name.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors">
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {form.mode === 'create' ? 'Créer' : 'Enregistrer'}
               </button>

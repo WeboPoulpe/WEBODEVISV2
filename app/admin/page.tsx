@@ -48,7 +48,7 @@ export default function AdminDashboard() {
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen"><Loader2 className="h-6 w-6 animate-spin text-[#9c27b0]" /></div>;
+    return <div className="flex items-center justify-center h-screen"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -87,7 +87,7 @@ function KpiCard({ label, value, icon: Icon, color }: { label: string; value: nu
   const colorMap: Record<string, string> = {
     blue: 'from-blue-500 to-blue-600',
     emerald: 'from-emerald-500 to-emerald-600',
-    purple: 'from-purple-500 to-purple-600',
+    purple: 'from-primary-500 to-primary-600',
     amber: 'from-amber-500 to-amber-600',
     rose: 'from-rose-500 to-rose-600',
     cyan: 'from-cyan-500 to-cyan-600',

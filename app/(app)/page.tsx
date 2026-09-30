@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  FileText, Users, Plus, TrendingUp, Euro, CalendarDays, ArrowRight,
+  FileText, Users, TrendingUp, Euro, CalendarDays, ArrowRight,
   Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase, Loader2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -115,42 +115,26 @@ export default function DashboardPage() {
   const maxCA = Math.max(...monthStats.map((s) => s.amount), 1);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Tableau de bord</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-        </div>
-        <Link
-          href="/devis/nouveau"
-          className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Nouveau devis
-        </Link>
-      </div>
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+      {/* Date du jour (le titre de la page est dans l'en-tête) */}
+      <p className="font-display text-2xl font-semibold text-gray-900 capitalize mb-5">
+        {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      </p>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Chiffres clés */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         {[
-          { label: 'CA ce mois', value: loading ? '…' : formatCurrency(caMensuel), color: '#388e3c', bg: '#e8f5e9', icon: Euro },
-          { label: 'Couverts à venir', value: loading ? '…' : String(couvertsAVenir), color: '#1976d2', bg: '#e3f2fd', icon: Users },
-          { label: 'Devis en cours', value: loading ? '…' : String(devisEnCours), color: '#9c27b0', bg: '#f3e5f5', icon: FileText },
-          { label: 'Taux conversion', value: loading ? '…' : `${tauxConversion}%`, color: '#e65100', bg: '#fff3e0', icon: TrendingUp },
-        ].map(({ label, value, color, bg, icon: Icon }) => (
-          <div key={label} className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500 leading-tight">{label}</p>
-              <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: bg, color }}>
-                <Icon className="h-4 w-4" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold tabular-nums truncate" style={{ color }}>
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : value}
+          { label: "Chiffre d'affaires du mois", value: formatCurrency(caMensuel), icon: Euro },
+          { label: 'Couverts à venir', value: String(couvertsAVenir), icon: Users },
+          { label: 'Devis en cours', value: String(devisEnCours), icon: FileText },
+          { label: 'Taux de conversion', value: `${tauxConversion} %`, icon: TrendingUp },
+        ].map(({ label, value, icon: Icon }) => (
+          <div key={label} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+            <Icon className="h-5 w-5 text-primary mb-3" strokeWidth={1.8} />
+            <p className="font-display text-[22px] sm:text-3xl font-semibold text-gray-900 tabular-nums leading-none whitespace-nowrap">
+              {loading ? <Loader2 className="h-5 w-5 animate-spin text-gray-400" /> : value}
             </p>
+            <p className="text-[13px] text-gray-500 mt-2 leading-snug">{label}</p>
           </div>
         ))}
       </div>
@@ -160,7 +144,7 @@ export default function DashboardPage() {
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900 text-sm">Prochains événements confirmés</h2>
-            <Link href="/calendrier" className="text-xs text-[#9c27b0] hover:underline flex items-center gap-1">
+            <Link href="/calendrier" className="text-xs text-primary hover:underline flex items-center gap-1">
               Voir calendrier <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
@@ -180,7 +164,7 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center py-10 text-center px-5">
               <CalendarDays className="h-8 w-8 text-gray-300 mb-2" />
               <p className="text-sm text-gray-400">Aucun événement confirmé à venir</p>
-              <Link href="/devis" className="text-xs text-[#9c27b0] mt-1 hover:underline">Gérer les devis</Link>
+              <Link href="/devis" className="text-xs text-primary mt-1 hover:underline">Gérer les devis</Link>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -190,8 +174,8 @@ export default function DashboardPage() {
                   <Link key={ev.id} href={`/devis/${ev.id}/modifier`}
                     className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors group"
                   >
-                    <div className="w-9 h-9 bg-[#f3e5f5] rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-[#9c27b0] transition-colors">
-                      <Icon className="h-4 w-4 text-[#9c27b0] group-hover:text-white transition-colors" />
+                    <div className="w-9 h-9 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-primary transition-colors">
+                      <Icon className="h-4 w-4 text-primary group-hover:text-white transition-colors" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-gray-900 truncate">{ev.client_name || '—'}</p>
@@ -230,7 +214,7 @@ export default function DashboardPage() {
                   return (
                     <div key={month} className="flex-1 flex flex-col items-center gap-1">
                       <div
-                        className={`w-full rounded-t-sm transition-all ${isCurrent ? 'bg-[#9c27b0]' : 'bg-[#e1bee7]'}`}
+                        className={`w-full rounded-t-sm transition-all ${isCurrent ? 'bg-primary' : 'bg-primary-100'}`}
                         style={{ height: `${height}%` }}
                         title={formatCurrency(amount)}
                       />
@@ -256,10 +240,10 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
         <Link href="/devis/nouveau"
-          className="flex items-center gap-4 p-5 bg-white border border-gray-200 rounded-xl hover:border-[#9c27b0] hover:shadow-sm transition-all group"
+          className="flex items-center gap-4 p-5 bg-white border border-gray-200 rounded-xl hover:border-primary hover:shadow-sm transition-all group"
         >
-          <div className="p-3 bg-[#f3e5f5] rounded-xl group-hover:bg-[#9c27b0] transition-colors">
-            <FileText className="h-5 w-5 text-[#9c27b0] group-hover:text-white transition-colors" />
+          <div className="p-3 bg-primary-50 rounded-xl group-hover:bg-primary transition-colors">
+            <FileText className="h-5 w-5 text-primary group-hover:text-white transition-colors" />
           </div>
           <div>
             <p className="font-medium text-gray-900">Créer un devis</p>

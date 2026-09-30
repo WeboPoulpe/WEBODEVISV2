@@ -37,7 +37,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-[#3a006f] via-[#6a1080] to-[#9c27b0]">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-primary-darker via-primary-darker to-primary">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-5">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Nouveau mot de passe</h1>
@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                  className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
                 <button type="button" onClick={() => setShow((s) => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
 
@@ -88,7 +88,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading || !password || !confirm}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
             >
               {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Mise à jour…</> : 'Mettre à jour le mot de passe'}
             </button>

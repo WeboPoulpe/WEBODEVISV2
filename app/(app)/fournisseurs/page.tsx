@@ -98,7 +98,7 @@ export default function FournisseursPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function FournisseursPage() {
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
         >
           <Plus className="h-4 w-4" />
           Ajouter
@@ -131,7 +131,7 @@ export default function FournisseursPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un fournisseur…"
-            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
       )}
@@ -151,10 +151,10 @@ export default function FournisseursPage() {
           {filtered.map((s) => (
             <div
               key={s.id}
-              className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:border-[#9c27b0]/30 transition-colors group"
+              className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:border-primary/30 transition-colors group"
             >
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center flex-shrink-0">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-bold text-sm">
                     {s.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
                   </span>
@@ -182,7 +182,7 @@ export default function FournisseursPage() {
                 </div>
                 <button
                   onClick={() => startEdit(s)}
-                  className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-purple-50 rounded-lg transition-colors"
+                  className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
@@ -200,7 +200,7 @@ export default function FournisseursPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white border border-[#9c27b0]/20 rounded-xl p-5 space-y-4">
+        <div className="bg-white border border-primary/20 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-800">{editingId ? 'Modifier' : 'Nouveau'} fournisseur</p>
             <button onClick={resetForm} className="p-1 text-gray-400 hover:text-gray-600">
@@ -215,7 +215,7 @@ export default function FournisseursPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex : METRO, Huguier Location…"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 autoFocus
               />
             </div>
@@ -225,7 +225,7 @@ export default function FournisseursPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="01 23 45 67 89"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -235,7 +235,7 @@ export default function FournisseursPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="contact@fournisseur.fr"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div className="col-span-2">
@@ -244,7 +244,7 @@ export default function FournisseursPage() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="123 rue…"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div className="col-span-2">
@@ -254,7 +254,7 @@ export default function FournisseursPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
                 placeholder="Infos complémentaires…"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
           </div>
@@ -266,7 +266,7 @@ export default function FournisseursPage() {
             <button
               onClick={handleSave}
               disabled={!name.trim() || saving}
-              className="flex items-center gap-1.5 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               {editingId ? 'Modifier' : 'Enregistrer'}

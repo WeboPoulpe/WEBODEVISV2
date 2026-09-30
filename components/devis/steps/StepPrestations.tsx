@@ -74,7 +74,7 @@ function PrestationSearch({
       <div className="relative flex items-center">
         <Search className="absolute left-2.5 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
         <input
-          className="w-full text-sm border border-gray-200 rounded-lg pl-7 pr-7 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white placeholder:text-gray-400"
+          className="w-full text-sm border border-gray-200 rounded-lg pl-7 pr-7 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white placeholder:text-gray-400"
           placeholder="Rechercher dans le catalogue…"
           value={value}
           onChange={handleChange}
@@ -96,7 +96,7 @@ function PrestationSearch({
             <li
               key={p.id}
               onMouseDown={() => { onSelect(p); setResults([]); setOpen(false); }}
-              className="px-3 py-2.5 cursor-pointer hover:bg-[#9c27b0]/5 border-b border-gray-50 last:border-0"
+              className="px-3 py-2.5 cursor-pointer hover:bg-primary/5 border-b border-gray-50 last:border-0"
             >
               <div className="flex justify-between items-start gap-2">
                 <p className="text-sm text-gray-900 font-medium">{p.name}</p>
@@ -107,7 +107,7 @@ function PrestationSearch({
               )}
               <div className="flex items-center gap-1.5 mt-1">
                 {p.category && (
-                  <span className="inline-block text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded">{p.category}</span>
+                  <span className="inline-block text-[10px] text-primary bg-primary-50 px-1.5 py-0.5 rounded">{p.category}</span>
                 )}
                 {p.is_option && (
                   <span className="inline-block text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Option</span>
@@ -167,7 +167,7 @@ function ServiceRow({
     if (p.description || p.is_option) setShowDesc(true);
   };
 
-  const inputCls = 'text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white';
+  const inputCls = 'text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white';
 
   // ── Page-break separator row ──────────────────────────────────────────────
   if (service.isPageBreak) {
@@ -175,14 +175,14 @@ function ServiceRow({
       <>
         {/* Desktop */}
         <div className="hidden sm:flex items-center gap-3 px-3 py-2.5 border-b border-gray-100 last:border-0">
-          <div className="flex-1 border-t border-dashed border-[#9c27b0]/25" />
+          <div className="flex-1 border-t border-dashed border-primary/25" />
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <Scissors className="h-3 w-3 text-[#9c27b0]/40" />
-            <span className="text-[9px] font-semibold text-[#9c27b0]/50 uppercase tracking-[0.18em]">
+            <Scissors className="h-3 w-3 text-primary/40" />
+            <span className="text-[9px] font-semibold text-primary/50 uppercase tracking-[0.18em]">
               Saut de page
             </span>
           </div>
-          <div className="flex-1 border-t border-dashed border-[#9c27b0]/25" />
+          <div className="flex-1 border-t border-dashed border-primary/25" />
           <button
             onClick={onRemove}
             title="Supprimer le saut de page"
@@ -193,12 +193,12 @@ function ServiceRow({
         </div>
         {/* Mobile */}
         <div className="sm:hidden flex items-center gap-2 py-3">
-          <div className="flex-1 border-t border-dashed border-[#9c27b0]/30" />
+          <div className="flex-1 border-t border-dashed border-primary/30" />
           <div className="flex items-center gap-1 px-2">
-            <Scissors className="h-3 w-3 text-[#9c27b0]/40" />
-            <span className="text-[9px] font-semibold text-[#9c27b0]/50 uppercase tracking-wider">Saut de page</span>
+            <Scissors className="h-3 w-3 text-primary/40" />
+            <span className="text-[9px] font-semibold text-primary/50 uppercase tracking-wider">Saut de page</span>
           </div>
-          <div className="flex-1 border-t border-dashed border-[#9c27b0]/30" />
+          <div className="flex-1 border-t border-dashed border-primary/30" />
           <button onClick={onRemove} className="p-1 text-gray-300 hover:text-red-500 rounded-lg transition-colors">
             <X className="h-3 w-3" />
           </button>
@@ -217,12 +217,12 @@ function ServiceRow({
           {service.isCustom ? (
             <div className="relative">
               <input
-                className={`${inputCls} w-full px-2.5 py-1.5 border-dashed border-[#9c27b0]/40 focus:border-[#9c27b0]`}
+                className={`${inputCls} w-full px-2.5 py-1.5 border-dashed border-primary/40 focus:border-primary`}
                 placeholder="Titre de la prestation…"
                 value={service.name}
                 onChange={(e) => onUpdate('name', e.target.value)}
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-[#9c27b0]/50 uppercase tracking-wider pointer-events-none">
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-primary/50 uppercase tracking-wider pointer-events-none">
                 Perso
               </span>
             </div>
@@ -254,7 +254,7 @@ function ServiceRow({
               <button
                 title={showDesc ? 'Masquer la description' : 'Ajouter une description gastronomique'}
                 onClick={() => setShowDesc((v) => !v)}
-                className={`p-1 rounded-lg transition-colors ${showDesc ? 'text-[#9c27b0] bg-[#f3e5f5]' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
+                className={`p-1 rounded-lg transition-colors ${showDesc ? 'text-primary bg-primary-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
               >
                 <AlignLeft className="h-3.5 w-3.5" />
               </button>
@@ -276,7 +276,7 @@ function ServiceRow({
               placeholder={service.isCustom
                 ? 'Description longue de la prestation (visible sur le devis)…'
                 : 'Description gastronomique (ex: Saumon d\'Écosse mariné à l\'aneth…)'}
-              className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
+              className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
               onInput={(e) => {
                 const el = e.currentTarget;
                 el.style.height = 'auto';
@@ -289,7 +289,7 @@ function ServiceRow({
                   type="checkbox"
                   checked={!!service.hideDescOnPdf}
                   onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
-                  className="h-3 w-3 rounded accent-[#9c27b0]"
+                  className="h-3 w-3 rounded accent-primary"
                 />
                 <span className="text-[10px] text-gray-400">Masquer sur le PDF (visible sur Carte Gastronomique)</span>
               </label>
@@ -317,11 +317,11 @@ function ServiceRow({
       </div>
 
       {/* ── Mobile card ── */}
-      <div className={`sm:hidden border rounded-xl p-3 space-y-2 bg-white shadow-sm ${service.isCustom ? 'border-dashed border-[#9c27b0]/30' : 'border-gray-200'}`}>
+      <div className={`sm:hidden border rounded-xl p-3 space-y-2 bg-white shadow-sm ${service.isCustom ? 'border-dashed border-primary/30' : 'border-gray-200'}`}>
         {service.isCustom ? (
           <div className="relative">
             <input
-              className="w-full text-sm border border-dashed border-[#9c27b0]/40 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+              className="w-full text-sm border border-dashed border-primary/40 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
               placeholder="Titre de la prestation…"
               value={service.name}
               onChange={(e) => onUpdate('name', e.target.value)}
@@ -340,7 +340,7 @@ function ServiceRow({
             value={service.description ?? ''}
             onChange={(e) => onUpdate('description', e.target.value)}
             placeholder={service.isCustom ? 'Description longue…' : 'Description gastronomique (optionnel)…'}
-            className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
+            className="w-full text-xs text-gray-600 italic border border-gray-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 placeholder:not-italic placeholder:text-gray-400 transition-colors"
           />
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <label className="flex items-center gap-1.5 cursor-pointer select-none w-fit">
@@ -348,7 +348,7 @@ function ServiceRow({
                 type="checkbox"
                 checked={!!service.hideDescOnPdf}
                 onChange={(e) => onUpdate('hideDescOnPdf', e.target.checked)}
-                className="h-3 w-3 rounded accent-[#9c27b0]"
+                className="h-3 w-3 rounded accent-primary"
               />
               <span className="text-[10px] text-gray-400">Masquer sur PDF</span>
             </label>
@@ -450,7 +450,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
             <button
               onClick={addPageBreak}
               title="Insérer un saut de page entre deux prestations"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[#9c27b0]/70 border border-dashed border-[#9c27b0]/30 rounded-lg hover:bg-[#f3e5f5]/50 hover:border-[#9c27b0]/60 hover:text-[#9c27b0] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary/70 border border-dashed border-primary/30 rounded-lg hover:bg-primary-50/50 hover:border-primary/60 hover:text-primary transition-colors"
             >
               <Scissors className="h-4 w-4" />
               <span className="hidden sm:inline">Saut de page</span>
@@ -470,7 +470,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
           {/* Catalog search */}
           <button
             onClick={addService}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[#9c27b0] border border-[#9c27b0]/40 rounded-lg hover:bg-[#9c27b0]/5 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary border border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Ajouter
@@ -515,7 +515,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
         <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-10 text-center">
           <p className="text-sm text-gray-400 mb-3">Aucune prestation — commencez par en ajouter</p>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={addService} className="text-xs px-3 py-1.5 bg-[#9c27b0] text-white rounded-lg hover:bg-[#7b1fa2] transition-colors">
+            <button onClick={addService} className="text-xs px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
               Depuis le catalogue
             </button>
             <button onClick={addCustomLine} className="text-xs px-3 py-1.5 border border-dashed border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
@@ -545,7 +545,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
         <button onClick={onBack} className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
           <ArrowLeft className="h-4 w-4" />Retour
         </button>
-        <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors">
+        <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors">
           Suivant<ArrowRight className="h-4 w-4" />
         </button>
       </div>

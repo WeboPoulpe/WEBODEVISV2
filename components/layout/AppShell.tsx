@@ -1,50 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileTabBar from './MobileTabBar';
+import { useNavBadges } from './nav';
 import OnboardingOverlay from '@/components/onboarding/OnboardingOverlay';
 import HelpWidget from '@/components/help/HelpWidget';
-import HelpTrigger from '@/components/help/HelpTrigger';
 import { useAuth } from '@/context/AuthContext';
 
-const SIDEBAR_W = 240;
-const SIDEBAR_W_COLLAPSED = 64;
-
+// Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
+// La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const { user, profile, loading } = useAuth();
+  const badges = useNavBadges();
 
-  const sidebarWidth = collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W;
+  useEffect(() => {
+    document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded';
+  }, [collapsed]);
 
   // Show onboarding overlay if user has not completed it
   const showOnboarding = !loading && user && profile && profile.has_completed_onboarding === false;
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Override sidebar margin on mobile (sidebar is hidden below lg) */}
-      <style>{`@media (max-width: 1023px) { .app-main-area { margin-left: 0 !important; } }`}</style>
-
+    <div className="flex h-[100dvh] overflow-hidden">
       {showOnboarding && <OnboardingOverlay userId={user!.id} />}
 
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} badges={badges} />
 
-      {/* Main area shifts right on desktop only */}
-      <div
-        className="app-main-area flex flex-col flex-1 min-w-0 transition-[margin-left] duration-300 ease-in-out"
-        style={{ marginLeft: sidebarWidth }}
-      >
-        <Header sidebarWidth={sidebarWidth} onToggleSidebar={() => setCollapsed((c) => !c)} />
-        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0" style={{ paddingTop: 60 }}>
+      <div className="app-main-area flex flex-col flex-1 min-w-0 transition-[margin-left] duration-200" style={{ marginLeft: 'var(--shell-left)' }}>
+        <Header onHelp={() => setHelpOpen(true)} />
+        <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'var(--tabbar-h)' }}>
           {children}
         </main>
       </div>
-      <MobileTabBar />
 
-      {/* Floating help — persists across navigation */}
-      <HelpTrigger open={helpOpen} onClick={() => setHelpOpen(true)} />
+      <MobileTabBar badges={badges} />
       <HelpWidget open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );

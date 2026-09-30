@@ -134,7 +134,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
             </div>
           ) : (
             <>
@@ -248,7 +248,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Frais additionnels</h3>
-                  <button onClick={addExtra} className="text-xs text-[#9c27b0] hover:underline font-medium">+ Ajouter</button>
+                  <button onClick={addExtra} className="text-xs text-primary hover:underline font-medium">+ Ajouter</button>
                 </div>
                 <div className="space-y-2">
                   {extraCosts.length === 0 ? (
@@ -260,14 +260,14 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                           value={e.label}
                           onChange={(ev) => updateExtra(e.id, 'label', ev.target.value)}
                           placeholder="Ex: Personnel supplémentaire"
-                          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                         />
                         <input
                           type="number" min={0} step={0.01}
                           value={e.amount || ''}
                           onChange={(ev) => updateExtra(e.id, 'amount', parseFloat(ev.target.value) || 0)}
                           placeholder="0.00"
-                          className="w-28 text-sm text-right border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                          className="w-28 text-sm text-right border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                         />
                         <button onClick={() => removeExtra(e.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded">
                           <X className="h-4 w-4" />

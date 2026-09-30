@@ -19,7 +19,7 @@ export default function ContactsEditor({
     onChange(next);
   };
 
-  const input = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]';
+  const input = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary';
 
   return (
     <div className="space-y-3">
@@ -48,7 +48,7 @@ export default function ContactsEditor({
         </div>
       ))}
       <button type="button" onClick={add}
-        className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-[#9c27b0] border border-dashed border-[#9c27b0]/40 rounded-lg hover:bg-purple-50">
+        className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary border border-dashed border-primary/40 rounded-lg hover:bg-primary-50">
         <Plus className="h-3.5 w-3.5" /> Ajouter un contact
       </button>
     </div>

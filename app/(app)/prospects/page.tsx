@@ -65,7 +65,7 @@ const STATUSES: {
   { key: 'devis_a_faire',    label: 'Devis à faire',    bg: 'bg-yellow-50',  text: 'text-yellow-700',  dot: 'bg-yellow-400'  },
   { key: 'devis_envoye',     label: 'Devis envoyé',     bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400'   },
   { key: 'rdv_deg_a_venir',  label: 'RDV/Dég à venir',  bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-400'  },
-  { key: 'rdv_deg_fait',     label: 'RDV/Dég fait',     bg: 'bg-purple-50',  text: 'text-purple-700',  dot: 'bg-purple-400'  },
+  { key: 'rdv_deg_fait',     label: 'RDV/Dég fait',     bg: 'bg-primary-50',  text: 'text-primary-700',  dot: 'bg-primary-400'  },
   { key: 'devis_final',      label: 'Devis final',      bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-400'  },
   { key: 'valide',           label: 'Validé',           bg: 'bg-teal-50',    text: 'text-teal-700',    dot: 'bg-teal-400'    },
   { key: 'acompte',          label: 'Acompte reçu',     bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400' },
@@ -170,7 +170,7 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
       <div className="relative bg-white rounded-2xl w-full max-w-md shadow-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <Link2 className="h-4 w-4 text-[#9c27b0]" />
+            <Link2 className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-gray-900">Lien de formulaire</h2>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors">
@@ -181,18 +181,18 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
         <div className="p-5 space-y-4">
           {loading ? (
             <div className="flex justify-center py-6">
-              <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
             </div>
           ) : !token ? (
             <div className="text-center py-6 space-y-3">
-              <div className="w-12 h-12 mx-auto bg-[#f3e5f5] rounded-2xl flex items-center justify-center">
-                <Link2 className="h-6 w-6 text-[#9c27b0]" />
+              <div className="w-12 h-12 mx-auto bg-primary-50 rounded-2xl flex items-center justify-center">
+                <Link2 className="h-6 w-6 text-primary" />
               </div>
               <p className="text-sm text-gray-600">Créez un lien pour recevoir des demandes de devis.</p>
               <button
                 onClick={createToken}
                 disabled={creating}
-                className="flex items-center gap-2 mx-auto px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+                className="flex items-center gap-2 mx-auto px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
               >
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 Créer mon lien
@@ -226,7 +226,7 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
                     value={brochureUrl}
                     onChange={(e) => setBrochureUrl(e.target.value)}
                     placeholder="https://…"
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                   <button
                     onClick={saveBrochure}
@@ -242,7 +242,7 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
                   href={`/p/${token.token}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-[#9c27b0] hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-primary hover:underline"
                 >
                   <Eye className="h-4 w-4" />
                   Voir le formulaire
@@ -385,7 +385,7 @@ function CreateDevisModal({
       <div className="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#9c27b0]" />
+            <FileText className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-gray-900">Créer un devis</h2>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors">
@@ -403,7 +403,7 @@ function CreateDevisModal({
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
               <div>
@@ -411,7 +411,7 @@ function CreateDevisModal({
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
             </div>
@@ -421,7 +421,7 @@ function CreateDevisModal({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -429,7 +429,7 @@ function CreateDevisModal({
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -437,7 +437,7 @@ function CreateDevisModal({
               <input
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
           </div>
@@ -450,7 +450,7 @@ function CreateDevisModal({
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
                 <option value="">— Choisir —</option>
                 {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -462,7 +462,7 @@ function CreateDevisModal({
                 type="date"
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -471,7 +471,7 @@ function CreateDevisModal({
                 type="number"
                 value={guestCount}
                 onChange={(e) => setGuestCount(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
 
@@ -501,7 +501,7 @@ function CreateDevisModal({
           <button
             onClick={handleCreate}
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
             Créer le devis
@@ -576,7 +576,7 @@ function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
     <button
       onClick={save}
       disabled={loading}
-      className="flex items-center justify-center gap-2 w-full py-2.5 border border-[#9c27b0]/30 text-[#9c27b0] text-sm font-semibold rounded-xl hover:bg-[#f3e5f5] transition-colors disabled:opacity-60"
+      className="flex items-center justify-center gap-2 w-full py-2.5 border border-primary/30 text-primary text-sm font-semibold rounded-xl hover:bg-primary-50 transition-colors disabled:opacity-60"
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
       Enregistrer en client
@@ -680,12 +680,12 @@ function ProspectDrawer({
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Contact</p>
             <div className="space-y-2">
-              <a href={`mailto:${prospect.email}`} className="flex items-center gap-2.5 text-sm text-gray-700 hover:text-[#9c27b0] transition-colors">
+              <a href={`mailto:${prospect.email}`} className="flex items-center gap-2.5 text-sm text-gray-700 hover:text-primary transition-colors">
                 <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
                 {prospect.email}
               </a>
               {prospect.phone && (
-                <a href={`tel:${prospect.phone}`} className="flex items-center gap-2.5 text-sm text-gray-700 hover:text-[#9c27b0] transition-colors">
+                <a href={`tel:${prospect.phone}`} className="flex items-center gap-2.5 text-sm text-gray-700 hover:text-primary transition-colors">
                   <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   {prospect.phone}
                 </a>
@@ -698,7 +698,7 @@ function ProspectDrawer({
               )}
               {prospect.service_address && prospect.service_address !== prospect.address && (
                 <div className="flex items-start gap-2.5 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 text-[#9c27b0]/60 flex-shrink-0 mt-0.5" />
+                  <MapPin className="h-4 w-4 text-primary/60 flex-shrink-0 mt-0.5" />
                   <div>
                     <span className="text-xs text-gray-400 block">Lieu de l&apos;événement</span>
                     {prospect.service_address}
@@ -739,9 +739,9 @@ function ProspectDrawer({
           {linkedQuoteId && (
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Devis lié</p>
-              <div className="flex items-center gap-3 p-3 bg-[#f3e5f5]/40 rounded-xl border border-[#9c27b0]/10">
-                <div className="w-8 h-8 bg-[#9c27b0]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-4 w-4 text-[#9c27b0]" />
+              <div className="flex items-center gap-3 p-3 bg-primary-50/40 rounded-xl border border-primary/10">
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">Devis créé</p>
@@ -749,7 +749,7 @@ function ProspectDrawer({
                 </div>
                 <Link
                   href={`/devis/${linkedQuoteId}/modifier`}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30 rounded-lg hover:bg-primary hover:text-white transition-colors"
                 >
                   <Eye className="h-3 w-3" />
                   Voir
@@ -776,7 +776,7 @@ function ProspectDrawer({
         {!linkedQuoteId && (
           <button
             onClick={onCreateDevis}
-            className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
           >
             <FileText className="h-4 w-4" />
             Créer un devis
@@ -815,8 +815,8 @@ function ProspectCard({
       className={cn(
         'w-full text-left bg-white border rounded-2xl p-4 transition-all hover:shadow-sm',
         selected
-          ? 'border-[#9c27b0]/40 ring-1 ring-[#9c27b0]/20 shadow-sm'
-          : 'border-gray-200 hover:border-[#9c27b0]/20',
+          ? 'border-primary/40 ring-1 ring-primary/20 shadow-sm'
+          : 'border-gray-200 hover:border-primary/20',
         isUrgent && !selected && 'border-orange-200 bg-orange-50/30',
       )}
     >
@@ -832,7 +832,7 @@ function ProspectCard({
 
       <div className="flex items-center gap-3 text-xs text-gray-400 mt-3 flex-wrap">
         {prospect.event_type && (
-          <span className="bg-[#f3e5f5] text-[#9c27b0] px-2 py-0.5 rounded-full font-medium">
+          <span className="bg-primary-50 text-primary px-2 py-0.5 rounded-full font-medium">
             {prospect.event_type}
           </span>
         )}
@@ -972,8 +972,8 @@ function ProspectsPageInner() {
       <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-gray-100">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#f3e5f5] rounded-xl flex items-center justify-center flex-shrink-0">
-              <Users className="h-5 w-5 text-[#9c27b0]" />
+            <div className="w-9 h-9 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Users className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h1 className="text-lg font-semibold text-gray-900">Demandes de devis</h1>
@@ -984,7 +984,7 @@ function ProspectsPageInner() {
           </div>
           <button
             onClick={() => setShowTokenManager(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors self-start sm:self-auto"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors self-start sm:self-auto"
           >
             <Link2 className="h-4 w-4" />
             Mon formulaire
@@ -998,7 +998,7 @@ function ProspectsPageInner() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher par nom, email, événement…"
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
 
@@ -1007,7 +1007,7 @@ function ProspectsPageInner() {
           <select
             value={eventFilter}
             onChange={(e) => setEventFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           >
             <option value="all">Tous les événements</option>
             {availableEventTypes.map((t) => (
@@ -1017,7 +1017,7 @@ function ProspectsPageInner() {
           <select
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           >
             <option value="all">Toutes les années</option>
             {availableYears.map((y) => (
@@ -1027,7 +1027,7 @@ function ProspectsPageInner() {
           {(eventFilter !== 'all' || yearFilter !== 'all') && (
             <button
               onClick={() => { setEventFilter('all'); setYearFilter('all'); }}
-              className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-[#9c27b0] bg-purple-50 border border-[#9c27b0]/20 rounded-xl hover:bg-purple-100 transition-colors"
+              className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-primary bg-primary-50 border border-primary/20 rounded-xl hover:bg-primary-100 transition-colors"
             >
               <X className="h-3 w-3" />
               Réinitialiser
@@ -1110,7 +1110,7 @@ function ProspectsPageInner() {
               {!search && statusFilter === 'all' && eventFilter === 'all' && yearFilter === 'all' && (
                 <button
                   onClick={() => setShowTokenManager(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
                 >
                   <Link2 className="h-4 w-4" />
                   Créer mon formulaire

@@ -295,7 +295,7 @@ export default function PrestationWeboEditor({
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100">
           <span className="text-sm font-semibold text-gray-800 truncate">{name}</span>
           <span className="text-xs text-gray-400">· {unitPrice}€ HT</span>
-          {category && <span className="text-xs text-[#9c27b0] bg-[#f3e5f5] px-2 py-0.5 rounded-full capitalize">{category}</span>}
+          {category && <span className="text-xs text-primary bg-primary-50 px-2 py-0.5 rounded-full capitalize">{category}</span>}
           {subCategory && <span className="text-xs text-gray-500 italic">{subCategory}</span>}
 
           {/* Auto-translate button */}
@@ -303,7 +303,7 @@ export default function PrestationWeboEditor({
             onClick={autoTranslateToEn}
             disabled={translating}
             title="Traduire automatiquement la version FR vers l'anglais"
-            className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 hover:bg-[#f3e5f5] disabled:opacity-50 transition-colors"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-primary border border-primary/30 hover:bg-primary-50 disabled:opacity-50 transition-colors"
           >
             {translating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Languages className="h-3.5 w-3.5" />}
             {translating ? 'Traduction…' : 'Traduire FR→EN'}
@@ -315,7 +315,7 @@ export default function PrestationWeboEditor({
               onClick={() => switchLanguage('fr')}
               className={cn(
                 'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
-                language === 'fr' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700',
+                language === 'fr' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700',
               )}
             >
               🇫🇷 Français
@@ -324,7 +324,7 @@ export default function PrestationWeboEditor({
               onClick={() => switchLanguage('en')}
               className={cn(
                 'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
-                language === 'en' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700',
+                language === 'en' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700',
               )}
             >
               🇬🇧 English
@@ -402,7 +402,7 @@ export default function PrestationWeboEditor({
           <button
             onClick={autoStructure}
             title="Structurer automatiquement (sépare par tirets, met en gras les prix)"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[#9c27b0]/70 hover:bg-[#f3e5f5] hover:text-[#9c27b0] transition-colors"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-primary/70 hover:bg-primary-50 hover:text-primary transition-colors"
           >
             <Wand2 className="h-3.5 w-3.5" />
             Structurer
@@ -431,7 +431,7 @@ export default function PrestationWeboEditor({
             contentEditable
             suppressContentEditableWarning
             spellCheck
-            className="outline-none min-h-[400px] p-8 focus:ring-2 focus:ring-[#9c27b0]/20 rounded-lg"
+            className="outline-none min-h-[400px] p-8 focus:ring-2 focus:ring-primary/20 rounded-lg"
           />
         </div>
       </div>

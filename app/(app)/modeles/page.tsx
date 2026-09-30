@@ -194,7 +194,7 @@ function TemplateModal({ initial, onClose, onSaved }: ModalProps) {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex : Mariage Élégant, Cocktail Corporate…"
                 autoFocus
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
               />
             </div>
 
@@ -211,7 +211,7 @@ function TemplateModal({ initial, onClose, onSaved }: ModalProps) {
                     className={[
                       'flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-sm font-medium',
                       base === b.key
-                        ? 'border-[#9c27b0] bg-[#f3e5f5] text-[#9c27b0]'
+                        ? 'border-primary bg-primary-50 text-primary'
                         : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
                     ].join(' ')}
                   >
@@ -270,7 +270,7 @@ function TemplateModal({ initial, onClose, onSaved }: ModalProps) {
                 onChange={(e) => setHeaderNote(e.target.value)}
                 rows={2}
                 placeholder="Ex : À la suite de notre entretien, voici notre proposition personnalisée…"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors resize-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
               />
             </div>
 
@@ -284,7 +284,7 @@ function TemplateModal({ initial, onClose, onSaved }: ModalProps) {
                 onChange={(e) => setFooterNote(e.target.value)}
                 rows={2}
                 placeholder="Ex : Devis valable 30 jours. Acompte de 30% à la commande…"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors resize-none"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
               />
             </div>
 
@@ -296,7 +296,7 @@ function TemplateModal({ initial, onClose, onSaved }: ModalProps) {
                 onClick={() => setIsDefault((v) => !v)}
                 className={[
                   'relative w-10 h-5.5 rounded-full transition-colors flex-shrink-0',
-                  isDefault ? 'bg-[#9c27b0]' : 'bg-gray-200',
+                  isDefault ? 'bg-primary' : 'bg-gray-200',
                 ].join(' ')}
                 style={{ height: '22px', width: '40px' }}
               >
@@ -346,7 +346,7 @@ function TemplateModal({ initial, onClose, onSaved }: ModalProps) {
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="flex items-center gap-2 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             {initial ? 'Enregistrer' : 'Créer le modèle'}
@@ -387,7 +387,7 @@ function CustomTemplateCard({
       <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <button
           onClick={onEdit}
-          className="p-1.5 bg-white/90 backdrop-blur-sm rounded-lg text-gray-500 hover:text-[#9c27b0] hover:bg-white shadow-sm transition-colors"
+          className="p-1.5 bg-white/90 backdrop-blur-sm rounded-lg text-gray-500 hover:text-primary hover:bg-white shadow-sm transition-colors"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
@@ -436,7 +436,7 @@ function CustomTemplateCard({
             <button
               onClick={onSetDefault}
               title="Définir comme modèle par défaut"
-              className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:text-[#9c27b0] hover:border-[#9c27b0]/30 transition-colors text-xs"
+              className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:text-primary hover:border-primary/30 transition-colors text-xs"
             >
               <Star className="h-3.5 w-3.5" />
             </button>
@@ -510,7 +510,7 @@ export default function ModelesPage() {
         </div>
         <button
           onClick={() => setModal({ open: true, editing: null })}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
         >
           <Plus className="h-4 w-4" />
           Créer un modèle
@@ -588,7 +588,7 @@ export default function ModelesPage() {
 
         {loading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-5 w-5 text-[#9c27b0] animate-spin" />
+            <Loader2 className="h-5 w-5 text-primary animate-spin" />
           </div>
         ) : customs.length === 0 ? (
           <div className="border-2 border-dashed border-gray-200 rounded-2xl p-10 text-center">
@@ -601,7 +601,7 @@ export default function ModelesPage() {
             </p>
             <button
               onClick={() => setModal({ open: true, editing: null })}
-              className="px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"
+              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"
             >
               Créer mon premier modèle
             </button>
@@ -620,7 +620,7 @@ export default function ModelesPage() {
             {/* Add new card */}
             <button
               onClick={() => setModal({ open: true, editing: null })}
-              className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] hover:bg-[#f3e5f5]/30 transition-all min-h-[200px]"
+              className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-primary/40 hover:text-primary hover:bg-primary-50/30 transition-all min-h-[200px]"
             >
               <Plus className="h-8 w-8" />
               <span className="text-sm font-medium">Nouveau modèle</span>

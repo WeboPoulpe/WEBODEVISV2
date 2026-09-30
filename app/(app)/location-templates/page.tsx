@@ -109,7 +109,7 @@ export default function LocationTemplatesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default function LocationTemplatesPage() {
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
         >
           <Plus className="h-4 w-4" />
           Ajouter
@@ -150,7 +150,7 @@ export default function LocationTemplatesPage() {
           {templates.map((t) => (
             <div
               key={t.id}
-              className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm group hover:border-[#9c27b0]/30 transition-colors"
+              className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm group hover:border-primary/30 transition-colors"
             >
               <GripVertical className="h-4 w-4 text-gray-300 flex-shrink-0" />
               <div className="flex-1 min-w-0">
@@ -163,7 +163,7 @@ export default function LocationTemplatesPage() {
               </div>
               <button
                 onClick={() => startEdit(t)}
-                className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-purple-50 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
@@ -180,7 +180,7 @@ export default function LocationTemplatesPage() {
 
       {/* Add / Edit form */}
       {showForm && (
-        <div className="bg-white border border-[#9c27b0]/20 rounded-xl p-5 space-y-4">
+        <div className="bg-white border border-primary/20 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-800">{editingId ? 'Modifier' : 'Nouveau'} template</p>
             <button onClick={resetForm} className="p-1 text-gray-400 hover:text-gray-600">
@@ -195,7 +195,7 @@ export default function LocationTemplatesPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex : Assiette plate, Verre à vin…"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 autoFocus
               />
             </div>
@@ -205,7 +205,7 @@ export default function LocationTemplatesPage() {
                 type="number" min="0" step="0.1"
                 value={qtyPerGuest}
                 onChange={(e) => setQtyPerGuest(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -214,7 +214,7 @@ export default function LocationTemplatesPage() {
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="pcs, lot…"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             <div>
@@ -222,7 +222,7 @@ export default function LocationTemplatesPage() {
               <select
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
               >
                 <option value="">— Aucun —</option>
                 {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -234,7 +234,7 @@ export default function LocationTemplatesPage() {
                 type="number" min="0" step="0.01"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function LocationTemplatesPage() {
             <button
               onClick={handleSave}
               disabled={!name.trim() || saving}
-              className="flex items-center gap-1.5 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               {editingId ? 'Modifier' : 'Enregistrer'}
@@ -256,11 +256,11 @@ export default function LocationTemplatesPage() {
       )}
 
       {/* Info */}
-      <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-4">
+      <div className="bg-primary-50/50 border border-primary-100 rounded-xl p-4">
         <p className="text-xs text-gray-600">
-          <strong className="text-[#9c27b0]">Comment ça marche :</strong> Sur chaque événement, cliquez sur{' '}
-          <span className="font-semibold text-[#9c27b0]">« Générer vaisselle »</span> dans l&apos;onglet Matériel.
-          La quantité sera automatiquement calculée : <code className="bg-purple-100 px-1 py-0.5 rounded text-[#9c27b0]">quantité / convive × nombre de convives</code>.
+          <strong className="text-primary">Comment ça marche :</strong> Sur chaque événement, cliquez sur{' '}
+          <span className="font-semibold text-primary">« Générer vaisselle »</span> dans l&apos;onglet Matériel.
+          La quantité sera automatiquement calculée : <code className="bg-primary-100 px-1 py-0.5 rounded text-primary">quantité / convive × nombre de convives</code>.
         </p>
       </div>
     </div>

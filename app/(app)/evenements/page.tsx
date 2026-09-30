@@ -53,16 +53,16 @@ function EventCard({ event }: { event: Event }) {
     <Link
       href={`/evenements/${event.id}`}
       className={[
-        'group flex items-center gap-4 bg-white border rounded-2xl p-4 transition-all hover:shadow-md hover:border-[#9c27b0]/30',
+        'group flex items-center gap-4 bg-white border rounded-2xl p-4 transition-all hover:shadow-md hover:border-primary/30',
         isPast ? 'opacity-60' : '',
-        isToday ? 'border-[#9c27b0]/40 ring-1 ring-[#9c27b0]/20' : 'border-gray-200',
+        isToday ? 'border-primary/40 ring-1 ring-primary/20' : 'border-gray-200',
       ].join(' ')}
     >
       {/* Date chip */}
       <div className={[
         'flex-shrink-0 w-12 h-12 rounded-xl flex flex-col items-center justify-center',
         isToday
-          ? 'bg-[#9c27b0] text-white'
+          ? 'bg-primary text-white'
           : 'bg-gray-50 text-gray-700 border border-gray-200',
       ].join(' ')}>
         {date ? (
@@ -80,7 +80,7 @@ function EventCard({ event }: { event: Event }) {
         <div className="flex items-center gap-2 mb-0.5">
           <p className="text-sm font-semibold text-gray-900 truncate">{event.client_name || 'Client inconnu'}</p>
           {isToday && (
-            <span className="text-[10px] font-bold text-[#9c27b0] bg-[#f3e5f5] px-2 py-0.5 rounded-full flex-shrink-0">
+            <span className="text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full flex-shrink-0">
               Aujourd&apos;hui
             </span>
           )}
@@ -106,11 +106,11 @@ function EventCard({ event }: { event: Event }) {
       <div className="flex-shrink-0 flex flex-col items-end gap-2">
         <StatusBadge status={event.status} />
         {event.total_amount != null && (
-          <p className="text-sm font-bold text-[#9c27b0] tabular-nums">
+          <p className="text-sm font-bold text-primary tabular-nums">
             {formatCurrency(event.total_amount)}
           </p>
         )}
-        <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#9c27b0] transition-colors" />
+        <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-primary transition-colors" />
       </div>
     </Link>
   );
@@ -169,7 +169,7 @@ export default function EvenementsPage() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+          <Loader2 className="h-6 w-6 text-primary animate-spin" />
         </div>
       ) : events.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-center">
@@ -182,7 +182,7 @@ export default function EvenementsPage() {
           </p>
           <Link
             href="/devis/nouveau"
-            className="mt-4 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"
+            className="mt-4 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"
           >
             Créer un devis
           </Link>

@@ -19,7 +19,7 @@ const TEMPLATES: { key: QuoteTemplate; label: string; sub: string; preview: Reac
     label: 'Gastronomique',
     sub: 'Classique violet — catégories de menu',
     preview: (
-      <div className="w-full h-12 bg-[#9c27b0] rounded-lg flex items-end px-2 pb-1.5">
+      <div className="w-full h-12 bg-primary rounded-lg flex items-end px-2 pb-1.5">
         <div className="space-y-1 w-full">
           <div className="h-1.5 bg-white/30 rounded-full w-3/4" />
           <div className="h-1 bg-white/20 rounded-full w-1/2" />
@@ -78,7 +78,7 @@ export default function StepOptions({ onNext, onBack }: Props) {
               className={[
                 'text-left rounded-xl border-2 p-3 transition-all',
                 template === key
-                  ? 'border-[#9c27b0] bg-[#f3e5f5]/30 shadow-sm'
+                  ? 'border-primary bg-primary-50/30 shadow-sm'
                   : 'border-gray-200 hover:border-gray-300 bg-white',
               ].join(' ')}
             >
@@ -86,7 +86,7 @@ export default function StepOptions({ onNext, onBack }: Props) {
               <p className="text-xs font-semibold text-gray-900">{label}</p>
               <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{sub}</p>
               {template === key && (
-                <span className="inline-block mt-1.5 text-[9px] font-semibold text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded-full">
+                <span className="inline-block mt-1.5 text-[9px] font-semibold text-primary bg-primary-50 px-1.5 py-0.5 rounded-full">
                   Sélectionné
                 </span>
               )}
@@ -106,7 +106,7 @@ export default function StepOptions({ onNext, onBack }: Props) {
               className={[
                 'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                 options.vatRate === rate
-                  ? 'bg-[#9c27b0] text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
               ].join(' ')}
             >
@@ -123,7 +123,7 @@ export default function StepOptions({ onNext, onBack }: Props) {
             onClick={() => set('hidePrice', !options.hidePrice)}
             className={[
               'relative w-10 h-6 rounded-full transition-colors',
-              options.hidePrice ? 'bg-[#9c27b0]' : 'bg-gray-200',
+              options.hidePrice ? 'bg-primary' : 'bg-gray-200',
             ].join(' ')}
           >
             <div
@@ -161,7 +161,7 @@ export default function StepOptions({ onNext, onBack }: Props) {
           value={options.remarks}
           onChange={(e) => set('remarks', e.target.value)}
           placeholder="Conditions de paiement, modalités d'annulation…"
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors resize-none"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
         />
       </section>
 
@@ -176,7 +176,7 @@ export default function StepOptions({ onNext, onBack }: Props) {
         </button>
         <button
           onClick={onNext}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors"
         >
           Voir le récapitulatif
           <ArrowRight className="h-4 w-4" />

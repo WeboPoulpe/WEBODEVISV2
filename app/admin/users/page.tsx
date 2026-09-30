@@ -73,7 +73,7 @@ export default function AdminUsersPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher (nom, email, entreprise)…"
-            className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30" />
+            className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30" />
         </div>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
           {(['all', 'active', 'disabled'] as const).map((f) => (
@@ -87,7 +87,7 @@ export default function AdminUsersPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-[#9c27b0]" /></div>
+        <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -106,7 +106,7 @@ export default function AdminUsersPage() {
                 <tr key={u.id} className={u.is_active ? '' : 'bg-red-50/30'}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
                         <span className="text-xs font-bold text-white">{(u.first_name?.[0] || u.email[0]).toUpperCase()}</span>
                       </div>
                       <div className="min-w-0">

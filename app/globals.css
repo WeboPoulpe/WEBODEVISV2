@@ -2,10 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Thème « Émail » : porcelaine, encre, bleu pétrole, citron ───────────────── */
 :root {
-  --sidebar-w: 240px;
-  --sidebar-w-collapsed: 64px;
+  /* Bleu pétrole (action) */
+  --p-50: 239 246 247;
+  --p-100: 225 238 240;
+  --p-200: 194 221 226;
+  --p-300: 148 195 203;
+  --p-400: 95 162 174;
+  --p-500: 53 128 143;
+  --p-600: 26 101 118;
+  --p-700: 12 74 91;
+  --p-800: 10 60 74;
+  --p-900: 8 47 58;
+  /* Neutres froids */
+  --n-50: 246 248 247;
+  --n-100: 238 241 240;
+  --n-200: 223 228 226;
+  --n-300: 198 206 203;
+  --n-400: 152 163 160;
+  --n-500: 107 119 117;
+  --n-600: 76 88 86;
+  --n-700: 54 65 63;
+  --n-800: 34 45 43;
+  --n-900: 20 33 31;
+  /* Accents */
+  --accent: 245 197 24;
+  --accent-ink: 61 47 0;
+  --danger: 214 69 93;
+
+  /* Coque : largeur occupée par la navigation latérale */
+  --shell-left: 0px;
   --header-h: 60px;
+  --tabbar-h: 0px;
+}
+@media (max-width: 767px) {
+  :root { --tabbar-h: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (min-width: 768px) {
+  :root { --shell-left: 72px; }
+}
+@media (min-width: 1024px) {
+  :root { --shell-left: 248px; }
+  :root[data-sidebar='collapsed'] { --shell-left: 72px; }
 }
 
 * {
@@ -18,9 +57,42 @@ body {
 }
 
 body {
-  background-color: #f9fafb;
-  color: #111827;
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: rgb(var(--n-50));
+  color: rgb(var(--n-900));
+  font-family: var(--font-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Titres et grands chiffres : Bricolage Grotesque */
+h1, h2, .font-display {
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  letter-spacing: -0.015em;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--p-500));
+  outline-offset: 2px;
+}
+
+/* Libellés de la barre latérale : visibles seulement quand elle est dépliée (grand écran) */
+.sb-label { display: none; }
+@media (min-width: 1024px) {
+  :root:not([data-sidebar='collapsed']) .sb-label { display: revert; }
+  :root:not([data-sidebar='collapsed']) .sb-rail-only { display: none; }
+}
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-sheet-up { animation: sheet-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
 /* Utility class for the luxury menu serif font */
@@ -121,7 +193,7 @@ body {
     margin-left: 0 !important;
   }
   main {
-    padding-top: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
   }
 
@@ -166,9 +238,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: rgb(var(--n-300));
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgb(var(--n-400));
 }

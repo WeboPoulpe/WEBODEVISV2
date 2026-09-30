@@ -261,7 +261,7 @@ export default function StepResume({ onBack }: Props) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? (
               <>
@@ -304,7 +304,7 @@ function Card({
         </span>
         <button
           onClick={onEdit}
-          className="flex items-center gap-1 text-xs text-[#9c27b0] hover:text-[#7b1fa2] font-medium"
+          className="flex items-center gap-1 text-xs text-primary hover:text-primary-dark font-medium"
         >
           <Pencil className="h-3 w-3" />
           Modifier

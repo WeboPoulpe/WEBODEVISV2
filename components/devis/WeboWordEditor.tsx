@@ -111,7 +111,7 @@ function TB({
       className={cn(
         'p-1.5 rounded-lg transition-colors text-sm',
         active
-          ? 'bg-[#9c27b0] text-white'
+          ? 'bg-primary text-white'
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
       )}
     >
@@ -1099,7 +1099,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             <div className="h-16 flex items-center justify-center overflow-hidden">
               <p
                 key={celebrateMsgIdx}
-                className="text-2xl font-black bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent px-4"
+                className="text-2xl font-black bg-gradient-to-r from-primary-600 via-pink-500 to-orange-500 bg-clip-text text-transparent px-4"
                 style={{ animation: 'celebrate-slide 0.4s ease-out' }}
               >
                 {CELEBRATE_MSGS[celebrateMsgIdx]}
@@ -1129,7 +1129,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Wand2 className="h-4 w-4 text-[#9c27b0]" />
+                <Wand2 className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold text-gray-900">Structurer les descriptions</h2>
               </div>
               <button onClick={() => setStructureModal({ open: false, items: [], titleColor: '#9c27b0', titleBold: true, titleItalic: false, descItalic: true })} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
@@ -1156,18 +1156,18 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                   </div>
                 </div>
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={structureModal.titleBold} onChange={(e) => setStructureModal({ ...structureModal, titleBold: e.target.checked })} className="h-3 w-3 rounded accent-[#9c27b0]" />
+                  <input type="checkbox" checked={structureModal.titleBold} onChange={(e) => setStructureModal({ ...structureModal, titleBold: e.target.checked })} className="h-3 w-3 rounded accent-primary" />
                   <span className="text-xs text-gray-600 font-bold">Gras</span>
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={structureModal.titleItalic} onChange={(e) => setStructureModal({ ...structureModal, titleItalic: e.target.checked })} className="h-3 w-3 rounded accent-[#9c27b0]" />
+                  <input type="checkbox" checked={structureModal.titleItalic} onChange={(e) => setStructureModal({ ...structureModal, titleItalic: e.target.checked })} className="h-3 w-3 rounded accent-primary" />
                   <span className="text-xs text-gray-600 italic">Italique</span>
                 </label>
               </div>
               <div className="border-t border-gray-200 pt-2">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Style des descriptions</p>
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={structureModal.descItalic} onChange={(e) => setStructureModal({ ...structureModal, descItalic: e.target.checked })} className="h-3 w-3 rounded accent-[#9c27b0]" />
+                  <input type="checkbox" checked={structureModal.descItalic} onChange={(e) => setStructureModal({ ...structureModal, descItalic: e.target.checked })} className="h-3 w-3 rounded accent-primary" />
                   <span className="text-xs text-gray-600 italic">Descriptions en italique</span>
                 </label>
               </div>
@@ -1187,7 +1187,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
               {structureModal.items.map((item, idx) => (
-                <label key={item.index} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.selected ? 'border-[#9c27b0]/30 bg-[#faf5ff]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <label key={item.index} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.selected ? 'border-primary/30 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                   <input
                     type="checkbox"
                     checked={item.selected}
@@ -1196,7 +1196,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                       updated[idx] = { ...updated[idx], selected: e.target.checked };
                       setStructureModal({ ...structureModal, items: updated });
                     }}
-                    className="mt-0.5 h-4 w-4 rounded accent-[#9c27b0] flex-shrink-0"
+                    className="mt-0.5 h-4 w-4 rounded accent-primary flex-shrink-0"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
@@ -1211,7 +1211,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                   const allSelected = structureModal.items.every((it) => it.selected);
                   setStructureModal({ ...structureModal, items: structureModal.items.map((it) => ({ ...it, selected: !allSelected })) });
                 }}
-                className="text-xs text-[#9c27b0] hover:underline font-medium"
+                className="text-xs text-primary hover:underline font-medium"
               >
                 {structureModal.items.every((it) => it.selected) ? 'Tout désélectionner' : 'Tout sélectionner'}
               </button>
@@ -1222,7 +1222,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 <button
                   onClick={applyStructure}
                   disabled={!structureModal.items.some((it) => it.selected)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
                 >
                   <Wand2 className="h-3.5 w-3.5" />
                   Structurer ({structureModal.items.filter((it) => it.selected).length})
@@ -1358,7 +1358,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors border',
               showDesc
                 ? 'border-gray-200 text-gray-600 hover:bg-gray-100'
-                : 'border-[#9c27b0] text-[#9c27b0] bg-purple-50',
+                : 'border-primary text-primary bg-primary-50',
             )}
           >
             {showDesc
@@ -1371,7 +1371,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             type="button"
             onClick={openStructureModal}
             title="Structurer automatiquement les descriptions (séparer par tirets, mettre en forme)"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[#9c27b0]/70 hover:bg-[#f3e5f5] hover:text-[#9c27b0] transition-colors"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-primary/70 hover:bg-primary-50 hover:text-primary transition-colors"
           >
             <Wand2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Structurer</span>
@@ -1397,8 +1397,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                     key={f.value}
                     onMouseDown={(e) => { e.preventDefault(); setFont(f.value); setShowFontMenu(false); }}
                     className={cn(
-                      'w-full text-left px-3 py-1.5 text-sm hover:bg-[#9c27b0]/5 transition-colors',
-                      font === f.value && 'text-[#9c27b0] font-semibold',
+                      'w-full text-left px-3 py-1.5 text-sm hover:bg-primary/5 transition-colors',
+                      font === f.value && 'text-primary font-semibold',
                     )}
                     style={{ fontFamily: f.value }}
                   >
@@ -1418,7 +1418,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               value={fontSize}
               onMouseDown={(e) => e.stopPropagation()}
               onChange={(e) => setFontSize(Number(e.target.value))}
-              className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 cursor-pointer"
+              className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
             >
               {FONT_SIZES.map((s) => (
                 <option key={s} value={s}>{s}px</option>
@@ -1433,7 +1433,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               value={lineHeight}
               onMouseDown={(e) => e.stopPropagation()}
               onChange={(e) => setLineHeight(e.target.value)}
-              className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 cursor-pointer"
+              className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
             >
               {LINE_HEIGHTS.map((lh) => (
                 <option key={lh.value} value={lh.value}>{lh.label}</option>
@@ -1576,7 +1576,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             suppressContentEditableWarning
             spellCheck
             style={{ padding: '20mm', fontSize: `${fontSize}px`, lineHeight: lineHeight }}
-            className="outline-none min-h-[120px] prose prose-sm max-w-none focus:ring-2 focus:ring-[#9c27b0]/20 rounded-lg"
+            className="outline-none min-h-[120px] prose prose-sm max-w-none focus:ring-2 focus:ring-primary/20 rounded-lg"
             data-placeholder="Cliquez ici pour commencer à modifier votre devis…"
           />
         </div>
@@ -1628,8 +1628,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-[#f3e5f5] rounded-xl">
-                  <PenLine className="h-4 w-4 text-[#9c27b0]" />
+                <div className="p-2 bg-primary-50 rounded-xl">
+                  <PenLine className="h-4 w-4 text-primary" />
                 </div>
                 <div>
                   <h2 className="font-semibold text-gray-900 text-sm">Informations administratives</h2>
@@ -1644,7 +1644,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             <div className="p-6 space-y-5">
               {/* Client section */}
               <div>
-                <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Client</p>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-3">Client</p>
                 <div className="space-y-3">
                   {/* Client search */}
                   <div className="relative">
@@ -1655,16 +1655,16 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         value={clientSearch}
                         onChange={(e) => searchClients(e.target.value)}
                         placeholder="Nom, email ou entreprise…"
-                        className="w-full text-sm border border-dashed border-[#9c27b0]/30 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-[#faf5ff]"
+                        className="w-full text-sm border border-dashed border-primary/30 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-primary-50"
                       />
                     </div>
                     {showClientPicker && clientResults.length > 0 && (
                       <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {clientResults.map((c) => (
                           <button key={c.id} onClick={() => selectClient(c)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#faf5ff] transition-colors text-left border-b border-gray-50 last:border-0">
-                            <div className="w-8 h-8 rounded-full bg-[#f3e5f5] flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-bold text-[#9c27b0]">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>
+                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-primary-50 transition-colors text-left border-b border-gray-50 last:border-0">
+                            <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-primary">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-gray-900 truncate">{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.company_name || c.email}</p>
@@ -1687,7 +1687,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                       value={adminFields.clientName}
                       onChange={(e) => setAdminFields((f) => ({ ...f, clientName: e.target.value }))}
                       placeholder="Jean Dupont"
-                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -1697,7 +1697,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         value={adminFields.clientEmail}
                         onChange={(e) => setAdminFields((f) => ({ ...f, clientEmail: e.target.value }))}
                         placeholder="jean@email.com"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                     <div>
@@ -1706,7 +1706,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         value={adminFields.clientPhone}
                         onChange={(e) => setAdminFields((f) => ({ ...f, clientPhone: e.target.value }))}
                         placeholder="06 12 34 56 78"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1716,7 +1716,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                       value={adminFields.clientAddress}
                       onChange={(e) => setAdminFields((f) => ({ ...f, clientAddress: e.target.value }))}
                       placeholder="12 rue des Lilas, 75001 Paris"
-                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
                 </div>
@@ -1724,7 +1724,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
               {/* Event section */}
               <div>
-                <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Événement</p>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-3">Événement</p>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1732,7 +1732,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                       <select
                         value={adminFields.eventType}
                         onChange={(e) => setAdminFields((f) => ({ ...f, eventType: e.target.value }))}
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       >
                         <option value="">— Choisir —</option>
                         {['Mariage', 'Cocktail', 'Anniversaire', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'].map((t) => (
@@ -1746,7 +1746,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         type="date"
                         value={adminFields.eventDate}
                         onChange={(e) => setAdminFields((f) => ({ ...f, eventDate: e.target.value }))}
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1765,7 +1765,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                           setAdminServices((prev) => prev.map((s) => ({ ...s, quantity: n })));
                         }}
                         placeholder="120"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                     <div>
@@ -1774,7 +1774,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                         value={adminFields.eventLocation}
                         onChange={(e) => setAdminFields((f) => ({ ...f, eventLocation: e.target.value }))}
                         placeholder="Château de Villebougis"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1782,7 +1782,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               </div>
               {/* Prestations section */}
               <div>
-                <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Prestations (page financière)</p>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-3">Prestations (page financière)</p>
                 <p className="text-[10px] text-gray-400 mb-2">Modifie le tableau financier uniquement. La carte gastronomique reste inchangée.</p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <div className="grid grid-cols-[1fr_45px_55px_65px_55px] gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
@@ -1803,14 +1803,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                           value={svc.quantity}
                           onChange={(e) => setAdminServices((prev) => prev.map((s, i) => i === idx ? { ...s, quantity: parseInt(e.target.value) || 1 } : s))}
                           disabled={svc.removed}
-                          className="w-full text-[11px] text-center border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 disabled:opacity-40"
+                          className="w-full text-[11px] text-center border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-40"
                         />
                         <input
                           type="number" min={0} step={0.01}
                           value={svc.unitPrice}
                           onChange={(e) => setAdminServices((prev) => prev.map((s, i) => i === idx ? { ...s, unitPrice: parseFloat(e.target.value) || 0 } : s))}
                           disabled={svc.removed}
-                          className="w-full text-[11px] text-right border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 disabled:opacity-40"
+                          className="w-full text-[11px] text-right border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-40"
                         />
                         <select
                           value={svc.removed ? 'removed' : svc.isFree ? 'free' : svc.isOption ? 'option' : 'normal'}
@@ -1823,7 +1823,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                               isOption: v === 'option',
                             } : s));
                           }}
-                          className="text-[10px] border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
+                          className="text-[10px] border border-gray-200 rounded px-1 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30"
                         >
                           <option value="normal">Normal</option>
                           <option value="free">Inclus</option>
@@ -1846,7 +1846,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               </button>
               <button
                 onClick={applyAdminChanges}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors"
               >
                 <Check className="h-4 w-4" />
                 Appliquer

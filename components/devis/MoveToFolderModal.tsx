@@ -41,8 +41,8 @@ export default function MoveToFolderModal({ open, folders, currentFolderId, quot
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-2 bg-[#f3e5f5] rounded-xl flex-shrink-0">
-              <FolderInput className="h-4 w-4 text-[#9c27b0]" />
+            <div className="p-2 bg-primary-50 rounded-xl flex-shrink-0">
+              <FolderInput className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-gray-900 text-sm">Déplacer vers…</h2>
@@ -63,7 +63,7 @@ export default function MoveToFolderModal({ open, folders, currentFolderId, quot
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher un dossier…"
-                className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
               />
             </div>
           </div>
@@ -75,7 +75,7 @@ export default function MoveToFolderModal({ open, folders, currentFolderId, quot
             disabled={moving !== null}
             className={[
               'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm transition-colors',
-              currentFolderId === null ? 'bg-[#f3e5f5] text-[#9c27b0] font-semibold' : 'text-gray-700 hover:bg-gray-50',
+              currentFolderId === null ? 'bg-primary-50 text-primary font-semibold' : 'text-gray-700 hover:bg-gray-50',
             ].join(' ')}
           >
             <span className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -93,7 +93,7 @@ export default function MoveToFolderModal({ open, folders, currentFolderId, quot
               style={{ paddingLeft: 10 + (search ? 0 : f.depth * 16) }}
               className={[
                 'w-full flex items-center gap-2.5 pr-2.5 py-2 rounded-xl text-sm transition-colors',
-                currentFolderId === f.id ? 'bg-[#f3e5f5] text-[#9c27b0] font-semibold' : 'text-gray-700 hover:bg-gray-50',
+                currentFolderId === f.id ? 'bg-primary-50 text-primary font-semibold' : 'text-gray-700 hover:bg-gray-50',
               ].join(' ')}
             >
               <FolderGlyph icon={f.icon} color={f.color} size="sm" />

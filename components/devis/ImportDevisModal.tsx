@@ -222,7 +222,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
     setExistingFileUrl(null); setExistingFileName(null);
   };
 
-  const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]';
+  const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary';
   const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5';
 
   return (
@@ -254,7 +254,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
         <div className="p-6 space-y-5">
           {/* Client */}
           <div>
-            <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Client</p>
+            <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-3">Client</p>
 
             {/* Step 3 — Client mode toggle (creation only) */}
             {!isEdit && (
@@ -263,14 +263,14 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
                   <button
                     type="button"
                     onClick={() => { setClientMode('new'); setSelectedCustomerId(null); }}
-                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${clientMode === 'new' ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${clientMode === 'new' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                   >
                     Nouveau client
                   </button>
                   <button
                     type="button"
                     onClick={() => setClientMode('existing')}
-                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${clientMode === 'existing' ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-colors ${clientMode === 'existing' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                   >
                     Client existant
                   </button>
@@ -294,7 +294,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
                             key={c.id}
                             type="button"
                             onClick={() => pickCustomer(c)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#f3e5f5] transition-colors"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors"
                           >
                             <span className="font-medium text-gray-900">
                               {[c.first_name, c.last_name].filter(Boolean).join(' ')}
@@ -305,7 +305,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
                       </div>
                     )}
                     {selectedCustomerId && (
-                      <p className="mt-1.5 text-[10px] text-[#9c27b0] font-medium">
+                      <p className="mt-1.5 text-[10px] text-primary font-medium">
                         Client sélectionné — champs pré-remplis ci-dessous
                       </p>
                     )}
@@ -330,7 +330,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
 
           {/* Event */}
           <div>
-            <p className="text-[10px] font-bold text-[#9c27b0] uppercase tracking-wider mb-3">Événement</p>
+            <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-3">Événement</p>
             <div className="grid grid-cols-3 gap-3">
               <div><label className={labelCls}>Type</label>
                 <select value={eventType} onChange={(e) => setEventType(e.target.value)} className={inputCls}>
@@ -387,7 +387,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#9c27b0]/50 hover:bg-gray-50 transition-colors"
+                className="w-full flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary/50 hover:bg-gray-50 transition-colors"
               >
                 <UploadCloud className="h-6 w-6 text-gray-400" />
                 <span className="text-xs text-gray-500">Cliquer pour sélectionner un fichier</span>
@@ -401,7 +401,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
           <button onClick={onClose} disabled={saving} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
             Annuler
           </button>
-          <button onClick={handleSave} disabled={saving || loadingEdit} className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving || loadingEdit} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             {isEdit ? 'Enregistrer les modifications' : 'Importer le devis'}
           </button>

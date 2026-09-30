@@ -117,7 +117,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
                 <div className="absolute inset-0 ring-1 ring-inset ring-white/20 rounded-xl pointer-events-none" />
               </div>
             ) : (
-              <label className="flex flex-col items-center gap-3 cursor-pointer border-2 border-dashed border-gray-300 rounded-2xl p-16 hover:border-purple-400 hover:bg-purple-50/30 transition-all w-full">
+              <label className="flex flex-col items-center gap-3 cursor-pointer border-2 border-dashed border-gray-300 rounded-2xl p-16 hover:border-primary-400 hover:bg-primary-50/30 transition-all w-full">
                 <Upload className="w-10 h-10 text-gray-400" />
                 <div className="text-center">
                   <p className="text-gray-600 font-medium">Cliquer ou glisser une photo</p>
@@ -132,7 +132,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
           {/* Controls */}
           <div className="w-64 border-l p-5 flex flex-col gap-5 overflow-y-auto flex-shrink-0">
             {url && (
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-3 py-2.5 hover:border-purple-400 hover:text-purple-600 transition-colors">
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-3 py-2.5 hover:border-primary-400 hover:text-primary-600 transition-colors">
                 <Upload className="w-4 h-4" />
                 Changer la photo
                 <input type="file" accept="image/*" className="hidden"
@@ -147,7 +147,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
                 <input type="range" min="0.5" max="3" step="0.05"
                   value={transform.zoom}
                   onChange={e => setTransform(t => ({ ...t, zoom: parseFloat(e.target.value) }))}
-                  className="flex-1 accent-purple-600" />
+                  className="flex-1 accent-primary-600" />
                 <ZoomIn className="w-4 h-4 text-gray-400 flex-shrink-0" />
               </div>
               <span className="text-xs text-gray-400">{Math.round(transform.zoom * 100)}%</span>
@@ -159,7 +159,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
                 <input type="range" min="-180" max="180" step="1"
                   value={transform.rotation}
                   onChange={e => setTransform(t => ({ ...t, rotation: parseFloat(e.target.value) }))}
-                  className="flex-1 accent-purple-600" />
+                  className="flex-1 accent-primary-600" />
                 <button
                   onClick={() => setTransform(t => ({ ...t, rotation: ((Math.round(t.rotation / 90) + 1) * 90) % 360 }))}
                   className="p-1.5 rounded-lg border hover:bg-gray-50 flex-shrink-0"
@@ -182,7 +182,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
                 value={caption}
                 onChange={e => setCaption(e.target.value)}
                 placeholder="Ajouter une légende…"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
               />
             </div>
 
@@ -205,7 +205,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
           <button
             onClick={handleApply}
             disabled={!url || isUploading}
-            className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isUploading ? 'Upload en cours…' : 'Appliquer'}
           </button>

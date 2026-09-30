@@ -31,7 +31,7 @@ export function CoverPage({ config, onChange }: Props) {
         <div className="flex justify-end p-2 bg-gray-50 border-b border-gray-200">
           <button
             onClick={() => setEditingText(false)}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#9c27b0] rounded-lg hover:bg-[#7b1fa2] transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors"
           >
             Terminer l&apos;édition du texte
           </button>
@@ -52,7 +52,7 @@ export function CoverPage({ config, onChange }: Props) {
       {/* Add/edit text overlay button */}
       <button
         onClick={() => setEditingText(true)}
-        className="absolute top-4 left-4 z-10 bg-[#9c27b0]/80 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-4 left-4 z-10 bg-primary/80 text-white rounded-lg px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <Type className="w-3.5 h-3.5" />
         {(config.customLayout && config.customLayout.length > 0) ? 'Modifier le texte' : '+ Ajouter du texte'}

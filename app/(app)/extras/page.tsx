@@ -63,7 +63,7 @@ function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg'
   const initials = name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const cls = size === 'sm' ? 'h-8 w-8 text-xs' : size === 'lg' ? 'h-14 w-14 text-base' : 'h-10 w-10 text-sm';
   return (
-    <div className={`${cls} rounded-xl bg-gradient-to-br from-[#7b1fa2] to-[#ab47bc] flex items-center justify-center flex-shrink-0`}>
+    <div className={`${cls} rounded-xl bg-gradient-to-br from-primary-dark to-primary-light flex items-center justify-center flex-shrink-0`}>
       <span className="text-white font-bold">{initials}</span>
     </div>
   );
@@ -92,7 +92,7 @@ function StatusPill({ value, onChange }: { value: Status; onChange?: (s: Status)
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${sx.value === value ? 'font-bold' : ''}`}>
                 <span className={`w-2 h-2 rounded-full ${sx.dot}`} />
                 {sx.label}
-                {sx.value === value && <Check className="h-3 w-3 ml-auto text-[#9c27b0]" />}
+                {sx.value === value && <Check className="h-3 w-3 ml-auto text-primary" />}
               </button>
             ))}
           </div>
@@ -178,7 +178,7 @@ function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSa
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
 
           {/* Event card */}
-          <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 space-y-3">
+          <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-gray-900 text-base leading-snug">{q.event_type || 'Événement'}</p>
@@ -189,25 +189,25 @@ function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSa
             <div className="space-y-1.5 text-sm text-gray-600">
               {q.event_date && (
                 <div className="flex items-center gap-2">
-                  <CalendarDays className="h-3.5 w-3.5 text-[#9c27b0] flex-shrink-0" />
+                  <CalendarDays className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                   <span className="font-medium">{dateFr(q.event_date, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 </div>
               )}
               {detail?.event_location && (
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-[#9c27b0] flex-shrink-0" />
+                  <MapPin className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                   <span>{detail.event_location}</span>
                 </div>
               )}
               {detail?.guest_count && (
                 <div className="flex items-center gap-2">
-                  <Users className="h-3.5 w-3.5 text-[#9c27b0] flex-shrink-0" />
+                  <Users className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                   <span>{detail.guest_count} convives</span>
                 </div>
               )}
             </div>
             <Link href={`/evenements/${q.id}`}
-              className="inline-flex items-center gap-1.5 text-xs text-[#9c27b0] font-medium hover:underline">
+              className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
               <ExternalLink className="h-3 w-3" />Voir l&apos;événement complet
             </Link>
           </div>
@@ -218,7 +218,7 @@ function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSa
               <Clock className="h-3.5 w-3.5 inline mr-1" />Heure d&apos;arrivée
             </label>
             <input type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
           </div>
 
           {/* Notes */}
@@ -229,7 +229,7 @@ function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSa
               onChange={(e) => setNotes(e.target.value)}
               rows={4}
               placeholder="Instructions spécifiques, tenue, matériel à apporter…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
             />
           </div>
 
@@ -248,7 +248,7 @@ function EventSheet({ assignment, extra, onClose, onStatusChange, onRemove, onSa
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4 text-emerald-300" /> : <Save className="h-4 w-4" />}
             {saved ? 'Sauvegardé !' : 'Enregistrer'}
@@ -308,12 +308,12 @@ function AssignModal({
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Événement *</label>
             {loading ? (
-              <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-[#9c27b0]" /></div>
+              <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
             ) : quotes.length === 0 ? (
               <p className="text-xs text-gray-400 py-2 text-center">Aucun événement disponible. Créez des devis depuis l&apos;onglet Devis.</p>
             ) : (
               <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white">
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white">
                 <option value="">— Choisir un événement —</option>
                 {quotes.map((q) => (
                   <option key={q.id} value={q.id}>
@@ -337,14 +337,14 @@ function AssignModal({
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">Heure d&apos;arrivée</label>
             <input type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
           </div>
         </div>
         <div className="flex gap-2 px-5 pb-5">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Annuler</button>
           <button onClick={async () => { if (!quoteId) return; setSaving(true); await onSave(quoteId, status, arrTime); setSaving(false); }}
             disabled={!quoteId || saving}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#9c27b0] text-white text-sm font-bold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50">
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}Assigner
           </button>
         </div>
@@ -380,13 +380,13 @@ function ExtraModal({ initial, onSave, onClose, saving }: {
             <div key={f.label}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
               <input type={f.type} value={f.value} onChange={(e) => f.set(e.target.value)} placeholder={f.ph}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
             </div>
           ))}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Rôle</label>
             <select value={role} onChange={(e) => setRole(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white">
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white">
               <option value="">— Sélectionner —</option>
               {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -395,7 +395,7 @@ function ExtraModal({ initial, onSave, onClose, saving }: {
         <div className="flex gap-2 px-5 pb-5">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Annuler</button>
           <button onClick={() => onSave({ name, role, phone, email })} disabled={!name.trim() || saving}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#9c27b0] text-white text-sm font-bold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50">
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
             {initial?.id ? 'Mettre à jour' : 'Ajouter'}
           </button>
@@ -579,7 +579,7 @@ function ExtraCard({
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-gray-900">{extra.name}</p>
             {extra.role && (
-              <span className="px-2 py-0.5 bg-purple-50 text-[#9c27b0] text-xs font-semibold rounded-full">{extra.role}</span>
+              <span className="px-2 py-0.5 bg-primary-50 text-primary text-xs font-semibold rounded-full">{extra.role}</span>
             )}
           </div>
           <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
@@ -589,14 +589,14 @@ function ExtraCard({
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button onClick={onAssign} title="Assigner à un événement"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded-xl hover:bg-purple-50 transition-colors">
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30 rounded-xl hover:bg-primary-50 transition-colors">
             <UserPlus className="h-3.5 w-3.5" />Assigner
           </button>
           <button onClick={onCopyLink}
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Copier le lien">
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Link2 className="h-3.5 w-3.5" />}
           </button>
-          <button onClick={onEdit} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-purple-50 rounded-lg transition-colors">
+          <button onClick={onEdit} className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button onClick={onDelete} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -609,7 +609,7 @@ function ExtraCard({
       {assignments.length === 0 ? (
         <div className="px-4 pb-4">
           <button onClick={onAssign}
-            className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] hover:bg-purple-50/50 transition-colors">
+            className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-primary/40 hover:text-primary hover:bg-primary-50/50 transition-colors">
             <UserPlus className="h-3.5 w-3.5" />Assigner à un événement
           </button>
         </div>
@@ -789,7 +789,7 @@ export default function ExtrasPage() {
             ))}
           </div>
           <button onClick={() => { setEditing(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-bold rounded-xl hover:bg-[#7b1fa2] transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark transition-colors">
             <Plus className="h-4 w-4" />Ajouter un extra
           </button>
         </div>
@@ -797,7 +797,7 @@ export default function ExtrasPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>
       ) : viewMode === 'agenda' ? (
         <AgendaView
           extras={extras}
@@ -810,7 +810,7 @@ export default function ExtrasPage() {
           <p className="text-gray-500 font-semibold">Aucun extra enregistré</p>
           <p className="text-sm text-gray-400 mt-1 mb-4">Ajoutez votre équipe pour gérer le staffing événementiel.</p>
           <button onClick={() => { setEditing(null); setShowModal(true); }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-bold rounded-xl hover:bg-[#7b1fa2] transition-colors">
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-dark transition-colors">
             <Plus className="h-4 w-4" />Ajouter un extra
           </button>
         </div>

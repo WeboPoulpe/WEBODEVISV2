@@ -56,7 +56,7 @@ function SortableCell({ cell, onEdit, onRemove }: {
       )}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
         <button onClick={() => onEdit(cell)}
-          className="bg-white rounded-lg p-1.5 shadow text-gray-700 hover:text-purple-600">
+          className="bg-white rounded-lg p-1.5 shadow text-gray-700 hover:text-primary-600">
           <ImagePlus className="w-4 h-4" />
         </button>
         <button onClick={() => onRemove(cell.id)}
@@ -125,7 +125,7 @@ function PhotosPageSection({ page, onChange, onRemovePage }: {
           <select
             value={page.layout}
             onChange={e => onChange({ ...page, layout: e.target.value as PhotosPageLayout })}
-            className="text-sm border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-400"
+            className="text-sm border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400"
           >
             {LAYOUT_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -153,7 +153,7 @@ function PhotosPageSection({ page, onChange, onRemovePage }: {
       </DndContext>
 
       <button onClick={addCell}
-        className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-800 border border-dashed border-purple-300 rounded-lg px-4 py-2.5 w-full justify-center hover:bg-purple-50 transition-colors">
+        className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 border border-dashed border-primary-300 rounded-lg px-4 py-2.5 w-full justify-center hover:bg-primary-50 transition-colors">
         <Plus className="w-4 h-4" /> Ajouter une photo
       </button>
 
@@ -198,7 +198,7 @@ export function PhotosPage({ config, onChange }: Props) {
         </div>
       ))}
       <button onClick={addPage}
-        className="flex items-center gap-2 text-sm text-gray-600 hover:text-purple-600 border border-dashed border-gray-300 rounded-xl px-4 py-3 w-full justify-center hover:border-purple-300 transition-colors">
+        className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 border border-dashed border-gray-300 rounded-xl px-4 py-3 w-full justify-center hover:border-primary-300 transition-colors">
         <Plus className="w-4 h-4" /> Nouvelle page photos
       </button>
     </div>

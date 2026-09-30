@@ -31,7 +31,7 @@ function AccordionSection({
 }) {
   const toneCls = {
     amber:   'text-amber-700',
-    purple:  'text-[#9c27b0]',
+    purple:  'text-primary',
     emerald: 'text-emerald-700',
     gray:    'text-gray-500',
   }[tone];
@@ -158,7 +158,7 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string;
   devis_a_faire:   { label: 'Devis à faire',    dot: 'bg-yellow-400',  badge: 'bg-yellow-50 text-yellow-700',   column: 'bg-yellow-50/40',  colBorder: 'border-yellow-200'  },
   devis_envoye:    { label: 'Devis envoyé',     dot: 'bg-amber-400',   badge: 'bg-amber-50 text-amber-700',     column: 'bg-amber-50/40',   colBorder: 'border-amber-200'   },
   rdv_deg_a_venir: { label: 'RDV/Dég à venir',  dot: 'bg-violet-400',  badge: 'bg-violet-50 text-violet-700',   column: 'bg-violet-50/40',  colBorder: 'border-violet-200'  },
-  rdv_deg_fait:    { label: 'RDV/Dég fait',     dot: 'bg-purple-400',  badge: 'bg-purple-50 text-purple-700',   column: 'bg-purple-50/40',  colBorder: 'border-purple-200'  },
+  rdv_deg_fait:    { label: 'RDV/Dég fait',     dot: 'bg-primary-400',  badge: 'bg-primary-50 text-primary-700',   column: 'bg-primary-50/40',  colBorder: 'border-primary-200'  },
   devis_final:     { label: 'Devis final',      dot: 'bg-orange-400',  badge: 'bg-orange-50 text-orange-700',   column: 'bg-orange-50/40',  colBorder: 'border-orange-200'  },
   valide:          { label: 'Validé',           dot: 'bg-teal-400',    badge: 'bg-teal-50 text-teal-700',       column: 'bg-teal-50/40',    colBorder: 'border-teal-200'    },
   acompte:         { label: 'Acompte reçu',     dot: 'bg-emerald-400', badge: 'bg-emerald-50 text-emerald-700', column: 'bg-emerald-50/40', colBorder: 'border-emerald-200' },
@@ -226,7 +226,7 @@ function ProspectMiniCard({ p, onStatus, onConvert }: { p: ProspectLite; onStatu
         <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 flex-1">
           {PIPELINE_ORDER.map((s) => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
         </select>
-        <button onClick={() => onConvert(p.id)} className="text-[10px] font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded px-2 py-0.5 hover:bg-[#f3e5f5]">Convertir</button>
+        <button onClick={() => onConvert(p.id)} className="text-[10px] font-semibold text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary-50">Convertir</button>
       </div>
     </div>
   );
@@ -317,9 +317,9 @@ function DevisSheet({
 
       {tab === 'apercu' && (
         <div className="p-6 space-y-4">
-          <div className="flex items-center gap-3 p-4 bg-[#f3e5f5]/30 rounded-xl border border-[#9c27b0]/10">
-            <div className="w-12 h-12 bg-[#9c27b0]/10 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Icon className="h-6 w-6 text-[#9c27b0]" />
+          <div className="flex items-center gap-3 p-4 bg-primary-50/30 rounded-xl border border-primary/10">
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Icon className="h-6 w-6 text-primary" />
             </div>
             <div>
               <p className="font-semibold text-gray-900">{quote.event_type || '—'}</p>
@@ -339,9 +339,9 @@ function DevisSheet({
                 onBlur={saveInternalName}
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                 placeholder={quote.client_name || 'Nom du client'}
-                className="w-full px-3 py-2 pr-16 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                className="w-full px-3 py-2 pr-16 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
               />
-              {savingName && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-[#9c27b0]" />}
+              {savingName && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-primary" />}
             </div>
             <p className="text-[10px] text-gray-400 mt-1">Non visible sur le devis client. Vide = nom du client par défaut.</p>
           </div>
@@ -350,7 +350,7 @@ function DevisSheet({
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dossier</p>
             <button
               onClick={onMoveFolder}
-              className="w-full flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:border-primary/40 hover:text-primary transition-colors"
             >
               <FolderInput className="h-4 w-4 flex-shrink-0 text-gray-400" />
               <span className="flex-1 text-left truncate">{folderLabel || 'Aucun dossier (racine)'}</span>
@@ -359,7 +359,7 @@ function DevisSheet({
           </div>
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Statut{prospectId && <span className="ml-2 text-[10px] font-normal text-[#9c27b0] normal-case">sync prospection activée</span>}
+              Statut{prospectId && <span className="ml-2 text-[10px] font-normal text-primary normal-case">sync prospection activée</span>}
             </p>
             <div className="flex flex-wrap gap-2">
               {PIPELINE_ORDER.map((s) => {
@@ -377,15 +377,15 @@ function DevisSheet({
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prospection liée</p>
             {prospectId ? (
-              <div className="flex items-center gap-2 p-3 bg-[#f3e5f5]/40 rounded-xl border border-[#9c27b0]/10">
-                <div className="w-6 h-6 bg-[#9c27b0]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Users className="h-3.5 w-3.5 text-[#9c27b0]" />
+              <div className="flex items-center gap-2 p-3 bg-primary-50/40 rounded-xl border border-primary/10">
+                <div className="w-6 h-6 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Users className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-gray-700">Prospection rattachée</p>
                   <p className="text-[10px] text-gray-400">Statuts synchronisés automatiquement</p>
                 </div>
-                <Link href="/prospects" className="text-xs font-medium text-[#9c27b0] hover:underline flex-shrink-0">
+                <Link href="/prospects" className="text-xs font-medium text-primary hover:underline flex-shrink-0">
                   Voir →
                 </Link>
               </div>
@@ -394,7 +394,7 @@ function DevisSheet({
                 {!linkOpen ? (
                   <button
                     onClick={() => setLinkOpen(true)}
-                    className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-gray-300 rounded-xl text-sm text-gray-400 hover:border-[#9c27b0]/40 hover:text-[#9c27b0] transition-colors"
+                    className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-gray-300 rounded-xl text-sm text-gray-400 hover:border-primary/40 hover:text-primary transition-colors"
                   >
                     <Users className="h-4 w-4" />
                     Rattacher une prospection…
@@ -408,7 +408,7 @@ function DevisSheet({
                         value={linkSearch}
                         onChange={(e) => searchProspects(e.target.value)}
                         placeholder="Nom, email du prospect…"
-                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                       />
                     </div>
                     {linkLoading && <p className="text-xs text-center text-gray-400 py-2">Recherche…</p>}
@@ -416,7 +416,7 @@ function DevisSheet({
                       <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
                         {linkResults.map((p) => (
                           <button key={p.id} onClick={() => linkProspect(p.id)}
-                            className="flex items-start gap-3 w-full px-3 py-2.5 hover:bg-[#f3e5f5]/40 text-left transition-colors">
+                            className="flex items-start gap-3 w-full px-3 py-2.5 hover:bg-primary-50/40 text-left transition-colors">
                             <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                               <Users className="h-3 w-3 text-gray-400" />
                             </div>
@@ -489,11 +489,11 @@ function DevisSheet({
               <Printer className="h-4 w-4" />PDF
             </Link>
             <button onClick={() => { onDuplicate(quote.id); onClose(); }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-[#9c27b0]/30 rounded-xl text-sm font-medium text-[#9c27b0] hover:bg-[#f3e5f5] transition-colors">
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-primary/30 rounded-xl text-sm font-medium text-primary hover:bg-primary-50 transition-colors">
               <Copy className="h-4 w-4" />Dupliquer
             </button>
             <Link href={`/devis/${quote.id}/modifier`}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#9c27b0] text-white rounded-xl text-sm font-medium hover:bg-[#7b1fa2] transition-colors">
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors">
               <Pencil className="h-4 w-4" />Éditer
             </Link>
           </div>
@@ -511,15 +511,15 @@ function DevisSheet({
       {tab === 'suivi' && (
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <StickyNote className="h-4 w-4 text-[#9c27b0]" />
+            <StickyNote className="h-4 w-4 text-primary" />
             <span>Notes de suivi — relances, appels, échanges</span>
           </div>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={10}
             placeholder={'Relance du 15/03 — message laissé en VM.\nÀ rappeler mardi matin.\nClient hésitant sur le nombre de couverts…'}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors leading-relaxed"
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors leading-relaxed"
           />
           <button onClick={async () => { setSavingNotes(true); await createClient().from('quotes').update({ notes }).eq('id', quote.id); setSavingNotes(false); }} disabled={savingNotes}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors">
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors">
             {savingNotes ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {savingNotes ? 'Sauvegarde…' : 'Sauvegarder les notes'}
           </button>
@@ -539,12 +539,12 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', quote.id); onDragStart({ type: 'quote', id: quote.id }); }}
       onDragEnd={onDragEnd}
       title="Glissez la carte sur un dossier pour la ranger"
-      className={['group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-md transition-all duration-200', dragging ? 'opacity-40' : ''].join(' ')}
+      className={['group bg-white border border-gray-200 rounded-2xl p-5 hover:border-primary/30 hover:shadow-md transition-all duration-200', dragging ? 'opacity-40' : ''].join(' ')}
     >
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-[#f3e5f5] flex items-center justify-center flex-shrink-0 group-hover:bg-[#9c27b0] transition-colors">
-            <Icon className="h-5 w-5 text-[#9c27b0] group-hover:text-white transition-colors" />
+          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary transition-colors">
+            <Icon className="h-5 w-5 text-primary group-hover:text-white transition-colors" />
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 truncate">{quoteDisplayName(quote)}</p>
@@ -591,7 +591,7 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
             <Printer className="h-3.5 w-3.5" />
           </Link>
           <button onClick={() => onDuplicate(quote.id)} title="Dupliquer"
-            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
             <Copy className="h-3.5 w-3.5" />
           </button>
           <button onClick={() => onOpenFinance(quote.id)} title="Gestion financière"
@@ -599,17 +599,17 @@ function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, o
             <Wallet className="h-3.5 w-3.5" />
           </button>
           <button onClick={() => onMove(quote)} title="Déplacer vers un dossier"
-            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
             <FolderInput className="h-3.5 w-3.5" />
           </button>
           {quote.imported && quote.imported_file_url ? (
             <a href={quote.imported_file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir le document importé"
-              className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+              className="p-1.5 text-primary/50 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
               <FileText className="h-3.5 w-3.5" />
             </a>
           ) : (
             <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
-              className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+              className="p-1.5 text-primary/50 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
               <LayoutTemplate className="h-3.5 w-3.5" />
             </Link>
           )}
@@ -671,14 +671,14 @@ function TableView({ quotes, onOpenSheet, onDelete, onDuplicate, onMove, onDragS
               <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{(() => { const t = computeQuoteTotal(q); return t ? formatCurrency(t) : '—'; })()}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1 justify-end">
-                  <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><FolderInput className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1.5 text-gray-300 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"><FolderInput className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
                   {['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(q.status) && (
                     <button onClick={() => onDelete(q.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                   )}
-                  <button onClick={() => onOpenSheet(q)} className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => onOpenSheet(q)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button>
                   <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="PDF"><Printer className="h-3.5 w-3.5" /></Link>
-                  <Link href={`/devis/${q.id}/modifier?mode=weboword`} className="p-1.5 text-[#9c27b0]/50 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors" title="Ouvrir dans WeboWord"><LayoutTemplate className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/devis/${q.id}/modifier?mode=weboword`} className="p-1.5 text-primary/50 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors" title="Ouvrir dans WeboWord"><LayoutTemplate className="h-3.5 w-3.5" /></Link>
                 </div>
               </td>
             </tr>
@@ -728,7 +728,7 @@ function PipelineView({
 
         return (
           <div key={statusKey}
-            className={['flex-shrink-0 w-64 rounded-2xl border-2 transition-all duration-150', cfg.column, isOver ? 'border-[#9c27b0]/50 scale-[1.01]' : cfg.colBorder].join(' ')}
+            className={['flex-shrink-0 w-64 rounded-2xl border-2 transition-all duration-150', cfg.column, isOver ? 'border-primary/50 scale-[1.01]' : cfg.colBorder].join(' ')}
             onDragOver={(e) => { e.preventDefault(); setDraggingOver(statusKey); }}
             onDragLeave={(e) => {
               // Only clear when actually leaving the column (not when entering a child)
@@ -758,11 +758,11 @@ function PipelineView({
                   <div key={q.id} draggable
                     onDragStart={() => { draggingIdRef.current = q.id; setDraggingId(q.id); }}
                     onDragEnd={() => { draggingIdRef.current = null; setDraggingId(null); setDraggingOver(null); }}
-                    className={['bg-white border border-gray-200 rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-[#9c27b0]/30 transition-all select-none', draggingId === q.id ? 'opacity-40' : ''].join(' ')}
+                    className={['bg-white border border-gray-200 rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30 transition-all select-none', draggingId === q.id ? 'opacity-40' : ''].join(' ')}
                   >
                     <div className="flex items-start gap-2 mb-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#f3e5f5] flex items-center justify-center flex-shrink-0">
-                        <Icon className="h-3.5 w-3.5 text-[#9c27b0]" />
+                      <div className="w-7 h-7 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                        <Icon className="h-3.5 w-3.5 text-primary" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-gray-900 truncate">{quoteDisplayName(q)}</p>
@@ -773,11 +773,11 @@ function PipelineView({
                     <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-gray-100">
                       {(() => { const t = computeQuoteTotal(q); return t ? <p className="text-xs font-bold text-gray-900 tabular-nums">{formatCurrency(t)}</p> : <span />; })()}
                       <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => onOpenSheet(q)} title="Aperçu" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Eye className="h-3 w-3" /></button>
+                        <button onClick={() => onOpenSheet(q)} title="Aperçu" className="p-1 text-gray-300 hover:text-primary hover:bg-primary-50 rounded transition-colors"><Eye className="h-3 w-3" /></button>
                         <Link href={`/devis/${q.id}/imprimer`} target="_blank" title="PDF" className="p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"><Printer className="h-3 w-3" /></Link>
-                        <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Copy className="h-3 w-3" /></button>
-                        <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><FolderInput className="h-3 w-3" /></button>
-                        <Link href={`/devis/${q.id}/modifier?mode=weboword`} title="Éditer" className="p-1 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded transition-colors"><Pencil className="h-3 w-3" /></Link>
+                        <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1 text-gray-300 hover:text-primary hover:bg-primary-50 rounded transition-colors"><Copy className="h-3 w-3" /></button>
+                        <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1 text-gray-300 hover:text-primary hover:bg-primary-50 rounded transition-colors"><FolderInput className="h-3 w-3" /></button>
+                        <Link href={`/devis/${q.id}/modifier?mode=weboword`} title="Éditer" className="p-1 text-gray-300 hover:text-primary hover:bg-primary-50 rounded transition-colors"><Pencil className="h-3 w-3" /></Link>
                       </div>
                     </div>
                   </div>
@@ -1251,7 +1251,7 @@ export default function DevisPage() {
           </button>
           <Link href={currentFolder ? `/devis/nouveau?dossier=${currentFolder}` : '/devis/nouveau'}
             title={currentFolder ? 'Le devis sera créé dans le dossier ouvert' : undefined}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors">
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors">
             <Plus className="h-4 w-4" />Nouveau
           </Link>
         </div>
@@ -1262,7 +1262,7 @@ export default function DevisPage() {
         <div className="mb-5">
           <button
             onClick={() => setShowTemplates((v) => !v)}
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#9c27b0] transition-colors mb-3"
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary transition-colors mb-3"
           >
             <Library className="h-4 w-4" />
             Mes modèles ({templates.length})
@@ -1277,9 +1277,9 @@ export default function DevisPage() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const totalHt = Array.isArray(tpl.services) ? tpl.services.reduce((sum: number, s: any) => sum + (s.isFree ? 0 : (s.quantity || 0) * (s.unitPrice || 0)), 0) : 0;
                 const templateLabel = tpl.template === 'mariage' ? 'Mariage' : tpl.template === 'business' ? 'Business' : 'Standard';
-                const templateColor = tpl.template === 'mariage' ? 'text-amber-700 bg-amber-50' : tpl.template === 'business' ? 'text-slate-700 bg-slate-100' : 'text-[#9c27b0] bg-[#f3e5f5]';
+                const templateColor = tpl.template === 'mariage' ? 'text-amber-700 bg-amber-50' : tpl.template === 'business' ? 'text-slate-700 bg-slate-100' : 'text-primary bg-primary-50';
                 return (
-                  <div key={tpl.id} className="group bg-gradient-to-br from-[#faf5ff] to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-[#9c27b0]/40 transition-all cursor-pointer" onClick={() => renamingTpl !== tpl.id && openPreview(tpl.id)}>
+                  <div key={tpl.id} className="group bg-gradient-to-br from-primary-50 to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-primary/40 transition-all cursor-pointer" onClick={() => renamingTpl !== tpl.id && openPreview(tpl.id)}>
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="min-w-0 flex-1">
                         {renamingTpl === tpl.id ? (
@@ -1293,7 +1293,7 @@ export default function DevisPage() {
                               if (e.key === 'Escape') setRenamingTpl(null);
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="text-sm font-bold text-gray-900 w-full border border-[#9c27b0] rounded px-2 py-0.5 focus:outline-none"
+                            className="text-sm font-bold text-gray-900 w-full border border-primary rounded px-2 py-0.5 focus:outline-none"
                           />
                         ) : (
                           <p className="text-sm font-bold text-gray-900 truncate">{tpl.name}</p>
@@ -1304,7 +1304,7 @@ export default function DevisPage() {
                         </div>
                       </div>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={(e) => { e.stopPropagation(); setRenamingTpl(tpl.id); setRenameName(tpl.name); }} title="Renommer" className="p-1.5 text-gray-300 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); setRenamingTpl(tpl.id); setRenameName(tpl.name); }} title="Renommer" className="p-1.5 text-gray-300 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -1332,7 +1332,7 @@ export default function DevisPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); createFromTemplate(tpl.id); }}
                         disabled={creatingFromTpl === tpl.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-[#9c27b0] hover:text-white transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30 rounded-lg hover:bg-primary hover:text-white transition-colors disabled:opacity-50"
                       >
                         {creatingFromTpl === tpl.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                         Utiliser
@@ -1377,13 +1377,13 @@ export default function DevisPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher par client ou événement…"
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors" />
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
             <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
             {STATUSES.map((s) => (
               <button key={s} onClick={() => setActiveStatus(s)}
-                className={['flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', activeStatus === s ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
+                className={['flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', activeStatus === s ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
                 {s}
               </button>
             ))}
@@ -1393,7 +1393,7 @@ export default function DevisPage() {
             value={sort}
             onChange={(e) => setSort(e.target.value as typeof sort)}
             title="Trier"
-            className="flex-shrink-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 cursor-pointer"
+            className="flex-shrink-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
           >
             <option value="recent">Plus récents</option>
             <option value="event">Date d’événement</option>
@@ -1406,7 +1406,7 @@ export default function DevisPage() {
         <div className="relative mb-5">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par client ou événement…"
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors" />
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
         </div>
       )}
 
@@ -1426,7 +1426,7 @@ export default function DevisPage() {
                 ? 'Glissez-y des devis depuis « Mes devis », ou utilisez « Déplacer vers… ».'
                 : 'Créez votre premier devis pour commencer.'}
           </p>
-          {!search && <Link href="/devis/nouveau" className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"><Plus className="h-4 w-4" />Créer un devis</Link>}
+          {!search && <Link href="/devis/nouveau" className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"><Plus className="h-4 w-4" />Créer un devis</Link>}
         </div>
       ) : view === 'grid' ? (
         <div className="space-y-3">
@@ -1531,8 +1531,8 @@ export default function DevisPage() {
           <div className="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="p-2 bg-[#f3e5f5] rounded-xl flex-shrink-0">
-                  <Library className="h-4 w-4 text-[#9c27b0]" />
+                <div className="p-2 bg-primary-50 rounded-xl flex-shrink-0">
+                  <Library className="h-4 w-4 text-primary" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-gray-900 text-sm truncate">{previewTpl.name}</h2>
@@ -1563,7 +1563,7 @@ export default function DevisPage() {
               </Link>
               <button
                 onClick={() => { createFromTemplate(previewTpl.id); setPreviewTpl(null); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 Créer un devis
@@ -1579,8 +1579,8 @@ export default function DevisPage() {
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-[#f3e5f5] rounded-xl">
-                  <Copy className="h-4 w-4 text-[#9c27b0]" />
+                <div className="p-2 bg-primary-50 rounded-xl">
+                  <Copy className="h-4 w-4 text-primary" />
                 </div>
                 <h2 className="font-semibold text-gray-900">Dupliquer le devis</h2>
               </div>
@@ -1594,10 +1594,10 @@ export default function DevisPage() {
               <button
                 onClick={() => executeDuplicate(false)}
                 disabled={dupModal.saving}
-                className="w-full flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-[#9c27b0]/40 hover:bg-[#faf5ff] transition-all text-left group"
+                className="w-full flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-primary/40 hover:bg-primary-50 transition-all text-left group"
               >
-                <div className="p-2.5 bg-gray-100 rounded-xl group-hover:bg-[#f3e5f5] transition-colors flex-shrink-0">
-                  <Copy className="h-5 w-5 text-gray-500 group-hover:text-[#9c27b0] transition-colors" />
+                <div className="p-2.5 bg-gray-100 rounded-xl group-hover:bg-primary-50 transition-colors flex-shrink-0">
+                  <Copy className="h-5 w-5 text-gray-500 group-hover:text-primary transition-colors" />
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900 text-sm">Duplication simple</p>
@@ -1620,12 +1620,12 @@ export default function DevisPage() {
                   value={dupModal.templateName}
                   onChange={(e) => setDupModal((m) => ({ ...m, templateName: e.target.value }))}
                   placeholder="Nom du modèle (ex: Menu Prestige 80 couverts)"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 />
                 <button
                   onClick={() => executeDuplicate(true)}
                   disabled={dupModal.saving || !dupModal.templateName.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
                 >
                   {dupModal.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookCopy className="h-4 w-4" />}
                   Dupliquer + enregistrer modèle

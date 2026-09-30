@@ -85,30 +85,30 @@ export default function AdminCategoriesPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-xl">
-            <FolderTree className="h-5 w-5 text-purple-600" />
+          <div className="p-2 bg-primary-100 rounded-xl">
+            <FolderTree className="h-5 w-5 text-primary-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Catégories globales</h1>
             <p className="text-sm text-gray-500">Visibles par tous les traiteurs (user_id NULL)</p>
           </div>
         </div>
-        <button onClick={() => setAddingCat(true)} className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2]">
+        <button onClick={() => setAddingCat(true)} className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark">
           <Plus className="h-4 w-4" />Catégorie
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-[#9c27b0]" /></div>
+        <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
       ) : (
         <div className="space-y-2">
           {addingCat && (
-            <div className="bg-white border-2 border-[#9c27b0] rounded-xl p-3 flex items-center gap-2">
+            <div className="bg-white border-2 border-primary rounded-xl p-3 flex items-center gap-2">
               <input autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addCategory(); if (e.key === 'Escape') setAddingCat(false); }}
                 placeholder="Nom de la catégorie…"
                 className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none" />
-              <button onClick={addCategory} className="p-2 bg-[#9c27b0] text-white rounded-lg hover:bg-[#7b1fa2]"><Check className="h-4 w-4" /></button>
+              <button onClick={addCategory} className="p-2 bg-primary text-white rounded-lg hover:bg-primary-dark"><Check className="h-4 w-4" /></button>
               <button onClick={() => { setAddingCat(false); setNewCatName(''); }} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="h-4 w-4" /></button>
             </div>
           )}
@@ -126,7 +126,7 @@ export default function AdminCategoriesPage() {
                     <>
                       <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') updateCategory(cat.id); if (e.key === 'Escape') setEditingCat(null); }}
-                        className="flex-1 text-sm font-medium border border-[#9c27b0] rounded-lg px-2 py-1" />
+                        className="flex-1 text-sm font-medium border border-primary rounded-lg px-2 py-1" />
                       <button onClick={() => updateCategory(cat.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check className="h-4 w-4" /></button>
                       <button onClick={() => setEditingCat(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="h-4 w-4" /></button>
                     </>
@@ -134,7 +134,7 @@ export default function AdminCategoriesPage() {
                     <>
                       <p className="flex-1 text-sm font-bold text-gray-900">{cat.name}</p>
                       <span className="text-[10px] text-gray-400">{subList.length} sous-cat.</span>
-                      <button onClick={() => { setEditingCat(cat.id); setEditName(cat.name); }} className="p-1 text-gray-300 hover:text-[#9c27b0]"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => { setEditingCat(cat.id); setEditName(cat.name); }} className="p-1 text-gray-300 hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
                       <button onClick={() => deleteCategory(cat.id)} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
                     </>
                   )}
@@ -147,7 +147,7 @@ export default function AdminCategoriesPage() {
                           <>
                             <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') updateSubcategory(s.id); if (e.key === 'Escape') setEditingSub(null); }}
-                              className="flex-1 text-sm border border-[#9c27b0] rounded px-2 py-1" />
+                              className="flex-1 text-sm border border-primary rounded px-2 py-1" />
                             <button onClick={() => updateSubcategory(s.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check className="h-3.5 w-3.5" /></button>
                             <button onClick={() => setEditingSub(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="h-3.5 w-3.5" /></button>
                           </>
@@ -156,7 +156,7 @@ export default function AdminCategoriesPage() {
                             <span className="text-gray-300">›</span>
                             <p className="flex-1 text-xs text-gray-700">{s.name}</p>
                             <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 transition-opacity">
-                              <button onClick={() => { setEditingSub(s.id); setEditName(s.name); }} className="p-1 text-gray-300 hover:text-[#9c27b0]"><Pencil className="h-3 w-3" /></button>
+                              <button onClick={() => { setEditingSub(s.id); setEditName(s.name); }} className="p-1 text-gray-300 hover:text-primary"><Pencil className="h-3 w-3" /></button>
                               <button onClick={() => deleteSubcategory(s.id)} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
                             </div>
                           </>
@@ -168,12 +168,12 @@ export default function AdminCategoriesPage() {
                         <input autoFocus value={newSubName} onChange={(e) => setNewSubName(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') addSubcategory(cat.id); if (e.key === 'Escape') setAddingSubFor(null); }}
                           placeholder="Nom de la sous-catégorie…"
-                          className="flex-1 text-xs border border-[#9c27b0] rounded px-2 py-1" />
+                          className="flex-1 text-xs border border-primary rounded px-2 py-1" />
                         <button onClick={() => addSubcategory(cat.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check className="h-3.5 w-3.5" /></button>
                         <button onClick={() => setAddingSubFor(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="h-3.5 w-3.5" /></button>
                       </div>
                     ) : (
-                      <button onClick={() => setAddingSubFor(cat.id)} className="ml-6 text-[10px] text-[#9c27b0] hover:underline">+ Sous-catégorie</button>
+                      <button onClick={() => setAddingSubFor(cat.id)} className="ml-6 text-[10px] text-primary hover:underline">+ Sous-catégorie</button>
                     )}
                   </div>
                 )}

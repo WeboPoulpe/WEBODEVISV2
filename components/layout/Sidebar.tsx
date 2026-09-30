@@ -1,514 +1,157 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, FileText, Users, CalendarDays, CalendarRange,
-  Package, Settings, Carrot, LayoutTemplate,
-  LogOut, ChevronLeft, ChevronRight, UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench,
-  User, Calendar as CalendarIcon, Palette, Image as ImageIcon, ArrowLeft,
-  Save, Printer, Download, Shield, FolderTree, Building2,
+  ArrowLeft, ChevronsLeft, ChevronsRight, Download, LogOut, Printer, Save,
+  User, Package, Calendar as CalendarIcon, Palette, Image as ImageIcon, LayoutTemplate,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { createClient } from '@/lib/supabase/client';
-import { CONFIRMED_STATUSES, PENDING_STATUSES } from '@/lib/quoteStatus';
+import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface NavItem {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  exact: boolean;
-  badge?: 'pendingDevis' | 'todayEvent' | 'newProspects' | 'stockAlert';
-}
+const PANEL_ICONS: Record<string, React.ElementType> = {
+  client: User, services: Package, event: CalendarIcon, style: Palette, images: ImageIcon, cover: LayoutTemplate, photos: ImageIcon,
+};
 
-interface NavGroup {
-  title: string;
-  items: NavItem[];
-  /** If set, group is collapsible and starts collapsed unless an item inside is active */
-  collapsible?: boolean;
-}
-
-// ── Navigation structure ──────────────────────────────────────────────────────
-const NAV_GROUPS: NavGroup[] = [
-  {
-    title: 'Commerce',
-    items: [
-      { href: '/',          icon: LayoutDashboard, label: 'Tableau de bord', exact: true  },
-      { href: '/devis',     icon: FileText,        label: 'Devis',           exact: false, badge: 'pendingDevis' },
-      { href: '/clients',   icon: Users,           label: 'Clients',         exact: false },
-      { href: '/prospects', icon: UserCheck,       label: 'Prospects',       exact: false, badge: 'newProspects' },
-    ],
-  },
-  {
-    title: 'Production',
-    items: [
-      { href: '/calendrier', icon: CalendarDays,   label: 'Calendrier', exact: false, badge: 'todayEvent' },
-      { href: '/evenements', icon: CalendarRange,  label: 'Événements', exact: false },
-      { href: '/commandes',  icon: ShoppingBasket, label: 'Commandes',  exact: false },
-    ],
-  },
-  {
-    title: 'Stock',
-    items: [
-      { href: '/stock', icon: Boxes, label: 'Stock', exact: false, badge: 'stockAlert' },
-    ],
-  },
-  {
-    title: 'Catalogue',
-    collapsible: true,
-    items: [
-      { href: '/prestations',     icon: Package,        label: 'Prestations',      exact: false },
-      { href: '/ingredients',     icon: Carrot,         label: 'Ingrédients',      exact: false },
-      { href: '/extras',          icon: Users2,         label: 'Extras',           exact: false },
-      { href: '/location-globale',   icon: Boxes,       label: 'Location',         exact: false },
-      { href: '/courses-globales',   icon: ShoppingBasket, label: 'Courses globales', exact: false },
-      { href: '/fournisseurs',    icon: Truck,          label: 'Fournisseurs',     exact: false },
-    ],
-  },
-  {
-    title: 'Paramètres',
-    collapsible: true,
-    items: [
-      { href: '/parametres/categories', icon: FolderTree,     label: 'Catégories',         exact: false },
-      { href: '/parametres',            icon: Building2,      label: 'Profil entreprise',  exact: true  },
-      { href: '/modeles',               icon: LayoutTemplate, label: 'Modèles de devis',   exact: false },
-      { href: '/location-templates',    icon: Wrench,         label: 'Templates location', exact: false },
-    ],
-  },
-];
-
-// Optional admin link (added at runtime if profile.role === 'admin')
-const ADMIN_ITEM: NavItem = { href: '/admin', icon: Shield, label: 'Espace admin', exact: false };
-
-// ── Props ─────────────────────────────────────────────────────────────────────
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  badges: Badges;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+const itemBase = 'relative flex items-center gap-3 h-10 px-3 rounded-xl text-sm font-medium transition-colors';
+const itemIdle = 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
+const itemActive = 'bg-primary-100 text-primary';
+
+function Badge({ value }: { value: number | 'dot' | null }) {
+  if (value === null) return null;
+  if (value === 'dot') return <span className="ml-auto w-2 h-2 rounded-full bg-accent flex-shrink-0" aria-label="Événement aujourd'hui" />;
+  return (
+    <span className="ml-auto min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full bg-gray-900 text-white text-[11px] font-semibold tabular-nums">
+      {value > 99 ? '99+' : value}
+    </span>
+  );
+}
+
+// Navigation latérale : rail d'icônes sur tablette, barre complète sur grand écran.
+export default function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
+  const groups = useNavGroups();
+  const editor = useEditorMode(pathname);
 
-  // Read URL params via window (avoid useSearchParams suspense issue)
-  const [urlParams, setUrlParams] = useState<{ mode: string | null; panel: string | null }>({ mode: null, panel: null });
-  useEffect(() => {
-    const update = () => {
-      if (typeof window === 'undefined') return;
-      const sp = new URLSearchParams(window.location.search);
-      setUrlParams({ mode: sp.get('mode'), panel: sp.get('panel') });
-    };
-    update();
-    window.addEventListener('popstate', update);
-    const interval = setInterval(update, 300); // Catch pushState changes
-    return () => { window.removeEventListener('popstate', update); clearInterval(interval); };
-  }, []);
-
-  // Detect WeboWord mode (on modifier page with mode=weboword)
-  const isWeboMode = pathname?.includes('/devis/') && pathname?.includes('/modifier') && urlParams.mode === 'weboword';
-  const quoteIdFromPath = pathname?.match(/\/devis\/([^/]+)\/modifier/)?.[1] || null;
-  const activePanel = urlParams.panel as 'client' | 'services' | 'event' | 'style' | 'images' | null;
-
-  // Detect Prestation WeboWord mode
-  const isPrestaWeboMode = pathname?.includes('/prestations/') && pathname?.includes('/edit-webo');
-
-  const weboItems: { key: string; icon: React.ElementType; label: string }[] = [
-    { key: 'client', icon: User, label: 'Client' },
-    { key: 'services', icon: Package, label: 'Prestations' },
-    { key: 'event', icon: CalendarIcon, label: 'Événement' },
-    { key: 'style', icon: Palette, label: 'Style' },
-    { key: 'images', icon: ImageIcon, label: 'Images' },
-    { key: 'cover', icon: LayoutTemplate, label: 'Page de garde' },
-    { key: 'photos', icon: ImageIcon, label: 'Page photos' },
-  ];
-
-  const [pendingDevis, setPendingDevis]   = useState(0);
-  const [stockAlertCount, setStockAlertCount] = useState(0);
-  const [hasTodayEvent, setHasTodayEvent] = useState(false);
-  const [newProspects, setNewProspects]   = useState(0);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const { user } = useAuth();
-
-  // Inject "Espace admin" link in Paramètres group when role=admin
-  const effectiveGroups: NavGroup[] = NAV_GROUPS.map((g) =>
-    g.title === 'Paramètres' && profile?.role === 'admin'
-      ? { ...g, items: [...g.items, ADMIN_ITEM] }
-      : g,
-  );
-
-  // Load badge data
-  useEffect(() => {
-    if (!user) return;
-    const supabase = createClient();
-    const today = new Date().toISOString().split('T')[0];
-
-    // Fetch devis + events badges
-    Promise.all([
-      supabase.from('quotes').select('*', { count: 'exact', head: true }).in('status', PENDING_STATUSES),
-      supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('event_date', today).in('status', CONFIRMED_STATUSES),
-    ]).then(([{ count: pending }, { count: todayCount }]) => {
-      setPendingDevis(pending ?? 0);
-      setHasTodayEvent((todayCount ?? 0) > 0);
-    });
-
-    // Fetch new prospects count (via user's tokens)
-    supabase
-      .from('user_prospect_tokens')
-      .select('token')
-      .eq('user_id', user.id)
-      .then(({ data: tokenRows }) => {
-        const tokens = (tokenRows ?? []).map((r: { token: string }) => r.token);
-        if (tokens.length === 0) return;
-        supabase
-          .from('prospect_requests')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'nouveau')
-          .in('user_token', tokens)
-          .then(({ count }) => setNewProspects(count ?? 0));
-      });
-
-    // Fetch stock alert count (ingredients where stock <= min_stock_alert)
-    supabase.from('ingredients')
-      .select('id, stock_quantity, min_stock_alert')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
-        const count = (data || []).filter((i: { stock_quantity: number | null; min_stock_alert: number | null }) =>
-          (i.min_stock_alert ?? 0) > 0 && (i.stock_quantity ?? 0) <= (i.min_stock_alert ?? 0)
-        ).length;
-        setStockAlertCount(count);
-      });
-  }, [user]);
-
-  // Active state logic
-  const isActive = (item: NavItem) => {
-    if (item.exact) return pathname === item.href;
-    if (item.href === '/devis') {
-      return pathname === '/devis' || (pathname.startsWith('/devis/') && pathname !== '/devis/nouveau');
-    }
-    if (item.href === '/evenements') {
-      return pathname.startsWith('/evenements');
-    }
-    return pathname === item.href || pathname.startsWith(item.href + '/');
-  };
-
-  // Badge resolver
-  const resolveBadge = (key?: NavItem['badge']): number | 'dot' | null => {
-    if (!key) return null;
-    if (key === 'pendingDevis' && pendingDevis > 0) return pendingDevis;
-    if (key === 'todayEvent'   && hasTodayEvent)    return 'dot';
-    if (key === 'newProspects' && newProspects > 0) return newProspects;
-    if (key === 'stockAlert'   && stockAlertCount > 0) return stockAlertCount;
-    return null;
-  };
-
-  // Avatar initials
-  const initials = [profile?.first_name?.[0], profile?.last_name?.[0]]
-    .filter(Boolean)
-    .join('')
-    .toUpperCase() || '?';
+  const initials = [profile?.first_name?.[0], profile?.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?';
 
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-30 hidden lg:flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden"
-      style={{
-        width: collapsed ? 64 : 240,
-        background: 'linear-gradient(175deg, #1a0733 0%, #2a1554 55%, #1e0e42 100%)',
-      }}
+      className="fixed inset-y-0 left-0 z-30 hidden md:flex flex-col bg-white border-r border-gray-200 overflow-hidden transition-[width] duration-200"
+      style={{ width: 'var(--shell-left)' }}
     >
-      {/* ── Logo ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center h-[60px] px-4 border-b border-white/[0.06] flex-shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #9c27b0, #7b1fa2)',
-              boxShadow: '0 4px 14px rgba(156, 39, 176, 0.4)',
-            }}
-          >
-            <span className="text-white font-bold text-sm select-none">W</span>
-          </div>
-          {!collapsed && (
-            <span className="text-white font-bold text-sm tracking-wide truncate select-none">
-              WeboDevis
-            </span>
-          )}
+      {/* Marque */}
+      <div className="flex items-center gap-3 h-[60px] px-[18px] flex-shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+          <span className="font-display text-white font-bold text-base select-none">W</span>
         </div>
+        <span className="sb-label font-display font-semibold text-gray-900 text-[17px] truncate select-none">WeboDevis</span>
       </div>
 
-      {/* ── Prestation WeboWord mode ───────────────────────────────────────── */}
-      {isPrestaWeboMode ? (
-        <nav className="flex-1 py-3 px-3 overflow-y-auto">
-          <Link
-            href="/prestations"
-            className="flex items-center gap-2 px-3 py-2.5 mb-4 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 flex-shrink-0" />
-            {!collapsed && <span className="text-sm font-medium">Retour aux prestations</span>}
+      {editor.isQuoteEditor || editor.isPrestationEditor ? (
+        // Éditeur plein écran : la navigation laisse place aux panneaux et aux actions du document.
+        <nav className="flex-1 px-3 py-2 overflow-y-auto scrollbar-none space-y-1">
+          <Link href={editor.isQuoteEditor ? '/devis' : '/prestations'} className={cn(itemBase, itemIdle)} title="Retour">
+            <ArrowLeft className="h-[18px] w-[18px] flex-shrink-0" />
+            <span className="sb-label truncate">{editor.isQuoteEditor ? 'Retour aux devis' : 'Retour aux prestations'}</span>
           </Link>
 
-          {!collapsed && (
-            <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
-              Édition prestation
-            </p>
-          )}
-
-          <div className="px-3 py-2 text-xs text-white/50 italic">
-            Stylez la carte gastronomique de votre prestation. Elle sera utilisée automatiquement dans tous les devis.
-          </div>
-
-          <div className="mt-6 pt-4 border-t border-white/10 space-y-1">
-            {!collapsed && (
-              <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
-                Actions
-              </p>
-            )}
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('presta-webo:save'))}
-              title={collapsed ? 'Enregistrer' : undefined}
-              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white rounded-xl hover:from-[#7b1fa2] hover:to-[#6a1080] transition-colors shadow-md"
-            >
-              <Save className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="text-sm font-semibold">Enregistrer</span>}
-            </button>
-          </div>
-        </nav>
-      ) : isWeboMode ? (
-        <nav className="flex-1 py-3 px-3 overflow-y-auto">
-          {/* Back button */}
-          <Link
-            href="/devis"
-            className="flex items-center gap-2 px-3 py-2.5 mb-4 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 flex-shrink-0" />
-            {!collapsed && <span className="text-sm font-medium">Retour aux devis</span>}
-          </Link>
-
-          {!collapsed && (
-            <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
-              Édition du devis
-            </p>
-          )}
-
-          <div className="space-y-1">
-            {weboItems.map((item) => {
-              const active = activePanel === item.key;
-              const Icon = item.icon;
-              const href = `/devis/${quoteIdFromPath}/modifier?mode=weboword&panel=${item.key}`;
-              return (
-                <Link
-                  key={item.key}
-                  href={href}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
-                    active
-                      ? 'bg-white/15 text-white'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white',
-                  )}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Actions: Save / Print / PDF (dispatch custom events to WeboWord editor) */}
-          <div className="mt-6 pt-4 border-t border-white/10 space-y-1">
-            {!collapsed && (
-              <p className="px-3 mb-2 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase">
-                Actions
-              </p>
-            )}
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('weboword:save'))}
-              title={collapsed ? 'Enregistrer' : undefined}
-              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white rounded-xl hover:from-[#7b1fa2] hover:to-[#6a1080] transition-colors shadow-md"
-            >
-              <Save className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="text-sm font-semibold">Enregistrer</span>}
-            </button>
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))}
-              title={collapsed ? 'Enregistrer PDF' : undefined}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-            >
-              <Download className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="text-sm font-medium">Enregistrer PDF</span>}
-            </button>
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent('weboword:print'))}
-              title={collapsed ? 'Imprimer' : undefined}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-            >
-              <Printer className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="text-sm font-medium">Imprimer</span>}
-            </button>
-          </div>
-        </nav>
-      ) : (
-      <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden scrollbar-none">
-        {effectiveGroups.map((group, gi) => {
-          const groupHasActive = group.items.some((it) => isActive(it));
-          const isOpen = !group.collapsible || groupHasActive || openGroups[group.title];
-          return (
-          <div key={group.title} className={gi > 0 ? 'mt-5' : ''}>
-            {/* Group label */}
-            {collapsed ? (
-              <div className="mx-auto my-2 w-6 h-px bg-white/[0.08]" />
-            ) : group.collapsible ? (
-              <button
-                onClick={() => setOpenGroups((s) => ({ ...s, [group.title]: !isOpen }))}
-                className="w-full flex items-center justify-between px-5 mb-1 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase select-none hover:text-white/50 transition-colors"
-              >
-                <span>{group.title}</span>
-                <ChevronRight
-                  className={cn('h-3 w-3 transition-transform', isOpen ? 'rotate-90' : '')}
-                  strokeWidth={2}
-                />
-              </button>
-            ) : (
-              <p className="px-5 mb-1 text-[9.5px] font-semibold tracking-[0.16em] text-white/25 uppercase select-none">
-                {group.title}
-              </p>
-            )}
-
-            {/* Items */}
-            {(!group.collapsible || isOpen || collapsed) && (
-            <div className="space-y-px">
-              {group.items.map((item) => {
-                const active = isActive(item);
-                const badge  = resolveBadge(item.badge);
-
+          {editor.isQuoteEditor && (
+            <div className="pt-3 space-y-1">
+              {WEBO_PANELS.map((panel) => {
+                const Icon = PANEL_ICONS[panel.key];
                 return (
                   <Link
-                    key={item.href}
-                    href={item.href}
-                    title={collapsed ? item.label : undefined}
-                    className={cn(
-                      'relative flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl transition-all duration-150 group',
-                      active
-                        ? 'bg-white/[0.11] text-white'
-                        : 'text-white/45 hover:bg-white/[0.07] hover:text-white/80',
-                    )}
+                    key={panel.key}
+                    href={`/devis/${editor.quoteId}/modifier?mode=weboword&panel=${panel.key}`}
+                    title={panel.label}
+                    className={cn(itemBase, editor.activePanel === panel.key ? itemActive : itemIdle)}
                   >
-                    {/* Active left accent */}
-                    {active && (
-                      <span
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-                        style={{ background: 'linear-gradient(180deg, #e040fb, #9c27b0)' }}
-                      />
-                    )}
-
-                    {/* Icon */}
-                    <item.icon
-                      className="flex-shrink-0"
-                      style={{ width: 17, height: 17 }}
-                      strokeWidth={1.6}
-                    />
-
-                    {/* Label */}
-                    {!collapsed && (
-                      <span className="flex-1 text-[13px] font-medium truncate leading-none">
-                        {item.label}
-                      </span>
-                    )}
-
-                    {/* Badges — expanded */}
-                    {!collapsed && badge !== null && (
-                      badge === 'dot' ? (
-                        <span className="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0 shadow-sm shadow-rose-400/50" />
-                      ) : (
-                        <span className="px-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[#9c27b0] text-white text-[10px] font-bold rounded-full leading-none flex-shrink-0">
-                          {(badge as number) > 9 ? '9+' : badge}
-                        </span>
-                      )
-                    )}
-
-                    {/* Badges — collapsed */}
-                    {collapsed && badge !== null && (
-                      badge === 'dot' ? (
-                        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-rose-400" />
-                      ) : (
-                        <span className="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center bg-[#9c27b0] text-white text-[9px] font-bold rounded-full leading-none">
-                          {(badge as number) > 9 ? '9+' : badge}
-                        </span>
-                      )
-                    )}
+                    <Icon className="h-[18px] w-[18px] flex-shrink-0" />
+                    <span className="sb-label truncate">{panel.label}</span>
                   </Link>
                 );
               })}
             </div>
+          )}
+
+          <div className="pt-4 mt-3 border-t border-gray-200 space-y-1">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent(editor.isQuoteEditor ? 'weboword:save' : 'presta-webo:save'))}
+              title="Enregistrer"
+              className={cn(itemBase, 'w-full bg-primary text-white hover:bg-primary-dark')}
+            >
+              <Save className="h-[18px] w-[18px] flex-shrink-0" />
+              <span className="sb-label">Enregistrer</span>
+            </button>
+            {editor.isQuoteEditor && (
+              <>
+                <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:savepdf'))} title="Enregistrer en PDF" className={cn(itemBase, itemIdle, 'w-full')}>
+                  <Download className="h-[18px] w-[18px] flex-shrink-0" />
+                  <span className="sb-label">Enregistrer en PDF</span>
+                </button>
+                <button onClick={() => window.dispatchEvent(new CustomEvent('weboword:print'))} title="Imprimer" className={cn(itemBase, itemIdle, 'w-full')}>
+                  <Printer className="h-[18px] w-[18px] flex-shrink-0" />
+                  <span className="sb-label">Imprimer</span>
+                </button>
+              </>
             )}
           </div>
-          );
-        })}
-      </nav>
+        </nav>
+      ) : (
+        <nav className="flex-1 px-3 py-2 overflow-y-auto overflow-x-hidden scrollbar-none">
+          {groups.map((group, gi) => (
+            <div key={group.title} className={gi > 0 ? 'mt-5' : ''}>
+              <p className="sb-label px-3 mb-1.5 text-xs font-medium text-gray-400 select-none">{group.title}</p>
+              {gi > 0 && <div className="sb-rail-only block mx-3 mb-3 h-px bg-gray-200" />}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isNavActive(item, pathname);
+                  const badge = item.badge ? badges[item.badge] : null;
+                  return (
+                    <Link key={item.href} href={item.href} title={item.label} className={cn(itemBase, active ? itemActive : itemIdle)}>
+                      <item.icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={active ? 2.1 : 1.8} />
+                      <span className="sb-label truncate">{item.label}</span>
+                      <span className="sb-label ml-auto"><Badge value={badge} /></span>
+                      {badge !== null && <span className="sb-rail-only absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
       )}
 
-      {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-t border-white/[0.06]">
-
-        {/* Avatar + user info */}
+      {/* Compte */}
+      <div className="flex-shrink-0 border-t border-gray-200 p-3 space-y-1">
         {profile && (
-          <div className={cn(
-            'flex items-center gap-2.5 px-3 py-3',
-            collapsed && 'justify-center',
-          )}>
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 select-none"
-              style={{
-                background: 'linear-gradient(135deg, #ce93d8, #9c27b0)',
-                boxShadow: '0 2px 8px rgba(156,39,176,0.35)',
-              }}
-            >
-              <span className="text-white font-semibold text-[11px]">{initials}</span>
+          <div className="flex items-center gap-3 px-1.5 py-1.5">
+            <div className="w-9 h-9 rounded-full bg-primary-100 text-primary flex items-center justify-center flex-shrink-0 text-xs font-semibold select-none">
+              {initials}
             </div>
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-[12px] font-medium truncate leading-snug">
-                  {profile.first_name} {profile.last_name}
-                </p>
-                <p className="text-white/35 text-[10px] truncate leading-snug">{profile.email}</p>
-              </div>
-            )}
+            <div className="sb-label flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate leading-tight">{profile.first_name} {profile.last_name}</p>
+              <p className="text-xs text-gray-500 truncate leading-tight">{profile.email}</p>
+            </div>
           </div>
         )}
-
-        {/* Sign out */}
-        <button
-          onClick={signOut}
-          title={collapsed ? 'Déconnexion' : undefined}
-          className={cn(
-            'flex items-center gap-3 w-full px-4 py-2.5 text-white/35 hover:text-white/65 hover:bg-white/[0.05] transition-colors',
-            collapsed && 'justify-center',
-          )}
-        >
-          <LogOut strokeWidth={1.6} style={{ width: 15, height: 15 }} className="flex-shrink-0" />
-          {!collapsed && <span className="text-[12px]">Déconnexion</span>}
+        <button onClick={signOut} title="Se déconnecter" className={cn(itemBase, itemIdle, 'w-full')}>
+          <LogOut className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.8} />
+          <span className="sb-label">Se déconnecter</span>
         </button>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={onToggle}
-          title={collapsed ? 'Développer' : 'Réduire'}
-          className={cn(
-            'flex items-center gap-3 w-full px-4 py-2.5 text-white/35 hover:text-white/65 hover:bg-white/[0.05] transition-colors border-t border-white/[0.06]',
-            collapsed && 'justify-center',
-          )}
-        >
-          {collapsed ? (
-            <ChevronRight strokeWidth={1.6} style={{ width: 15, height: 15 }} className="flex-shrink-0" />
-          ) : (
-            <>
-              <ChevronLeft strokeWidth={1.6} style={{ width: 15, height: 15 }} className="flex-shrink-0" />
-              <span className="text-[12px]">Réduire</span>
-            </>
-          )}
+        {/* Replier : utile seulement sur grand écran (la tablette est toujours en rail) */}
+        <button onClick={onToggle} title={collapsed ? 'Déplier le menu' : 'Replier le menu'} className={cn(itemBase, itemIdle, 'w-full hidden lg:flex')}>
+          {collapsed ? <ChevronsRight className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.8} /> : <ChevronsLeft className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.8} />}
+          <span className="sb-label">Replier le menu</span>
         </button>
       </div>
     </aside>

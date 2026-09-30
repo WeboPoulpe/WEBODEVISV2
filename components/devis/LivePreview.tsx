@@ -96,7 +96,7 @@ export function LivePreviewFAB() {
     <div className="lg:hidden print:hidden">
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 px-4 py-3 bg-[#9c27b0] text-white rounded-full shadow-xl hover:bg-[#7b1fa2] transition-colors"
+        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 px-4 py-3 bg-primary text-white rounded-full shadow-xl hover:bg-primary-dark transition-colors"
       >
         <Eye className="h-5 w-5" />
         <span className="text-sm font-medium">Aperçu</span>
@@ -108,7 +108,7 @@ export function LivePreviewFAB() {
           <div className="relative bg-white rounded-t-2xl max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <ChefHat className="h-4 w-4 text-[#9c27b0]" />
+                <ChefHat className="h-4 w-4 text-primary" />
                 <span className="font-semibold text-gray-900 text-sm">Aperçu du devis</span>
               </div>
               <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">

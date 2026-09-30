@@ -458,26 +458,26 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
 
   if (!activePanel) return null;
 
-  const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]';
+  const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary';
   const labelCls = 'block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1';
 
   return (
     <>
       {/* Overlay — full screen but doesn't cover sidebar */}
-      <div className="fixed inset-0 z-40 bg-black/20 print:hidden" style={{ left: 240 }} onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/20 print:hidden" style={{ left: 'var(--shell-left)' }} onClick={onClose} />
 
       {/* Panel — positioned right after the app sidebar */}
-      <div className="fixed top-0 bottom-0 w-80 bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200 print:hidden" style={{ left: 240 }}>
+      <div className="fixed top-0 bottom-0 w-80 bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200 print:hidden" style={{ left: 'var(--shell-left)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            {activePanel === 'client' && <><User className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Client</h2></>}
-            {activePanel === 'services' && <><Package className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Prestations</h2></>}
-            {activePanel === 'event' && <><Calendar className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Événement & Options</h2></>}
-            {activePanel === 'style' && <><Palette className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Style</h2></>}
-            {activePanel === 'images' && <><ImageIcon className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Images</h2></>}
-            {activePanel === 'cover' && <><LayoutTemplate className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Page de garde</h2></>}
-            {activePanel === 'photos' && <><ImageIcon className="h-4 w-4 text-[#9c27b0]" /><h2 className="font-semibold text-gray-900 text-sm">Page photos</h2></>}
+            {activePanel === 'client' && <><User className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Client</h2></>}
+            {activePanel === 'services' && <><Package className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Prestations</h2></>}
+            {activePanel === 'event' && <><Calendar className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Événement & Options</h2></>}
+            {activePanel === 'style' && <><Palette className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Style</h2></>}
+            {activePanel === 'images' && <><ImageIcon className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Images</h2></>}
+            {activePanel === 'cover' && <><LayoutTemplate className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Page de garde</h2></>}
+            {activePanel === 'photos' && <><ImageIcon className="h-4 w-4 text-primary" /><h2 className="font-semibold text-gray-900 text-sm">Page photos</h2></>}
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
             <X className="h-4 w-4" />
@@ -487,7 +487,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 text-[#9c27b0] animate-spin" /></div>
+            <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
           ) : (
             <>
               {/* CLIENT PANEL */}
@@ -501,16 +501,16 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         value={clientSearch}
                         onChange={(e) => searchClients(e.target.value)}
                         placeholder="Nom, email, entreprise…"
-                        className={`${inputCls} pl-9 border-dashed border-[#9c27b0]/30 bg-[#faf5ff]`}
+                        className={`${inputCls} pl-9 border-dashed border-primary/30 bg-primary-50`}
                       />
                     </div>
                     {showPicker && clientResults.length > 0 && (
                       <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {clientResults.map((c) => (
                           <button key={c.id} onClick={() => selectClient(c)}
-                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#faf5ff] text-left border-b border-gray-50 last:border-0">
-                            <div className="w-7 h-7 rounded-full bg-[#f3e5f5] flex items-center justify-center">
-                              <span className="text-xs font-bold text-[#9c27b0]">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary-50 text-left border-b border-gray-50 last:border-0">
+                            <div className="w-7 h-7 rounded-full bg-primary-50 flex items-center justify-center">
+                              <span className="text-xs font-bold text-primary">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-medium truncate">{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.company_name || c.email}</p>
@@ -558,14 +558,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         value={prestationSearch}
                         onChange={(e) => searchPrestations(e.target.value)}
                         placeholder="Chercher une prestation…"
-                        className={`${inputCls} pl-9 border-dashed border-[#9c27b0]/30 bg-[#faf5ff]`}
+                        className={`${inputCls} pl-9 border-dashed border-primary/30 bg-primary-50`}
                       />
                     </div>
                     {showPrestationPicker && prestationResults.length > 0 && (
                       <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                         {prestationResults.map((p) => (
                           <button key={p.id} onClick={() => addPrestation(p)}
-                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#faf5ff] text-left border-b border-gray-50 last:border-0">
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary-50 text-left border-b border-gray-50 last:border-0">
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-medium truncate">{p.name}</p>
                               <p className="text-[10px] text-gray-400">{p.category || '—'}</p>
@@ -602,11 +602,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                             'border rounded-xl p-3 space-y-2 transition-all',
                             svc.removed ? 'bg-red-50/30 opacity-50' : 'bg-white',
                             dragIdx === idx && 'opacity-30 scale-95',
-                            dragOverIdx === idx && dragIdx !== idx && 'border-[#9c27b0] border-2 shadow-lg scale-[1.02]',
+                            dragOverIdx === idx && dragIdx !== idx && 'border-primary border-2 shadow-lg scale-[1.02]',
                           )}
                         >
                           <div className="flex items-start gap-1">
-                            <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#9c27b0] mt-1.5 flex-shrink-0" title="Glisser pour réordonner">
+                            <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-primary mt-1.5 flex-shrink-0" title="Glisser pour réordonner">
                               <GripVertical className="h-4 w-4" />
                             </div>
                             <input
@@ -665,7 +665,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                             ) : (
                               <button
                                 onClick={() => setEditingServicePhotoIdx(idx)}
-                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-600 border border-dashed border-gray-200 rounded px-2 py-1"
+                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 border border-dashed border-gray-200 rounded px-2 py-1"
                               >
                                 + Photo
                               </button>
@@ -719,7 +719,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       </select>
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="h-4 w-4 accent-[#9c27b0]" />
+                      <input type="checkbox" checked={hidePrice} onChange={(e) => setHidePrice(e.target.checked)} className="h-4 w-4 accent-primary" />
                       <span className="text-xs text-gray-600">Masquer les prix sur le devis</span>
                     </label>
                     <div><label className={labelCls}>Remarques</label>
@@ -755,12 +755,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                     <div className="grid grid-cols-2 gap-1.5">
                       <button onClick={() => setLanguage('fr')}
                         className={cn('py-2 px-2 text-xs font-semibold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5',
-                          language === 'fr' ? 'border-[#9c27b0] bg-[#faf5ff] text-[#9c27b0]' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
+                          language === 'fr' ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
                         🇫🇷 Français
                       </button>
                       <button onClick={() => setLanguage('en')}
                         className={cn('py-2 px-2 text-xs font-semibold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5',
-                          language === 'en' ? 'border-[#9c27b0] bg-[#faf5ff] text-[#9c27b0]' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
+                          language === 'en' ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
                         🇬🇧 English
                       </button>
                     </div>
@@ -775,7 +775,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         {MENU_WIDTHS.map((w) => (
                           <button key={w.value} onClick={() => onMenuWidthChange(w.value)}
                             className={cn('py-1.5 px-2 text-xs font-medium rounded-lg border transition-all',
-                              menuWidth === w.value ? 'bg-[#9c27b0] text-white border-[#9c27b0]' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
+                              menuWidth === w.value ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-500 hover:bg-gray-50')}>
                             {w.label}
                           </button>
                         ))}
@@ -847,7 +847,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={coverConfig.enabled}
                       onChange={e => onCoverChange({ ...coverConfig, enabled: e.target.checked })}
-                      className="w-4 h-4 accent-[#9c27b0]" />
+                      className="w-4 h-4 accent-primary" />
                     <span className="text-sm text-gray-700">Activer la page de garde</span>
                   </label>
 
@@ -856,12 +856,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       <div className="flex rounded-lg border overflow-hidden text-sm">
                         <button
                           onClick={() => onCoverChange({ ...coverConfig, mode: 'template' })}
-                          className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'template' ? 'bg-[#9c27b0] text-white' : 'hover:bg-gray-50'}`}>
+                          className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'template' ? 'bg-primary text-white' : 'hover:bg-gray-50'}`}>
                           Templates
                         </button>
                         <button
                           onClick={() => onCoverChange({ ...coverConfig, mode: 'builder' })}
-                          className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'builder' ? 'bg-[#9c27b0] text-white' : 'hover:bg-gray-50'}`}>
+                          className={`flex-1 py-2 font-medium transition-colors ${coverConfig.mode === 'builder' ? 'bg-primary text-white' : 'hover:bg-gray-50'}`}>
                           Builder libre
                         </button>
                       </div>
@@ -880,7 +880,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               {(['mariage', 'gastronomique', 'business', 'provence', 'luxe'] as const).map(t => (
                                 <button key={t}
                                   onClick={() => onCoverChange({ ...coverConfig, template: t })}
-                                  className={`py-2 px-3 rounded-lg border text-sm capitalize transition-colors ${coverConfig.template === t ? 'bg-[#faf5ff] border-[#9c27b0] text-[#9c27b0] font-medium' : 'hover:bg-gray-50'}`}>
+                                  className={`py-2 px-3 rounded-lg border text-sm capitalize transition-colors ${coverConfig.template === t ? 'bg-primary-50 border-primary text-primary font-medium' : 'hover:bg-gray-50'}`}>
                                   {t}
                                 </button>
                               ))}
@@ -918,7 +918,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                           <div key={tpl.id} className="flex items-center gap-2 mb-1.5">
                             <button
                               onClick={() => onCoverChange({ ...tpl.config, enabled: coverConfig.enabled })}
-                              className="flex-1 text-left text-sm py-1.5 px-2.5 rounded-lg border hover:bg-purple-50 hover:border-purple-300 transition-colors truncate"
+                              className="flex-1 text-left text-sm py-1.5 px-2.5 rounded-lg border hover:bg-primary-50 hover:border-primary-300 transition-colors truncate"
                             >
                               {tpl.name}
                             </button>
@@ -937,12 +937,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               placeholder="Nom du modèle…"
                               className={inputCls + ' flex-1'}
                             />
-                            <button onClick={saveCoverTemplate} disabled={!saveCoverName.trim()} className="px-3 py-1.5 bg-[#9c27b0] text-white text-sm rounded-lg disabled:opacity-50">
+                            <button onClick={saveCoverTemplate} disabled={!saveCoverName.trim()} className="px-3 py-1.5 bg-primary text-white text-sm rounded-lg disabled:opacity-50">
                               <Check className="w-4 h-4" />
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => setShowSaveCoverInput(true)} className="flex items-center gap-1.5 text-sm text-[#9c27b0] hover:text-[#7b1fa2] mt-1">
+                          <button onClick={() => setShowSaveCoverInput(true)} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary-dark mt-1">
                             <Save className="w-3.5 h-3.5" /> Enregistrer comme modèle
                           </button>
                         )}
@@ -958,7 +958,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={photosConfig.enabled}
                       onChange={e => onPhotosChange({ ...photosConfig, enabled: e.target.checked })}
-                      className="w-4 h-4 accent-[#9c27b0]" />
+                      className="w-4 h-4 accent-primary" />
                     <span className="text-sm text-gray-700">Activer la page photos</span>
                   </label>
                   {photosConfig.enabled && (
@@ -977,7 +977,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                           <div key={tpl.id} className="flex items-center gap-2 mb-1.5">
                             <button
                               onClick={() => onPhotosChange({ ...tpl.config, enabled: photosConfig.enabled })}
-                              className="flex-1 text-left text-sm py-1.5 px-2.5 rounded-lg border hover:bg-purple-50 hover:border-purple-300 transition-colors truncate"
+                              className="flex-1 text-left text-sm py-1.5 px-2.5 rounded-lg border hover:bg-primary-50 hover:border-primary-300 transition-colors truncate"
                             >
                               {tpl.name}
                             </button>
@@ -996,12 +996,12 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               placeholder="Nom du modèle…"
                               className={inputCls + ' flex-1'}
                             />
-                            <button onClick={savePhotosTemplate} disabled={!savePhotosName.trim()} className="px-3 py-1.5 bg-[#9c27b0] text-white text-sm rounded-lg disabled:opacity-50">
+                            <button onClick={savePhotosTemplate} disabled={!savePhotosName.trim()} className="px-3 py-1.5 bg-primary text-white text-sm rounded-lg disabled:opacity-50">
                               <Check className="w-4 h-4" />
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => setShowSavePhotosInput(true)} className="flex items-center gap-1.5 text-sm text-[#9c27b0] hover:text-[#7b1fa2] mt-1">
+                          <button onClick={() => setShowSavePhotosInput(true)} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary-dark mt-1">
                             <Save className="w-3.5 h-3.5" /> Enregistrer comme modèle
                           </button>
                         )}
@@ -1021,7 +1021,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
             Fermer
           </button>
           {activePanel !== 'cover' && activePanel !== 'photos' && (
-            <button onClick={save} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
+            <button onClick={save} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               Appliquer
             </button>
@@ -1049,7 +1049,7 @@ export function SidePanelIcons({ activePanel, onSelect }: { activePanel: PanelKe
         <button key={key} onClick={() => onSelect(key)} title={label}
           className={cn(
             'w-10 h-10 flex items-center justify-center rounded-xl transition-all group relative',
-            activePanel === key ? 'bg-[#9c27b0] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+            activePanel === key ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
           )}>
           <Icon className="h-4 w-4" />
           <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">

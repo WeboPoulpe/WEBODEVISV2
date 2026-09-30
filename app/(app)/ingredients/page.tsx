@@ -51,8 +51,8 @@ const CAT_COLORS: Record<string, string> = {
   'Poissons':         'bg-blue-50 text-blue-700 border-blue-200',
   'Fruits & Légumes': 'bg-green-50 text-green-700 border-green-200',
   'Herbes & Épices':  'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'Pâtisserie':       'bg-pink-50 text-pink-700 border-pink-200',
-  'Boissons':         'bg-purple-50 text-purple-700 border-purple-200',
+  'Pâtisserie':       'bg-primary-50 text-pink-700 border-pink-200',
+  'Boissons':         'bg-primary-50 text-primary-700 border-primary-200',
   'Boulangerie':      'bg-amber-50 text-amber-700 border-amber-200',
   'Surgelés Pro':     'bg-cyan-50 text-cyan-700 border-cyan-200',
   'Divers':           'bg-gray-100 text-gray-600 border-gray-200',
@@ -123,7 +123,7 @@ function CsvImportModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <UploadCloud className="h-4 w-4 text-[#9c27b0]" />
+            <UploadCloud className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-gray-900">Import CSV</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
@@ -134,7 +134,7 @@ function CsvImportModal({
         {/* Stats */}
         <div className="flex gap-0 border-b border-gray-100">
           <div className="flex-1 py-3 text-center">
-            <p className="text-2xl font-bold text-[#9c27b0]">{toImport.length}</p>
+            <p className="text-2xl font-bold text-primary">{toImport.length}</p>
             <p className="text-xs text-gray-500">à importer</p>
           </div>
           <div className="w-px bg-gray-100" />
@@ -189,7 +189,7 @@ function CsvImportModal({
           <button
             onClick={onConfirm}
             disabled={toImport.length === 0 || importing}
-            className="flex items-center gap-2 px-5 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
           >
             {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Importer {toImport.length} ingrédient{toImport.length > 1 ? 's' : ''}
@@ -318,7 +318,7 @@ function IngredientModal({
               onChange={(e) => handleNameChange(e.target.value)}
               onBlur={() => setTimeout(() => setShowOff(false), 200)}
               placeholder="Ex. : Crème fraîche épaisse…"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
               autoFocus
             />
             {offLoading && (
@@ -373,7 +373,7 @@ function IngredientModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
               >
                 <option value="">— Choisir —</option>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -384,7 +384,7 @@ function IngredientModal({
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors bg-white"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
               >
                 {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
@@ -401,7 +401,7 @@ function IngredientModal({
               value={subCategory}
               onChange={(e) => setSubCategory(e.target.value)}
               placeholder="Ex. : Volaille, Fromage, Champignons…"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             />
           </div>
 
@@ -411,7 +411,7 @@ function IngredientModal({
               Fournisseur préféré <span className="text-gray-400 font-normal">(pour calcul auto commandes)</span>
             </label>
             <select value={preferredSupplierId} onChange={(e) => setPreferredSupplierId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]">
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
               <option value="">— Aucun —</option>
               {suppliersList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -428,7 +428,7 @@ function IngredientModal({
                 value={minStockAlert}
                 onChange={(e) => setMinStockAlert(e.target.value)}
                 placeholder="10"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
               <p className="text-[10px] text-gray-400 mt-1">Alerte si stock ≤ ce seuil</p>
             </div>
@@ -441,7 +441,7 @@ function IngredientModal({
                 value={volumeUnitPrice}
                 onChange={(e) => setVolumeUnitPrice(e.target.value)}
                 placeholder="2.50"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
               <p className="text-[10px] text-gray-400 mt-1">€ par {unit || 'unité'}</p>
             </div>
@@ -455,7 +455,7 @@ function IngredientModal({
           <button
             onClick={handleSave}
             disabled={!name.trim() || saving}
-            className="flex items-center gap-2 px-5 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             {initial?.id ? 'Modifier' : 'Ajouter'}
@@ -500,7 +500,7 @@ function SupplierRow({
             {[supplier.email, supplier.phone].filter(Boolean).join(' · ') || 'Aucune coordonnée'}
           </p>
         </div>
-        <button onClick={() => setEditing(true)} className="p-1.5 text-gray-400 hover:text-[#9c27b0] transition-colors rounded-lg hover:bg-gray-50">
+        <button onClick={() => setEditing(true)} className="p-1.5 text-gray-400 hover:text-primary transition-colors rounded-lg hover:bg-gray-50">
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button onClick={() => onDelete(supplier.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
@@ -511,21 +511,21 @@ function SupplierRow({
   }
 
   return (
-    <div className="bg-white border border-[#9c27b0]/30 rounded-xl p-4 space-y-3">
+    <div className="bg-white border border-primary/30 rounded-xl p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom *"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
       </div>
       <div className="flex gap-2 justify-end">
         <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Annuler</button>
         <button onClick={save} disabled={!name.trim() || saving}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[#9c27b0] text-white font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
+          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-white font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60">
           {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           Enregistrer
         </button>
@@ -703,7 +703,7 @@ export default function IngredientsPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Carrot className="h-5 w-5 text-[#9c27b0]" />
+            <Carrot className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-bold text-gray-900">Ingrédients</h1>
             {!loading && (
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -719,7 +719,7 @@ export default function IngredientsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher…"
-                className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] w-48 transition-all"
+                className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary w-48 transition-all"
               />
             </div>
             {/* Hidden CSV file input */}
@@ -749,7 +749,7 @@ export default function IngredientsPage() {
             </button>
             <button
               onClick={() => setModal({ open: true, item: null })}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
             >
               <Plus className="h-4 w-4" />
               Ajouter
@@ -766,7 +766,7 @@ export default function IngredientsPage() {
               className={[
                 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
                 catFilter === cat
-                  ? 'bg-[#9c27b0] text-white border-[#9c27b0]'
+                  ? 'bg-primary text-white border-primary'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
               ].join(' ')}
             >
@@ -796,7 +796,7 @@ export default function IngredientsPage() {
                 </p>
                 <button
                   onClick={() => setModal({ open: true, item: null })}
-                  className="mt-3 text-xs text-[#9c27b0] hover:underline font-medium"
+                  className="mt-3 text-xs text-primary hover:underline font-medium"
                 >
                   + Ajouter le premier ingrédient
                 </button>
@@ -809,7 +809,7 @@ export default function IngredientsPage() {
                 {filtered.map((ing) => (
                   <div
                     key={ing.id}
-                    className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-[#9c27b0]/30 hover:shadow-sm transition-all group"
+                    className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm transition-all group"
                   >
                     {/* Photo */}
                     <div className="h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
@@ -844,7 +844,7 @@ export default function IngredientsPage() {
                       <div className="border-t border-gray-100 flex opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setModal({ open: true, item: ing })}
-                          className="flex-1 flex items-center justify-center py-2 text-gray-400 hover:text-[#9c27b0] hover:bg-gray-50 transition-colors text-xs gap-1"
+                          className="flex-1 flex items-center justify-center py-2 text-gray-400 hover:text-primary hover:bg-gray-50 transition-colors text-xs gap-1"
                         >
                           <Pencil className="h-3 w-3" />
                         </button>
@@ -875,7 +875,7 @@ export default function IngredientsPage() {
             className="flex items-center justify-between w-full px-5 py-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-[#9c27b0]" />
+              <Truck className="h-4 w-4 text-primary" />
               <span className="font-semibold text-gray-900 text-sm">
                 Fournisseurs
               </span>
@@ -902,16 +902,16 @@ export default function IngredientsPage() {
 
               {/* Add new supplier form */}
               {newSupplier ? (
-                <div className="bg-[#f3e5f5]/20 border border-[#9c27b0]/20 rounded-xl p-4 space-y-3">
+                <div className="bg-primary-50/20 border border-primary/20 rounded-xl p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <input value={nsName} onChange={(e) => setNsName(e.target.value)} placeholder="Nom du fournisseur *"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" autoFocus />
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" autoFocus />
                     <input value={nsEmail} onChange={(e) => setNsEmail(e.target.value)} placeholder="Email"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                     <input value={nsPhone} onChange={(e) => setNsPhone(e.target.value)} placeholder="Téléphone"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                     <input value={nsNotes} onChange={(e) => setNsNotes(e.target.value)} placeholder="Notes (optionnel)"
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                   </div>
                   <div className="flex gap-2 justify-end">
                     <button onClick={() => { setNewSupplier(false); setNsName(''); setNsEmail(''); setNsPhone(''); setNsNotes(''); }}
@@ -919,7 +919,7 @@ export default function IngredientsPage() {
                       Annuler
                     </button>
                     <button onClick={addSupplier} disabled={!nsName.trim() || nsSaving}
-                      className="flex items-center gap-1 px-4 py-1.5 text-xs bg-[#9c27b0] text-white font-medium rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60">
+                      className="flex items-center gap-1 px-4 py-1.5 text-xs bg-primary text-white font-medium rounded-lg hover:bg-primary-dark disabled:opacity-60">
                       {nsSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                       Ajouter
                     </button>
@@ -928,7 +928,7 @@ export default function IngredientsPage() {
               ) : (
                 <button
                   onClick={() => setNewSupplier(true)}
-                  className="flex items-center gap-2 text-sm text-[#9c27b0] hover:text-[#7b1fa2] font-medium transition-colors"
+                  className="flex items-center gap-2 text-sm text-primary hover:text-primary-dark font-medium transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Ajouter un fournisseur

@@ -73,11 +73,11 @@ function ClientCombobox({
     <div ref={containerRef} className="relative">
       <div className="relative flex items-center">
         {searching
-          ? <Loader2 className="absolute left-3 h-4 w-4 text-[#9c27b0] animate-spin pointer-events-none" />
+          ? <Loader2 className="absolute left-3 h-4 w-4 text-primary animate-spin pointer-events-none" />
           : <Search className="absolute left-3 h-4 w-4 text-gray-400 pointer-events-none" />
         }
         <input
-          className="w-full pl-10 pr-9 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors placeholder:text-gray-400"
+          className="w-full pl-10 pr-9 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors placeholder:text-gray-400"
           placeholder="Rechercher un client par nom, entreprise ou email…"
           value={query}
           onChange={handleChange}
@@ -107,12 +107,12 @@ function ClientCombobox({
                 <li
                   key={c.id}
                   onMouseDown={() => { onSelect(c); setOpen(false); setQuery(''); }}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#9c27b0]/5 border-b border-gray-50 last:border-0 transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-primary/5 border-b border-gray-50 last:border-0 transition-colors"
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${c.customer_type === 'entreprise' ? 'bg-blue-50' : 'bg-[#f3e5f5]'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${c.customer_type === 'entreprise' ? 'bg-blue-50' : 'bg-primary-50'}`}>
                     {c.customer_type === 'entreprise'
                       ? <Building2 className="h-4 w-4 text-blue-500" />
-                      : <User className="h-4 w-4 text-[#9c27b0]" />
+                      : <User className="h-4 w-4 text-primary" />
                     }
                   </div>
                   <div className="min-w-0">
@@ -142,17 +142,17 @@ function SelectedClientCard({
     : `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim();
 
   return (
-    <div className="flex items-center gap-3 p-4 bg-[#f3e5f5]/40 border border-[#9c27b0]/20 rounded-xl">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${customer.customer_type === 'entreprise' ? 'bg-blue-100' : 'bg-[#f3e5f5]'}`}>
+    <div className="flex items-center gap-3 p-4 bg-primary-50/40 border border-primary/20 rounded-xl">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${customer.customer_type === 'entreprise' ? 'bg-blue-100' : 'bg-primary-50'}`}>
         {customer.customer_type === 'entreprise'
           ? <Building2 className="h-5 w-5 text-blue-500" />
-          : <User className="h-5 w-5 text-[#9c27b0]" />
+          : <User className="h-5 w-5 text-primary" />
         }
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-semibold text-gray-900 truncate">{name || '—'}</p>
-          <CheckCircle2 className="h-4 w-4 text-[#9c27b0] flex-shrink-0" />
+          <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
         </div>
         <p className="text-sm text-gray-500 truncate">{customer.email}</p>
         {customer.phone && <p className="text-xs text-gray-400">{customer.phone}</p>}
@@ -209,7 +209,7 @@ function NewClientForm({
           <button
             key={t}
             onClick={() => setType(t)}
-            className={['flex-1 py-2.5 rounded-lg text-sm font-medium capitalize transition-colors', type === t ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}
+            className={['flex-1 py-2.5 rounded-lg text-sm font-medium capitalize transition-colors', type === t ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}
           >
             {t}
           </button>
@@ -233,7 +233,7 @@ function NewClientForm({
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         {saving ? 'Enregistrement…' : 'Créer le client'}
@@ -344,7 +344,7 @@ export default function StepClientEvent({ onNext }: Props) {
             </div>
             <button
               onClick={() => setSheetOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-[#9c27b0]/30 rounded-xl text-sm font-medium text-[#9c27b0] hover:bg-[#9c27b0]/5 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-primary/30 rounded-xl text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Créer un nouveau client
@@ -361,7 +361,7 @@ export default function StepClientEvent({ onNext }: Props) {
                 <button
                   key={t}
                   onClick={() => setClient('type', t)}
-                  className={['px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors', clientInfo.type === t ? 'bg-[#9c27b0] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'].join(' ')}
+                  className={['px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors', clientInfo.type === t ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'].join(' ')}
                 >
                   {t}
                 </button>
@@ -429,7 +429,7 @@ export default function StepClientEvent({ onNext }: Props) {
       <div className="flex justify-end pt-2">
         <button
           onClick={onNext}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors"
         >
           Suivant
           <ArrowRight className="h-4 w-4" />
@@ -469,7 +469,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
       />
     </div>
   );

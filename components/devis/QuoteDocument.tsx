@@ -96,8 +96,8 @@ function EditableText({
       }}
       className={[
         className,
-        'outline-none cursor-text rounded px-0.5 ring-1 ring-[#9c27b0]/30 bg-[#f3e5f5]/20',
-        'hover:ring-[#9c27b0]/50 focus:ring-[#9c27b0] focus:bg-[#f3e5f5]/40 transition-all',
+        'outline-none cursor-text rounded px-0.5 ring-1 ring-primary/30 bg-primary-50/20',
+        'hover:ring-primary/50 focus:ring-primary focus:bg-primary-50/40 transition-all',
       ].join(' ')}
     >
       {value || ''}
@@ -112,7 +112,7 @@ function SectionHeader({ label, sub }: { label: string; sub?: string }) {
       <div className="flex items-center gap-3 w-full">
         <div className="flex-1 h-px bg-gray-200" />
         <div>
-          <p className="font-menu text-[11px] font-semibold tracking-[0.18em] text-[#9c27b0] uppercase leading-none">{label}</p>
+          <p className="font-menu text-[11px] font-semibold tracking-[0.18em] text-primary uppercase leading-none">{label}</p>
           {sub && <p className="text-[8px] tracking-[0.15em] text-gray-400 uppercase mt-0.5">{sub}</p>}
         </div>
         <div className="flex-1 h-px bg-gray-200" />
@@ -160,7 +160,7 @@ function MenuLine({
       </div>
       {/* Description — rendered as HTML (supports bold, italic, lists from RichTextEditor) */}
       {service.description && (
-        <div className="mt-0.5 pl-2 border-l-2 border-[#9c27b0]/15">
+        <div className="mt-0.5 pl-2 border-l-2 border-primary/15">
           <div
             className="font-menu text-[9.5px] italic text-gray-500 leading-relaxed description-html"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(service.description) }}
@@ -175,7 +175,7 @@ function TotalsRow({ label, value, bold, small, accent }: {
   label: string; value: string; bold?: boolean; small?: boolean; accent?: boolean;
 }) {
   return (
-    <div className={['flex justify-between items-baseline gap-4', small ? 'text-[9.5px]' : 'text-[10.5px]', bold ? 'font-bold' : '', accent ? 'text-[#9c27b0]' : 'text-gray-600'].join(' ')}>
+    <div className={['flex justify-between items-baseline gap-4', small ? 'text-[9.5px]' : 'text-[10.5px]', bold ? 'font-bold' : '', accent ? 'text-primary' : 'text-gray-600'].join(' ')}>
       <span>{label}</span><span className="tabular-nums">{value}</span>
     </div>
   );
@@ -264,12 +264,12 @@ export default function QuoteDocument({
         'bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm text-[10.5px]',
         'flex flex-col',
         'print:border-0 print:rounded-none print:overflow-visible print:min-h-[297mm]',
-        editMode ? 'ring-2 ring-[#9c27b0]/25' : '',
+        editMode ? 'ring-2 ring-primary/25' : '',
       ].join(' ')}
     >
 
       {/* ── Purple header ───────────────────────────────────────────────────── */}
-      <div className="bg-[#9c27b0] px-6 pt-6 pb-5 print-block flex-shrink-0">
+      <div className="bg-primary px-6 pt-6 pb-5 print-block flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="font-menu text-[8px] tracking-[0.25em] text-white/50 uppercase mb-1">Proposé par</p>
@@ -291,9 +291,9 @@ export default function QuoteDocument({
       </div>
 
       {/* ── Event block ─────────────────────────────────────────────────────── */}
-      <div className="px-6 py-4 bg-[#faf7fb] border-b border-[#9c27b0]/10 print-block flex-shrink-0">
+      <div className="px-6 py-4 bg-[#faf7fb] border-b border-primary/10 print-block flex-shrink-0">
         <div className="text-center">
-          <p className="font-menu text-[8px] tracking-[0.3em] text-[#9c27b0]/60 uppercase mb-1.5">Carte de réception</p>
+          <p className="font-menu text-[8px] tracking-[0.3em] text-primary/60 uppercase mb-1.5">Carte de réception</p>
           <p className="font-menu font-bold text-[15px] text-gray-900 leading-tight">
             <EditableText
               value={eventType} placeholder="Événement"
@@ -401,7 +401,7 @@ export default function QuoteDocument({
           </div>
 
           {/* ── Massive TTC block ──────────────────────────────────────────── */}
-          <div className="mt-4 bg-[#9c27b0] rounded-xl px-5 py-4 print:rounded-none print-block">
+          <div className="mt-4 bg-primary rounded-xl px-5 py-4 print:rounded-none print-block">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-[9px] tracking-[0.25em] text-white/65 uppercase font-semibold leading-none mb-1">
@@ -468,7 +468,7 @@ export default function QuoteDocument({
             <p className="font-menu text-[9px] text-gray-500">{companyName}</p>
           </div>
           <div>
-            <p className="text-[8px] tracking-[0.15em] text-[#9c27b0] uppercase mb-0.5 font-semibold">Bon pour accord</p>
+            <p className="text-[8px] tracking-[0.15em] text-primary uppercase mb-0.5 font-semibold">Bon pour accord</p>
             <p className="font-menu text-[8.5px] italic text-gray-400 mb-3">Lu et approuvé</p>
             <div className="h-12 border-b border-gray-300 mb-1.5" />
             <p className="font-menu text-[9px] text-gray-500">{clientName || 'Le client'}</p>

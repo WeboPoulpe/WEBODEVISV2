@@ -14,9 +14,9 @@ import { cn } from '@/lib/utils';
 const EVENT_TYPES = [
   { key: 'Mariage', label: 'Mariage', icon: Heart, color: 'from-pink-500 to-rose-500' },
   { key: 'Cocktail', label: 'Cocktail', icon: Wine, color: 'from-amber-500 to-orange-500' },
-  { key: 'Anniversaire', label: 'Anniversaire', icon: PartyPopper, color: 'from-purple-500 to-fuchsia-500' },
+  { key: 'Anniversaire', label: 'Anniversaire', icon: PartyPopper, color: 'from-primary-500 to-fuchsia-500' },
   { key: 'Séminaire', label: 'Séminaire', icon: Briefcase, color: 'from-slate-500 to-slate-700' },
-  { key: 'Gala', label: 'Gala', icon: Music, color: 'from-indigo-500 to-purple-600' },
+  { key: 'Gala', label: 'Gala', icon: Music, color: 'from-indigo-500 to-primary-600' },
   { key: 'Communion', label: 'Communion', icon: UtensilsCrossed, color: 'from-sky-400 to-blue-600' },
   { key: 'Baptême', label: 'Baptême', icon: UtensilsCrossed, color: 'from-cyan-400 to-teal-500' },
   { key: 'Autre', label: 'Autre', icon: Sparkles, color: 'from-gray-400 to-gray-600' },
@@ -151,7 +151,7 @@ export default function NouveauDevisOnboarding() {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-[#faf5ff] via-white to-[#fff7ed]">
+    <div className="min-h-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-[#fff7ed]">
       {/* Animated background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="blob blob-1" />
@@ -240,7 +240,7 @@ export default function NouveauDevisOnboarding() {
 
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden relative z-10 backdrop-blur-sm">
         {/* Top bar */}
-        <div className="bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-primary to-primary-dark px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/devis" className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
               <ArrowLeft className="h-4 w-4" />
@@ -274,13 +274,13 @@ export default function NouveauDevisOnboarding() {
                     onClick={() => setEventType(key)}
                     className={cn(
                       'flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all',
-                      eventType === key ? 'border-[#9c27b0] bg-[#faf5ff] shadow-sm scale-105' : 'border-gray-200 hover:border-gray-300',
+                      eventType === key ? 'border-primary bg-primary-50 shadow-sm scale-105' : 'border-gray-200 hover:border-gray-300',
                     )}
                   >
                     <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br', color)}>
                       <Icon className="h-5 w-5 text-white" />
                     </div>
-                    <span className={cn('text-xs font-medium', eventType === key ? 'text-[#9c27b0]' : 'text-gray-700')}>{label}</span>
+                    <span className={cn('text-xs font-medium', eventType === key ? 'text-primary' : 'text-gray-700')}>{label}</span>
                   </button>
                 ))}
               </div>
@@ -295,7 +295,7 @@ export default function NouveauDevisOnboarding() {
                     type="date"
                     value={eventDate}
                     onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
                 <div>
@@ -309,7 +309,7 @@ export default function NouveauDevisOnboarding() {
                     value={guestCount}
                     onChange={(e) => setGuestCount(e.target.value)}
                     placeholder="120"
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
               </div>
@@ -323,7 +323,7 @@ export default function NouveauDevisOnboarding() {
                   value={eventLocation}
                   onChange={(e) => setEventLocation(e.target.value)}
                   placeholder="Château de Villebougis"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
             </div>
@@ -342,7 +342,7 @@ export default function NouveauDevisOnboarding() {
                 <button
                   onClick={() => { setMode('existing'); resetClient(); }}
                   className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
-                    mode === 'existing' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700')}
+                    mode === 'existing' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700')}
                 >
                   <Search className="h-3.5 w-3.5" />
                   Client existant
@@ -350,7 +350,7 @@ export default function NouveauDevisOnboarding() {
                 <button
                   onClick={() => { setMode('new'); resetClient(); }}
                   className={cn('flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
-                    mode === 'new' ? 'bg-white shadow-sm text-[#9c27b0]' : 'text-gray-500 hover:text-gray-700')}
+                    mode === 'new' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700')}
                 >
                   <User className="h-3.5 w-3.5" />
                   Nouveau client
@@ -371,7 +371,7 @@ export default function NouveauDevisOnboarding() {
                         value={clientSearch}
                         onChange={(e) => searchCustomers(e.target.value)}
                         placeholder="Nom, email, entreprise…"
-                        className="w-full text-sm border border-gray-200 rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full text-sm border border-gray-200 rounded-lg pl-10 pr-3 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                     {showCustomerPicker && clientResults.length > 0 && (
@@ -380,9 +380,9 @@ export default function NouveauDevisOnboarding() {
                           <button
                             key={c.id}
                             onClick={() => selectCustomer(c)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#faf5ff] transition-colors text-left border-b border-gray-50 last:border-0"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-primary-50 transition-colors text-left border-b border-gray-50 last:border-0"
                           >
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center flex-shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
                               {c.customer_type === 'entreprise'
                                 ? <Building2 className="h-4 w-4 text-white" />
                                 : <span className="text-sm font-bold text-white">{(c.first_name?.[0] || c.email[0]).toUpperCase()}</span>}
@@ -403,7 +403,7 @@ export default function NouveauDevisOnboarding() {
                       <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-4 text-center">
                         <p className="text-xs text-gray-400">Aucun client trouvé.</p>
                         <button onClick={() => { setMode('new'); setClientName(clientSearch); setClientSearch(''); setShowCustomerPicker(false); }}
-                          className="text-xs text-[#9c27b0] hover:underline mt-1 font-medium">
+                          className="text-xs text-primary hover:underline mt-1 font-medium">
                           Créer « {clientSearch} » comme nouveau client
                         </button>
                       </div>
@@ -412,9 +412,9 @@ export default function NouveauDevisOnboarding() {
 
                   {/* Selected client preview */}
                   {selectedCustomerId && (
-                    <div className="bg-[#faf5ff] border border-[#9c27b0]/20 rounded-xl p-4">
+                    <div className="bg-primary-50 border border-primary/20 rounded-xl p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center flex-shrink-0">
                           <User className="h-5 w-5 text-white" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -441,7 +441,7 @@ export default function NouveauDevisOnboarding() {
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
                       placeholder="Jean Dupont"
-                      className="w-full text-base border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      className="w-full text-base border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
 
@@ -449,12 +449,12 @@ export default function NouveauDevisOnboarding() {
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
                       <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="jean@email.com"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Téléphone</label>
                       <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="06 12 34 56 78"
-                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                     </div>
                   </div>
                 </>
@@ -479,7 +479,7 @@ export default function NouveauDevisOnboarding() {
                     onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business')}
                     className={cn(
                       'flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all',
-                      template === t.key ? 'border-[#9c27b0] shadow-md scale-105' : 'border-gray-200 hover:border-gray-300',
+                      template === t.key ? 'border-primary shadow-md scale-105' : 'border-gray-200 hover:border-gray-300',
                     )}
                   >
                     <div className="w-16 h-16 rounded-2xl shadow-md" style={{ background: t.color }} />
@@ -499,21 +499,21 @@ export default function NouveauDevisOnboarding() {
                     onClick={() => setLanguage('fr')}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all',
-                      language === 'fr' ? 'border-[#9c27b0] bg-[#faf5ff] shadow-sm' : 'border-gray-200 hover:border-gray-300',
+                      language === 'fr' ? 'border-primary bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300',
                     )}
                   >
                     <span className="text-2xl">🇫🇷</span>
-                    <span className={cn('font-semibold text-sm', language === 'fr' ? 'text-[#9c27b0]' : 'text-gray-600')}>Français</span>
+                    <span className={cn('font-semibold text-sm', language === 'fr' ? 'text-primary' : 'text-gray-600')}>Français</span>
                   </button>
                   <button
                     onClick={() => setLanguage('en')}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all',
-                      language === 'en' ? 'border-[#9c27b0] bg-[#faf5ff] shadow-sm' : 'border-gray-200 hover:border-gray-300',
+                      language === 'en' ? 'border-primary bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300',
                     )}
                   >
                     <span className="text-2xl">🇬🇧</span>
-                    <span className={cn('font-semibold text-sm', language === 'en' ? 'text-[#9c27b0]' : 'text-gray-600')}>English</span>
+                    <span className={cn('font-semibold text-sm', language === 'en' ? 'text-primary' : 'text-gray-600')}>English</span>
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-400 italic mt-2">Les prestations utiliseront leur version traduite si disponible.</p>
@@ -543,7 +543,7 @@ export default function NouveauDevisOnboarding() {
             <button
               onClick={() => setStep(step + 1)}
               disabled={(step === 1 && !canNext1) || (step === 2 && !canNext2)}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
             >
               Suivant
               <ArrowRight className="h-4 w-4" />
@@ -552,7 +552,7 @@ export default function NouveauDevisOnboarding() {
             <button
               onClick={createQuote}
               disabled={creating || !canFinish}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white text-sm font-semibold rounded-xl hover:from-[#7b1fa2] hover:to-[#6a1080] disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white text-sm font-semibold rounded-xl hover:from-primary-dark hover:to-primary-darker disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
             >
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               Créer et ouvrir WeboWord

@@ -46,7 +46,7 @@ export default function OnboardingOverlay({ userId }: Props) {
         {/* Progress bar */}
         <div className="h-1 bg-gray-100">
           <div
-            className="h-1 bg-gradient-to-r from-[#6a1080] to-[#9c27b0] transition-all duration-500"
+            className="h-1 bg-gradient-to-r from-primary-darker to-primary transition-all duration-500"
             style={{ width: `${(step / 3) * 100}%` }}
           />
         </div>
@@ -55,7 +55,7 @@ export default function OnboardingOverlay({ userId }: Props) {
         {step === 1 && (
           <div className="p-8 text-center space-y-6">
             <div className="flex items-center justify-center">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#6a1080] to-[#9c27b0] flex items-center justify-center shadow-xl animate-[fadeInDown_0.4s_ease-out]">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-darker to-primary flex items-center justify-center shadow-xl animate-[fadeInDown_0.4s_ease-out]">
                 <span className="text-white font-bold text-4xl">W</span>
               </div>
             </div>
@@ -71,7 +71,7 @@ export default function OnboardingOverlay({ userId }: Props) {
                 { icon: '📅', label: 'Suivi événements' },
                 { icon: '👨‍🍳', label: 'Gestion staffing' },
               ].map((f) => (
-                <div key={f.label} className="p-3 bg-purple-50 rounded-xl">
+                <div key={f.label} className="p-3 bg-primary-50 rounded-xl">
                   <div className="text-2xl mb-1">{f.icon}</div>
                   <p className="text-xs font-medium text-gray-700">{f.label}</p>
                 </div>
@@ -79,7 +79,7 @@ export default function OnboardingOverlay({ userId }: Props) {
             </div>
             <button
               onClick={() => setStep(2)}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-[#9c27b0] text-white font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors animate-[fadeInUp_0.4s_ease-out_0.3s_both]"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-colors animate-[fadeInUp_0.4s_ease-out_0.3s_both]"
             >
               Commencer la configuration
               <ArrowRight className="h-4 w-4" />
@@ -91,7 +91,7 @@ export default function OnboardingOverlay({ userId }: Props) {
         {step === 2 && (
           <div className="p-8 space-y-5">
             <div>
-              <p className="text-xs font-semibold text-[#9c27b0] uppercase tracking-widest mb-1">Étape 2/3</p>
+              <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">Étape 2/3</p>
               <h2 className="text-xl font-bold text-gray-900">Votre profil traiteur</h2>
               <p className="text-sm text-gray-500 mt-1">Ces informations apparaîtront sur vos devis.</p>
             </div>
@@ -109,7 +109,7 @@ export default function OnboardingOverlay({ userId }: Props) {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Traiteur Dupont & Associés"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
 
@@ -120,7 +120,7 @@ export default function OnboardingOverlay({ userId }: Props) {
                 value={companyAddress}
                 onChange={(e) => setCompanyAddress(e.target.value)}
                 placeholder="12 rue de la Gastronomie, 75001 Paris"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
 
@@ -134,7 +134,7 @@ export default function OnboardingOverlay({ userId }: Props) {
                     onClick={() => setVatRate(r)}
                     className={[
                       'flex-1 py-2 rounded-lg text-sm font-medium transition-colors',
-                      vatRate === r ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                      vatRate === r ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
                     ].join(' ')}
                   >
                     {r === '0' ? 'Exo.' : `${r}%`}
@@ -152,7 +152,7 @@ export default function OnboardingOverlay({ userId }: Props) {
               </button>
               <button
                 onClick={() => setStep(3)}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#9c27b0] text-white font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition-colors"
               >
                 Continuer <ArrowRight className="h-4 w-4" />
               </button>
@@ -164,7 +164,7 @@ export default function OnboardingOverlay({ userId }: Props) {
         {step === 3 && (
           <div className="p-8 space-y-5">
             <div>
-              <p className="text-xs font-semibold text-[#9c27b0] uppercase tracking-widest mb-1">Étape 3/3</p>
+              <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">Étape 3/3</p>
               <h2 className="text-xl font-bold text-gray-900">Prêt à démarrer !</h2>
               <p className="text-sm text-gray-500 mt-1">Voici les 3 actions clés pour bien commencer.</p>
             </div>
@@ -203,7 +203,7 @@ export default function OnboardingOverlay({ userId }: Props) {
             <button
               onClick={complete}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-[#9c27b0] text-white font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors"
             >
               {saving ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Finalisation…</>

@@ -162,7 +162,7 @@ export default function CoursesGlobalesPage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             />
           </div>
           <div>
@@ -171,14 +171,14 @@ export default function CoursesGlobalesPage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             />
           </div>
         </div>
         <button
           onClick={search}
           disabled={!startDate || !endDate || loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBasket className="h-4 w-4" />}
           Calculer les besoins
@@ -229,7 +229,7 @@ export default function CoursesGlobalesPage() {
                       {grouped[sup].map((r) => (
                         <div key={r.ingredient_id} className="flex items-center gap-3 px-4 py-2.5">
                           <span className="flex-1 text-sm text-gray-800">{r.ingredient_name}</span>
-                          <span className="text-sm font-bold text-[#9c27b0] tabular-nums bg-purple-50 px-2 py-0.5 rounded-lg">
+                          <span className="text-sm font-bold text-primary tabular-nums bg-primary-50 px-2 py-0.5 rounded-lg">
                             {Math.round(r.total_qty * 100) / 100} {r.unit ?? ''}
                           </span>
                           {r.event_dates.length > 0 && (

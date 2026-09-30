@@ -116,7 +116,7 @@ export default function StockPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher un ingrédient…"
-              className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+              className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
           {filter !== 'all' && (
@@ -129,7 +129,7 @@ export default function StockPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center h-40">
-            <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+            <Loader2 className="h-6 w-6 text-primary animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -206,7 +206,7 @@ export default function StockPage() {
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-[#9c27b0]" />
+                <History className="h-4 w-4 text-primary" />
                 <h2 className="font-semibold text-sm">Historique — {historyModal.ingredient.name}</h2>
               </div>
               <button onClick={() => setHistoryModal({ open: false, ingredient: null, movements: [] })} className="p-1 text-gray-400 hover:bg-gray-100 rounded-lg">
@@ -309,7 +309,7 @@ function MovementModal({ ingredient, type, userId, onClose, onDone }: {
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder={type === 'adjust' ? 'Nouveau stock total' : '10'}
-              className="w-full text-base border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+              className="w-full text-base border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
             <p className="text-[10px] text-gray-400 mt-1">
               Stock actuel : {ingredient.stock_quantity ?? 0}{ingredient.unit || ''}
@@ -324,7 +324,7 @@ function MovementModal({ ingredient, type, userId, onClose, onDone }: {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={type === 'in' ? 'Livraison fournisseur X' : type === 'out' ? 'Consommation event Y' : 'Inventaire'}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
         </div>

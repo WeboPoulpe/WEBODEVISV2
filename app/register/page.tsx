@@ -6,7 +6,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* ── Left panel — branding ───────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#3a006f] via-[#6a1080] to-[#9c27b0] flex-col items-center justify-center p-12">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary-darker via-primary-darker to-primary flex-col items-center justify-center p-12">
         <div className="absolute top-[-80px] left-[-80px] w-72 h-72 rounded-full bg-white/5 animate-pulse" />
         <div className="absolute bottom-[-60px] right-[-60px] w-96 h-96 rounded-full bg-white/5 animate-pulse [animation-delay:1000ms]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-white/[0.03] blur-3xl" />
@@ -43,7 +43,7 @@ export default function RegisterPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-white">
         <div className="w-full max-w-sm">
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#9c27b0] mb-4 shadow-lg">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4 shadow-lg">
               <span className="text-white font-bold text-2xl">W</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">WeboDevis</h1>
@@ -57,7 +57,7 @@ export default function RegisterPage() {
             <RegisterForm />
             <p className="text-center text-xs text-gray-400">
               Déjà un compte ?{' '}
-              <a href="/login" className="text-[#9c27b0] hover:underline font-medium">
+              <a href="/login" className="text-primary hover:underline font-medium">
                 Se connecter
               </a>
             </p>

@@ -56,8 +56,8 @@ function quoteVariant(status: string): 'confirmed' | 'pending' | 'other' {
 }
 
 const EVENT_PILL: Record<string, string> = {
-  confirmed: 'bg-[#9c27b0] text-white',
-  pending:   'bg-white text-[#9c27b0] border border-[#9c27b0]/50',
+  confirmed: 'bg-primary text-white',
+  pending:   'bg-white text-primary border border-primary/50',
   other:     'bg-gray-100 text-gray-500 border border-gray-200',
 };
 
@@ -147,7 +147,7 @@ function EventSheet({
 
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-gray-700">
-          <CalendarDays className="h-4 w-4 text-[#9c27b0] flex-shrink-0" />
+          <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
           <span>
             {new Date(quote.event_date + 'T00:00:00').toLocaleDateString('fr-FR', {
               weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -158,13 +158,13 @@ function EventSheet({
         {/* Address */}
         {quote.client_address && (
           <div className="flex items-start gap-2 text-sm text-gray-700">
-            <MapPin className="h-4 w-4 text-[#9c27b0] flex-shrink-0 mt-0.5" />
+            <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
             {mapsUrl ? (
               <a
                 href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-[#9c27b0] hover:underline flex items-center gap-1 transition-colors"
+                className="hover:text-primary hover:underline flex items-center gap-1 transition-colors"
               >
                 {quote.client_address}
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
@@ -200,7 +200,7 @@ function EventSheet({
                       <p className="text-xs italic text-gray-400 mt-0.5 leading-relaxed">{s.description}</p>
                     )}
                     {s.category && (
-                      <span className="inline-block text-[10px] text-[#9c27b0] bg-[#f3e5f5] px-1.5 py-0.5 rounded mt-1">
+                      <span className="inline-block text-[10px] text-primary bg-primary-50 px-1.5 py-0.5 rounded mt-1">
                         {s.category}
                       </span>
                     )}
@@ -216,9 +216,9 @@ function EventSheet({
 
         {/* Total */}
         {quote.total_amount != null && (
-          <div className="flex items-center justify-between bg-[#f3e5f5]/40 rounded-xl px-4 py-3 border border-[#9c27b0]/10">
+          <div className="flex items-center justify-between bg-primary-50/40 rounded-xl px-4 py-3 border border-primary/10">
             <span className="text-sm font-medium text-gray-700">Total TTC</span>
-            <span className="font-bold text-[#9c27b0] text-base tabular-nums">
+            <span className="font-bold text-primary text-base tabular-nums">
               {formatCurrency(quote.total_amount)}
             </span>
           </div>
@@ -229,7 +229,7 @@ function EventSheet({
           {variant === 'confirmed' && (
             <Link
               href={`/evenements/${quote.id}`}
-              className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+              className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
             >
               <Eye className="h-4 w-4" />
               Gérer l&apos;événement
@@ -241,7 +241,7 @@ function EventSheet({
               'flex items-center justify-center gap-2 w-full py-2.5 text-sm font-semibold rounded-xl transition-colors',
               variant === 'confirmed'
                 ? 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-                : 'bg-[#9c27b0] text-white hover:bg-[#7b1fa2]',
+                : 'bg-primary text-white hover:bg-primary-dark',
             ].join(' ')}
           >
             <FileText className="h-4 w-4" />
@@ -279,7 +279,7 @@ function DayCell({
       className={[
         'min-h-[100px] p-1.5 border border-gray-100 flex flex-col gap-1 transition-colors',
         isCurrentMonth ? 'bg-white' : 'bg-gray-50/60',
-        isToday ? 'ring-2 ring-inset ring-[#9c27b0]/40' : '',
+        isToday ? 'ring-2 ring-inset ring-primary/40' : '',
       ].join(' ')}
     >
       {/* Day number */}
@@ -288,7 +288,7 @@ function DayCell({
           className={[
             'text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full',
             isToday
-              ? 'bg-[#9c27b0] text-white'
+              ? 'bg-primary text-white'
               : isCurrentMonth
               ? 'text-gray-800'
               : 'text-gray-300',
@@ -343,11 +343,11 @@ function Legend() {
   return (
     <div className="flex items-center gap-4 text-xs text-gray-500">
       <div className="flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded bg-[#9c27b0]" />
+        <span className="w-3 h-3 rounded bg-primary" />
         Accepté
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="w-3 h-3 rounded border border-[#9c27b0]/50 bg-white" />
+        <span className="w-3 h-3 rounded border border-primary/50 bg-white" />
         Brouillon / En attente / Envoyé
       </div>
       <div className="flex items-center gap-1.5">
@@ -440,7 +440,7 @@ export default function CalendrierPage() {
 
           {/* Title + nav */}
           <div className="flex items-center gap-3">
-            <CalendarDays className="h-5 w-5 text-[#9c27b0]" />
+            <CalendarDays className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-bold text-gray-900">Calendrier</h1>
             <div className="flex items-center gap-1 ml-2">
               <button
@@ -497,7 +497,7 @@ export default function CalendrierPage() {
                 onClick={() => setConfirmedOnly((v) => !v)}
                 className={[
                   'relative w-9 h-5 rounded-full transition-colors',
-                  confirmedOnly ? 'bg-[#9c27b0]' : 'bg-gray-200',
+                  confirmedOnly ? 'bg-primary' : 'bg-gray-200',
                 ].join(' ')}
               >
                 <span
@@ -581,7 +581,7 @@ export default function CalendrierPage() {
             </p>
             <Link
               href="/devis/nouveau"
-              className="mt-1 text-xs text-[#9c27b0] hover:underline font-medium"
+              className="mt-1 text-xs text-primary hover:underline font-medium"
             >
               + Créer un devis
             </Link>

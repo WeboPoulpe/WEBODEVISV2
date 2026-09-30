@@ -32,7 +32,7 @@ const FONT_FAMILIES = [
 ]
 
 const labelCls = 'block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5'
-const inputCls = 'w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-purple-400'
+const inputCls = 'w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-400'
 
 export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -157,16 +157,16 @@ export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
         </div>
         <div className="w-px h-5 bg-gray-200" />
         <button onClick={() => addElement('text')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border bg-white hover:bg-purple-50 hover:border-purple-300 text-sm text-gray-700 transition-colors">
-          <Type className="w-3.5 h-3.5 text-purple-500" /> Texte
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border bg-white hover:bg-primary-50 hover:border-primary-300 text-sm text-gray-700 transition-colors">
+          <Type className="w-3.5 h-3.5 text-primary-500" /> Texte
         </button>
         <button onClick={() => addElement('photo')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border bg-white hover:bg-purple-50 hover:border-purple-300 text-sm text-gray-700 transition-colors">
-          <ImagePlus className="w-3.5 h-3.5 text-purple-500" /> Photo
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border bg-white hover:bg-primary-50 hover:border-primary-300 text-sm text-gray-700 transition-colors">
+          <ImagePlus className="w-3.5 h-3.5 text-primary-500" /> Photo
         </button>
         <button onClick={() => addElement('shape')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border bg-white hover:bg-purple-50 hover:border-purple-300 text-sm text-gray-700 transition-colors">
-          <Square className="w-3.5 h-3.5 text-purple-500" /> Forme
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border bg-white hover:bg-primary-50 hover:border-primary-300 text-sm text-gray-700 transition-colors">
+          <Square className="w-3.5 h-3.5 text-primary-500" /> Forme
         </button>
 
         {selected && (
@@ -322,7 +322,7 @@ export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
                 <textarea
                   value={selected.content}
                   onChange={e => upd(selected.id, { content: e.target.value })}
-                  className="w-full border rounded-lg px-2 py-1.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  className="w-full border rounded-lg px-2 py-1.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary-400"
                   rows={2}
                 />
               </div>
@@ -354,7 +354,7 @@ export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
                   ] as { icon: React.ReactNode; prop: keyof CoverPageLayoutElement; on: string; off: string; label: string }[]).map(({ icon, prop, on, off, label }) => (
                     <button key={prop} title={label}
                       onClick={() => upd(selected.id, { [prop]: (selected[prop] as string) === on ? off : on })}
-                      className={`p-1.5 rounded border transition-colors ${(selected[prop] as string) === on ? 'bg-purple-100 border-purple-400 text-purple-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      className={`p-1.5 rounded border transition-colors ${(selected[prop] as string) === on ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                       {icon}
                     </button>
                   ))}
@@ -366,7 +366,7 @@ export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
                   ]).map(({ icon, value }) => (
                     <button key={value} title={value}
                       onClick={() => upd(selected.id, { textAlign: value as 'left' | 'center' | 'right' })}
-                      className={`p-1.5 rounded border transition-colors ${(selected.textAlign ?? 'left') === value ? 'bg-purple-100 border-purple-400 text-purple-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                      className={`p-1.5 rounded border transition-colors ${(selected.textAlign ?? 'left') === value ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                       {icon}
                     </button>
                   ))}
@@ -413,8 +413,8 @@ export function CoverPageBuilder({ config, onChange, backgroundHtml }: Props) {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => { setAddingPhotoId(selected.id); setShowPhotoBuilder(true) }}
-                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border bg-white hover:bg-purple-50 text-sm transition-colors w-full">
-                <ImagePlus className="w-4 h-4 text-purple-600" />
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border bg-white hover:bg-primary-50 text-sm transition-colors w-full">
+                <ImagePlus className="w-4 h-4 text-primary-600" />
                 {selected.content ? 'Changer la photo' : 'Ajouter une photo'}
               </button>
               <div className="grid grid-cols-3 gap-3">

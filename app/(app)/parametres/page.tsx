@@ -34,7 +34,7 @@ function Field({ label, value, onChange, placeholder, type = 'text' }: {
         type={type} value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
       />
     </div>
   );
@@ -46,7 +46,7 @@ function SaveBtn({ loading, saved, onClick }: { loading: boolean; saved: boolean
     <button
       onClick={onClick}
       disabled={loading}
-      className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+      className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
       {loading ? 'Sauvegarde…' : saved ? 'Enregistré !' : 'Enregistrer'}
@@ -171,7 +171,7 @@ export default function ParametresPage() {
   if (loadingProfile) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -186,8 +186,8 @@ export default function ParametresPage() {
       {/* ── Section 1: Identité ─────────────────────────────────────────────── */}
       <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="p-2 bg-[#f3e5f5] rounded-lg">
-            <Building2 className="h-4 w-4 text-[#9c27b0]" />
+          <div className="p-2 bg-primary-50 rounded-lg">
+            <Building2 className="h-4 w-4 text-primary" />
           </div>
           <div>
             <h2 className="font-semibold text-gray-900 text-sm">Identité de l&apos;entreprise</h2>
@@ -230,8 +230,8 @@ export default function ParametresPage() {
       {/* ── Section 2: Logo ─────────────────────────────────────────────────── */}
       <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="p-2 bg-[#f3e5f5] rounded-lg">
-            <Upload className="h-4 w-4 text-[#9c27b0]" />
+          <div className="p-2 bg-primary-50 rounded-lg">
+            <Upload className="h-4 w-4 text-primary" />
           </div>
           <div>
             <h2 className="font-semibold text-gray-900 text-sm">Logo</h2>
@@ -269,10 +269,10 @@ export default function ParametresPage() {
             <button
               onClick={() => logoInputRef.current?.click()}
               disabled={uploadingLogo}
-              className="flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed border-gray-200 rounded-xl p-8 hover:border-[#9c27b0]/40 hover:bg-[#f3e5f5]/20 transition-all"
+              className="flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed border-gray-200 rounded-xl p-8 hover:border-primary/40 hover:bg-primary-50/20 transition-all"
             >
               {uploadingLogo
-                ? <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+                ? <Loader2 className="h-6 w-6 text-primary animate-spin" />
                 : <Upload className="h-6 w-6 text-gray-300" />}
               <span className="text-sm text-gray-500">
                 {uploadingLogo ? 'Upload en cours…' : 'Cliquer pour uploader votre logo'}
@@ -292,8 +292,8 @@ export default function ParametresPage() {
       {/* ── Section 3: CGV ──────────────────────────────────────────────────── */}
       <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="p-2 bg-[#f3e5f5] rounded-lg">
-            <FileText className="h-4 w-4 text-[#9c27b0]" />
+          <div className="p-2 bg-primary-50 rounded-lg">
+            <FileText className="h-4 w-4 text-primary" />
           </div>
           <div>
             <h2 className="font-semibold text-gray-900 text-sm">Conditions Générales de Vente</h2>

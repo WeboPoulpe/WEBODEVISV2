@@ -59,7 +59,7 @@ function MiniBarChart({ quotes }: { quotes: QuoteSummary[] }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-700">CA généré (6 derniers mois)</p>
-        <p className="text-sm font-bold text-[#9c27b0]">{formatCurrency(totalCA)}</p>
+        <p className="text-sm font-bold text-primary">{formatCurrency(totalCA)}</p>
       </div>
       <div className="flex items-end gap-1.5" style={{ height: 64 }}>
         {months.map((m) => {
@@ -68,12 +68,12 @@ function MiniBarChart({ quotes }: { quotes: QuoteSummary[] }) {
             <div key={`${m.year}-${m.month}`} className="flex-1 flex flex-col items-center justify-end gap-1 group h-full">
               <div className="w-full flex items-end" style={{ height: 48 }}>
                 <div
-                  className="w-full bg-[#9c27b0]/25 rounded-t hover:bg-[#9c27b0]/60 transition-colors cursor-default relative group/bar"
+                  className="w-full bg-primary/25 rounded-t hover:bg-primary/60 transition-colors cursor-default relative group/bar"
                   style={{ height: `${Math.max(pct, m.total > 0 ? 12 : 2)}%`, minHeight: m.total > 0 ? 4 : 2 }}
                   title={m.total > 0 ? formatCurrency(m.total) : 'Aucun'}
                 >
                   {m.total > 0 && (
-                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] text-[#9c27b0] font-medium whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity pointer-events-none">
+                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] text-primary font-medium whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity pointer-events-none">
                       {formatCurrency(m.total)}
                     </span>
                   )}
@@ -185,7 +185,7 @@ function CustomerSheet({
           <div className="flex gap-2">
             {(['particulier', 'entreprise'] as const).map((t) => (
               <button key={t} onClick={() => setForm({ ...form, customer_type: t })}
-                className={['flex-1 py-2.5 rounded-lg text-sm font-medium capitalize transition-colors', form.customer_type === t ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
+                className={['flex-1 py-2.5 rounded-lg text-sm font-medium capitalize transition-colors', form.customer_type === t ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
                 {t}
               </button>
             ))}
@@ -208,7 +208,7 @@ function CustomerSheet({
             </div>
           )}
           <button onClick={handleSaveInfos} disabled={saving}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors">
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Sauvegarde…' : saveOk ? '✓ Sauvegardé' : 'Sauvegarder'}
           </button>
@@ -218,16 +218,16 @@ function CustomerSheet({
       {tab === 'notes' && (
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <StickyNote className="h-4 w-4 text-[#9c27b0]" />
+            <StickyNote className="h-4 w-4 text-primary" />
             <span>Notes commerciales — suivi, relances, contexte</span>
           </div>
           <textarea
             value={notes} onChange={(e) => setNotes(e.target.value)} rows={12}
             placeholder={'Appel du 12/03 — Intéressé par un package mariage.\nRappeler en juin pour confirmer la date.\nContact via Instagram…'}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors leading-relaxed"
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors leading-relaxed"
           />
           <button onClick={handleSaveNotes} disabled={savingNotes}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors">
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors">
             {savingNotes ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {savingNotes ? 'Sauvegarde…' : 'Sauvegarder les notes'}
           </button>
@@ -238,7 +238,7 @@ function CustomerSheet({
       {tab === 'historique' && (
         <div className="p-6 space-y-5">
           {loadingQuotes ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" /></div>
+            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>
           ) : (
             <>
               <MiniBarChart quotes={quotes} />
@@ -263,7 +263,7 @@ function CustomerSheet({
                         {q.total_amount && (
                           <p className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">{formatCurrency(q.total_amount)}</p>
                         )}
-                        <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="text-gray-300 hover:text-[#9c27b0] transition-colors flex-shrink-0">
+                        <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="text-gray-300 hover:text-primary transition-colors flex-shrink-0">
                           <ChevronRight className="h-4 w-4" />
                         </Link>
                       </div>
@@ -286,10 +286,10 @@ function CustomerCard({ c, onOpen }: { c: Customer; onOpen: () => void }) {
   const isHabitual = (c.quote_count ?? 0) >= 3;
 
   return (
-    <div onClick={onOpen} className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-[#9c27b0]/30 hover:shadow-sm transition-all cursor-pointer">
+    <div onClick={onOpen} className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
       <div className="flex items-start gap-3">
-        <div className={['w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0', isEntreprise ? 'bg-blue-50' : 'bg-[#f3e5f5]'].join(' ')}>
-          {isEntreprise ? <Building2 className="h-5 w-5 text-blue-500" /> : <User className="h-5 w-5 text-[#9c27b0]" />}
+        <div className={['w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0', isEntreprise ? 'bg-blue-50' : 'bg-primary-50'].join(' ')}>
+          {isEntreprise ? <Building2 className="h-5 w-5 text-blue-500" /> : <User className="h-5 w-5 text-primary" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -300,12 +300,12 @@ function CustomerCard({ c, onOpen }: { c: Customer; onOpen: () => void }) {
               </span>
             )}
           </div>
-          <p className={`text-xs mt-0.5 capitalize font-medium ${isEntreprise ? 'text-blue-500' : 'text-[#9c27b0]'}`}>{c.customer_type}</p>
+          <p className={`text-xs mt-0.5 capitalize font-medium ${isEntreprise ? 'text-blue-500' : 'text-primary'}`}>{c.customer_type}</p>
         </div>
         <div className="flex-shrink-0 text-center">
-          <div className={['w-10 h-10 rounded-xl flex flex-col items-center justify-center', (c.quote_count ?? 0) > 0 ? 'bg-[#f3e5f5]' : 'bg-gray-100'].join(' ')}>
-            <FileText className={`h-3.5 w-3.5 ${(c.quote_count ?? 0) > 0 ? 'text-[#9c27b0]' : 'text-gray-400'}`} />
-            <span className={`text-[10px] font-bold leading-none mt-0.5 ${(c.quote_count ?? 0) > 0 ? 'text-[#9c27b0]' : 'text-gray-400'}`}>{c.quote_count ?? 0}</span>
+          <div className={['w-10 h-10 rounded-xl flex flex-col items-center justify-center', (c.quote_count ?? 0) > 0 ? 'bg-primary-50' : 'bg-gray-100'].join(' ')}>
+            <FileText className={`h-3.5 w-3.5 ${(c.quote_count ?? 0) > 0 ? 'text-primary' : 'text-gray-400'}`} />
+            <span className={`text-[10px] font-bold leading-none mt-0.5 ${(c.quote_count ?? 0) > 0 ? 'text-primary' : 'text-gray-400'}`}>{c.quote_count ?? 0}</span>
           </div>
           <p className="text-[10px] text-gray-400 mt-0.5">devis</p>
         </div>
@@ -315,11 +315,11 @@ function CustomerCard({ c, onOpen }: { c: Customer; onOpen: () => void }) {
         {c.phone && <p className="flex items-center gap-2 text-sm text-gray-500"><Phone className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" /><span>{c.phone}</span></p>}
       </div>
       <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-        <span className="text-xs text-[#9c27b0] font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="text-xs text-primary font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <TrendingUp className="h-3 w-3" />Ouvrir la fiche
         </span>
         <Link href={`/devis/nouveau?client=${c.id}`} onClick={(e) => e.stopPropagation()}
-          className="text-xs font-medium text-gray-500 hover:text-[#9c27b0] flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          className="text-xs font-medium text-gray-500 hover:text-primary flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Plus className="h-3 w-3" />Nouveau devis
         </Link>
       </div>
@@ -390,7 +390,7 @@ export default function ClientsPage() {
             {!loading && habitualsCount > 0 && <span className="ml-2 text-amber-600 font-medium">· {habitualsCount} habitué{habitualsCount > 1 ? 's' : ''} ⭐</span>}
           </p>
         </div>
-        <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors self-start sm:self-auto">
+        <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors self-start sm:self-auto">
           <Plus className="h-4 w-4" />Nouveau client
         </Link>
       </div>
@@ -399,12 +399,12 @@ export default function ClientsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom ou email…"
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors" />
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-0.5">
           {FILTERS.map((f) => (
             <button key={f} onClick={() => setFilter(f)}
-              className={['flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', filter === f ? 'bg-[#9c27b0] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
+              className={['flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', filter === f ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
               {f}
             </button>
           ))}
@@ -418,7 +418,7 @@ export default function ClientsPage() {
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4"><Users className="h-8 w-8 text-gray-400" /></div>
           <p className="text-gray-500 font-medium mb-1">Aucun client trouvé</p>
           <p className="text-sm text-gray-400 mb-4">{search ? 'Essayez d\'autres termes.' : 'Ajoutez votre premier client pour commencer.'}</p>
-          {!search && <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"><Plus className="h-4 w-4" />Ajouter un client</Link>}
+          {!search && <Link href="/clients/nouveau" className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"><Plus className="h-4 w-4" />Ajouter un client</Link>}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -445,7 +445,7 @@ function SField({ label, value, onChange, type = 'text' }: { label: string; valu
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors" />
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
     </div>
   );
 }

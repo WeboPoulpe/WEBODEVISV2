@@ -34,9 +34,9 @@ function StepIndicator() {
                 className={[
                   'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200',
                   done
-                    ? 'bg-[#9c27b0] text-white'
+                    ? 'bg-primary text-white'
                     : active
-                    ? 'bg-[#9c27b0] text-white ring-4 ring-[#9c27b0]/20'
+                    ? 'bg-primary text-white ring-4 ring-primary/20'
                     : 'bg-gray-100 text-gray-400',
                 ].join(' ')}
               >
@@ -45,7 +45,7 @@ function StepIndicator() {
               <span
                 className={[
                   'text-[11px] font-medium whitespace-nowrap hidden sm:block',
-                  active ? 'text-[#9c27b0]' : done ? 'text-gray-600' : 'text-gray-400',
+                  active ? 'text-primary' : done ? 'text-gray-600' : 'text-gray-400',
                 ].join(' ')}
               >
                 {step.label}
@@ -57,7 +57,7 @@ function StepIndicator() {
               <div
                 className={[
                   'h-0.5 w-12 sm:w-20 mx-2 mb-5 rounded-full transition-all duration-300',
-                  done ? 'bg-[#9c27b0]' : 'bg-gray-200',
+                  done ? 'bg-primary' : 'bg-gray-200',
                 ].join(' ')}
               />
             )}

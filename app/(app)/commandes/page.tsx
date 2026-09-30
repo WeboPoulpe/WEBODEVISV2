@@ -87,7 +87,7 @@ export default function CommandesPage() {
             </div>
           </div>
           <button onClick={() => setCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2]">
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark">
             <Plus className="h-4 w-4" />Nouvelle commande
           </button>
         </div>
@@ -110,19 +110,19 @@ export default function CommandesPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher fournisseur…"
-            className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+            className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
         </div>
       </div>
 
       {/* List */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" /></div>
+          <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 text-primary animate-spin" /></div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <ShoppingCart className="h-10 w-10 text-gray-300 mx-auto mb-3" />
             <p className="text-sm text-gray-500">Aucune commande</p>
-            <button onClick={() => setCreateModal(true)} className="mt-3 text-xs text-[#9c27b0] hover:underline font-medium">+ Créer une commande</button>
+            <button onClick={() => setCreateModal(true)} className="mt-3 text-xs text-primary hover:underline font-medium">+ Créer une commande</button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -154,7 +154,7 @@ export default function CommandesPage() {
                     <div className="text-right flex-shrink-0">
                       <p className="text-lg font-bold text-gray-900 tabular-nums">{formatCurrency(order.total_amount || 0)}</p>
                       <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingOrder(order)} title="Détails" className="p-1 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded">
+                        <button onClick={() => setEditingOrder(order)} title="Détails" className="p-1 text-gray-400 hover:text-primary hover:bg-primary-50 rounded">
                           <FileText className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -406,7 +406,7 @@ function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Fournisseur *</label>
             <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]">
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
               <option value="">— Choisir un fournisseur —</option>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -419,13 +419,13 @@ function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <input value={search} onChange={(e) => { setSearch(e.target.value); setShowPicker(true); }}
                 placeholder="Rechercher un ingrédient…"
-                className="w-full text-sm border border-dashed border-[#9c27b0]/30 bg-[#faf5ff] rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30" />
+                className="w-full text-sm border border-dashed border-primary/30 bg-primary-50 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
             {showPicker && filteredIngs.length > 0 && (
               <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                 {filteredIngs.map((ing) => (
                   <button key={ing.id} onClick={() => addItem(ing)}
-                    className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-[#faf5ff] text-left border-b border-gray-50 last:border-0">
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-primary-50 text-left border-b border-gray-50 last:border-0">
                     <span className="text-sm font-medium text-gray-900">{ing.name}</span>
                     <span className="text-xs text-gray-400">{ing.unit || ''} · {(ing.volume_unit_price ?? 0).toFixed(2)}€</span>
                   </button>
@@ -469,14 +469,14 @@ function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notes</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
               placeholder="Pour le mariage Dupont du 14 juin…"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]" />
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Annuler</button>
           <button onClick={save} disabled={saving || !supplierId || items.length === 0}
-            className="flex items-center gap-2 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50">
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Créer la commande
           </button>

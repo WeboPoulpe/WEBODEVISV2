@@ -236,7 +236,7 @@ export default function LocationGlobalePage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             />
           </div>
           <div>
@@ -245,14 +245,14 @@ export default function LocationGlobalePage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             />
           </div>
         </div>
         <button
           onClick={search}
           disabled={!startDate || !endDate || loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
           Calculer les besoins
@@ -261,14 +261,14 @@ export default function LocationGlobalePage() {
 
       {/* Events summary */}
       {searched && !loading && quotes.length > 0 && (
-        <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-4">
-          <p className="text-xs font-semibold text-[#9c27b0] uppercase tracking-widest mb-2">
+        <div className="bg-primary-50/50 border border-primary-100 rounded-xl p-4">
+          <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
             {quotes.length} événement{quotes.length > 1 ? 's' : ''} sur la période
           </p>
           <div className="flex flex-wrap gap-2">
             {quotes.map((q) => (
-              <span key={q.id} className="inline-flex items-center gap-1.5 text-xs bg-white border border-purple-200 text-gray-700 px-2.5 py-1 rounded-lg">
-                <CalendarDays className="h-3 w-3 text-[#9c27b0]" />
+              <span key={q.id} className="inline-flex items-center gap-1.5 text-xs bg-white border border-primary-200 text-gray-700 px-2.5 py-1 rounded-lg">
+                <CalendarDays className="h-3 w-3 text-primary" />
                 {fmtDate(q.event_date)} — {q.client_name} ({q.guest_count ?? '?'} conv.)
               </span>
             ))}
@@ -291,11 +291,11 @@ export default function LocationGlobalePage() {
               <p className="text-xs text-gray-500">
                 {rows.length} article{rows.length !== 1 ? 's' : ''} — {supplierKeys.length} fournisseur{supplierKeys.length !== 1 ? 's' : ''}
                 {' — '}
-                <span className="font-bold text-[#9c27b0]">{money(grandTotal)}</span>
+                <span className="font-bold text-primary">{money(grandTotal)}</span>
               </p>
               <button
                 onClick={printGeneral}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-50 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary-50 transition-colors"
               >
                 <Printer className="h-3.5 w-3.5" />
                 Bon général PDF
@@ -317,12 +317,12 @@ export default function LocationGlobalePage() {
                       <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                         {grouped[sup].length} article{grouped[sup].length !== 1 ? 's' : ''}
                       </span>
-                      <span className="text-xs font-bold text-[#9c27b0]">{money(supTotal)}</span>
+                      <span className="text-xs font-bold text-primary">{money(supTotal)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); printSupplier(sup); }}
-                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#9c27b0] border border-[#9c27b0]/20 rounded-lg hover:bg-purple-50 transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-primary border border-primary/20 rounded-lg hover:bg-primary-50 transition-colors"
                         title={`Bon de commande ${sup}`}
                       >
                         <Printer className="h-3 w-3" />
@@ -338,7 +338,7 @@ export default function LocationGlobalePage() {
                       {grouped[sup].map((r, i) => (
                         <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                           <span className="flex-1 text-sm text-gray-800">{r.material_name}</span>
-                          <span className="text-sm font-bold text-[#9c27b0] tabular-nums bg-purple-50 px-2 py-0.5 rounded-lg">
+                          <span className="text-sm font-bold text-primary tabular-nums bg-primary-50 px-2 py-0.5 rounded-lg">
                             {r.total_qty} {r.unit ?? ''}
                           </span>
                           <span className="text-xs font-semibold text-gray-600 tabular-nums">{money(r.total_cost)}</span>

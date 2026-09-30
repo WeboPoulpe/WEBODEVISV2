@@ -219,7 +219,7 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-gray-500">
             <span>{done}/{items.length} tâche{items.length > 1 ? 's' : ''}</span>
-            <span className="font-bold text-[#9c27b0]">{pct}%</span>
+            <span className="font-bold text-primary">{pct}%</span>
           </div>
           <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
             <div
@@ -232,8 +232,8 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
 
       {items.length === 0 ? (
         <div className="text-center py-10">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-50 flex items-center justify-center mx-auto mb-3">
-            <CheckSquare className="h-6 w-6 text-[#9c27b0]" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-50 flex items-center justify-center mx-auto mb-3">
+            <CheckSquare className="h-6 w-6 text-primary" />
           </div>
           <p className="text-sm font-medium text-gray-500">Aucune tâche</p>
           <p className="text-xs text-gray-400 mt-1">Ajoutez votre première tâche ci-dessous</p>
@@ -247,14 +247,14 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
                 'flex items-center gap-3 rounded-xl px-4 py-3 group transition-all duration-200 border',
                 item.done
                   ? 'bg-emerald-50/50 border-emerald-200/50'
-                  : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+                  : 'bg-white border-gray-100 hover:border-primary-200/60 hover:shadow-sm',
               ].join(' ')}
             >
               <input
                 type="checkbox"
                 checked={item.done}
                 onChange={() => toggle(item.id)}
-                className="h-4.5 w-4.5 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                className="h-4.5 w-4.5 rounded accent-primary cursor-pointer flex-shrink-0"
               />
               <span className={['flex-1 text-sm font-medium', item.done ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
                 {item.text}
@@ -282,12 +282,12 @@ function ChecklistTab({ quote, onUpdate }: { quote: Quote; onUpdate: (items: Che
           onChange={(e) => setNewText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
           placeholder="Ajouter une tâche…"
-          className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] focus:bg-white transition-all"
+          className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
         />
         <button
           onClick={add}
           disabled={!newText.trim()}
-          className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-200/50 disabled:opacity-40 transition-all duration-200"
+          className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-primary-200/50 disabled:opacity-40 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           Ajouter
@@ -573,13 +573,13 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 border',
             checked.has(s.id)
               ? 'bg-emerald-50/50 border-emerald-200/50'
-              : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+              : 'bg-white border-gray-100 hover:border-primary-200/60 hover:shadow-sm',
           ].join(' ')}>
             <input
               type="checkbox"
               checked={checked.has(s.id)}
               onChange={() => toggle(s.id)}
-              className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+              className="h-4 w-4 rounded accent-primary cursor-pointer flex-shrink-0"
             />
             <div className="flex-1 min-w-0">
               <p className={['text-sm font-medium leading-snug', checked.has(s.id) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
@@ -587,7 +587,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               </p>
               {s.description && <p className="text-xs text-gray-400 italic truncate">{s.description}</p>}
             </div>
-            <span className="text-xs font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 px-2.5 py-1 rounded-lg border border-purple-100/50">
+            <span className="text-xs font-bold text-primary tabular-nums flex-shrink-0 bg-gradient-to-r from-primary-50 to-primary-50 px-2.5 py-1 rounded-lg border border-primary-100/50">
               x{s.quantity}
             </span>
           </div>
@@ -611,13 +611,13 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
       {isEmpty && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-50 flex items-center justify-center mx-auto mb-4">
-            <Package className="h-7 w-7 text-[#9c27b0]" />
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-50 flex items-center justify-center mx-auto mb-4">
+            <Package className="h-7 w-7 text-primary" />
           </div>
           <p className="text-sm font-medium text-gray-500">Aucun matériel</p>
           <p className="text-xs text-gray-400 mt-1.5 max-w-xs mx-auto">
             Ajoutez du matériel ci-dessous ou configurez les templates dans{' '}
-            <Link href="/location-templates" className="text-[#9c27b0] hover:underline font-medium">Configuration</Link>.
+            <Link href="/location-templates" className="text-primary hover:underline font-medium">Configuration</Link>.
           </p>
         </div>
       )}
@@ -636,18 +636,18 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 border',
                 checked.has(item.id)
                   ? 'bg-emerald-50/50 border-emerald-200/50'
-                  : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+                  : 'bg-white border-gray-100 hover:border-primary-200/60 hover:shadow-sm',
               ].join(' ')}>
                 <input
                   type="checkbox"
                   checked={checked.has(item.id)}
                   onChange={() => toggle(item.id)}
-                  className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                  className="h-4 w-4 rounded accent-primary cursor-pointer flex-shrink-0"
                 />
                 <p className={['flex-1 text-sm font-medium', checked.has(item.id) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
                   {item.name}
                 </p>
-                <span className="text-xs font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 px-2.5 py-1 rounded-lg border border-purple-100/50">
+                <span className="text-xs font-bold text-primary tabular-nums flex-shrink-0 bg-gradient-to-r from-primary-50 to-primary-50 px-2.5 py-1 rounded-lg border border-primary-100/50">
                   {item.qty} {item.unit}
                 </span>
                 <button onClick={() => removeCustom(item.id)} className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
@@ -673,18 +673,18 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 border',
                 checked.has(item.key)
                   ? 'bg-emerald-50/50 border-emerald-200/50'
-                  : 'bg-white border-gray-100 hover:border-purple-200/60 hover:shadow-sm',
+                  : 'bg-white border-gray-100 hover:border-primary-200/60 hover:shadow-sm',
               ].join(' ')}>
                 <input
                   type="checkbox"
                   checked={checked.has(item.key)}
                   onChange={() => toggle(item.key)}
-                  className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                  className="h-4 w-4 rounded accent-primary cursor-pointer flex-shrink-0"
                 />
                 <p className={['flex-1 text-sm font-medium', checked.has(item.key) ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
                   {item.name}
                 </p>
-                <span className="text-xs font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 px-2.5 py-1 rounded-lg border border-purple-100/50">
+                <span className="text-xs font-bold text-primary tabular-nums flex-shrink-0 bg-gradient-to-r from-primary-50 to-primary-50 px-2.5 py-1 rounded-lg border border-primary-100/50">
                   {item.qty} {item.unit ?? ''}
                 </span>
               </div>
@@ -706,8 +706,8 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               className={[
                 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200',
                 showCatalog
-                  ? 'bg-[#9c27b0] text-white shadow-md shadow-purple-200/50'
-                  : 'text-[#9c27b0] border border-[#9c27b0]/30 hover:bg-purple-50',
+                  ? 'bg-primary text-white shadow-md shadow-primary-200/50'
+                  : 'text-primary border border-primary/30 hover:bg-primary-50',
               ].join(' ')}
             >
               <Search className="h-3.5 w-3.5" />
@@ -718,7 +718,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
         {/* Catalog picker */}
         {showCatalog && (
-          <div className="rounded-xl bg-white border border-purple-200/60 overflow-hidden shadow-sm">
+          <div className="rounded-xl bg-white border border-primary-200/60 overflow-hidden shadow-sm">
             <div className="p-3 border-b border-gray-100">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
@@ -727,7 +727,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
                   placeholder="Rechercher une prestation…"
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] focus:bg-white transition-all"
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
                   autoFocus
                 />
               </div>
@@ -739,13 +739,13 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 <button
                   key={p.id}
                   onClick={() => { addFromCatalog(p); setCatalogSearch(''); setShowCatalog(false); }}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-purple-50/50 transition-colors text-left group"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary-50/50 transition-colors text-left group"
                 >
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-gray-800">{p.name}</span>
                     {p.category && <span className="ml-2 text-xs text-gray-400">{p.category}</span>}
                   </div>
-                  <span className="flex items-center gap-1 text-xs font-semibold text-[#9c27b0] opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                     <Plus className="h-3 w-3" />Ajouter
                   </span>
                 </button>
@@ -761,7 +761,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCustom()}
             placeholder="Nom du matériel…"
-            className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] transition-all"
+            className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
           <input
             type="number"
@@ -769,19 +769,19 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             onChange={(e) => setNewQty(e.target.value)}
             min="0"
             step="1"
-            className="w-20 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] transition-all"
+            className="w-20 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
           <input
             type="text"
             value={newUnit}
             onChange={(e) => setNewUnit(e.target.value)}
             placeholder="unité"
-            className="w-20 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] transition-all"
+            className="w-20 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
           <button
             onClick={addCustom}
             disabled={!newName.trim() || saving}
-            className="flex items-center justify-center w-11 h-11 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white rounded-xl hover:shadow-lg hover:shadow-purple-200/50 disabled:opacity-40 transition-all duration-200"
+            className="flex items-center justify-center w-11 h-11 bg-gradient-to-r from-primary to-primary-dark text-white rounded-xl hover:shadow-lg hover:shadow-primary-200/50 disabled:opacity-40 transition-all duration-200"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           </button>
@@ -789,15 +789,15 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
       </div>
 
       {/* ── Location de matériel ─────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 to-pink-50/30 p-5 space-y-5">
+      <div className="rounded-2xl border border-primary-200/60 bg-gradient-to-br from-primary-50/60 to-primary-50/30 p-5 space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] flex items-center justify-center shadow-md shadow-purple-200/50">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-md shadow-primary-200/50">
               <Package className="h-4 w-4 text-white" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-800">Location de matériel</h3>
-              <Link href="/location-templates" className="text-[10px] text-[#9c27b0] hover:underline">Gérer les templates</Link>
+              <Link href="/location-templates" className="text-[10px] text-primary hover:underline">Gérer les templates</Link>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -805,7 +805,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               <button
                 onClick={generateFromTemplates}
                 disabled={generatingRentals}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#9c27b0] bg-white border border-purple-200/60 rounded-xl hover:bg-purple-50 hover:shadow-sm transition-all duration-200"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-primary bg-white border border-primary-200/60 rounded-xl hover:bg-primary-50 hover:shadow-sm transition-all duration-200"
               >
                 {generatingRentals ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
                 Générer ({quote.guest_count ?? 1} conv.)
@@ -822,7 +822,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             )}
             <button
               onClick={() => { resetRentalForm(); setShowRentalForm(true); }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] rounded-xl hover:shadow-lg hover:shadow-purple-200/50 transition-all duration-200"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gradient-to-r from-primary to-primary-dark rounded-xl hover:shadow-lg hover:shadow-primary-200/50 transition-all duration-200"
             >
               <Plus className="h-3.5 w-3.5" />
               Ajouter
@@ -847,7 +847,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                   <div key={sup} className="space-y-2">
                     <div className="flex justify-between items-center px-1">
                       <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{sup}</p>
-                      <span className="text-xs font-bold text-[#9c27b0] bg-white px-2.5 py-1 rounded-lg border border-purple-100/50">
+                      <span className="text-xs font-bold text-primary bg-white px-2.5 py-1 rounded-lg border border-primary-100/50">
                         {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(total)}
                       </span>
                     </div>
@@ -859,7 +859,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                             'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 group border',
                             r.ordered
                               ? 'bg-emerald-50/80 border-emerald-200/60'
-                              : 'bg-white/80 border-white hover:border-purple-200/60 hover:shadow-sm',
+                              : 'bg-white/80 border-white hover:border-primary-200/60 hover:shadow-sm',
                           ].join(' ')}
                         >
                           <input
@@ -878,7 +878,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                                 {r.material_name}
                               </p>
                               {r.source === 'template' && (
-                                <span className="text-[9px] bg-gradient-to-r from-purple-100 to-pink-50 text-[#9c27b0] px-2 py-0.5 rounded-full font-semibold border border-purple-200/40">auto</span>
+                                <span className="text-[9px] bg-gradient-to-r from-primary-100 to-primary-50 text-primary px-2 py-0.5 rounded-full font-semibold border border-primary-200/40">auto</span>
                               )}
                               {r.ordered && (
                                 <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">commandé</span>
@@ -889,7 +889,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                           <span className="text-xs text-gray-500 flex-shrink-0 font-medium">{r.qty}{r.unit ? ` ${r.unit}` : ''}</span>
                           <span className={[
                             'text-xs font-bold tabular-nums flex-shrink-0 px-2.5 py-1 rounded-lg',
-                            r.ordered ? 'text-emerald-700 bg-emerald-100/80' : 'text-[#9c27b0] bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100/50',
+                            r.ordered ? 'text-emerald-700 bg-emerald-100/80' : 'text-primary bg-gradient-to-r from-primary-50 to-primary-50 border border-primary-100/50',
                           ].join(' ')}>
                             {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(r.qty * r.price_per_unit)}
                           </span>
@@ -906,7 +906,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                             </button>
                             <button
                               onClick={() => startEditRental(r)}
-                              className="p-1.5 text-gray-300 hover:text-[#9c27b0] rounded-lg hover:bg-purple-50 transition-all"
+                              className="p-1.5 text-gray-300 hover:text-primary rounded-lg hover:bg-primary-50 transition-all"
                             >
                               <Pencil className="h-3 w-3" />
                             </button>
@@ -924,8 +924,8 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 );
               })}
               {/* Grand total */}
-              <div className="flex justify-end pt-3 border-t border-purple-200/40">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] shadow-lg shadow-purple-200/40">
+              <div className="flex justify-end pt-3 border-t border-primary-200/40">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary-200/40">
                   <span className="text-xs text-white/70 font-medium">Total</span>
                   <span className="text-sm font-bold text-white tabular-nums">
                     {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(grandTotal)}
@@ -941,7 +941,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
             <p className="text-xs text-gray-500 font-medium">Aucun matériel à louer</p>
             {rentalTemplates.length === 0 && (
               <p className="text-[10px] text-gray-400 mt-1.5">
-                Configurez vos templates dans <Link href="/location-templates" className="text-[#9c27b0] hover:underline font-medium">Configuration</Link>
+                Configurez vos templates dans <Link href="/location-templates" className="text-primary hover:underline font-medium">Configuration</Link>
               </p>
             )}
           </div>
@@ -949,32 +949,32 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
 
         {/* Add / Edit rental form */}
         {showRentalForm && (
-          <div className="bg-white rounded-2xl border border-purple-200/60 p-4 space-y-3 shadow-sm">
+          <div className="bg-white rounded-2xl border border-primary-200/60 p-4 space-y-3 shadow-sm">
             <h4 className="text-sm font-semibold text-gray-700">{editingRentalId ? 'Modifier' : 'Nouvel'} article</h4>
             <div className="grid grid-cols-2 gap-2.5">
               <input
                 value={rName}
                 onChange={(e) => setRName(e.target.value)}
                 placeholder="Nom du matériel *"
-                className="col-span-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
+                className="col-span-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 focus:bg-white transition-all"
               />
               <input
                 type="number" min="0" step="1"
                 value={rQty}
                 onChange={(e) => setRQty(e.target.value)}
                 placeholder="Quantité"
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 focus:bg-white transition-all"
               />
               <input
                 value={rUnit}
                 onChange={(e) => setRUnit(e.target.value)}
                 placeholder="Unité"
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 focus:bg-white transition-all"
               />
               <select
                 value={rSupplierId}
                 onChange={(e) => setRSupplierId(e.target.value)}
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 focus:bg-white transition-all"
               >
                 <option value="">Fournisseur (optionnel)</option>
                 {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -984,13 +984,13 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
                 value={rPrice}
                 onChange={(e) => setRPrice(e.target.value)}
                 placeholder="Prix unitaire HT"
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 focus:bg-white transition-all"
               />
               <input
                 value={rNotes}
                 onChange={(e) => setRNotes(e.target.value)}
                 placeholder="Notes (optionnel)"
-                className="col-span-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/20 focus:border-[#9c27b0] bg-gray-50 focus:bg-white transition-all"
+                className="col-span-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 focus:bg-white transition-all"
               />
             </div>
             <div className="flex justify-end gap-2 pt-1">
@@ -1000,7 +1000,7 @@ function MaterielTab({ quote, onUpdate }: { quote: Quote; onUpdate: (mats: Mater
               <button
                 onClick={saveRental}
                 disabled={!rName.trim() || savingRental}
-                className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-[#9c27b0] to-[#7b1fa2] text-white text-xs font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-200/50 disabled:opacity-40 transition-all duration-200"
+                className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-primary to-primary-dark text-white text-xs font-semibold rounded-xl hover:shadow-lg hover:shadow-primary-200/50 disabled:opacity-40 transition-all duration-200"
               >
                 {savingRental ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 {editingRentalId ? 'Modifier' : 'Enregistrer'}
@@ -1127,7 +1127,7 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
 
   if (loading || generating) return (
     <div className="flex flex-col items-center justify-center py-8 gap-2">
-      <Loader2 className="h-5 w-5 animate-spin text-[#9c27b0]" />
+      <Loader2 className="h-5 w-5 animate-spin text-primary" />
       {generating && <p className="text-xs text-gray-400">Calcul depuis les prestations…</p>}
     </div>
   );
@@ -1151,7 +1151,7 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
           <ShoppingCart className="h-8 w-8 text-gray-300 mx-auto mb-2" />
           <p className="text-sm text-gray-400">Aucun article dans la liste de courses.</p>
           <p className="text-xs text-gray-400 mt-1">
-            Ajoutez des ingrédients depuis l&apos;onglet <span className="text-[#9c27b0] font-medium">Prépa & Achats</span>
+            Ajoutez des ingrédients depuis l&apos;onglet <span className="text-primary font-medium">Prépa & Achats</span>
             {' '}ou liez des ingrédients à vos prestations.
           </p>
         </div>
@@ -1161,10 +1161,10 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
           <div>
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>{done}/{items.length} article{items.length > 1 ? 's' : ''} coché{done > 1 ? 's' : ''}</span>
-              <span className="font-medium text-[#9c27b0]">{pct}%</span>
+              <span className="font-medium text-primary">{pct}%</span>
             </div>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-2 bg-[#9c27b0] rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+              <div className="h-2 bg-primary rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
             </div>
           </div>
 
@@ -1178,7 +1178,7 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                     type="checkbox"
                     checked={item.checked}
                     onChange={(e) => toggle(item.id, e.target.checked)}
-                    className="h-4 w-4 rounded accent-[#9c27b0] cursor-pointer flex-shrink-0"
+                    className="h-4 w-4 rounded accent-primary cursor-pointer flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <p className={['text-sm font-medium leading-snug', item.checked ? 'line-through text-gray-400' : 'text-gray-800'].join(' ')}>
@@ -1186,7 +1186,7 @@ function CoursesTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                     </p>
                     {item.notes && <p className="text-xs text-gray-400 italic truncate">{item.notes}</p>}
                   </div>
-                  <span className="text-sm font-bold text-[#9c27b0] tabular-nums flex-shrink-0 bg-purple-50 px-2 py-0.5 rounded-lg">
+                  <span className="text-sm font-bold text-primary tabular-nums flex-shrink-0 bg-primary-50 px-2 py-0.5 rounded-lg">
                     {item.quantity} {item.unit ?? item.ingredient.unit ?? ''}
                   </span>
                 </div>
@@ -1292,7 +1292,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
     }, {}),
   [items]);
 
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-[#9c27b0]" /></div>;
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-4">
@@ -1302,14 +1302,14 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
         <div className="flex gap-2">
           <Link
             href={`/evenements/${quoteId}/courses`}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary-50 transition-colors"
           >
             <Smartphone className="h-3.5 w-3.5" />
             Mode courses
           </Link>
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#9c27b0] text-white rounded-lg hover:bg-[#7b1fa2] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Ajouter
@@ -1337,7 +1337,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-800">{item.ingredient.name}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-[#9c27b0] font-semibold">{item.quantity} {item.unit ?? item.ingredient.unit ?? ''}</span>
+                  <span className="text-xs text-primary font-semibold">{item.quantity} {item.unit ?? item.ingredient.unit ?? ''}</span>
                   {item.supplier && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{item.supplier.name}</span>}
                 </div>
                 {item.notes && <p className="text-xs text-gray-400 italic mt-0.5">{item.notes}</p>}
@@ -1368,7 +1368,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                     {its.map((it) => (
                       <div key={it.id} className="flex items-center gap-2 text-sm text-gray-800">
                         <span className="flex-1">{it.ingredient.name}</span>
-                        <span className="font-semibold text-[#9c27b0]">{it.quantity} {it.unit ?? it.ingredient.unit ?? ''}</span>
+                        <span className="font-semibold text-primary">{it.quantity} {it.unit ?? it.ingredient.unit ?? ''}</span>
                       </div>
                     ))}
                   </div>
@@ -1402,7 +1402,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Rechercher un ingrédient…"
-                      className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                      className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                       autoFocus
                     />
                   </div>
@@ -1414,7 +1414,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                         <button
                           key={ing.id}
                           onClick={() => { setSelected(ing); setUnit(ing.unit ?? 'Unité'); }}
-                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-purple-50 text-left transition-colors"
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-primary-50 text-left transition-colors"
                         >
                           {ing.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -1435,17 +1435,17 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                 </>
               ) : (
                 <>
-                  <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl">
+                  <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-xl">
                     {selected.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={selected.image_url} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
                     ) : (
-                      <div className="h-10 w-10 rounded-lg bg-white border border-purple-100 flex items-center justify-center flex-shrink-0">
-                        <UtensilsCrossed className="h-4 w-4 text-[#9c27b0]" />
+                      <div className="h-10 w-10 rounded-lg bg-white border border-primary-100 flex items-center justify-center flex-shrink-0">
+                        <UtensilsCrossed className="h-4 w-4 text-primary" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#9c27b0]">{selected.name}</p>
+                      <p className="text-sm font-semibold text-primary">{selected.name}</p>
                       {selected.category && <p className="text-xs text-gray-500">{selected.category}</p>}
                     </div>
                     <button onClick={() => setSelected(null)} className="p-1 text-gray-400 hover:text-gray-600">
@@ -1462,7 +1462,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                         onChange={(e) => setQty(e.target.value)}
                         min="0"
                         step="0.1"
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                     <div>
@@ -1472,7 +1472,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                         value={unit}
                         onChange={(e) => setUnit(e.target.value)}
                         placeholder="kg, L, pièce…"
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1482,7 +1482,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                     <select
                       value={supplierId}
                       onChange={(e) => setSupplierId(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
                     >
                       <option value="">— Aucun fournisseur —</option>
                       {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1496,7 +1496,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                       onChange={(e) => setNotes(e.target.value)}
                       rows={2}
                       placeholder="Instructions particulières…"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
                 </>
@@ -1508,7 +1508,7 @@ function AchatsTab({ quoteId }: { quoteId: string }) {
                 <button
                   onClick={addItem}
                   disabled={saving}
-                  className="flex items-center gap-1.5 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
                 >
                   {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   Ajouter
@@ -1641,7 +1641,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
   const alreadyAssigned = new Set(assignments.map((a) => a.extra_id));
   const available = allExtras.filter((e) => !alreadyAssigned.has(e.id));
 
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-[#9c27b0]" /></div>;
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-4">
@@ -1668,7 +1668,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
           <button
             onClick={() => setShowAdd(true)}
             disabled={available.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#9c27b0] text-white rounded-lg hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Assigner
@@ -1683,7 +1683,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
           <p className="text-sm text-gray-400">Aucun extra assigné à cet événement.</p>
           {allExtras.length === 0 && (
             <p className="text-xs text-gray-400 mt-1">
-              <Link href="/extras" className="text-[#9c27b0] hover:underline">Créer des extras</Link> d&apos;abord.
+              <Link href="/extras" className="text-primary hover:underline">Créer des extras</Link> d&apos;abord.
             </p>
           )}
         </div>
@@ -1705,7 +1705,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                   <div key={a.id} className="bg-white rounded-xl p-3 shadow-sm space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#7b1fa2] to-[#ab47bc] flex items-center justify-center flex-shrink-0">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-dark to-primary-light flex items-center justify-center flex-shrink-0">
                           <span className="text-white font-bold text-xs">
                             {a.extra.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
                           </span>
@@ -1730,7 +1730,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                         type="checkbox"
                         checked={a.assign_courses}
                         onChange={(e) => toggleCourses(a.id, e.target.checked)}
-                        className="h-3 w-3 rounded accent-[#9c27b0]"
+                        className="h-3 w-3 rounded accent-primary"
                       />
                       <span className="text-[10px] text-gray-500">Mission courses</span>
                     </label>
@@ -1742,7 +1742,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                           defaultValue={a.mission_notes ?? ''}
                           id={`notes-${a.id}`}
                           rows={3}
-                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30"
                           placeholder="Notes de mission…"
                           autoFocus
                         />
@@ -1753,7 +1753,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                               saveNotes(a.id, el.value);
                             }}
                             disabled={savingId === a.id}
-                            className="flex items-center gap-1 px-2 py-1 bg-[#9c27b0] text-white text-[10px] font-medium rounded-lg"
+                            className="flex items-center gap-1 px-2 py-1 bg-primary text-white text-[10px] font-medium rounded-lg"
                           >
                             {savingId === a.id ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Check className="h-2.5 w-2.5" />}
                             Sauvegarder
@@ -1764,7 +1764,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                     ) : (
                       <button
                         onClick={() => setEditingNotes(a.id)}
-                        className="w-full text-left text-[10px] text-gray-400 hover:text-[#9c27b0] flex items-center gap-1 transition-colors"
+                        className="w-full text-left text-[10px] text-gray-400 hover:text-primary flex items-center gap-1 transition-colors"
                       >
                         <Pencil className="h-2.5 w-2.5 flex-shrink-0" />
                         {a.mission_notes ? <span className="truncate italic">{a.mission_notes}</span> : 'Ajouter des notes…'}
@@ -1813,7 +1813,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                 <select
                   value={selExtra}
                   onChange={(e) => setSelExtra(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] bg-white"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
                 >
                   <option value="">— Sélectionner —</option>
                   {available.map((e) => <option key={e.id} value={e.id}>{e.name}{e.role ? ` (${e.role})` : ''}</option>)}
@@ -1826,7 +1826,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                   type="time"
                   value={arrTime}
                   onChange={(e) => setArrTime(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
               <div>
@@ -1836,7 +1836,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                   onChange={(e) => setMissionNotes(e.target.value)}
                   rows={3}
                   placeholder="Arrivée 17h, tenue noire exigée…"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
               </div>
               <label className="flex items-center gap-2.5 cursor-pointer">
@@ -1844,7 +1844,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
                   type="checkbox"
                   checked={assignCourses}
                   onChange={(e) => setAssignCourses(e.target.checked)}
-                  className="h-4 w-4 rounded accent-[#9c27b0]"
+                  className="h-4 w-4 rounded accent-primary"
                 />
                 <span className="text-sm text-gray-700">Assigner la mission de courses</span>
               </label>
@@ -1854,7 +1854,7 @@ function StaffingTab({ quoteId, quote }: { quoteId: string; quote: Quote }) {
               <button
                 onClick={addAssignment}
                 disabled={!selExtra || addSaving}
-                className="flex items-center gap-1.5 px-5 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1.5 px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark disabled:opacity-50 transition-colors"
               >
                 {addSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 Assigner
@@ -1894,7 +1894,7 @@ export default function EvenementPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 text-[#9c27b0] animate-spin" />
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
       </div>
     );
   }
@@ -1911,17 +1911,17 @@ export default function EvenementPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50/30">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* ── Back ──────────────────────────────────────────────────────────── */}
-        <Link href="/calendrier" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#9c27b0] transition-colors group">
+        <Link href="/calendrier" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-primary transition-colors group">
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
           Calendrier
         </Link>
 
         {/* ── Hero header card ──────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/80 backdrop-blur-sm shadow-lg shadow-purple-100/40">
+        <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/80 backdrop-blur-sm shadow-lg shadow-primary-100/40">
           {/* Decorative gradient bar */}
           <div className="absolute inset-x-0 top-0 h-1" style={{ background: 'linear-gradient(90deg, #9c27b0, #e040fb, #7b1fa2)' }} />
 
@@ -1930,7 +1930,7 @@ export default function EvenementPage() {
               <div className="space-y-3">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{quote.client_name || 'Événement'}</h1>
-                  <span className="inline-block mt-1.5 px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-gradient-to-r from-purple-100 to-pink-50 text-[#9c27b0] border border-purple-200/50">
+                  <span className="inline-block mt-1.5 px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-gradient-to-r from-primary-100 to-primary-50 text-primary border border-primary-200/50">
                     {quote.event_type}
                   </span>
                 </div>
@@ -1938,8 +1938,8 @@ export default function EvenementPage() {
                 {/* Info chips */}
                 <div className="flex flex-wrap gap-2">
                   {displayDate && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50/80 border border-purple-100/50">
-                      <Calendar className="h-3.5 w-3.5 text-[#9c27b0]" />
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50/80 border border-primary-100/50">
+                      <Calendar className="h-3.5 w-3.5 text-primary" />
                       <span className="text-xs font-medium text-gray-700 capitalize">{displayDate}</span>
                     </div>
                   )}
@@ -1961,7 +1961,7 @@ export default function EvenementPage() {
               {/* Price + actions */}
               <div className="text-right flex-shrink-0 space-y-2">
                 {quote.total_amount != null && (
-                  <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] shadow-lg shadow-purple-200/50">
+                  <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary-200/50">
                     <CreditCard className="h-4 w-4 text-white/70" />
                     <span className="text-lg font-bold text-white tabular-nums">{formatCurrency(quote.total_amount)}</span>
                   </div>
@@ -1973,7 +1973,7 @@ export default function EvenementPage() {
                     <Wallet className="h-3 w-3" />
                     Finance
                   </button>
-                  <Link href={`/devis/${quote.id}/modifier`} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#9c27b0] transition-colors">
+                  <Link href={`/devis/${quote.id}/modifier`} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition-colors">
                     <Eye className="h-3 w-3" />
                     Voir le devis
                   </Link>
@@ -1992,7 +1992,7 @@ export default function EvenementPage() {
               className={[
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200',
                 tab === key
-                  ? 'bg-gradient-to-br from-[#9c27b0] to-[#7b1fa2] text-white shadow-md shadow-purple-200/50'
+                  ? 'bg-gradient-to-br from-primary to-primary-dark text-white shadow-md shadow-primary-200/50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
               ].join(' ')}
             >

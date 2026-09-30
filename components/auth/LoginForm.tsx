@@ -68,7 +68,7 @@ export default function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="vous@exemple.fr"
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
         />
       </div>
 
@@ -82,7 +82,7 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+            className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
           <button
             type="button"
@@ -100,7 +100,7 @@ export default function LoginForm() {
           type="button"
           onClick={handleForgot}
           disabled={resetting}
-          className="text-xs text-[#9c27b0] hover:underline font-medium disabled:opacity-60"
+          className="text-xs text-primary hover:underline font-medium disabled:opacity-60"
         >
           {resetting ? 'Envoi…' : 'Mot de passe oublié ?'}
         </button>
@@ -122,7 +122,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading || !email || !password}
-        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? (
           <>

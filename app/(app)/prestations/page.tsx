@@ -118,7 +118,7 @@ function CsvImportModal({
       <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <UploadCloud className="h-4 w-4 text-[#9c27b0]" />
+            <UploadCloud className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-gray-900">Import CSV</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
@@ -148,7 +148,7 @@ function CsvImportModal({
               {r.sub_category && (
                 <span className="text-xs text-gray-400">{r.sub_category}</span>
               )}
-              <span className="text-xs text-[#9c27b0] font-medium capitalize">{r.category}</span>
+              <span className="text-xs text-primary font-medium capitalize">{r.category}</span>
             </div>
           ))}
         </div>
@@ -160,7 +160,7 @@ function CsvImportModal({
           <button
             onClick={onConfirm}
             disabled={importing || toImport.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
           >
             {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
             Importer {toImport.length} prestation{toImport.length !== 1 ? 's' : ''}
@@ -181,7 +181,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
 
 function categoryColor(cat: string | null) {
   if (!cat) return { bg: 'bg-gray-100', text: 'text-gray-500' };
-  return CATEGORY_COLORS[cat.toLowerCase()] ?? { bg: 'bg-[#f3e5f5]', text: 'text-[#9c27b0]' };
+  return CATEGORY_COLORS[cat.toLowerCase()] ?? { bg: 'bg-primary-50', text: 'text-primary' };
 }
 
 // ── Shared field component ────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ const Field = ({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
     />
   </div>
 );
@@ -225,7 +225,7 @@ function DevisLinePreview({ name, price, description }: {
         </div>
       ) : (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
-          <div className="bg-[#9c27b0] px-4 py-2">
+          <div className="bg-primary px-4 py-2">
             <p className="text-[8px] tracking-[0.2em] text-white/60 uppercase">Extrait du devis</p>
           </div>
           <div className="px-4 py-3">
@@ -239,7 +239,7 @@ function DevisLinePreview({ name, price, description }: {
               </span>
             </div>
             {description && (
-              <div className="mt-1 pl-2 border-l-2 border-[#9c27b0]/15">
+              <div className="mt-1 pl-2 border-l-2 border-primary/15">
                 <div
                   className="font-menu text-[9.5px] italic text-gray-500 leading-relaxed description-html"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(description) }}
@@ -312,13 +312,13 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
     <div className="border border-gray-100 rounded-xl p-3 space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Carrot className="h-3.5 w-3.5 text-[#9c27b0]" />
+          <Carrot className="h-3.5 w-3.5 text-primary" />
           <p className="text-xs font-semibold text-gray-700">Ingrédients (par personne)</p>
         </div>
         <button
           type="button"
           onClick={() => setShowAdd((v) => !v)}
-          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#9c27b0] border border-[#9c27b0]/30 rounded-lg hover:bg-purple-50 transition-colors"
+          className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary-50 transition-colors"
         >
           <Plus className="h-3 w-3" />
           Ajouter
@@ -334,7 +334,7 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
           {links.map((l) => (
             <div key={l.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
               <span className="flex-1 text-gray-700 font-medium truncate">{l.ingredient.name}</span>
-              <span className="text-[#9c27b0] font-bold tabular-nums">{l.qty_per_person} {l.unit ?? l.ingredient.unit ?? ''}/pers.</span>
+              <span className="text-primary font-bold tabular-nums">{l.qty_per_person} {l.unit ?? l.ingredient.unit ?? ''}/pers.</span>
               <button type="button" onClick={() => removeLink(l.id)} className="p-0.5 text-gray-300 hover:text-red-500 transition-colors">
                 <X className="h-3 w-3" />
               </button>
@@ -352,7 +352,7 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
               value={selected ? selected.name : search}
               onChange={(e) => { setSelected(null); setSearch(e.target.value); }}
               placeholder="Rechercher un ingrédient…"
-              className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+              className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
             />
           </div>
           {!selected && options.length > 0 && (
@@ -361,7 +361,7 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
                 <button
                   key={o.id} type="button"
                   onClick={() => { setSelected(o); setSearch(o.name); setOptions([]); }}
-                  className="w-full text-left px-2 py-1.5 text-xs hover:bg-purple-50 transition-colors border-b border-gray-50 last:border-0"
+                  className="w-full text-left px-2 py-1.5 text-xs hover:bg-primary-50 transition-colors border-b border-gray-50 last:border-0"
                 >
                   {o.name} {o.unit ? <span className="text-gray-400">({o.unit})</span> : null}
                 </button>
@@ -374,11 +374,11 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
               <input
                 type="number" min="0" step="0.1" value={qty}
                 onChange={(e) => setQty(e.target.value)}
-                className="w-20 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9c27b0]/30"
+                className="w-20 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30"
               />
               <button
                 type="button" onClick={addLink} disabled={saving}
-                className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold bg-[#9c27b0] text-white rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+                className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
               >
                 {saving ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Check className="h-2.5 w-2.5" />}
                 Lier
@@ -619,7 +619,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center justify-between">
                   Catégorie
-                  <button type="button" onClick={() => setCreatingCat((v) => !v)} className="text-[10px] text-[#9c27b0] hover:underline font-normal">
+                  <button type="button" onClick={() => setCreatingCat((v) => !v)} className="text-[10px] text-primary hover:underline font-normal">
                     {creatingCat ? 'Annuler' : '+ Nouvelle'}
                   </button>
                 </label>
@@ -631,9 +631,9 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                       onChange={(e) => setNewCatName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') createCategory(); if (e.key === 'Escape') setCreatingCat(false); }}
                       placeholder="Nom de la catégorie…"
-                      className="flex-1 min-w-0 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
+                      className="flex-1 min-w-0 px-3 py-2.5 border border-primary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
-                    <button type="button" onClick={createCategory} className="flex-shrink-0 px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
+                    <button type="button" onClick={createCategory} className="flex-shrink-0 px-3 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary-dark">
                       <Check className="h-4 w-4" />
                     </button>
                   </div>
@@ -647,7 +647,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                       setCategory(cat?.name || '');
                       setSubCategory('');
                     }}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                   >
                     <option value="">— Aucune —</option>
                     {dbCategories.map(c => (
@@ -664,7 +664,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center justify-between">
                   Sous-catégorie
                   {categoryId && (
-                    <button type="button" onClick={() => setCreatingSubCat((v) => !v)} className="text-[10px] text-[#9c27b0] hover:underline font-normal">
+                    <button type="button" onClick={() => setCreatingSubCat((v) => !v)} className="text-[10px] text-primary hover:underline font-normal">
                       {creatingSubCat ? 'Annuler' : '+ Nouvelle'}
                     </button>
                   )}
@@ -677,9 +677,9 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                       onChange={(e) => setNewSubCatName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') createSubCategory(); if (e.key === 'Escape') setCreatingSubCat(false); }}
                       placeholder="Nom de la sous-catégorie…"
-                      className="flex-1 min-w-0 px-3 py-2.5 border border-[#9c27b0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30"
+                      className="flex-1 min-w-0 px-3 py-2.5 border border-primary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
-                    <button type="button" onClick={createSubCategory} className="flex-shrink-0 px-3 py-2 bg-[#9c27b0] text-white text-sm rounded-lg hover:bg-[#7b1fa2]">
+                    <button type="button" onClick={createSubCategory} className="flex-shrink-0 px-3 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary-dark">
                       <Check className="h-4 w-4" />
                     </button>
                   </div>
@@ -692,7 +692,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                       setSubCategory(sub?.name || '');
                     }}
                     disabled={!categoryId}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors disabled:bg-gray-50 disabled:text-gray-400"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:bg-gray-50 disabled:text-gray-400"
                   >
                     <option value="">— Aucune —</option>
                     {subcategoriesFor(categoryId).map((s) => (
@@ -740,11 +740,11 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                   type="checkbox"
                   checked={syncDrafts}
                   onChange={(e) => setSyncDrafts(e.target.checked)}
-                  className="w-4 h-4 accent-[#9c27b0] rounded"
+                  className="w-4 h-4 accent-primary rounded"
                 />
                 <span className="text-sm text-gray-600">
                   Mettre à jour{' '}
-                  <span className="font-semibold text-[#9c27b0]">
+                  <span className="font-semibold text-primary">
                     {draftCount} devis brouillon{draftCount > 1 ? 's' : ''}
                   </span>{' '}
                   contenant cette prestation
@@ -770,7 +770,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                   onClick={handleSaveAndWebo}
                   disabled={loading || !name.trim() || !price}
                   title="Enregistrer et styler dans WeboWord"
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#9c27b0] border border-[#9c27b0]/40 rounded-lg hover:bg-[#9c27b0]/5 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary border border-primary/40 rounded-lg hover:bg-primary/5 disabled:opacity-50 transition-colors"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
                   Styler dans WeboWord
@@ -778,7 +778,7 @@ function PrestationModal({ initial, onClose, onSaved }: ModalProps) {
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-semibold rounded-lg hover:bg-[#7b1fa2] disabled:opacity-60 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                   {initial ? 'Enregistrer' : 'Ajouter'}
@@ -805,7 +805,7 @@ function PrestationCard({
 }) {
   const colors = categoryColor(p.category);
   return (
-    <div className="group bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#9c27b0]/30 hover:shadow-sm transition-all">
+    <div className="group bg-white border border-gray-200 rounded-2xl p-4 hover:border-primary/30 hover:shadow-sm transition-all">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-gray-900 truncate">
@@ -825,14 +825,14 @@ function PrestationCard({
           <button
             onClick={onEdit}
             title="Modifier"
-            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"
+            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onDuplicate}
             title="Dupliquer"
-            className="p-1.5 text-gray-400 hover:text-[#9c27b0] hover:bg-[#f3e5f5] rounded-lg transition-colors"
+            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
@@ -1037,7 +1037,7 @@ export default function PrestationsPage() {
           </button>
           <button
             onClick={() => setModal({ open: true, editing: null })}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#9c27b0] text-white text-sm font-semibold rounded-xl hover:bg-[#7b1fa2] transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-dark transition-colors"
           >
             <Plus className="h-4 w-4" />
             Nouvelle prestation
@@ -1054,9 +1054,9 @@ export default function PrestationsPage() {
             className={[
               'flex items-center gap-1.5 flex-shrink-0 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors',
               activeTab === key
-                ? 'bg-[#9c27b0] text-white shadow-sm'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-[#9c27b0]/30 hover:bg-[#f3e5f5]/50',
-              isCustom && activeTab !== key ? 'border-dashed border-[#9c27b0]/30' : '',
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-primary/30 hover:bg-primary-50/50',
+              isCustom && activeTab !== key ? 'border-dashed border-primary/30' : '',
             ].join(' ')}
             title={isCustom ? 'Catégorie perso' : undefined}
           >
@@ -1076,8 +1076,8 @@ export default function PrestationsPage() {
               className={[
                 'flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                 activeSub === key
-                  ? 'bg-[#9c27b0]/15 text-[#9c27b0] border border-[#9c27b0]/40'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:border-[#9c27b0]/30 hover:bg-[#f3e5f5]/50',
+                  ? 'bg-primary/15 text-primary border border-primary/40'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-primary/30 hover:bg-primary-50/50',
               ].join(' ')}
             >
               {label}
@@ -1093,7 +1093,7 @@ export default function PrestationsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher une prestation…"
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0] transition-colors"
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
         />
       </div>
 
@@ -1123,7 +1123,7 @@ export default function PrestationsPage() {
           {!search && (
             <button
               onClick={() => setModal({ open: true, editing: null })}
-              className="flex items-center gap-2 px-4 py-2 bg-[#9c27b0] text-white text-sm font-medium rounded-xl hover:bg-[#7b1fa2] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"
             >
               <Plus className="h-4 w-4" />
               Ajouter une prestation

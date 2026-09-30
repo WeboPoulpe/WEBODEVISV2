@@ -124,7 +124,7 @@ export default function RichTextEditor({
       className={[
         'p-1.5 rounded transition-colors',
         active.has(listKey ?? cmd)
-          ? 'bg-[#9c27b0] text-white'
+          ? 'bg-primary text-white'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
       ].join(' ')}
     >
@@ -133,7 +133,7 @@ export default function RichTextEditor({
   );
 
   return (
-    <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-[#9c27b0]/30 focus-within:border-[#9c27b0] transition-colors overflow-hidden">
+    <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary transition-colors overflow-hidden">
 
       {/* ── Toolbar ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
@@ -146,7 +146,7 @@ export default function RichTextEditor({
           type="button"
           title="Structurer automatiquement le texte"
           onMouseDown={(e) => { e.preventDefault(); autoStructure(); }}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-[#9c27b0]/70 hover:bg-[#f3e5f5] hover:text-[#9c27b0] transition-colors"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-primary/70 hover:bg-primary-50 hover:text-primary transition-colors"
         >
           <Wand2 className="h-3.5 w-3.5" />
           Structurer

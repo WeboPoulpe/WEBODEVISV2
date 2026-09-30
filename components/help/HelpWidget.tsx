@@ -140,7 +140,7 @@ export default function HelpWidget({ open, onClose }: HelpWidgetProps) {
       {/* Header — drag handle */}
       <div
         onMouseDown={onHeaderMouseDown}
-        className="flex items-center gap-2 px-3 h-[44px] bg-gradient-to-r from-[#9c27b0] to-[#6a1b9a] text-white cursor-grab active:cursor-grabbing flex-shrink-0 select-none"
+        className="flex items-center gap-2 px-3 h-[44px] bg-gradient-to-r from-primary to-primary-darker text-white cursor-grab active:cursor-grabbing flex-shrink-0 select-none"
       >
         <BookOpen className="h-4 w-4" />
         <span className="text-sm font-semibold flex-1">Centre d&apos;aide</span>
@@ -168,7 +168,7 @@ export default function HelpWidget({ open, onClose }: HelpWidgetProps) {
               <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 flex-shrink-0">
                 <button
                   onClick={() => setOpenArticle(null)}
-                  className="flex items-center gap-1 text-xs text-gray-600 hover:text-[#9c27b0] transition-colors"
+                  className="flex items-center gap-1 text-xs text-gray-600 hover:text-primary transition-colors"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />Retour
                 </button>
@@ -194,7 +194,7 @@ export default function HelpWidget({ open, onClose }: HelpWidgetProps) {
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); setActiveCat(null); }}
                     placeholder="Rechercher (créer un devis, stock, prospect...)"
-                    className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+                    className="w-full text-sm border border-gray-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
               </div>
@@ -207,7 +207,7 @@ export default function HelpWidget({ open, onClose }: HelpWidgetProps) {
                     className={cn(
                       'w-full text-left px-3 py-2 text-xs font-medium transition-colors',
                       !activeCat && !query
-                        ? 'bg-[#f3e5f5] text-[#9c27b0]'
+                        ? 'bg-primary-50 text-primary'
                         : 'text-gray-600 hover:bg-gray-50',
                     )}
                   >
@@ -223,7 +223,7 @@ export default function HelpWidget({ open, onClose }: HelpWidgetProps) {
                         onClick={() => { setActiveCat(c.id); setQuery(''); }}
                         className={cn(
                           'w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors',
-                          active ? 'bg-[#f3e5f5] text-[#9c27b0] font-semibold' : 'text-gray-600 hover:bg-gray-50',
+                          active ? 'bg-primary-50 text-primary font-semibold' : 'text-gray-600 hover:bg-gray-50',
                         )}
                       >
                         <span className={cn('w-6 h-6 rounded-md bg-gradient-to-br flex items-center justify-center', c.gradient)}>
@@ -260,7 +260,7 @@ export default function HelpWidget({ open, onClose }: HelpWidgetProps) {
                                 <Icon className="h-4 w-4 text-white" />
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-gray-900 group-hover:text-[#9c27b0] transition-colors">{a.title}</p>
+                                <p className="text-sm font-semibold text-gray-900 group-hover:text-primary transition-colors">{a.title}</p>
                                 <p className="text-xs text-gray-500 mt-0.5">{a.description}</p>
                                 <span className="inline-block mt-1.5 text-[9px] uppercase tracking-wider font-bold text-gray-400">
                                   {cat.label}

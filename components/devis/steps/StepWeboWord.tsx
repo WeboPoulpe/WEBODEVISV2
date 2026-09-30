@@ -98,7 +98,7 @@ export default function StepWeboWord({ onBack }: Props) {
   if (loading || !initialHtml) {
     return (
       <div className="flex items-center justify-center h-full py-24">
-        <Loader2 className="h-7 w-7 text-[#9c27b0] animate-spin" />
+        <Loader2 className="h-7 w-7 text-primary animate-spin" />
       </div>
     );
   }

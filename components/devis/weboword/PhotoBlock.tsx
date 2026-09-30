@@ -67,7 +67,7 @@ export function PhotoBlockPicker({ onInsert, onClose }: PhotoBlockPickerProps) {
             <span className="text-sm text-gray-600">Colonnes :</span>
             {([1, 2, 3, 4] as const).map(n => (
               <button key={n} onClick={() => setCols(n)}
-                className={`w-8 h-8 rounded-lg border text-sm font-medium ${cols === n ? 'bg-purple-600 text-white border-purple-600' : 'hover:bg-gray-50'}`}>
+                className={`w-8 h-8 rounded-lg border text-sm font-medium ${cols === n ? 'bg-primary-600 text-white border-primary-600' : 'hover:bg-gray-50'}`}>
                 {n}
               </button>
             ))}
@@ -85,7 +85,7 @@ export function PhotoBlockPicker({ onInsert, onClose }: PhotoBlockPickerProps) {
               </div>
             ))}
             <button onClick={addPhoto}
-              className="aspect-[4/3] rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-colors text-sm">
+              className="aspect-[4/3] rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 hover:border-primary-400 hover:text-primary-500 transition-colors text-sm">
               + Photo
             </button>
           </div>
@@ -93,7 +93,7 @@ export function PhotoBlockPicker({ onInsert, onClose }: PhotoBlockPickerProps) {
         <div className="px-6 py-4 border-t flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50">Annuler</button>
           <button onClick={handleInsert} disabled={photos.length === 0}
-            className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
+            className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
             Insérer
           </button>
         </div>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, Plus, Bell, Check, Users, Calendar, FileText, AlertCircle, Info, CheckSquare, X } from 'lucide-react';
+import { HelpCircle, Bell, Check, Users, Calendar, FileText, AlertCircle, Info, CheckSquare, X } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -114,7 +114,7 @@ function NotificationBell() {
       >
         <Bell className="h-5 w-5" />
         {unread.length > 0 && (
-          <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-[#9c27b0] text-white text-[9px] font-bold rounded-full leading-none">
+          <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-primary text-white text-[9px] font-bold rounded-full leading-none">
             {unread.length > 9 ? '9+' : unread.length}
           </span>
         )}
@@ -128,7 +128,7 @@ function NotificationBell() {
               <Bell className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-semibold text-gray-800">Notifications</span>
               {unread.length > 0 && (
-                <span className="px-1.5 py-0.5 bg-[#9c27b0] text-white text-[10px] font-bold rounded-full leading-none">
+                <span className="px-1.5 py-0.5 bg-primary text-white text-[10px] font-bold rounded-full leading-none">
                   {unread.length}
                 </span>
               )}
@@ -169,7 +169,7 @@ function NotificationBell() {
                     onClick={() => markRead(n.id, n.action_url)}
                     className={cn(
                       'w-full text-left flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 transition-colors hover:bg-gray-50',
-                      !n.is_read && 'bg-[#faf5ff]'
+                      !n.is_read && 'bg-primary-50'
                     )}
                   >
                     <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5', colorCls)}>
@@ -187,7 +187,7 @@ function NotificationBell() {
                       </p>
                     </div>
                     {!n.is_read && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#9c27b0] flex-shrink-0 mt-1.5" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0 mt-1.5" />
                     )}
                   </button>
                 );
@@ -200,7 +200,7 @@ function NotificationBell() {
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="text-xs font-semibold text-[#9c27b0] hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
               Voir toutes les notifications →
             </Link>
@@ -218,7 +218,7 @@ const TITLES: Record<string, string> = {
   '/devis/nouveau':  'Nouveau devis',
   '/clients':        'Clients',
   '/clients/nouveau':'Nouveau client',
-  '/parametres':     'Paramètres',
+  '/parametres':     'Mon entreprise',
   '/prospects':      'Demandes de devis',
   '/notifications':  'Notifications',
   '/calendrier':     'Calendrier',
@@ -226,14 +226,21 @@ const TITLES: Record<string, string> = {
   '/ingredients':    'Ingrédients',
   '/prestations':    'Prestations',
   '/modeles':        'Modèles de devis',
+  '/commandes':      'Commandes',
+  '/stock':          'Stock',
+  '/extras':         'Extras',
+  '/fournisseurs':   'Fournisseurs',
+  '/location-globale': 'Location',
+  '/courses-globales': 'Courses globales',
+  '/location-templates': 'Modèles de location',
+  '/parametres/categories': 'Catégories',
 };
 
 interface HeaderProps {
-  sidebarWidth: number;
-  onToggleSidebar: () => void;
+  onHelp: () => void;
 }
 
-export default function Header({ sidebarWidth, onToggleSidebar }: HeaderProps) {
+export default function Header({ onHelp }: HeaderProps) {
   const pathname = usePathname();
 
   // Match longest prefix
@@ -242,31 +249,16 @@ export default function Header({ sidebarWidth, onToggleSidebar }: HeaderProps) {
     .sort((a, b) => b[0].length - a[0].length)[0]?.[1] ?? 'WeboDevis';
 
   return (
-    <header
-      className="fixed top-0 right-0 z-20 flex items-center justify-between h-[60px] px-4 bg-white border-b border-gray-200 transition-[left] duration-300 ease-in-out"
-      style={{ left: sidebarWidth }}
-    >
-      {/* Left */}
-      <div className="flex items-center gap-3">
+    <header className="flex-shrink-0 z-20 flex items-center justify-between h-[60px] px-4 md:px-6 bg-gray-50/80 backdrop-blur-md border-b border-gray-200">
+      <h1 className="text-lg font-semibold text-gray-900 truncate">{title}</h1>
+      <div className="flex items-center gap-1">
         <button
-          onClick={onToggleSidebar}
-          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors lg:hidden"
-          aria-label="Toggle sidebar"
+          onClick={onHelp}
+          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+          aria-label="Centre d'aide"
         >
-          <Menu className="h-5 w-5" />
+          <HelpCircle className="h-5 w-5" />
         </button>
-        <h1 className="text-base font-semibold text-gray-900">{title}</h1>
-      </div>
-
-      {/* Right */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/devis/nouveau"
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#9c27b0] text-white text-sm font-medium rounded-lg hover:bg-[#7b1fa2] transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Nouveau devis
-        </Link>
         <NotificationBell />
       </div>
     </header>

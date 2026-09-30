@@ -84,10 +84,10 @@ export default function ImageUpload({ images, onChange, userId, max = 5, bucket 
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-[#9c27b0]/40 hover:bg-[#f3e5f5]/20 transition-all disabled:opacity-60 w-full justify-center"
+          className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-primary/40 hover:bg-primary-50/20 transition-all disabled:opacity-60 w-full justify-center"
         >
           {uploading
-            ? <><Loader2 className="h-4 w-4 animate-spin text-[#9c27b0]" /> Upload en cours…</>
+            ? <><Loader2 className="h-4 w-4 animate-spin text-primary" /> Upload en cours…</>
             : <><Upload className="h-4 w-4" /> Ajouter des photos ({images.length}/{max})</>}
         </button>
       )}

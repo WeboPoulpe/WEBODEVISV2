@@ -34,7 +34,7 @@ export default function RecipientPicker({
       <select
         value={valueContactId ?? ''}
         onChange={(e) => onPick(contacts.find((c) => c.id === e.target.value) ?? null)}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9c27b0]/30 focus:border-[#9c27b0]"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
       >
         {contacts.map((c) => (
           <option key={c.id} value={c.id}>

@@ -88,7 +88,7 @@ function NotifCard({
         'group flex items-start gap-3 p-4 rounded-2xl border transition-all',
         n.is_read
           ? 'bg-white border-gray-100'
-          : 'bg-[#faf5ff] border-[#9c27b0]/15 shadow-sm',
+          : 'bg-primary-50 border-primary/15 shadow-sm',
       )}
     >
       {/* Icon */}
@@ -120,7 +120,7 @@ function NotifCard({
           {n.action_url && (
             <a
               href={n.action_url}
-              className="text-xs font-semibold text-[#9c27b0] hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
               Voir →
             </a>
@@ -146,7 +146,7 @@ function NotifCard({
 
       {/* Unread dot */}
       {!n.is_read && (
-        <span className="w-2 h-2 rounded-full bg-[#9c27b0] flex-shrink-0 mt-1.5" />
+        <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />
       )}
     </div>
   );
@@ -220,13 +220,13 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#f3e5f5] rounded-xl flex items-center justify-center">
-            <Bell className="h-5 w-5 text-[#9c27b0]" />
+          <div className="w-9 h-9 bg-primary-50 rounded-xl flex items-center justify-center">
+            <Bell className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h1 className="text-lg font-semibold text-gray-900">Notifications</h1>
             {unreadCount > 0 && (
-              <p className="text-xs text-[#9c27b0] font-medium">{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</p>
+              <p className="text-xs text-primary font-medium">{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</p>
             )}
           </div>
         </div>
@@ -251,7 +251,7 @@ export default function NotificationsPage() {
             className={cn(
               'px-3.5 py-1.5 rounded-xl text-sm font-medium transition-colors',
               filter === key
-                ? 'bg-[#9c27b0] text-white'
+                ? 'bg-primary text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
             )}
           >
@@ -263,7 +263,7 @@ export default function NotificationsPage() {
       {/* Content */}
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 text-[#9c27b0] animate-spin" />
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center py-20 text-center">

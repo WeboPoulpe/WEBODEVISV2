@@ -95,7 +95,7 @@ export function SheetTabs({
           className={[
             'px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px',
             active === t.key
-              ? 'border-[#9c27b0] text-[#9c27b0]'
+              ? 'border-primary text-primary'
               : 'border-transparent text-gray-500 hover:text-gray-700',
           ].join(' ')}
         >
