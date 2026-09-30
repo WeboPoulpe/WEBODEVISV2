@@ -30,6 +30,20 @@ export interface IngredientNeed {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// Ce qui s'achète à l'unité ne se commande pas en fraction : 27,5 bouteilles deviennent 28.
+const WHOLE_UNITS = new Set([
+  'unite', 'unites', 'piece', 'pieces', 'pce', 'pc', 'bouteille', 'bouteilles', 'btl', 'boite', 'boites', 'sachet', 'sachets',
+  'paquet', 'paquets', 'barquette', 'barquettes', 'botte', 'bottes', 'douzaine', 'douzaines', 'carton', 'cartons', 'pot', 'pots',
+  'bocal', 'bocaux', 'brique', 'briques', 'conserve', 'conserves', 'rouleau', 'rouleaux', 'plaque', 'plaques', 'sac', 'sacs',
+]);
+
+/** Quantité à acheter : arrondie à l'unité supérieure pour ce qui se vend à la pièce, au centième sinon (kg, L…). */
+export function purchaseQuantity(quantity: number, unit: string | null): number {
+  const key = (unit ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  // La marge évite qu'une erreur d'arrondi (28,0000001) n'ajoute une unité.
+  return WHOLE_UNITS.has(key) ? Math.ceil(round2(quantity) - 1e-9) : round2(quantity);
+}
+
 /** Nom comparable : sans accents, sans casse, espaces réduits. */
 export function normalizeName(name: string): string {
   return name.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -79,7 +93,7 @@ export function computeIngredientNeeds(lines: QuoteLine[], recipes: PrestationRe
   }
 
   return {
-    needs: [...needs.values()].map((n) => ({ ...n, quantity: round2(n.quantity) })),
+    needs: [...needs.values()].map((n) => ({ ...n, quantity: purchaseQuantity(n.quantity, n.unit) })),
     matched,
     unmatched,
     withoutIngredients,

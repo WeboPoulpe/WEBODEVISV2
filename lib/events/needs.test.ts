@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeIngredientNeeds, groupNeedsBySupplier, normalizeName, type PrestationRecipe } from './needs';
+import { computeIngredientNeeds, groupNeedsBySupplier, normalizeName, purchaseQuantity, type PrestationRecipe } from './needs';
 
 const recipes: PrestationRecipe[] = [
   { id: 'p-menu', name: 'Menu', ingredients: [
@@ -83,5 +83,27 @@ describe('groupNeedsBySupplier', () => {
       { supplier_id: 'epicier', total: 20, items: [{ ingredient_id: 'pates', quantity: 10, unit_price: 2 }] },
     ]);
     expect(withoutSupplier).toEqual(['sel']);
+  });
+});
+
+describe('purchaseQuantity', () => {
+  it('arrondit à l’unité supérieure ce qui s’achète à la pièce', () => {
+    expect(purchaseQuantity(27.5, 'Bouteille')).toBe(28);
+    expect(purchaseQuantity(19.8, 'Unité')).toBe(20);
+    expect(purchaseQuantity(12, 'pièces')).toBe(12);
+    expect(purchaseQuantity(28.0000001, 'bouteille')).toBe(28);
+  });
+
+  it('garde les décimales pour ce qui se pèse ou se mesure', () => {
+    expect(purchaseQuantity(21.604, 'kg')).toBe(21.6);
+    expect(purchaseQuantity(6.25, 'L')).toBe(6.25);
+    expect(purchaseQuantity(3.333, null)).toBe(3.33);
+  });
+
+  it('s’applique au calcul des besoins', () => {
+    const { needs } = computeIngredientNeeds([{ name: 'Apéritif' }], [{
+      id: 'p', name: 'Apéritif', ingredients: [{ ingredient_id: 'cremant', qty_per_person: 0.25, unit: 'Bouteille', preferred_supplier_id: null, unit_price: 9 }],
+    }], 110);
+    expect(needs[0].quantity).toBe(28);
   });
 });
