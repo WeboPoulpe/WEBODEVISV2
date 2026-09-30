@@ -71,6 +71,13 @@
       "when": 1790784910141,
       "tag": "0009_rental_template_sets",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790785476898,
+      "tag": "0010_ingredient_image_credit",
+      "breakpoints": true
     }
   ]
 }

@@ -450,6 +450,8 @@ export const ingredients = pgTable("ingredients", {
 	category: text(),
 	unit: text().default('Unité'),
 	image_url: text(),
+	// Auteur et licence de la photo quand elle vient d'une banque d'images libres.
+	image_credit: text(),
 	off_product_id: text(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	sub_category: text(),

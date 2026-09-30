@@ -17,6 +17,8 @@ interface Ingredient {
   sub_category: string | null;
   unit: string | null;
   image_url: string | null;
+  /** Auteur et licence de la photo, quand elle vient d'une banque d'images libres. */
+  image_credit?: string | null;
   off_product_id: string | null;
 }
 
@@ -283,6 +285,8 @@ function IngredientModal({
       sub_category: subCategory || null,
       unit: unit || 'Unité',
       image_url: imageUrl || null,
+      // Une photo remplacée perd le crédit de l'ancienne.
+      ...(imageUrl !== (initial?.image_url ?? '') ? { image_credit: null } : {}),
       off_product_id: offId || null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       min_stock_alert: parseFloat(minStockAlert) || 0,
@@ -815,7 +819,8 @@ export default function IngredientsPage() {
                     <div className="h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
                       {ing.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={ing.image_url} alt={ing.name} className="h-full w-full object-contain p-2" />
+                        <img src={ing.image_url} alt={ing.name} loading="lazy" title={ing.image_credit ? `Photo : ${ing.image_credit}` : undefined}
+                          className={ing.image_credit ? 'h-full w-full object-cover' : 'h-full w-full object-contain p-2'} />
                       ) : (
                         <Carrot className="h-8 w-8 text-gray-300" />
                       )}
