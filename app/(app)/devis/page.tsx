@@ -7,10 +7,14 @@ import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder,
+  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { cn, formatDate, formatCurrency } from '@/lib/utils';
+import Modal from '@/components/ui/Modal';
+import DateBlock from '@/components/ui/DateBlock';
+import StatusPill from '@/components/ui/StatusPill';
+import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, pill } from '@/components/ui/kit';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 import ImportDevisModal from '@/components/devis/ImportDevisModal';
@@ -21,39 +25,6 @@ import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES } from '@/lib/q
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
 import FolderBar, { DragItem } from '@/components/devis/FolderBar';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
-
-// ── Section repliable (accordéon) ───────────────────────────────────────────
-function AccordionSection({
-  title, count, tone, open, onToggle, children,
-}: {
-  title: string; count: number; tone: 'amber' | 'purple' | 'emerald' | 'gray';
-  open: boolean; onToggle: () => void; children: React.ReactNode;
-}) {
-  const toneCls = {
-    amber:   'text-amber-700',
-    purple:  'text-primary',
-    emerald: 'text-emerald-700',
-    gray:    'text-gray-500',
-  }[tone];
-  return (
-    <section className="border border-gray-200 rounded-2xl overflow-hidden bg-white">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-      >
-        <span className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide ${toneCls}`}>
-          {title}
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{count}</span>
-        </span>
-        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} />
-      </button>
-      {open && count > 0 && <div className="px-4 pb-4 pt-1">{children}</div>}
-      {open && count === 0 && (
-        <p className="px-4 pb-4 pt-1 text-xs text-gray-400 italic">Aucun élément dans cette section.</p>
-      )}
-    </section>
-  );
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -93,7 +64,8 @@ interface Quote {
   /** Dossier de rangement (null = racine) */
   folder_id?: string | null;
 }
-type ViewMode = 'grid' | 'table' | 'pipeline';
+type ViewMode = 'list' | 'pipeline';
+type Scope = 'encours' | 'confirmes' | 'refuses' | 'prospects';
 
 /** Colonnes chargées pour la liste des devis (une seule source de vérité). */
 // ⚠️ Doit rester UN littéral d'une seule pièce : supabase-js infère le type des lignes
@@ -167,14 +139,6 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string;
   refus_traiteur:  { label: 'Refus traiteur',   dot: 'bg-rose-400',    badge: 'bg-rose-50 text-rose-700',       column: 'bg-rose-50/40',    colBorder: 'border-rose-200'    },
 };
 const PIPELINE_ORDER = ['nouveau', 'broch_envoyee', 'devis_a_faire', 'devis_envoye', 'rdv_deg_a_venir', 'rdv_deg_fait', 'devis_final', 'valide', 'acompte', 'paye', 'refus_client', 'refus_traiteur'];
-const STATUSES = ['Tous', 'Nouveau', 'Brochure envoyée', 'Devis à faire', 'Devis envoyé', 'RDV/Dég à venir', 'RDV/Dég fait', 'Devis final', 'Validé', 'Acompte reçu', 'Payé', 'Refus client', 'Refus traiteur'];
-const STATUS_VALUES: Record<string, string> = {
-  'Nouveau': 'nouveau', 'Brochure envoyée': 'broch_envoyee', 'Devis à faire': 'devis_a_faire',
-  'Devis envoyé': 'devis_envoye', 'RDV/Dég à venir': 'rdv_deg_a_venir', 'RDV/Dég fait': 'rdv_deg_fait',
-  'Devis final': 'devis_final', 'Validé': 'valide', 'Acompte reçu': 'acompte',
-  'Payé': 'paye', 'Refus client': 'refus_client', 'Refus traiteur': 'refus_traiteur',
-};
-
 function getEventIcon(eventType: string): React.ElementType {
   return EVENT_ICONS[eventType.toLowerCase().trim()] ?? CalendarDays;
 }
@@ -213,20 +177,20 @@ interface ProspectLite {
   status: string;
 }
 
-// ── Prospect mini-card (colonne Nouveau + grille/tableau) ─────────────────────
+// ── Prospect mini-card (vue Pipeline) ────────────────────────────────────────
 function ProspectMiniCard({ p, onStatus, onConvert }: { p: ProspectLite; onStatus: (id: string, s: string) => void; onConvert: (id: string) => void }) {
   return (
-    <div className="bg-white border border-amber-200 rounded-xl p-3">
+    <div className="bg-white border border-gray-200 rounded-xl p-3">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Prospect</span>
-        <p className="text-xs font-semibold text-gray-900 truncate">{p.first_name} {p.last_name}</p>
+        <span className={cn(pill, 'bg-primary-100 text-primary')}>Prospect</span>
+        <p className="text-sm font-semibold text-gray-900 truncate">{p.first_name} {p.last_name}</p>
       </div>
-      <p className="text-[10px] text-gray-500 truncate">{p.event_type || '—'}{p.event_date ? ` · ${formatDate(p.event_date)}` : ''}</p>
+      <p className="text-xs text-gray-600 truncate">{[p.event_type, p.event_date ? formatDate(p.event_date) : null].filter(Boolean).join(', ') || 'Demande sans détail'}</p>
       <div className="flex items-center gap-1 mt-2">
-        <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 flex-1">
+        <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} aria-label="Statut du prospect" className="text-xs border border-gray-200 rounded-lg px-1.5 h-8 flex-1 min-w-0">
           {PIPELINE_ORDER.map((s) => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
         </select>
-        <button onClick={() => onConvert(p.id)} className="text-[10px] font-semibold text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary-50">Convertir</button>
+        <button onClick={() => onConvert(p.id)} className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-2 h-8 hover:bg-primary-50">Créer le devis</button>
       </div>
     </div>
   );
@@ -250,6 +214,12 @@ function DevisSheet({
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
   const [notes, setNotes] = useState('');
+  const [notesError, setNotesError] = useState<string | null>(null);
+  // Les notes de suivi vivent dans la colonne internal_notes du devis.
+  useEffect(() => {
+    createClient().from('quotes').select('internal_notes').eq('id', quote.id).maybeSingle()
+      .then(({ data }) => setNotes(data?.internal_notes ?? ''));
+  }, [quote.id]);
   const [savingNotes, setSavingNotes] = useState(false);
   const [internalName, setInternalName] = useState(quote.internal_name ?? '');
   const [savingName, setSavingName] = useState(false);
@@ -518,174 +488,81 @@ function DevisSheet({
             placeholder={'Relance du 15/03 — message laissé en VM.\nÀ rappeler mardi matin.\nClient hésitant sur le nombre de couverts…'}
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors leading-relaxed"
           />
-          <button onClick={async () => { setSavingNotes(true); await createClient().from('quotes').update({ notes }).eq('id', quote.id); setSavingNotes(false); }} disabled={savingNotes}
+          <button onClick={async () => { setSavingNotes(true); const { error } = await createClient().from('quotes').update({ internal_notes: notes }).eq('id', quote.id); setSavingNotes(false); setNotesError(error ? 'Les notes n’ont pas pu être enregistrées. Réessayez.' : null); }} disabled={savingNotes}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark disabled:opacity-60 transition-colors">
             {savingNotes ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {savingNotes ? 'Sauvegarde…' : 'Sauvegarder les notes'}
           </button>
-          <p className="text-[10px] text-gray-400">Nécessite une colonne <code className="bg-gray-100 px-1 rounded">notes</code> (text) dans <code className="bg-gray-100 px-1 rounded">quotes</code>.</p>
+          {notesError && <p role="alert" className="text-sm text-danger">{notesError}</p>}
         </div>
       )}
     </Sheet>
   );
 }
 
-// ── Grid card ─────────────────────────────────────────────────────────────────
-function QuoteCard({ quote, onOpenSheet, onDelete, onDuplicate, onOpenFinance, onEditImport, onMove, onDragStart, onDragEnd, dragging, folderLabel }: { quote: Quote; onOpenSheet: () => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onOpenFinance: (id: string) => void; onEditImport: (id: string) => void; onMove: (q: Quote) => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; dragging: boolean; folderLabel: string }) {
-  const Icon = getEventIcon(quote.event_type || '');
+// ── Ligne de devis ────────────────────────────────────────────────────────────
+function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, folderLabel }: {
+  quote: Quote; onOpen: () => void; onMenu: () => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; dragging: boolean; folderLabel: string;
+}) {
+  const total = computeQuoteTotal(quote);
   return (
-    <div
+    <li
       draggable
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', quote.id); onDragStart({ type: 'quote', id: quote.id }); }}
       onDragEnd={onDragEnd}
-      title="Glissez la carte sur un dossier pour la ranger"
-      className={['group bg-white border border-gray-200 rounded-2xl p-5 hover:border-primary/30 hover:shadow-md transition-all duration-200', dragging ? 'opacity-40' : ''].join(' ')}
+      className={cn('flex items-center gap-1 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition-colors', dragging && 'opacity-40')}
     >
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary transition-colors">
-            <Icon className="h-5 w-5 text-primary group-hover:text-white transition-colors" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{quoteDisplayName(quote)}</p>
-            <p className="text-sm text-gray-500 capitalize truncate">{quote.event_type || 'Événement'}</p>
-            {folderLabel && (
-              <p className="flex items-center gap-1 text-[10px] text-gray-400 truncate mt-0.5" title={folderLabel}>
-                <Folder className="h-2.5 w-2.5 flex-shrink-0" />{folderLabel}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex-shrink-0 flex items-center gap-1">
-          {quote.imported && (
-            <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full uppercase tracking-wider">Importé</span>
-          )}
-          {!quote.user_id && <V1Badge />}
-        </div>
-      </div>
-      {quote.imported && quote.imported_file_url && (
-        <a href={quote.imported_file_url} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 hover:bg-amber-100 transition-colors">
-          <Download className="h-3 w-3" />
-          <span className="truncate flex-1">{quote.imported_file_name || 'Document original'}</span>
-        </a>
-      )}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm text-gray-500">
-        {quote.event_date && <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-gray-400" />{formatDate(quote.event_date)}</span>}
-        {quote.guest_count && <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-gray-400" />{quote.guest_count} couvert{quote.guest_count > 1 ? 's' : ''}</span>}
-      </div>
-      <div className="pt-3 border-t border-gray-100 space-y-2.5">
-        <div className="flex items-center justify-between">
-          {(() => { const t = computeQuoteTotal(quote); return t ? (
-            <p className="font-bold text-gray-900 text-base">{formatCurrency(t)}<span className="text-xs font-normal text-gray-400 ml-1">TTC</span></p>
-          ) : <p className="text-sm text-gray-400 italic">—</p>; })()}
-          <StatusBadge status={quote.status} />
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={onOpenSheet} title="Aperçu"
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Eye className="h-3.5 w-3.5" />Aperçu
-          </button>
-          <Link href={`/devis/${quote.id}/imprimer`} target="_blank" title="PDF"
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <Printer className="h-3.5 w-3.5" />
-          </Link>
-          <button onClick={() => onDuplicate(quote.id)} title="Dupliquer"
-            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => onOpenFinance(quote.id)} title="Gestion financière"
-            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
-            <Wallet className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => onMove(quote)} title="Déplacer vers un dossier"
-            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
-            <FolderInput className="h-3.5 w-3.5" />
-          </button>
-          {quote.imported && quote.imported_file_url ? (
-            <a href={quote.imported_file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir le document importé"
-              className="p-1.5 text-primary/50 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
-              <FileText className="h-3.5 w-3.5" />
-            </a>
-          ) : (
-            <Link href={`/devis/${quote.id}/modifier?mode=weboword`} title="WeboWord"
-              className="p-1.5 text-primary/50 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
-              <LayoutTemplate className="h-3.5 w-3.5" />
-            </Link>
-          )}
-          {quote.imported && (
-            <button onClick={() => onEditImport(quote.id)} title="Modifier l'import (prix, fichier, infos)"
-              className="p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {(['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(quote.status) || quote.imported) && (
-            <button onClick={() => onDelete(quote.id)} title="Supprimer"
-              className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+      <button onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 p-3 sm:p-4 text-left rounded-2xl">
+        {quote.event_date
+          ? <DateBlock iso={quote.event_date} />
+          : <div className="w-14 h-14 rounded-xl border border-dashed border-gray-300 flex-shrink-0" aria-hidden />}
+        <span className="flex-1 min-w-0">
+          <span className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 truncate">{quoteDisplayName(quote)}</span>
+            {quote.imported && <span className={cn(pill, 'bg-gray-100 text-gray-600 flex-shrink-0')}>Importé</span>}
+            {!quote.user_id && <V1Badge />}
+          </span>
+          <span className="block text-sm text-gray-600 truncate mt-0.5">
+            <span className="capitalize">{quote.event_type || 'Événement'}</span>
+            {quote.guest_count ? `, ${quote.guest_count} couverts` : ''}
+            {folderLabel ? `, dossier ${folderLabel}` : ''}
+          </span>
+          <span className="flex items-center gap-2 mt-2 lg:hidden">
+            <StatusPill status={quote.status} />
+            {total ? <span className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(total)}</span> : null}
+          </span>
+        </span>
+        <span className="hidden lg:block w-40 flex-shrink-0"><StatusPill status={quote.status} /></span>
+        <span className="hidden lg:block w-36 flex-shrink-0 text-right font-display font-bold text-gray-900 tabular-nums">
+          {total ? formatCurrency(total) : <span className="font-sans font-normal text-gray-400">Non chiffré</span>}
+        </span>
+      </button>
+      <button onClick={onMenu} className={cn(iconBtn, 'mr-2')} aria-label={`Actions pour ${quoteDisplayName(quote)}`}>
+        <MoreHorizontal className="h-5 w-5" />
+      </button>
+    </li>
   );
 }
 
-// ── Table view ────────────────────────────────────────────────────────────────
-function TableView({ quotes, onOpenSheet, onDelete, onDuplicate, onMove, onDragStart, onDragEnd, folderLabelOf }: { quotes: Quote[]; onOpenSheet: (q: Quote) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onMove: (q: Quote) => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; folderLabelOf: (q: Quote) => string }) {
+// ── Ligne de prospect (demande pas encore transformée en devis) ───────────────
+function ProspectRow({ p, onStatus, onConvert }: { p: ProspectLite; onStatus: (id: string, s: string) => void; onConvert: (id: string) => void }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Événement</th>
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Date</th>
-            <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
-            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Montant TTC</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody>
-          {quotes.map((q) => (
-            <tr key={q.id} draggable
-              onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', q.id); onDragStart({ type: 'quote', id: q.id }); }}
-              onDragEnd={onDragEnd}
-              className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-              <td className="px-4 py-3 font-medium text-gray-900">
-                {quoteDisplayName(q)}
-                {folderLabelOf(q) && (
-                  <span className="flex items-center gap-1 text-[10px] font-normal text-gray-400 mt-0.5">
-                    <Folder className="h-2.5 w-2.5 flex-shrink-0" />{folderLabelOf(q)}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3 text-gray-600 capitalize">{q.event_type || '—'}</td>
-              <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{q.event_date ? formatDate(q.event_date) : '—'}</td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-1.5">
-                  {!q.user_id && <V1Badge />}
-                  <StatusBadge status={q.status} />
-                </div>
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums hidden sm:table-cell">{(() => { const t = computeQuoteTotal(q); return t ? formatCurrency(t) : '—'; })()}</td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-1 justify-end">
-                  <button onClick={() => onMove(q)} title="Déplacer vers un dossier" className="p-1.5 text-gray-300 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"><FolderInput className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => onDuplicate(q.id)} title="Dupliquer" className="p-1.5 text-gray-300 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"><Copy className="h-3.5 w-3.5" /></button>
-                  {['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(q.status) && (
-                    <button onClick={() => onDelete(q.id)} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
-                  )}
-                  <button onClick={() => onOpenSheet(q)} className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button>
-                  <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="PDF"><Printer className="h-3.5 w-3.5" /></Link>
-                  <Link href={`/devis/${q.id}/modifier?mode=weboword`} className="p-1.5 text-primary/50 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors" title="Ouvrir dans WeboWord"><LayoutTemplate className="h-3.5 w-3.5" /></Link>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <li className="flex flex-wrap items-center gap-3 p-3 sm:p-4 bg-white border border-gray-200 rounded-2xl">
+      {p.event_date
+        ? <DateBlock iso={p.event_date} />
+        : <div className="w-14 h-14 rounded-xl border border-dashed border-gray-300 flex-shrink-0" aria-hidden />}
+      <div className="flex-1 min-w-[160px]">
+        <p className="font-semibold text-gray-900 truncate">{p.first_name} {p.last_name}</p>
+        <p className="text-sm text-gray-600 truncate first-letter:uppercase">
+          {[p.event_type, p.guest_count ? `${p.guest_count} couverts` : null].filter(Boolean).join(', ') || p.email}
+        </p>
+      </div>
+      <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} aria-label="Statut du prospect"
+        className="h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900">
+        {PIPELINE_ORDER.map((s) => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
+      </select>
+      <button onClick={() => onConvert(p.id)} className={btnSecondary}>Créer le devis</button>
+    </li>
   );
 }
 
@@ -719,7 +596,7 @@ function PipelineView({
   };
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6" style={{ minHeight: 400 }}>
+    <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 md:-mx-6 px-4 md:px-6" style={{ minHeight: 400 }}>
       {PIPELINE_ORDER.map((statusKey) => {
         const cfg = STATUS_CONFIG[statusKey];
         const col = quotes.filter((q) => q.status === statusKey);
@@ -796,24 +673,6 @@ function PipelineView({
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-function SkeletonCard() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 animate-pulse">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 bg-gray-100 rounded-xl" />
-        <div className="space-y-2 flex-1"><div className="h-4 bg-gray-100 rounded w-2/3" /><div className="h-3 bg-gray-100 rounded w-1/3" /></div>
-        <div className="h-6 bg-gray-100 rounded-full w-20" />
-      </div>
-      <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
-      <div className="border-t border-gray-100 pt-3 flex justify-between">
-        <div className="h-5 bg-gray-100 rounded w-24" />
-        <div className="h-7 bg-gray-100 rounded w-32" />
-      </div>
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DevisPage() {
   const { user } = useAuth();
@@ -822,12 +681,11 @@ export default function DevisPage() {
   const [prospects, setProspects] = useState<ProspectLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState('Tous');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [scope, setScope] = useState<Scope>('encours');
+  const [menuQuote, setMenuQuote] = useState<Quote | null>(null);
   const [sort, setSort] = useState<'recent' | 'event' | 'amount' | 'client'>('recent');
-  const [view, setView] = useState<ViewMode>('grid');
-  // Sections repliables de la vue grille (Prospection collapsée par défaut, En cours ouverte)
-  const [sec, setSec] = useState({ prospection: false, encours: true, confirmes: false, refuses: false });
-  const toggleSec = (k: keyof typeof sec) => setSec((s) => ({ ...s, [k]: !s[k] }));
+  const [view, setView] = useState<ViewMode>('list');
   const [sheetQuote, setSheetQuote] = useState<Quote | null>(null);
   const [dupModal, setDupModal] = useState<{ open: boolean; quoteId: string | null; saving: boolean; templateName: string }>({ open: false, quoteId: null, saving: false, templateName: '' });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1164,191 +1022,97 @@ export default function DevisPage() {
     [folders],
   );
 
-  const filtered = quotes.filter((q) => {
+  // ── Filtres ────────────────────────────────────────────────────────────────
+  const needle = search.trim().toLowerCase();
+  /** Devis du dossier ouvert qui correspondent à la recherche (tous statuts). */
+  const base = useMemo(() => quotes.filter((q) => {
     if (!inFolderScope(q)) return false;
-    const q4 = search.toLowerCase();
-    const haystack = [
-      q.client_name, q.client_first_name, q.client_last_name,
-      q.client_email, q.event_type,
-    ].filter(Boolean).join(' ').toLowerCase();
-    const matchSearch = !search || haystack.includes(q4);
-    const isRefused = q.status === 'refus_client' || q.status === 'refus_traiteur';
-    if (isRefused && activeStatus !== 'Refus client' && activeStatus !== 'Refus traiteur') return false;
-    const matchStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
-    return matchSearch && matchStatus;
-  });
+    if (!needle) return true;
+    return [q.internal_name, q.client_name, q.client_first_name, q.client_last_name, q.client_email, q.event_type]
+      .filter(Boolean).join(' ').toLowerCase().includes(needle);
+  }), [quotes, inFolderScope, needle]);
+
+  // Les prospects ne se rangent pas en dossier : ils n'apparaissent qu'à la racine (ou en recherche).
+  const scopedProspects = useMemo(() => (currentFolder && !searching ? [] : prospects).filter((p) =>
+    !needle || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(needle)),
+  [prospects, currentFolder, searching, needle]);
+
+  const SCOPES: { key: Scope; label: string; statuses: string[] }[] = [
+    { key: 'encours', label: 'En cours', statuses: PENDING_STATUSES },
+    { key: 'confirmes', label: 'Confirmés', statuses: CONFIRMED_STATUSES },
+    { key: 'refuses', label: 'Refusés', statuses: REJECTED_STATUSES },
+    { key: 'prospects', label: 'Prospects', statuses: [] },
+  ];
+  const countOf = (s: typeof SCOPES[number]) => (s.key === 'prospects' ? scopedProspects.length : base.filter((q) => s.statuses.includes(q.status)).length);
+  const activeScope = SCOPES.find((s) => s.key === scope)!;
 
   const sortFn = (a: Quote, b: Quote) => {
     switch (sort) {
       case 'recent': return (b.created_at || '').localeCompare(a.created_at || '');
       case 'event':  return (a.event_date || '9999').localeCompare(b.event_date || '9999');
       case 'amount': return (computeQuoteTotal(b) ?? 0) - (computeQuoteTotal(a) ?? 0);
-      case 'client': return (a.client_name || '').localeCompare(b.client_name || '');
+      case 'client': return quoteDisplayName(a).localeCompare(quoteDisplayName(b), 'fr');
       default: return 0;
     }
   };
-  const sorted = [...filtered].sort(sortFn);
+  const listed = base
+    .filter((q) => activeScope.statuses.includes(q.status) && (!statusFilter || q.status === statusFilter))
+    .sort(sortFn);
 
-  // ── Sections de la vue grille (inclut les refusés, rangés dans leur section) ──
-  const secMatch = (q: Quote) => {
-    if (!inFolderScope(q)) return false;
-    const hay = [q.client_name, q.client_first_name, q.client_last_name, q.client_email, q.event_type]
-      .filter(Boolean).join(' ').toLowerCase();
-    const okSearch = !search || hay.includes(search.toLowerCase());
-    const okStatus = activeStatus === 'Tous' || q.status === STATUS_VALUES[activeStatus];
-    return okSearch && okStatus;
-  };
-  const secSorted = [...quotes].filter(secMatch).sort(sortFn);
-  const secEncours   = secSorted.filter((q) => (PENDING_STATUSES as string[]).includes(q.status));
-  const secConfirmes = secSorted.filter((q) => (CONFIRMED_STATUSES as string[]).includes(q.status));
-  const secRefuses   = secSorted.filter((q) => (REJECTED_STATUSES as string[]).includes(q.status));
-
-  // Les prospects ne sont pas rangeables en dossier : on ne les montre qu'à la racine
-  const scopedProspects = currentFolder && !searching ? [] : prospects;
-
-  const gridProspects = scopedProspects.filter((p) => {
-    const okStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
-    const okSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(search.toLowerCase());
-    return okStatus && okSearch;
-  });
-
-  const showEmpty =
-    (view === 'grid' && gridProspects.length === 0 && secSorted.length === 0) ||
-    (view === 'table' && filtered.length === 0);
-
-  const VIEW_BUTTONS: { mode: ViewMode; Icon: React.ElementType; label: string }[] = [
-    { mode: 'grid', Icon: LayoutGrid, label: 'Grille' },
-    { mode: 'table', Icon: List, label: 'Tableau' },
-    { mode: 'pipeline', Icon: Columns3, label: 'Pipeline' },
-  ];
+  const controlCls = 'h-11 px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-100';
+  const segment = (active: boolean) => cn('h-9 px-3 sm:px-4 rounded-lg text-sm font-medium whitespace-nowrap transition-colors',
+    active ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900');
 
   return (
     <div className="px-4 md:px-6 pb-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      {/* Titre et actions de la page */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 mb-4">
         <div>
-          <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Mes devis</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{loading ? '…' : `${quotes.length} devis au total`}</p>
+          <h1 className="text-[28px] md:text-[36px] font-bold text-gray-900 leading-tight">Devis</h1>
+          <p className="text-sm text-gray-600 mt-1">{loading ? 'Chargement…' : `${quotes.length} devis au total`}</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* View selector */}
-          <div className="flex items-center gap-0.5 bg-gray-100 p-1 rounded-xl">
-            {VIEW_BUTTONS.map(({ mode, Icon, label }) => (
-              <button key={mode} onClick={() => setView(mode)} title={label}
-                className={['flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', view === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'].join(' ')}>
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden md:flex p-1 rounded-xl bg-gray-200/70" role="tablist" aria-label="Affichage">
+            <button role="tab" aria-selected={view === 'list'} onClick={() => setView('list')} className={segment(view === 'list')}>Liste</button>
+            <button role="tab" aria-selected={view === 'pipeline'} onClick={() => setView('pipeline')} className={segment(view === 'pipeline')}>Pipeline</button>
           </div>
-          <button
-            onClick={() => setImportModal(true)}
-            title="Importer un devis déjà fait dans un autre logiciel"
-            className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
-          >
-            <UploadCloud className="h-4 w-4" />
-            <span className="hidden sm:inline">Importer</span>
+          {templates.length > 0 && (
+            <button onClick={() => setShowTemplates(true)} className={btnSecondary}><Library className="h-4 w-4" />Partir d’un modèle</button>
+          )}
+          <button onClick={() => setImportModal(true)} className={btnSecondary} title="Ajouter un devis fait dans un autre logiciel">
+            <UploadCloud className="h-4 w-4" />Importer
           </button>
-          {/* À la racine, « Nouveau devis » est déjà dans l'en-tête (ou le bouton + sur téléphone). */}
+          {/* À la racine, « Nouveau devis » est dans l'en-tête (ou le bouton + sur téléphone). */}
           {currentFolder && (
-            <Link href={`/devis/nouveau?dossier=${currentFolder}`}
-              className="flex items-center gap-2 px-4 py-2.5 border border-primary/40 text-primary text-sm font-semibold rounded-xl hover:bg-primary-50 transition-colors">
-              <Plus className="h-4 w-4" />Nouveau dans ce dossier
-            </Link>
+            <Link href={`/devis/nouveau?dossier=${currentFolder}`} className={btnPrimary}><Plus className="h-4 w-4" />Nouveau dans ce dossier</Link>
           )}
         </div>
       </div>
 
-      {/* ── Templates section ──────────────────────────────────────────── */}
-      {templates.length > 0 && (
-        <div className="mb-5">
-          <button
-            onClick={() => setShowTemplates((v) => !v)}
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary transition-colors mb-3"
-          >
-            <Library className="h-4 w-4" />
-            Mes modèles ({templates.length})
-            <span className={`text-xs transition-transform ${showTemplates ? 'rotate-180' : ''}`}>▾</span>
-          </button>
-          {showTemplates && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-              {templates.map((tpl) => {
-                const svcCount = Array.isArray(tpl.services) ? tpl.services.length : 0;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const svcNames = Array.isArray(tpl.services) ? tpl.services.filter((s: any) => s.name && !s.isPageBreak).slice(0, 3) : [];
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const totalHt = Array.isArray(tpl.services) ? tpl.services.reduce((sum: number, s: any) => sum + (s.isFree ? 0 : (s.quantity || 0) * (s.unitPrice || 0)), 0) : 0;
-                const templateLabel = tpl.template === 'mariage' ? 'Mariage' : tpl.template === 'business' ? 'Business' : 'Standard';
-                const templateColor = tpl.template === 'mariage' ? 'text-amber-700 bg-amber-50' : tpl.template === 'business' ? 'text-slate-700 bg-slate-100' : 'text-primary bg-primary-50';
-                return (
-                  <div key={tpl.id} className="group bg-gradient-to-br from-primary-50 to-white border border-[#e9d5ff] rounded-xl p-4 hover:shadow-md hover:border-primary/40 transition-all cursor-pointer" onClick={() => renamingTpl !== tpl.id && openPreview(tpl.id)}>
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="min-w-0 flex-1">
-                        {renamingTpl === tpl.id ? (
-                          <input
-                            autoFocus
-                            value={renameName}
-                            onChange={(e) => setRenameName(e.target.value)}
-                            onBlur={() => renameTemplate(tpl.id, renameName)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') renameTemplate(tpl.id, renameName);
-                              if (e.key === 'Escape') setRenamingTpl(null);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-sm font-bold text-gray-900 w-full border border-primary rounded px-2 py-0.5 focus:outline-none"
-                          />
-                        ) : (
-                          <p className="text-sm font-bold text-gray-900 truncate">{tpl.name}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${templateColor}`}>{templateLabel}</span>
-                          <span className="text-[10px] text-gray-400">{svcCount} prestation{svcCount > 1 ? 's' : ''}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={(e) => { e.stopPropagation(); setRenamingTpl(tpl.id); setRenameName(tpl.name); }} title="Renommer" className="p-1.5 text-gray-300 hover:text-primary hover:bg-primary-50 rounded-lg transition-colors">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }} title="Supprimer" className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    {/* Preview of services */}
-                    {svcNames.length > 0 && (
-                      <div className="mb-3 space-y-1">
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {svcNames.map((s: any, i: number) => (
-                          <p key={i} className="text-[11px] text-gray-500 truncate">
-                            <span className="text-gray-300 mr-1">•</span>{s.name}
-                          </p>
-                        ))}
-                        {svcCount > 3 && <p className="text-[10px] text-gray-400 italic">+{svcCount - 3} autres…</p>}
-                      </div>
-                    )}
-                    {/* Total + CTA */}
-                    <div className="flex items-center justify-between pt-3 border-t border-[#e9d5ff]/50">
-                      {totalHt > 0 ? (
-                        <p className="text-xs font-bold text-gray-700 tabular-nums">{formatCurrency(totalHt)} <span className="text-[10px] font-normal text-gray-400">HT</span></p>
-                      ) : <span />}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); createFromTemplate(tpl.id); }}
-                        disabled={creatingFromTpl === tpl.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30 rounded-lg hover:bg-primary hover:text-white transition-colors disabled:opacity-50"
-                      >
-                        {creatingFromTpl === tpl.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                        Utiliser
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {/* Recherche, statut, tri */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrer par client ou événement" aria-label="Filtrer les devis"
+            className={cn(controlCls, 'w-full pl-10')} />
         </div>
-      )}
+        {view === 'list' && scope !== 'prospects' && (
+          <>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Statut" className={cn(controlCls, 'flex-1 sm:flex-none min-w-0')}>
+              <option value="">Tous les statuts</option>
+              {activeScope.statuses.map((s) => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
+            </select>
+            <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Tri" className={cn(controlCls, 'flex-1 sm:flex-none min-w-0')}>
+              <option value="recent">Plus récents</option>
+              <option value="event">Date d’événement</option>
+              <option value="amount">Montant</option>
+              <option value="client">Nom A-Z</option>
+            </select>
+          </>
+        )}
+      </div>
 
-      {/* ── Dossiers ───────────────────────────────────────────────────── */}
+      {/* Dossiers */}
       {!loading && <FolderBar
         folders={folders}
         currentId={currentFolder}
@@ -1364,125 +1128,114 @@ export default function DevisPage() {
         onDragEnd={endDrag}
       />}
 
-      {/* La recherche traverse tous les dossiers : on le dit clairement */}
       {searching && currentFolder && (
-        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          <Search className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>La recherche porte sur <strong>tous les dossiers</strong>, pas seulement le dossier ouvert.</span>
-        </div>
+        <p className="mb-3 text-sm text-gray-600">La recherche porte sur tous les dossiers, pas seulement celui qui est ouvert.</p>
       )}
 
-      {/* Search + filter */}
-      {view !== 'pipeline' && (
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher par client ou événement…"
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
-          </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-            <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
-            {STATUSES.map((s) => (
-              <button key={s} onClick={() => setActiveStatus(s)}
-                className={['flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', activeStatus === s ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'].join(' ')}>
-                {s}
+      {view === 'pipeline' ? (
+        <PipelineView quotes={base} prospects={scopedProspects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} onMove={(q) => setMoveQuote(q)} />
+      ) : (
+        <>
+          {/* Volets */}
+          <div className="flex p-1 mb-3 rounded-xl bg-gray-200/70 overflow-x-auto scrollbar-none sm:w-fit" role="tablist" aria-label="Devis affichés">
+            {SCOPES.map((s) => (
+              <button key={s.key} role="tab" aria-selected={scope === s.key} onClick={() => { setScope(s.key); setStatusFilter(''); }} className={cn(segment(scope === s.key), 'flex-1 sm:flex-none')}>
+                {s.label} <span className="text-gray-500 tabular-nums">{loading ? '' : countOf(s)}</span>
               </button>
             ))}
           </div>
-          {/* Tri */}
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-            title="Trier"
-            className="flex-shrink-0 px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
-          >
-            <option value="recent">Plus récents</option>
-            <option value="event">Date d’événement</option>
-            <option value="amount">Montant</option>
-            <option value="client">Client A-Z</option>
-          </select>
-        </div>
-      )}
-      {view === 'pipeline' && (
-        <div className="relative mb-5">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par client ou événement…"
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
-        </div>
-      )}
 
-      {/* Content */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">{[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}</div>
-      ) : showEmpty ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-            {currentFolder && !search ? <Folder className="h-8 w-8 text-gray-400" /> : <CalendarDays className="h-8 w-8 text-gray-400" />}
-          </div>
-          <p className="text-gray-500 font-medium mb-1">{currentFolder && !search ? 'Ce dossier est vide' : 'Aucun devis trouvé'}</p>
-          <p className="text-sm text-gray-400 mb-4">
-            {search
-              ? 'Essayez avec d\'autres termes.'
-              : currentFolder
-                ? 'Glissez-y des devis depuis « Mes devis », ou utilisez « Déplacer vers… ».'
-                : 'Créez votre premier devis pour commencer.'}
-          </p>
-          {!search && <Link href="/devis/nouveau" className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-dark transition-colors"><Plus className="h-4 w-4" />Créer un devis</Link>}
-        </div>
-      ) : view === 'grid' ? (
-        <div className="space-y-3">
-          <AccordionSection title="Prospection" count={gridProspects.length} tone="amber" open={sec.prospection} onToggle={() => toggleSec('prospection')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-              {gridProspects.map((p) => (
-                <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
-              ))}
-            </div>
-          </AccordionSection>
-
-          <AccordionSection title="Devis en cours" count={secEncours.length} tone="purple" open={sec.encours} onToggle={() => toggleSec('encours')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {secEncours.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
-            </div>
-          </AccordionSection>
-
-          <AccordionSection title="Confirmés / Événements" count={secConfirmes.length} tone="emerald" open={sec.confirmes} onToggle={() => toggleSec('confirmes')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {secConfirmes.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
-            </div>
-          </AccordionSection>
-
-          <AccordionSection title="Archivés / Refusés" count={secRefuses.length} tone="gray" open={sec.refuses} onToggle={() => toggleSec('refuses')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {secRefuses.map((q) => <QuoteCard key={q.id} quote={q} onOpenSheet={() => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate} onOpenFinance={(id) => setFinanceQuoteId(id)} onEditImport={(id) => setEditImportId(id)} onMove={(qq) => setMoveQuote(qq)} onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id} folderLabel={folderLabelOf(q)} />)}
-            </div>
-          </AccordionSection>
-        </div>
-      ) : view === 'table' ? (
-        <>
-          {(() => {
-            const q4 = search.toLowerCase();
-            const visibleProspects = scopedProspects.filter((p) => {
-              const matchStatus = activeStatus === 'Tous' || p.status === STATUS_VALUES[activeStatus];
-              const matchSearch = !search || [p.first_name, p.last_name, p.email, p.event_type ?? ''].join(' ').toLowerCase().includes(q4);
-              return matchStatus && matchSearch;
-            });
-            return visibleProspects.length > 0 ? (
-              <div className="mb-5">
-                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Prospects ({visibleProspects.length})</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                  {visibleProspects.map((p) => (
-                    <ProspectMiniCard key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />
-                  ))}
-                </div>
+          {loading ? (
+            <ul className="space-y-2.5">{[0, 1, 2, 3].map((i) => <li key={i} className="h-[84px] rounded-2xl bg-white border border-gray-200 animate-pulse" />)}</ul>
+          ) : scope === 'prospects' ? (
+            scopedProspects.length === 0 ? (
+              <div className="rounded-2xl bg-white border border-gray-200 px-6 py-10 text-center">
+                <p className="font-semibold text-gray-900">Aucune demande en attente</p>
+                <p className="text-sm text-gray-600 mt-1">Les demandes reçues par votre formulaire en ligne arrivent ici, jusqu’à ce que vous en fassiez un devis.</p>
               </div>
-            ) : null;
-          })()}
-          <TableView quotes={sorted} onOpenSheet={(q) => setSheetQuote(q)} onDelete={handleDelete} onDuplicate={handleDuplicate}
-            onMove={(q) => setMoveQuote(q)} onDragStart={startDrag} onDragEnd={endDrag} folderLabelOf={folderLabelOf} />
+            ) : (
+              <ul className="space-y-2.5">
+                {scopedProspects.map((p) => <ProspectRow key={p.id} p={p} onStatus={handleProspectStatus} onConvert={handleConvertProspect} />)}
+              </ul>
+            )
+          ) : listed.length === 0 ? (
+            <div className="rounded-2xl bg-white border border-gray-200 px-6 py-10 text-center">
+              <p className="font-semibold text-gray-900">
+                {needle ? 'Aucun devis ne correspond' : currentFolder ? 'Ce dossier ne contient aucun devis de ce type' : `Aucun devis ${activeScope.label.toLowerCase()}`}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                {needle ? 'Essayez un autre nom, ou regardez dans un autre volet.' : 'Glissez un devis sur un dossier pour le ranger, ou créez-en un nouveau.'}
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2.5">
+              {listed.map((q) => (
+                <QuoteRow key={q.id} quote={q} onOpen={() => setSheetQuote(q)} onMenu={() => setMenuQuote(q)}
+                  onDragStart={startDrag} onDragEnd={endDrag} dragging={dragItem?.type === 'quote' && dragItem.id === q.id}
+                  folderLabel={currentFolder ? '' : folderLabelOf(q)} />
+              ))}
+            </ul>
+          )}
         </>
-      ) : (
-        <PipelineView quotes={filtered} prospects={scopedProspects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} onMove={(q) => setMoveQuote(q)} />
+      )}
+
+      {/* ── Actions d'un devis ─────────────────────────────────────────── */}
+      {menuQuote && (() => {
+        const q = menuQuote;
+        const close = () => setMenuQuote(null);
+        const item = 'w-full flex items-center gap-3 h-12 px-3 rounded-xl text-[15px] font-medium text-gray-900 hover:bg-gray-50 text-left';
+        const deletable = ['nouveau', 'devis_a_faire', 'broch_envoyee'].includes(q.status) || !!q.imported;
+        return (
+          <Modal title={quoteDisplayName(q)} onClose={close}>
+            <div className="pb-3 space-y-0.5">
+              {q.imported && q.imported_file_url ? (
+                <a href={q.imported_file_url} target="_blank" rel="noopener noreferrer" onClick={close} className={item}><FileText className="h-5 w-5 text-gray-500" />Ouvrir le document importé</a>
+              ) : (
+                <Link href={`/devis/${q.id}/modifier?mode=weboword`} className={item}><Pencil className="h-5 w-5 text-gray-500" />Modifier le devis</Link>
+              )}
+              {(CONFIRMED_STATUSES as string[]).includes(q.status) && (
+                <Link href={`/evenements/${q.id}`} className={item}><CalendarRange className="h-5 w-5 text-gray-500" />Préparer l’événement</Link>
+              )}
+              <Link href={`/devis/${q.id}/imprimer`} target="_blank" onClick={close} className={item}><Printer className="h-5 w-5 text-gray-500" />Imprimer ou enregistrer en PDF</Link>
+              <button onClick={() => { close(); handleDuplicate(q.id); }} className={item}><Copy className="h-5 w-5 text-gray-500" />Dupliquer</button>
+              <button onClick={() => { close(); setFinanceQuoteId(q.id); }} className={item}><Wallet className="h-5 w-5 text-gray-500" />Marge et coûts</button>
+              <button onClick={() => { close(); setMoveQuote(q); }} className={item}><FolderInput className="h-5 w-5 text-gray-500" />Déplacer vers un dossier</button>
+              {q.imported && <button onClick={() => { close(); setEditImportId(q.id); }} className={item}><UploadCloud className="h-5 w-5 text-gray-500" />Modifier l’import</button>}
+              {deletable && <button onClick={() => { close(); handleDelete(q.id); }} className={cn(item, 'text-danger')}><Trash2 className="h-5 w-5" />Supprimer</button>}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ── Modèles enregistrés ────────────────────────────────────────── */}
+      {showTemplates && (
+        <Modal title="Partir d’un modèle" onClose={() => setShowTemplates(false)}>
+          <ul className="pb-3 space-y-2">
+            {templates.map((tpl) => {
+              const count = Array.isArray(tpl.services) ? tpl.services.filter((s: { name?: string; isPageBreak?: boolean }) => s.name && !s.isPageBreak).length : 0;
+              return (
+                <li key={tpl.id} className="p-3 rounded-2xl bg-gray-50">
+                  {renamingTpl === tpl.id ? (
+                    <input autoFocus value={renameName} onChange={(e) => setRenameName(e.target.value)} onBlur={() => renameTemplate(tpl.id, renameName)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') renameTemplate(tpl.id, renameName); if (e.key === 'Escape') setRenamingTpl(null); }}
+                      aria-label="Nom du modèle" className={cn(controlCls, 'w-full')} />
+                  ) : (
+                    <p className="font-semibold text-gray-900 break-words">{tpl.name}</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-0.5">{count} prestation{count > 1 ? 's' : ''}</p>
+                  <div className="flex flex-wrap items-center gap-1 mt-2">
+                    <button onClick={() => createFromTemplate(tpl.id)} disabled={creatingFromTpl === tpl.id} className={cn(btnPrimary, 'h-10')}>
+                      {creatingFromTpl === tpl.id && <Loader2 className="h-4 w-4 animate-spin" />}Utiliser
+                    </button>
+                    <button onClick={() => { setShowTemplates(false); openPreview(tpl.id); }} className={cn(btnGhost, 'h-10')}>Aperçu</button>
+                    <button onClick={() => { setRenamingTpl(tpl.id); setRenameName(tpl.name); }} className={iconBtn} aria-label={`Renommer ${tpl.name}`}><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => deleteTemplate(tpl.id)} className={iconBtnDanger} aria-label={`Supprimer ${tpl.name}`}><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Modal>
       )}
 
       {sheetQuote && (
