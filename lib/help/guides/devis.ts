@@ -169,7 +169,7 @@ export const devis: HelpGuide[] = [
     href: '/devis',
     steps: [
       { title: 'Cliquez sur « Partir d’un modèle »', text: 'Le bouton est en haut de la page Devis.' },
-      { title: 'Repérez le modèle qui convient', text: 'Chacun indique son nombre de prestations.' },
+      { title: 'Repérez le modèle qui convient', text: 'Chaque modèle montre la première page de son document. Cliquez sur la vignette pour le voir en grand.' },
       { title: 'Cliquez sur « Utiliser »', text: 'Un nouveau devis s’ouvre dans l’éditeur avec les prestations du modèle.' },
     ],
     notes: [

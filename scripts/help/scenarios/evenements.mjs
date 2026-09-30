@@ -35,7 +35,7 @@ const setValue = async (act, field, value) => {
 /** Ouvre la fiche d'un événement à venir depuis la liste (rang 0 = le plus proche) : son adresse change à chaque régénération. */
 const openEvent = async (page, act, rank = 0) => {
   await act.click(page.locator('main a[href^="/evenements/"]').nth(rank));
-  await page.getByRole('tablist', { name: 'Préparation de l\'événement' }).waitFor({ timeout: 20_000 });
+  await page.getByRole('tablist', { name: 'Préparation de l\'événement' }).waitFor({ timeout: 45_000 });
   await settled(page);
   await act.pause(900);
 };
@@ -109,17 +109,21 @@ export default {
       await openEvent(page, act, 0);
       await openTab(page, act, 'Matériel');
       await act.scroll(330);
-      await act.type(page.getByLabel('Nom du matériel'), 'Rampe de chargement');
-      await retype(act, page, page.getByLabel('Quantité'), '2');
-      await act.type(page.getByLabel('Unité'), 'pièces');
-      await act.click(panel(page).getByRole('button', { name: 'Ajouter', exact: true }));
+      // La liste de matériel du traiteur : on y ajoute un article, il est coché d'office, puis on l'ajoute à l'événement.
+      await act.click(page.getByRole('button', { name: 'Choisir dans ma liste' }));
+      const list = page.getByRole('dialog');
+      await act.type(list.getByLabel('Nom du matériel'), 'Rampe de chargement');
+      await retype(act, page, list.getByLabel('Quantité', { exact: true }), '2');
+      await act.type(list.getByLabel('Unité'), 'pièces');
+      await act.click(list.getByRole('button', { name: 'Ajouter à ma liste' }));
+      await act.hover(list.getByRole('checkbox', { name: 'Rampe de chargement' }));
+      await act.pause(900);
+      await act.click(list.getByRole('button', { name: /^Ajouter 1 article/ }));
       await act.pause(500);
       await act.click(page.getByRole('checkbox', { name: 'Rampe de chargement' }));
       await act.pause(500);
       // Les lignes « du devis » : matériel et personnel vendus au client.
       const fromQuote = panel(page).getByRole('listitem').filter({ hasText: 'du devis' });
-      await act.hover(fromQuote.first().getByText('du devis'));
-      await act.pause(600);
       await act.click(fromQuote.getByRole('checkbox', { checked: false }).first());
       await act.pause(600);
     },
@@ -132,8 +136,14 @@ export default {
       await openTab(page, act, 'Matériel');
       await act.hover(page.getByRole('heading', { name: 'Location', exact: true }));
       await act.scroll(260);
-      await act.hover(page.getByRole('button', { name: 'Générer depuis mes modèles' }));
-      await act.pause(900);
+      // Appliquer le modèle qui a déjà servi à générer cette liste : le résultat est le même, à l'écran comme en base.
+      await act.click(page.getByRole('button', { name: /^Appliquer/ }));
+      const models = page.getByRole('dialog', { name: 'Quel modèle appliquer ?' });
+      await act.hover(models.getByRole('button').nth(2));
+      await act.pause(700);
+      await act.click(models.getByRole('button', { name: /^Dîner assis/ }));
+      await settled(page);
+      await act.pause(700);
       await act.click(panel(page).getByRole('checkbox', { name: /commandé$/ }).first());
       await act.pause(500);
       await act.click(page.getByRole('button', { name: 'Ajouter un article' }));
@@ -144,9 +154,7 @@ export default {
       await choose(act, page.getByLabel('Fournisseur'), 'Loca-Réception');
       await act.click(page.getByRole('dialog').getByRole('button', { name: 'Enregistrer' }));
       await act.hover(page.getByText('Vasque à champagne', { exact: true }));
-      await act.pause(600);
-      await act.hover(page.getByText('Total de la location'));
-      await act.pause(600);
+      await act.pause(900);
     },
   },
 
@@ -180,7 +188,7 @@ export default {
       await openEvent(page, act, 0);
       await openTab(page, act, 'Courses');
       await act.click(page.getByRole('link', { name: 'Mode courses' }));
-      await page.getByRole('heading', { name: 'Courses', exact: true }).waitFor({ timeout: 20_000 });
+      await page.getByRole('heading', { name: 'Courses', exact: true }).waitFor({ timeout: 45_000 });
       await settled(page);
       await act.pause(900);
       const todo = page.locator('main button[aria-pressed="false"]');

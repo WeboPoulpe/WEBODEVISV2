@@ -1,6 +1,6 @@
 // Scénarios des vidéos de la rubrique « Catalogue ». Un scénario par guide, même identifiant.
 // Rappel : le compte de démonstration n'enregistre rien. Quand la page relit ses données après l'écriture
-// (catégories, modèles de location) ou part vers une autre page (nouvelle prestation), la vidéo s'arrête
+// (catégories) ou part vers une autre page (nouvelle prestation), la vidéo s'arrête
 // sur le bouton de validation, sans cliquer dessus.
 // Pas de vidéo pour « modeles-presentation » (page Modèles de devis) : la création d'un modèle y échoue
 // et le modèle choisi n'est pas repris par le nouveau devis. Le guide est écrit, avec ce qui marche.
@@ -123,16 +123,25 @@ export default {
   'modeles-location': {
     start: '/location-templates',
     async run({ page, act }) {
-      await act.hover(page.getByText('Verre à vin 35 cl'));
+      // L'article est ajouté à un modèle existant : un modèle créé dans la démonstration n'existe pas en base,
+      // il ne pourrait donc pas recevoir d'article. La création d'un modèle vient ensuite.
+      await act.click(page.getByRole('tab', { name: /^Cocktail/ }));
       await act.pause(700);
-      await act.click(page.getByRole('button', { name: 'Ajouter', exact: true }));
-      await act.type(page.getByPlaceholder('Ex : Assiette plate, Verre à vin…'), 'Verre à eau 25 cl');
-      const numbers = page.locator('main input[type="number"]');
-      await retype(act, page, numbers.nth(0), '1.1');
-      await act.type(page.getByPlaceholder('pcs, lot…'), 'pièce');
-      await choose(act, page.locator('main select'), 'Loca-Réception');
-      await retype(act, page, numbers.nth(1), '0.22');
-      await act.hover(page.getByRole('button', { name: 'Enregistrer' }));
+      await act.click(page.getByRole('button', { name: 'Ajouter un article' }));
+      const item = page.getByRole('dialog', { name: 'Nouvel article' });
+      await act.type(item.getByLabel('Article'), 'Tasse à café');
+      await retype(act, page, item.getByLabel('Quantité par couvert'), '0.5');
+      await act.type(item.getByLabel('Unité'), 'pièce');
+      await retype(act, page, item.getByLabel('Prix unitaire HT'), '0.2');
+      await choose(act, item.getByLabel('Fournisseur habituel'), 'Loca-Réception');
+      await act.click(item.getByRole('button', { name: 'Enregistrer' }));
+      await act.hover(page.getByText('Tasse à café', { exact: true }));
+      await act.pause(900);
+      await act.click(page.getByRole('button', { name: 'Nouveau modèle' }));
+      const model = page.getByRole('dialog', { name: 'Nouveau modèle de location' });
+      await act.type(model.getByLabel('Nom du modèle'), 'Séminaire');
+      await act.click(model.getByRole('button', { name: 'Créer le modèle' }));
+      await act.hover(page.getByRole('heading', { name: 'Séminaire' }));
       await act.pause(900);
     },
   },
