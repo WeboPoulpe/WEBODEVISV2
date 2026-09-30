@@ -273,7 +273,7 @@ function CreateDevisModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,7 +351,18 @@ function CreateDevisModal({
           guest_count: parseInt(guestCount) || null,
           services: [],
           total_amount: 0,
-          internal_notes: `Créé depuis la demande prospect #${prospect.id}`,
+          // Tout ce que la demande contient passe dans le devis : lieu, adresse, message du client, style du compte.
+          event_location: prospect.service_address?.trim() || '',
+          client_address: address.trim() || null,
+          internal_notes: prospect.message?.trim()
+            ? `Demande reçue le ${new Date(prospect.created_at).toLocaleDateString('fr-FR')} :
+${prospect.message.trim()}`
+            : `Demande reçue le ${new Date(prospect.created_at).toLocaleDateString('fr-FR')}`,
+          template: profile?.default_quote_style || 'classique',
+          ...(profile?.default_quote_font ? { selected_font: profile.default_quote_font } : {}),
+          language: 'fr',
+          vat_rate: 20,
+          hide_price: false,
           client_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
           client_first_name: firstName.trim(),
           client_last_name: lastName.trim(),
@@ -372,9 +383,10 @@ function CreateDevisModal({
         .eq('id', prospect.id);
 
       onCreated();
-      router.push(`/devis/${quote.id}/modifier`);
+      router.push(`/devis/${quote.id}/modifier?mode=weboword`);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+      console.error(e);
+      setError('Le devis n’a pas pu être créé. Vérifiez l’email et la date, puis réessayez.');
       setLoading(false);
     }
   };

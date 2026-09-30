@@ -28,6 +28,8 @@ interface Customer {
   company_name: string | null;
   email: string;
   phone: string | null;
+  address?: string | null;
+  siret_number?: string | null;
   notes?: string | null;
   quote_count?: number;
 }
@@ -127,10 +129,10 @@ function CustomerSheet({
     createClient()
       .from('quotes')
       .select('id, event_type, event_date, total_amount, status, created_at')
-      .eq('client_email', customer.email)
+      .or(customer.email ? `customer_id.eq.${customer.id},client_email.eq.${customer.email}` : `customer_id.eq.${customer.id}`)
       .order('created_at', { ascending: false })
       .then(({ data }) => { setQuotes(data ?? []); setLoadingQuotes(false); });
-  }, [tab, customer.email, quotes.length]);
+  }, [tab, customer.id, customer.email, quotes.length]);
 
   useEffect(() => {
     if (customer.customer_type !== 'entreprise') return;
@@ -151,17 +153,19 @@ function CustomerSheet({
       company_name: form.company_name || null,
       email: form.email,
       phone: form.phone || null,
+      address: form.address?.trim() || null,
+      siret_number: form.customer_type === 'entreprise' ? form.siret_number?.trim() || null : null,
     }).eq('id', customer.id);
     if (error) {
       setSaving(false);
-      alert('Erreur lors de la sauvegarde : ' + error.message);
+      alert('La fiche n’a pas pu être enregistrée. Vérifiez l’email (il doit être unique dans votre carnet) et réessayez.');
       return;
     }
     if (form.customer_type === 'entreprise' && user) {
       const res = await saveContacts(customer.id, user.id, editContacts);
       if (res.error) {
         setSaving(false);
-        alert('Erreur lors de la sauvegarde des contacts : ' + res.error);
+        alert('Les contacts n’ont pas pu être enregistrés. Réessayez.');
         return;
       }
     }
@@ -181,6 +185,9 @@ function CustomerSheet({
 
   return (
     <Sheet open onClose={onClose} title={name || '—'} subtitle={customer.email} width="w-[520px]">
+      <div className="px-6 pt-4">
+        <Link href={`/devis/nouveau?client=${customer.id}`} className={cn(btnPrimary, 'w-full sm:w-auto')}><FilePlus2 className="h-4 w-4" />Nouveau devis pour ce client</Link>
+      </div>
       <SheetTabs tabs={TABS} active={tab} onChange={(k) => setTab(k as typeof tab)} />
 
       {tab === 'infos' && (
@@ -203,6 +210,11 @@ function CustomerSheet({
           )}
           <SField label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
           <SField label="Téléphone" value={form.phone ?? ''} onChange={(v) => setForm({ ...form, phone: v })} />
+          <SField label="Adresse" value={form.address ?? ''} onChange={(v) => setForm({ ...form, address: v })} />
+          {form.customer_type === 'entreprise' && (
+            <SField label="SIRET" value={form.siret_number ?? ''} onChange={(v) => setForm({ ...form, siret_number: v })} />
+          )}
+          <p className="text-xs text-gray-500">L’adresse et le SIRET sont repris dans chaque nouveau devis de ce client.</p>
           {form.customer_type === 'entreprise' && (
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">Contacts</h3>
@@ -265,7 +277,7 @@ function CustomerSheet({
                         {q.total_amount && (
                           <p className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">{formatCurrency(q.total_amount)}</p>
                         )}
-                        <Link href={`/devis/${q.id}/imprimer`} target="_blank" className="text-gray-300 hover:text-primary transition-colors flex-shrink-0">
+                        <Link href={`/devis/${q.id}/modifier`} aria-label={`Ouvrir le devis ${q.event_type || ''}`} className="text-gray-400 hover:text-primary transition-colors flex-shrink-0 p-1">
                           <ChevronRight className="h-4 w-4" />
                         </Link>
                       </div>
@@ -330,7 +342,7 @@ export default function ClientsPage() {
     const supabase = createClient();
     const { data: cust } = await supabase
       .from('customers')
-      .select('id, customer_type, first_name, last_name, company_name, email, phone, notes')
+      .select('id, customer_type, first_name, last_name, company_name, email, phone, address, siret_number, notes')
       .order('created_at', { ascending: false });
     if (!cust) { setLoading(false); return; }
     const { data: counts } = await supabase.from('quotes').select('client_email');

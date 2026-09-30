@@ -233,11 +233,16 @@ export default function CalendrierPage() {
           ) : agenda.length === 0 ? (
             <div className="rounded-2xl bg-gray-50 px-5 py-8 text-center">
               <p className="text-sm text-gray-600">{selectedDate ? 'Aucun événement ce jour-là.' : 'Aucun événement ce mois-ci.'}</p>
-              <Link href="/devis/nouveau" className="inline-block mt-2 text-sm font-medium text-primary hover:underline">Créer un devis</Link>
+              <Link href={selectedDay ? `/devis/nouveau?date=${selectedDay}` : '/devis/nouveau'} className="inline-block mt-2 text-sm font-medium text-primary hover:underline">
+                {selectedDay ? 'Créer un devis pour ce jour' : 'Créer un devis'}
+              </Link>
             </div>
           ) : (
             <ul className="space-y-2.5">
               {agenda.map((q) => <li key={q.id}><EventRow quote={q} showDate={!selectedDate} /></li>)}
+              {selectedDay && (
+                <li><Link href={`/devis/nouveau?date=${selectedDay}`} className="block px-4 py-3 rounded-2xl border border-dashed border-gray-300 text-sm font-medium text-primary hover:bg-gray-50">Autre devis ce jour-là</Link></li>
+              )}
             </ul>
           )}
         </section>

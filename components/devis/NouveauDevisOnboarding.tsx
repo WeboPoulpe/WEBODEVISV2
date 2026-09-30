@@ -28,6 +28,12 @@ const TEMPLATES = [
   { key: 'business', label: 'Business', color: '#1e293b', desc: 'Sobre, pour les entreprises' },
 ];
 
+type Customer = {
+  id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null;
+  customer_type: string; address: string | null; siret_number: string | null; contact_person_name: string | null;
+};
+const CUSTOMER_COLUMNS = 'id, first_name, last_name, email, phone, company_name, customer_type, address, siret_number, contact_person_name';
+
 export default function NouveauDevisOnboarding() {
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -45,7 +51,8 @@ export default function NouveauDevisOnboarding() {
   const [clientAddress, setClientAddress] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState('');
-  const [clientResults, setClientResults] = useState<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; customer_type: string }[]>([]);
+  const [clientResults, setClientResults] = useState<Customer[]>([]);
+  const [picked, setPicked] = useState<Customer | null>(null);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('classique');
@@ -56,6 +63,22 @@ export default function NouveauDevisOnboarding() {
   }, [profile?.default_quote_style]);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
 
+  // Arrivée depuis une fiche client (?client=), un jour du calendrier (?date=) ou avec un nombre de couverts (?couverts=) :
+  // ces informations sont déjà remplies.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get('date');
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setEventDate(date);
+    const guests = params.get('couverts');
+    if (guests && /^\d+$/.test(guests)) setGuestCount(guests);
+    const clientId = params.get('client');
+    if (clientId) {
+      createClient().from('customers').select(CUSTOMER_COLUMNS).eq('id', clientId).maybeSingle()
+        .then(({ data }) => { if (data) selectCustomer(data as Customer); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const canNext1 = !!eventType && !!eventDate && !!guestCount;
 
   // Client search
@@ -64,20 +87,23 @@ export default function NouveauDevisOnboarding() {
     if (!q.trim() || q.length < 2) { setClientResults([]); setShowCustomerPicker(false); return; }
     const supabase = createClient();
     const { data } = await supabase.from('customers')
-      .select('id, first_name, last_name, email, phone, company_name, customer_type')
+      .select(CUSTOMER_COLUMNS)
       .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,company_name.ilike.%${q}%`)
       .limit(8);
-    setClientResults(data || []);
+    setClientResults((data || []) as Customer[]);
     setShowCustomerPicker(true);
   }, []);
 
-  const selectCustomer = (c: typeof clientResults[number]) => {
+  const selectCustomer = (c: Customer) => {
+    setMode('existing');
+    setPicked(c);
     const fullName = c.customer_type === 'entreprise' && c.company_name
       ? c.company_name
       : [c.first_name, c.last_name].filter(Boolean).join(' ');
     setClientName(fullName);
     setClientEmail(c.email || '');
     setClientPhone(c.phone || '');
+    setClientAddress(c.address || '');
     setSelectedCustomerId(c.id);
     setShowCustomerPicker(false);
     setClientSearch(fullName);
@@ -88,6 +114,7 @@ export default function NouveauDevisOnboarding() {
     setClientEmail('');
     setClientPhone('');
     setClientAddress('');
+    setPicked(null);
     setSelectedCustomerId(null);
     setClientSearch('');
   };
@@ -137,6 +164,13 @@ export default function NouveauDevisOnboarding() {
       client_last_name: cLast || null,
       client_email: clientEmail || null,
       client_phone: clientPhone || null,
+      client_address: clientAddress || null,
+      ...(picked ? {
+        client_type: picked.customer_type === 'entreprise' ? 'entreprise' : 'particulier',
+        company_name: picked.company_name || null,
+        client_siret: picked.siret_number || null,
+        contact_person_name: picked.contact_person_name || null,
+      } : {}),
       status: 'devis_a_faire',
       services: [],
       event_type: eventType,
