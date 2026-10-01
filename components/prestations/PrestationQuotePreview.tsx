@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { generateQuoteHtml, type QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
+import { useHydrated } from '@/lib/useHydrated';
 import { googleFontHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
 import { sanitizeHtml } from '@/lib/sanitize';
 
@@ -40,7 +41,10 @@ export default function PrestationQuotePreview({ data, style, font }: {
   const template: Template = TEMPLATES.includes(style as Template) ? (style as Template) : 'classique';
   const fontName = font || 'Georgia';
 
+  // Le découpage passe par DOMParser, qui n'existe que dans le navigateur : rien n'est calculé au rendu serveur.
+  const hydrated = useHydrated();
   const { table, menu } = useMemo(() => {
+    if (!hydrated) return { table: '', menu: '' };
     const html = generateQuoteHtml({
       companyName: '',
       clientName: '',
@@ -59,7 +63,7 @@ export default function PrestationQuotePreview({ data, style, font }: {
       table: doc.querySelector('[data-webo-financials] table')?.outerHTML ?? '',
       menu: doc.querySelector('.gastro-menu')?.outerHTML ?? '',
     };
-  }, [data.name, data.unitPrice, data.isOption, data.description, data.gastroCardHtml, template, fontName]);
+  }, [hydrated, data.name, data.unitPrice, data.isOption, data.description, data.gastroCardHtml, template, fontName]);
 
   // Feuille de sortie des devis, sans la règle @page (elle changerait l'impression de la page Prestations).
   const css = useMemo(() => quoteOutputCss(outputSettings({ selected_font: fontName })).replace(/@page\s*\{[^}]*\}/, ''), [fontName]);
