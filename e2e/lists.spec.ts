@@ -187,7 +187,7 @@ test('éditeur WeboWord : statut, envoi et copie sans repasser par la liste', as
     // Envoi : le document est enregistré, le devis part et passe en « Devis envoyé ».
     await sidebar.getByRole('button', { name: 'Envoyer au client' }).click();
     const send = page.getByRole('dialog', { name: 'Envoyer le devis au client' });
-    await expect(send.locator('#send-to')).toHaveValue('paul.durand@essai.test', { timeout: 20_000 });
+    await expect(send.locator('[data-recipient="paul.durand@essai.test"]')).toBeVisible({ timeout: 20_000 });
     await send.getByRole('button', { name: 'Envoyer' }).click();
     await expect(page.getByRole('dialog', { name: 'Devis envoyé' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('dialog', { name: 'Devis envoyé' }).getByRole('button', { name: 'Fermer', exact: true }).last().click();

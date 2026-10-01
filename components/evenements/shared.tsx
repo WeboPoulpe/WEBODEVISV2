@@ -123,6 +123,5 @@ export function printDocument(title: string, body: string): boolean {
   return true;
 }
 
-const has = (category: string | undefined, keys: string[]) => !!category && keys.some((k) => category.toLowerCase().includes(k));
-export const isMaterielLine = (l: ServiceLine) => has(l.category, ['matériel', 'materiel', 'vaisselle', 'équipement', 'equipement', 'location', 'technique']);
-export const isPersonnelLine = (l: ServiceLine) => has(l.category, ['personnel', 'service', 'staff', 'extra', 'cuisinier', 'serveur']);
+// Partagées avec le tableau de bord, qui calcule aussi ce qui reste à préparer.
+export { isMaterielLine, isPersonnelLine } from '@/lib/events/prep';

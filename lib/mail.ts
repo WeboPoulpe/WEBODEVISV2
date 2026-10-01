@@ -36,11 +36,19 @@ export async function sendMail({ to, subject, html, fromName, replyTo }: Mail): 
     return { error: null };
   }
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const post = () => fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
     });
+    let res = await post();
+    // Resend limite le nombre d'envois par seconde : plusieurs emails à la suite (un devis envoyé à
+    // plusieurs personnes) peuvent être refusés une fois. On attend un peu et on réessaie.
+    if (res.status === 429) {
+      const wait = Math.min(5, Number(res.headers.get('retry-after')) || 1);
+      await new Promise((r) => setTimeout(r, wait * 1000));
+      res = await post();
+    }
     if (!res.ok) {
       console.error(`[mail] refusé par Resend (${res.status}) : ${(await res.text()).slice(0, 300)}`);
       return { error: 'L’email n’a pas pu être envoyé.' };

@@ -19,7 +19,7 @@ import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 import ImportDevisModal from '@/components/devis/ImportDevisModal';
 import FinanceSheet from '@/components/devis/FinanceSheet';
-import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
+import { quoteTotalTTC } from '@/lib/quoteTotals';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES, QUOTE_STATUSES, QUOTE_STATUS_LABELS } from '@/lib/quoteStatus';
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
@@ -98,29 +98,8 @@ function quoteDisplayName(q: { internal_name?: string | null; client_name?: stri
   return (q.internal_name && q.internal_name.trim()) || q.client_name || '—';
 }
 
-function computeQuoteTotal(quote: {
-  total_amount: number | null;
-  vat_rate?: number | null;
-  guest_count?: number | null;
-  guest_count_adults?: number | null;
-  guest_count_children?: number | null;
-  services: QuoteService[] | null;
-}): number | null {
-  // Calcule depuis les services (exclut gratuits, options et retirés) — montant HORS options,
-  // en tenant compte du prix enfant « au couvert ».
-  if (Array.isArray(quote.services) && quote.services.length > 0) {
-    const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const services = quote.services as any[];
-    const ht = services.reduce((sum, s) => {
-      if (s.removed || s.isFree || s.isOption || s.isPageBreak) return sum;
-      return sum + lineTotalHT(s, adults, children);
-    }, 0);
-    if (ht > 0) return ht * (1 + (quote.vat_rate ?? 20) / 100); // TTC au vrai taux de TVA du devis
-  }
-  // Fallback to total_amount in DB
-  return quote.total_amount;
-}
+// Total TTC hors options, au vrai taux de TVA du devis (partagé avec le tableau de bord).
+const computeQuoteTotal = quoteTotalTTC;
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const EVENT_ICONS: Record<string, React.ElementType> = {
@@ -1243,9 +1222,9 @@ export default function DevisPage() {
           quote={{ id: sendQuote.id, client_email: sendQuote.client_email ?? null, event_type: sendQuote.event_type, event_date: sendQuote.event_date }}
           companyName={profile?.company_name}
           onClose={() => setSendQuote(null)}
-          onSent={({ status, to }) => {
+          onSent={({ status, clientEmail }) => {
             if (status) handleStatusChange(sendQuote.id, status);
-            setQuotes((prev) => prev.map((q) => (q.id === sendQuote.id ? { ...q, client_email: to } : q)));
+            if (clientEmail) setQuotes((prev) => prev.map((q) => (q.id === sendQuote.id ? { ...q, client_email: clientEmail } : q)));
           }}
         />
       )}

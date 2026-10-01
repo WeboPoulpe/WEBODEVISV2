@@ -81,7 +81,7 @@ export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light 
           quote={{ id: quoteId, client_email: meta.client_email, event_type: meta.event_type, event_date: meta.event_date }}
           companyName={profile?.company_name}
           onClose={() => setOpen(null)}
-          onSent={({ status, to }) => setMeta((m) => (m ? { ...m, status: status ?? m.status, client_email: to } : m))}
+          onSent={({ status, clientEmail }) => setMeta((m) => (m ? { ...m, status: status ?? m.status, client_email: clientEmail ?? m.client_email } : m))}
         />
       )}
       {open === 'copy' && user && <DuplicateQuoteModal quoteId={quoteId} userId={user.id} onClose={() => setOpen(null)} />}

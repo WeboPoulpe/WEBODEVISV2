@@ -34,3 +34,29 @@ export function lineTotalHT(line: PricedLine, adults = 0, children = 0): number 
   }
   return (line.quantity ?? 0) * unit;
 }
+
+/**
+ * Total TTC d'un devis, hors options : calculé depuis ses lignes (sans les lignes offertes, en option
+ * ou retirées) au taux de TVA du devis, sinon le montant enregistré. Le même que la liste des devis.
+ */
+export function quoteTotalTTC(quote: {
+  total_amount: number | string | null;
+  vat_rate?: number | string | null;
+  guest_count?: number | null;
+  guest_count_adults?: number | null;
+  guest_count_children?: number | null;
+  services: unknown;
+}): number | null {
+  if (Array.isArray(quote.services) && quote.services.length > 0) {
+    const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const services = quote.services as any[];
+    const ht = services.reduce((sum, s) => {
+      if (!s || s.removed || s.isFree || s.isOption || s.isPageBreak) return sum;
+      return sum + lineTotalHT(s, adults, children);
+    }, 0);
+    const vat = quote.vat_rate == null || quote.vat_rate === '' ? 20 : Number(quote.vat_rate);
+    if (ht > 0) return ht * (1 + (Number.isFinite(vat) ? vat : 20) / 100); // TTC au vrai taux de TVA du devis
+  }
+  return quote.total_amount == null ? null : Number(quote.total_amount);
+}

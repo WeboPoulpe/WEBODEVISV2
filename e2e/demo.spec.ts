@@ -113,7 +113,7 @@ test.describe('démonstration', () => {
     test.skip(!mission, 'aucun extra de démonstration chargé des courses');
 
     await page.goto(`/e/${mission.token}`);
-    await page.getByRole('link', { name: 'Voir la liste de courses' }).first().click();
+    await page.getByRole('link', { name: 'Ma liste de courses' }).first().click();
     await expect(page).toHaveURL(new RegExp('/e/[^/]+/courses/'), { timeout: 20_000 });
     await expect(page.getByRole('heading', { level: 1, name: 'Liste de courses' })).toBeVisible();
     const before = await page.getByRole('checkbox', { checked: true }).count();
