@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check, ChevronRight, RotateCw } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Printer, RotateCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { quoteStatusLabel } from '@/lib/quoteStatus';
@@ -95,9 +95,16 @@ function TodoPanel({ data }: { data: DashboardData | null }) {
 
   return (
     <section className={cn(cardCls, 'p-4 sm:p-5')} aria-labelledby="todo-title" data-testid="todo">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="todo-title" className="text-xl font-semibold text-gray-900">À faire</h2>
-        {data && todo.length > 0 && <p className="text-sm text-gray-500">{plural(todo.length, 'tâche', 'tâches')}, la plus urgente d’abord</p>}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="todo-title" className="text-xl font-semibold text-gray-900">À faire</h2>
+          {data && todo.length > 0 && <p className="text-sm text-gray-500">{plural(todo.length, 'tâche', 'tâches')}, la plus urgente d’abord</p>}
+        </div>
+        {data && (
+          <a href="/tableau-de-bord/imprimer?auto" target="_blank" rel="noopener" className={cn(btnSecondary, 'h-10 px-3 flex-shrink-0')}>
+            <Printer className="h-4 w-4" /><span className="hidden sm:inline">Imprimer</span><span className="sr-only sm:hidden">Imprimer le à faire</span>
+          </a>
+        )}
       </div>
 
       {!data ? (
