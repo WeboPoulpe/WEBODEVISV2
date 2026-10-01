@@ -11,8 +11,9 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
-import { ErrorBanner } from '@/components/evenements/shared';
-import { EXTRA_ROLES, MISSION_STATUSES, type MissionStatus } from '@/lib/extras';
+import { Check as CheckBox, ErrorBanner } from '@/components/evenements/shared';
+import MultiAssignModal, { StatusChoice, type NewAssignment } from '@/components/extras/MultiAssignModal';
+import { EXTRA_ROLES, MISSION_STATUSES, roleFamily, type MissionStatus } from '@/lib/extras';
 import { notifyMissionChanged } from '@/server/extras';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -94,21 +95,6 @@ function StatusPill({ value }: { value: Status }) {
     <span className={cn(pill, 'gap-1.5', s.cls)}>
       <span className={cn('w-1.5 h-1.5 rounded-full', s.dot)} />{s.label}
     </span>
-  );
-}
-
-/** Choix du statut en onglets segmentés : visible d'un coup d'œil, confortable au doigt. */
-function StatusChoice({ value, onChange }: { value: Status; onChange: (s: Status) => void }) {
-  return (
-    <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-gray-200/70" role="radiogroup" aria-label="Statut">
-      {STATUSES.map((s) => (
-        <button key={s.value} type="button" role="radio" aria-checked={value === s.value} onClick={() => onChange(s.value)}
-          className={cn('flex items-center justify-center gap-1.5 h-10 px-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
-            value === s.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
-          <span className={cn('w-2 h-2 rounded-full flex-shrink-0', legendDot(s))} />{s.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -227,91 +213,6 @@ function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, on
           </div>
         )}
 
-        {error && <p role="alert" className={errorCls}>{error}</p>}
-      </div>
-    </Modal>
-  );
-}
-
-// ── Affecter à un événement ──────────────────────────────────────────────────
-function AssignModal({
-  extra, userId, assignedQuoteIds, onSave, onClose,
-}: {
-  extra: Extra;
-  userId: string;
-  assignedQuoteIds: string[];
-  onSave: (quoteId: string, status: Status, arrivalTime: string) => Promise<boolean>;
-  onClose: () => void;
-}) {
-  const [quotes, setQuotes]   = useState<QuoteOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [quoteId, setQuoteId] = useState('');
-  const [status, setStatus]   = useState<Status>('a_solliciter');
-  const [arrTime, setArrTime] = useState('');
-  const [error, setError]     = useState<string | null>(null);
-  // Clé stable : la liste est recréée à chaque rendu de la page, sans que son contenu change.
-  const assignedKey = assignedQuoteIds.join(',');
-
-  useEffect(() => {
-    const assigned = assignedKey ? assignedKey.split(',') : [];
-    createClient()
-      .from('quotes')
-      .select('id, event_type, event_date, client_name')
-      .eq('user_id', userId)
-      .order('event_date', { ascending: true, nullsFirst: false })
-      .then(({ data }) => {
-        setQuotes(((data ?? []) as QuoteOption[]).filter((q) => !assigned.includes(q.id)));
-        setLoading(false);
-      });
-  }, [userId, assignedKey]);
-
-  const submit = async () => {
-    if (!quoteId) return;
-    setSaving(true); setError(null);
-    const ok = await onSave(quoteId, status, arrTime);
-    setSaving(false);
-    if (!ok) setError('L’extra n’a pas pu être affecté. Réessayez.');
-  };
-
-  return (
-    <Modal
-      title="Assigner à un événement"
-      onClose={onClose}
-      footer={<>
-        <button onClick={onClose} className={btnGhost}>Annuler</button>
-        <button onClick={submit} disabled={!quoteId || saving} className={btnPrimary}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Assigner
-        </button>
-      </>}
-    >
-      <div className="space-y-4 pb-3">
-        <p className="text-[15px] font-semibold text-gray-900">{extra.name}</p>
-        <div>
-          <label htmlFor="assign-event" className={labelCls}>Événement</label>
-          {loading ? (
-            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
-          ) : quotes.length === 0 ? (
-            <p className="rounded-2xl bg-gray-50 px-4 py-4 text-sm text-gray-600">Aucun événement disponible. Les événements viennent de vos devis.</p>
-          ) : (
-            <select id="assign-event" value={quoteId} onChange={(e) => setQuoteId(e.target.value)} className={inputCls}>
-              <option value="">Choisir un événement</option>
-              {quotes.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.event_type || 'Événement'}, {q.client_name}{q.event_date ? ` (${dateFr(q.event_date, { day: 'numeric', month: 'long' })})` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div>
-          <p className={labelCls}>Statut de départ</p>
-          <StatusChoice value={status} onChange={setStatus} />
-        </div>
-        <div>
-          <label htmlFor="assign-time" className={labelCls}>Heure d’arrivée</label>
-          <input id="assign-time" type="time" value={arrTime} onChange={(e) => setArrTime(e.target.value)} className={inputCls} />
-        </div>
         {error && <p role="alert" className={errorCls}>{error}</p>}
       </div>
     </Modal>
@@ -541,9 +442,11 @@ function AgendaView({ extras, assignments, onTagClick }: {
 
 // ── Ligne d'un extra ──────────────────────────────────────────────────────────
 function ExtraRow({
-  extra, assignments, onEdit, onDelete, onAssign, onCopyLink, copied, onTagClick,
+  extra, assignments, checked, onCheck, onEdit, onDelete, onAssign, onCopyLink, copied, onTagClick,
 }: {
   extra: Extra;
+  checked: boolean;
+  onCheck: (on: boolean) => void;
   assignments: Assignment[];
   onEdit: () => void;
   onDelete: () => void;
@@ -563,17 +466,20 @@ function ExtraRow({
   const daysOff = (extra.unavailable_dates ?? []).map((d) => d.slice(0, 10)).filter((d) => d >= today).sort();
 
   return (
-    <li className="py-1">
+    <li data-extra={extra.name} className={cn('py-1', checked && 'bg-sage-100/30')}>
       <div className="flex items-center gap-1 pr-2">
-        <button onClick={onEdit} aria-label={`Modifier ${extra.name}`} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 text-left pl-4 sm:pl-5 py-2.5">
-          <Avatar name={extra.name} />
+        <label className="flex items-center justify-center w-10 h-10 ml-1.5 sm:ml-3 flex-shrink-0 cursor-pointer">
+          <CheckBox checked={checked} onChange={onCheck} label={`Sélectionner ${extra.name}`} />
+        </label>
+        <button onClick={onEdit} aria-label={`Modifier ${extra.name}`} className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 text-left pl-1 sm:pl-2 py-2.5">
+          <span className="hidden sm:flex"><Avatar name={extra.name} /></span>
           <span className="flex-1 min-w-0">
             <span className="block font-semibold text-gray-900 truncate">{extra.name}</span>
             <span className="block text-sm text-gray-500 truncate">{meta || 'Aucune coordonnée'}</span>
           </span>
         </button>
         <button onClick={onAssign} className={cn(btnSecondary, 'h-10 px-3 hidden sm:inline-flex')}><UserPlus className="h-4 w-4" />Assigner</button>
-        <button onClick={onAssign} className={cn(iconBtn, 'sm:hidden')} aria-label={`Assigner ${extra.name} à un événement`}><UserPlus className="h-[18px] w-[18px]" /></button>
+        <button onClick={onAssign} className={cn(iconBtn, 'sm:hidden')} aria-label={`Assigner ${extra.name} à des événements`}><UserPlus className="h-[18px] w-[18px]" /></button>
         <button onClick={onCopyLink} className={iconBtn} aria-label={`Copier le lien de la page de missions de ${extra.name}`} title={copied ? 'Lien copié' : 'Copier le lien de sa page de missions'}>
           {copied ? <Check className="h-[18px] w-[18px] text-sage" /> : <Link2 className="h-[18px] w-[18px]" />}
         </button>
@@ -581,7 +487,7 @@ function ExtraRow({
       </div>
 
       {assignments.length > 0 && (
-        <div className="flex flex-wrap gap-2 pl-4 sm:pl-[76px] pr-4 pb-2.5">
+        <div className="flex flex-wrap gap-2 pl-[56px] sm:pl-[128px] pr-4 pb-2.5">
           {upcoming.map((a) => {
             const s = st(a.status);
             return (
@@ -608,7 +514,7 @@ function ExtraRow({
         </div>
       )}
       {daysOff.length > 0 && (
-        <p className="pl-4 sm:pl-[76px] pr-4 pb-2.5 text-sm text-gray-600">
+        <p className="pl-[56px] sm:pl-[128px] pr-4 pb-2.5 text-sm text-gray-600">
           Pas disponible le {daysOff.slice(0, 6).map((d) => dateFr(d, { day: 'numeric', month: 'short' })).join(', ')}
           {daysOff.length > 6 ? ` et ${daysOff.length - 6} autre${daysOff.length - 6 > 1 ? 's' : ''} jour${daysOff.length - 6 > 1 ? 's' : ''}` : ''}
         </p>
@@ -616,6 +522,14 @@ function ExtraRow({
     </li>
   );
 }
+
+// ── Filtre par rôle ──────────────────────────────────────────────────────────
+type Family = 'all' | 'service' | 'cuisine' | 'plonge' | 'transport' | 'autre';
+const FAMILY_FILTERS: { key: Family; label: string }[] = [
+  { key: 'all', label: 'Tous' }, { key: 'service', label: 'Service' }, { key: 'cuisine', label: 'Cuisine' },
+  { key: 'plonge', label: 'Plonge' }, { key: 'transport', label: 'Transport' }, { key: 'autre', label: 'Autres' },
+];
+const familyOf = (e: Extra): Family => roleFamily(e.role) ?? 'autre';
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function ExtrasPage() {
@@ -628,7 +542,10 @@ export default function ExtrasPage() {
   const [editing,     setEditing]     = useState<Extra | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [copied,      setCopied]      = useState<string | null>(null);
-  const [assignFor,   setAssignFor]   = useState<Extra | null>(null);
+  // Extras cochés dans la liste, filtre par rôle, et extras pour qui la fenêtre « Assigner » est ouverte.
+  const [selected,    setSelected]    = useState<string[]>([]);
+  const [family,      setFamily]      = useState<Family>('all');
+  const [assignFor,   setAssignFor]   = useState<string[] | null>(null);
   const [viewMode,    setViewMode]    = useState<'list' | 'agenda'>('list');
   const [openSheet,   setOpenSheet]   = useState<{ assignment: Assignment; extra: Extra } | null>(null);
 
@@ -717,18 +634,27 @@ export default function ExtrasPage() {
     return true;
   };
 
-  const handleAssign = async (quoteId: string, status: Status, arrivalTime: string) => {
-    if (!assignFor) return false;
-    const { data, error: err } = await createClient()
-      .from('event_extras')
-      .insert({ extra_id: assignFor.id, quote_id: quoteId, status, arrival_time: arrivalTime || null, mission_notes: null })
-      .select(ASSIGN_SELECT)
-      .single();
-    if (err || !data) return false;
-    setAssignments((p) => [...p, data as unknown as Assignment]);
-    setAssignFor(null);
-    return true;
+  /** Toutes les affectations de la fenêtre « Assigner » en un seul envoi. */
+  const handleAssign = async (rows: NewAssignment[]) => {
+    const { data, error: err } = await createClient().from('event_extras').insert(rows).select(ASSIGN_SELECT);
+    if (err || !data) return null;
+    const created = (data as unknown as Assignment[]).filter((a) => a.quote?.id);
+    setAssignments((p) => [...p, ...created]);
+    setSelected([]);
+    return created.map((a) => ({ id: a.id, extra_id: a.extra_id, quote_id: a.quote.id }));
   };
+
+  // Filtre par rôle (familles de lib/extras.ts) ; « Tout cocher » porte sur les extras affichés.
+  const families = useMemo(() => {
+    const count: Record<Family, number> = { all: extras.length, service: 0, cuisine: 0, plonge: 0, transport: 0, autre: 0 };
+    for (const e of extras) count[familyOf(e)]++;
+    return FAMILY_FILTERS.filter((f) => f.key === 'all' || count[f.key] > 0).map((f) => ({ ...f, count: count[f.key] }));
+  }, [extras]);
+  const visible = family === 'all' ? extras : extras.filter((e) => familyOf(e) === family);
+  const allChecked = visible.length > 0 && visible.every((e) => selected.includes(e.id));
+  const checkAll = (on: boolean) => setSelected((list) => on
+    ? [...list, ...visible.map((e) => e.id).filter((id) => !list.includes(id))]
+    : list.filter((id) => !visible.some((e) => e.id === id)));
 
   const copyLink = (token: string, id: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/e/${token}`).then(() => {
@@ -781,21 +707,52 @@ export default function ExtrasPage() {
       ) : viewMode === 'agenda' ? (
         <AgendaView extras={extras} assignments={assignments} onTagClick={(a, e) => setOpenSheet({ assignment: a, extra: e })} />
       ) : (
-        <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
-          {extras.map((extra) => (
+        <>
+          <div className="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-2 mb-2 bg-page">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex items-center gap-2.5 h-10 pl-3 pr-4 rounded-xl bg-white border border-gray-200 cursor-pointer text-sm font-medium text-gray-900">
+                <CheckBox checked={allChecked} onChange={checkAll} label={allChecked ? 'Tout décocher' : 'Tout cocher'} />
+                {allChecked ? 'Tout décocher' : 'Tout cocher'}
+              </label>
+              {families.length > 2 && (
+                <div role="group" aria-label="Filtrer par rôle" className="flex flex-wrap gap-1.5">
+                  {families.map((f) => (
+                    <button key={f.key} type="button" aria-pressed={family === f.key} onClick={() => setFamily(f.key)}
+                      className={cn('h-10 px-3 rounded-xl text-sm font-medium border transition-colors whitespace-nowrap',
+                        family === f.key ? 'bg-forest border-forest text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300')}>
+                      {f.label} <span className={family === f.key ? 'text-white/80' : 'text-gray-500'}>{f.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selected.length > 0 && (
+                <div className="flex items-center gap-3 w-full sm:w-auto sm:ml-auto">
+                  <p className="text-sm text-gray-700 flex-1 sm:flex-none whitespace-nowrap">{selected.length} sélectionné{selected.length > 1 ? 's' : ''}</p>
+                  <button onClick={() => setAssignFor(selected)} className={cn(btnPrimary, 'h-10')}>
+                    <UserPlus className="h-4 w-4" />{selected.length > 1 ? `Assigner ${selected.length} extras` : 'Assigner'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
+          {visible.map((extra) => (
             <ExtraRow
               key={extra.id}
               extra={extra}
               assignments={assignmentsByExtra[extra.id] ?? []}
+              checked={selected.includes(extra.id)}
+              onCheck={(on) => setSelected((list) => (on ? [...list, extra.id] : list.filter((id) => id !== extra.id)))}
               onEdit={() => { setEditing(extra); setShowModal(true); }}
               onDelete={() => handleDelete(extra)}
-              onAssign={() => setAssignFor(extra)}
+              onAssign={() => setAssignFor([extra.id])}
               onCopyLink={() => copyLink(extra.access_token, extra.id)}
               copied={copied === extra.id}
               onTagClick={(a) => setOpenSheet({ assignment: a, extra })}
             />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       {showModal && (
@@ -806,12 +763,13 @@ export default function ExtrasPage() {
           saving={saving}
         />
       )}
-      {assignFor && user && (
-        <AssignModal
-          extra={assignFor}
-          userId={user.id}
-          assignedQuoteIds={(assignmentsByExtra[assignFor.id] ?? []).map((a) => a.quote.id)}
-          onSave={handleAssign}
+      {assignFor && (
+        <MultiAssignModal
+          extras={extras}
+          initialSelected={assignFor}
+          assignments={assignments}
+          onCreate={handleAssign}
+          onSent={load}
           onClose={() => setAssignFor(null)}
         />
       )}
