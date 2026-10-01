@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
+import CompanySearch from '@/components/clients/CompanySearch';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ServiceLine {
@@ -437,6 +438,7 @@ export default function QuoteInlineEditor({
       client_address:      client.address,
       client_type:         client.type,
       company_name:        client.companyName || null,
+      client_siret:        client.type === 'entreprise' ? (client.siret?.trim() || null) : null,
       contact_person_name: client.contactName || null,
       event_type:          event.eventType,
       event_date:          event.eventDate || null,
@@ -478,6 +480,7 @@ export default function QuoteInlineEditor({
       client_address:      client.address,
       client_type:         client.type,
       company_name:        client.companyName || null,
+      client_siret:        client.type === 'entreprise' ? (client.siret?.trim() || null) : null,
       contact_person_name: client.contactName || null,
       event_type:          event.eventType,
       event_date:          event.eventDate || null,
@@ -571,7 +574,16 @@ export default function QuoteInlineEditor({
                 >Entreprise</button>
               </div>
               {client.type === 'entreprise' && (
-                <input value={client.companyName} onChange={(e) => setClient((c) => ({ ...c, companyName: e.target.value }))} placeholder="Nom de l'entreprise" className={inputCls} />
+                <>
+                  {/* Registre public : nom, adresse et SIRET remplis ; prénom, nom et contact gardés. */}
+                  <CompanySearch
+                    compact
+                    label="Rechercher l’entreprise"
+                    onPick={(co) => setClient((c) => ({ ...c, companyName: co.name, address: co.address || c.address, siret: co.siret }))}
+                  />
+                  <input value={client.companyName} onChange={(e) => setClient((c) => ({ ...c, companyName: e.target.value }))} placeholder="Nom de l'entreprise" aria-label="Nom de l’entreprise" className={inputCls} />
+                  <input value={client.siret ?? ''} onChange={(e) => setClient((c) => ({ ...c, siret: e.target.value }))} placeholder="SIRET" aria-label="SIRET" inputMode="numeric" className={inputCls} />
+                </>
               )}
               <div className="grid grid-cols-2 gap-2">
                 <input value={client.firstName} onChange={(e) => setClient((c) => ({ ...c, firstName: e.target.value }))} placeholder="Prénom" className={inputCls} />

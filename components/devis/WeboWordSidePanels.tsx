@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import RecipientPicker from '@/components/devis/RecipientPicker';
+import CompanySearch from '@/components/clients/CompanySearch';
+import type { CompanyResult } from '@/lib/companies';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -294,6 +296,29 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     setClientSearch('');
   };
 
+  // Entreprise trouvée dans le registre public : nom, adresse et SIRET remplis, le contact déjà saisi est gardé.
+  const pickCompany = (c: CompanyResult) => {
+    if (clientType !== 'entreprise') {
+      // Le devis passe d'un particulier à une entreprise : la personne devient le contact, la fiche
+      // du particulier n'est plus celle du destinataire.
+      if (!recipientContactName.trim() && clientName.trim()) setRecipientContactName(clientName.trim());
+      setCustomerId(null);
+      setRecipientContactId(null);
+    }
+    setClientType('entreprise');
+    setClientName(c.name);
+    if (c.address) setClientAddress(c.address);
+    setClientSiret(c.siret);
+  };
+
+  // SIRET déjà dans le carnet : on reprend cette fiche, comme depuis « Rechercher un client ».
+  const adoptExistingCustomer = async (id: string) => {
+    const { data } = await supabase.from('customers')
+      .select('id, first_name, last_name, email, phone, company_name, customer_type, address, siret_number, contact_person_name')
+      .eq('id', id).maybeSingle();
+    if (data) selectClient(data as Client);
+  };
+
   // ── Prestation search ──
   const searchPrestations = useCallback(async (q: string) => {
     setPrestationSearch(q);
@@ -560,11 +585,24 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       </div>
                     )}
                   </div>
+                  <CompanySearch
+                    compact
+                    label="Client entreprise : nom ou SIRET"
+                    excludeCustomerId={customerId}
+                    onPick={pickCompany}
+                    onUseExisting={(c) => adoptExistingCustomer(c.id)}
+                  />
                   <div className="border-t border-gray-100 pt-3 space-y-3">
-                    <div><label className={labelCls}>Nom complet</label><input value={clientName} onChange={(e) => setClientName(e.target.value)} className={inputCls} placeholder="Jean Dupont" /></div>
+                    <div><label htmlFor="ww-client-name" className={labelCls}>{clientType === 'entreprise' ? 'Entreprise' : 'Nom complet'}</label><input id="ww-client-name" value={clientName} onChange={(e) => setClientName(e.target.value)} className={inputCls} placeholder={clientType === 'entreprise' ? 'Nom de l’entreprise' : 'Jean Dupont'} /></div>
+                    {clientType === 'entreprise' && (
+                      <div><label htmlFor="ww-client-siret" className={labelCls}>SIRET</label><input id="ww-client-siret" inputMode="numeric" value={clientSiret} onChange={(e) => setClientSiret(e.target.value)} className={inputCls} placeholder="123 456 789 00012" /></div>
+                    )}
+                    {clientType === 'entreprise' && !customerId && (
+                      <div><label htmlFor="ww-client-contact" className={labelCls}>Personne de contact</label><input id="ww-client-contact" value={recipientContactName} onChange={(e) => setRecipientContactName(e.target.value)} className={inputCls} placeholder="Claire Martin" /></div>
+                    )}
                     <div><label className={labelCls}>Email</label><input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className={inputCls} placeholder="jean@email.com" /></div>
                     <div><label className={labelCls}>Téléphone</label><input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className={inputCls} placeholder="06 12 34 56 78" /></div>
-                    <div><label className={labelCls}>Adresse</label><input value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} className={inputCls} placeholder="12 rue des Lilas" /></div>
+                    <div><label htmlFor="ww-client-address" className={labelCls}>Adresse</label><input id="ww-client-address" value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} className={inputCls} placeholder="12 rue des Lilas" /></div>
                   </div>
 
                   {customerId && clientType === 'entreprise' && (

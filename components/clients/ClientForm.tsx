@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import ContactsEditor from '@/components/clients/ContactsEditor';
 import { saveContacts, type ContactDraft } from '@/lib/customerContacts';
+import CompanySearch from '@/components/clients/CompanySearch';
+import { cleanSiret } from '@/lib/companies';
 
 type ClientType = 'particulier' | 'entreprise';
 
@@ -55,6 +57,16 @@ export default function ClientForm() {
     e.preventDefault();
     if (!user) return;
 
+    // Une entreprise s'enregistre avec son nom et une personne de contact (contrainte de la base) :
+    // à défaut du champ, le premier interlocuteur saisi plus bas en tient lieu.
+    const contactPerson = form.contactPersonName.trim()
+      || contacts.find((c) => c.is_primary && c.name.trim())?.name.trim()
+      || contacts.find((c) => c.name.trim())?.name.trim() || '';
+    if (form.type === 'entreprise' && (!form.companyName.trim() || !contactPerson)) {
+      setError('Indiquez le nom de l’entreprise et une personne de contact.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -67,8 +79,8 @@ export default function ClientForm() {
         first_name: form.firstName || null,
         last_name: form.lastName || null,
         company_name: form.companyName || null,
-        siret_number: form.siretNumber || null,
-        contact_person_name: form.contactPersonName || null,
+        siret_number: form.type === 'entreprise' ? cleanSiret(form.siretNumber) : null,
+        contact_person_name: form.type === 'entreprise' ? contactPerson : form.contactPersonName || null,
         contact_person_email: form.contactPersonEmail || null,
         contact_person_phone: form.contactPersonPhone || null,
         email: form.email,
@@ -80,7 +92,12 @@ export default function ClientForm() {
 
     if (err || !created) {
       setLoading(false);
-      setError(err?.message ?? 'Erreur lors de la création du client.');
+      const message = err?.message ?? '';
+      setError(/siret/i.test(message)
+        ? 'Un client de votre carnet porte déjà ce SIRET.'
+        : /email/i.test(message)
+          ? 'Un client de votre carnet utilise déjà cet email.'
+          : 'Le client n’a pas pu être créé. Vérifiez les informations et réessayez.');
       return;
     }
 
@@ -138,6 +155,13 @@ export default function ClientForm() {
             </>
           ) : (
             <>
+              <CompanySearch
+                className="sm:col-span-2"
+                label="Rechercher l’entreprise (nom ou SIRET)"
+                onPick={(c) => setForm((f) => ({ ...f, companyName: c.name, address: c.address || f.address, siretNumber: c.siret }))}
+                onUseExisting={(c) => router.push(`/clients?fiche=${c.id}`)}
+                useExistingLabel="Ouvrir cette fiche"
+              />
               <div className="sm:col-span-2">
                 <Field
                   label="Nom de l'entreprise *"
@@ -273,10 +297,12 @@ function Field({
   type?: string;
   required?: boolean;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useId, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus, Search, Users, Building2, User, Mail, Phone, FileText, Star,
@@ -18,6 +18,8 @@ import { FilePlus2 } from 'lucide-react';
 import { btnPrimary, btnSecondary, cardCls, iconBtn, inputCls, pill } from '@/components/ui/kit';
 import { Upload } from 'lucide-react';
 import ImportClientsModal from '@/components/clients/ImportClientsModal';
+import CompanySearch from '@/components/clients/CompanySearch';
+import { cleanSiret } from '@/lib/companies';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Customer {
@@ -30,6 +32,7 @@ interface Customer {
   phone: string | null;
   address?: string | null;
   siret_number?: string | null;
+  contact_person_name?: string | null;
   notes?: string | null;
   quote_count?: number;
 }
@@ -104,9 +107,11 @@ const statusOf = (status: string) => ({
 
 // ── Customer CRM Sheet ─────────────────────────────────────────────────────────
 function CustomerSheet({
-  customer, onClose, onUpdated,
+  customer, onClose, onUpdated, onOpenCustomer,
 }: {
   customer: Customer; onClose: () => void; onUpdated: (c: Customer) => void;
+  /** Ouvre une autre fiche du carnet (SIRET déjà enregistré ailleurs). */
+  onOpenCustomer: (id: string) => void;
 }) {
   const { user } = useAuth();
   const [tab, setTab] = useState<'infos' | 'notes' | 'historique'>('infos');
@@ -145,6 +150,16 @@ function CustomerSheet({
   }, [customer.id, customer.customer_type]);
 
   const handleSaveInfos = async () => {
+    // Une entreprise s'enregistre avec une personne de contact (contrainte de la base) : le contact
+    // principal, sinon celui déjà connu, sinon la personne de la fiche quand elle était un particulier.
+    const contactPerson = editContacts.find((c) => c.is_primary && c.name.trim())?.name.trim()
+      || editContacts.find((c) => c.name.trim())?.name.trim()
+      || form.contact_person_name?.trim()
+      || `${form.first_name ?? ''} ${form.last_name ?? ''}`.trim();
+    if (form.customer_type === 'entreprise' && (!form.company_name?.trim() || !contactPerson)) {
+      alert('Indiquez le nom de l’entreprise et ajoutez au moins un contact.');
+      return;
+    }
     setSaving(true);
     const { error } = await createClient().from('customers').update({
       customer_type: form.customer_type,
@@ -154,14 +169,19 @@ function CustomerSheet({
       email: form.email,
       phone: form.phone || null,
       address: form.address?.trim() || null,
-      siret_number: form.customer_type === 'entreprise' ? form.siret_number?.trim() || null : null,
+      siret_number: form.customer_type === 'entreprise' ? cleanSiret(form.siret_number) : null,
+      ...(form.customer_type === 'entreprise' ? { contact_person_name: contactPerson } : {}),
     }).eq('id', customer.id);
     if (error) {
       setSaving(false);
-      alert('La fiche n’a pas pu être enregistrée. Vérifiez l’email (il doit être unique dans votre carnet) et réessayez.');
+      alert(/siret/i.test(error.message ?? '')
+        ? 'Un autre client de votre carnet porte déjà ce SIRET.'
+        : 'La fiche n’a pas pu être enregistrée. Vérifiez l’email (il doit être unique dans votre carnet) et réessayez.');
       return;
     }
-    if (form.customer_type === 'entreprise' && user) {
+    // Sans interlocuteur nommé, la liste n'est pas réécrite : le contact de la fiche (obligatoire pour
+    // une entreprise) serait effacé et l'enregistrement refusé.
+    if (form.customer_type === 'entreprise' && user && editContacts.some((c) => c.name.trim())) {
       const res = await saveContacts(customer.id, user.id, editContacts);
       if (res.error) {
         setSaving(false);
@@ -206,7 +226,17 @@ function CustomerSheet({
               <SField label="Nom" value={form.last_name ?? ''} onChange={(v) => setForm({ ...form, last_name: v })} />
             </div>
           ) : (
-            <SField label="Entreprise" value={form.company_name ?? ''} onChange={(v) => setForm({ ...form, company_name: v })} />
+            <>
+              <CompanySearch
+                compact
+                label="Rechercher l’entreprise (nom ou SIRET)"
+                excludeCustomerId={customer.id}
+                onPick={(c) => setForm((f) => ({ ...f, company_name: c.name, address: c.address || f.address, siret_number: c.siret }))}
+                onUseExisting={(c) => onOpenCustomer(c.id)}
+                useExistingLabel="Ouvrir cette fiche"
+              />
+              <SField label="Entreprise" value={form.company_name ?? ''} onChange={(v) => setForm({ ...form, company_name: v })} />
+            </>
           )}
           <SField label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
           <SField label="Téléphone" value={form.phone ?? ''} onChange={(v) => setForm({ ...form, phone: v })} />
@@ -342,7 +372,7 @@ export default function ClientsPage() {
     const supabase = createClient();
     const { data: cust } = await supabase
       .from('customers')
-      .select('id, customer_type, first_name, last_name, company_name, email, phone, address, siret_number, notes')
+      .select('id, customer_type, first_name, last_name, company_name, email, phone, address, siret_number, contact_person_name, notes')
       .order('created_at', { ascending: false });
     if (!cust) { setLoading(false); return; }
     const { data: counts } = await supabase.from('quotes').select('client_email');
@@ -350,8 +380,13 @@ export default function ClientsPage() {
     counts?.forEach(({ client_email }) => {
       if (client_email) countMap[client_email] = (countMap[client_email] ?? 0) + 1;
     });
-    setCustomers(cust.map((c) => ({ ...c, quote_count: countMap[c.email] ?? 0 })));
+    const list = cust.map((c) => ({ ...c, quote_count: countMap[c.email] ?? 0 }));
+    setCustomers(list);
     setLoading(false);
+    // Arrivée depuis une autre page sur une fiche précise (/clients?fiche=…) : elle s'ouvre.
+    const wanted = new URLSearchParams(window.location.search).get('fiche');
+    const target = wanted ? list.find((c) => c.id === wanted) : undefined;
+    if (target) setSheetCustomer(target);
   }, []);
 
   useEffect(() => { loadCustomers(); }, [loadCustomers]);
@@ -444,7 +479,9 @@ export default function ClientsPage() {
 
       {sheetCustomer && (
         <CustomerSheet
+          key={sheetCustomer.id}
           customer={sheetCustomer}
+          onOpenCustomer={(id) => { const other = customers.find((c) => c.id === id); if (other) setSheetCustomer(other); }}
           onClose={() => setSheetCustomer(null)}
           onUpdated={(updated) => {
             setCustomers((prev) => prev.map((c) => c.id === updated.id ? { ...c, ...updated } : c));
@@ -457,10 +494,11 @@ export default function ClientsPage() {
 }
 
 function SField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string; }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
     </div>
   );
