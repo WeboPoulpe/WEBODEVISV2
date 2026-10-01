@@ -92,7 +92,19 @@ export const EQUIPMENT_BASE: { name: string; unit: (typeof UNITS)[number]; qty: 
   { group: 'Installation et nettoyage', name: 'Trousse de secours', unit: 'pièce', qty: 1 },
 ];
 
-const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+/** Texte ramené à sa forme simple : minuscules, sans accents, espaces réduits (« Étuve  » → « etuve »). */
+export const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+
+/**
+ * Recherche dans les listes : chaque mot tapé doit se retrouver dans l'un des textes (nom, groupe…),
+ * sans tenir compte des accents ni des majuscules. « etuve » trouve « Étuve chauffante ».
+ */
+export function matchesSearch(query: string, ...texts: (string | null | undefined)[]): boolean {
+  const words = fold(query).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  const haystack = fold(texts.filter(Boolean).join(' '));
+  return words.every((w) => haystack.includes(w));
+}
 
 /** L'article de base qui porte ce nom, pour préremplir son unité et sa quantité. */
 export function findBaseArticle<T extends { name: string }>(list: T[], name: string): T | undefined {

@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ListChecks, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { EQUIPMENT_BASE, findBaseArticle, sameName, UNITS } from '@/lib/equipment';
+import { EQUIPMENT_BASE, findBaseArticle, matchesSearch, sameName, UNITS } from '@/lib/equipment';
 import Modal from '@/components/ui/Modal';
+import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +31,8 @@ export default function MaterielPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<typeof emptyForm | null>(null);
   const [picking, setPicking] = useState<Record<string, string> | null>(null);
+  // Recherche dans la liste de base ; les articles cochés restent cochés même quand elle les cache.
+  const [baseQuery, setBaseQuery] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -82,6 +85,16 @@ export default function MaterielPage() {
     setPicking(null);
   };
 
+  const openPicking = () => { setBaseQuery(''); setPicking({}); };
+
+  // Article introuvable dans la liste de base : formulaire d'article perso prérempli avec le texte cherché.
+  // La liste reste ouverte dessous si des articles y sont cochés.
+  const addTyped = (text: string) => {
+    if (picking && Object.keys(picking).length === 0) setPicking(null);
+    setBaseQuery('');
+    setForm({ ...emptyForm, name: text });
+  };
+
   const qtyLabel = (i: Preset) => (i.qty_per_guest ? `${i.qty_per_guest.toLocaleString('fr-FR')} ${i.unit ?? 'pièce'} par couvert` : `${i.default_qty.toLocaleString('fr-FR')} ${i.unit ?? 'pièce'}`);
 
   return (
@@ -92,7 +105,7 @@ export default function MaterielPage() {
           <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">Ce que vous emportez sur vos événements. Dans un événement, onglet Matériel, vous le cochez au lieu de le retaper.</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button onClick={() => setPicking({})} className={cn(btnSecondary, 'whitespace-nowrap')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
+          <button onClick={openPicking} className={cn(btnSecondary, 'whitespace-nowrap')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
           <button onClick={() => setForm({ ...emptyForm })} className={cn(btnPrimary, 'flex-1 sm:flex-none whitespace-nowrap')}><Plus className="h-4 w-4" />Nouvel article</button>
         </div>
       </div>
@@ -114,7 +127,7 @@ export default function MaterielPage() {
         <div className={cn(cardCls, 'flex flex-col items-center px-6 py-14 text-center')}>
           <p className="font-semibold text-gray-900 mb-1">Votre liste de matériel est vide</p>
           <p className="text-sm text-gray-500 mb-5 max-w-md">Partez de la liste de base (chafing dish, caisses isothermes, bacs gastro, rallonges…) : vous cochez ce que vous avez, et la quantité habituelle est déjà remplie.</p>
-          <button onClick={() => setPicking({})} className={btnPrimary}><ListChecks className="h-4 w-4" />Partir de la liste de base</button>
+          <button onClick={openPicking} className={btnPrimary}><ListChecks className="h-4 w-4" />Partir de la liste de base</button>
         </div>
       ) : (
         <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
@@ -135,8 +148,12 @@ export default function MaterielPage() {
 
       {picking && (() => {
         const available = EQUIPMENT_BASE.filter((a) => !(items ?? []).some((i) => sameName(i.name, a.name)));
-        const groups = [...new Set(available.map((a) => a.group))];
+        const found = available.filter((a) => matchesSearch(baseQuery, a.name, a.group));
+        const groups = [...new Set(found.map((a) => a.group))];
         const count = Object.keys(picking).length;
+        const hiddenOn = Object.keys(picking).filter((n) => !found.some((a) => a.name === n)).length;
+        const typed = baseQuery.trim();
+        const owned = typed && found.length === 0 ? (items ?? []).filter((i) => matchesSearch(typed, i.name)) : [];
         return (
           <Modal
             title="Liste de base"
@@ -147,17 +164,30 @@ export default function MaterielPage() {
             </>}
           >
             <div className="pb-3 space-y-5">
-              <p className="text-sm text-gray-600">Cochez ce que vous possédez ; ajustez la quantité que vous emportez d’habitude.</p>
+              {available.length > 0 && (
+                <SearchField sticky autoFocus value={baseQuery} onChange={setBaseQuery} label="Rechercher dans la liste de base"
+                  placeholder="Rechercher : chafing, glacière, rallonge…" status={searchStatus(baseQuery, found.length, hiddenOn)} />
+              )}
+              {(!typed || found.length > 0) && <p className="text-sm text-gray-600">Cochez ce que vous possédez ; ajustez la quantité que vous emportez d’habitude.</p>}
               {available.length === 0 && <p className="text-[15px] text-gray-700">Toute la liste de base est déjà dans votre matériel.</p>}
+              {available.length > 0 && typed && found.length === 0 && (
+                <div className="rounded-2xl bg-gray-50 px-4 py-4 space-y-3">
+                  {owned.length > 0 && <p className="text-[15px] text-gray-700 break-words">Déjà dans votre matériel : {owned.map((i) => i.name).join(', ')}.</p>}
+                  <p className="text-[15px] text-gray-700">Cet article n’est pas dans la liste de base. Ajoutez-le vous-même à votre matériel.</p>
+                  <button onClick={() => addTyped(typed)} className={cn(btnSecondary, 'h-auto min-h-11 py-2 max-w-full text-left')}>
+                    <Plus className="h-4 w-4 flex-shrink-0" /><span className="min-w-0 break-words">Ajouter « {typed} »</span>
+                  </button>
+                </div>
+              )}
               {groups.map((g) => {
-                const rows = available.filter((a) => a.group === g);
+                const rows = found.filter((a) => a.group === g);
                 const allOn = rows.every((a) => a.name in picking);
                 return (
                   <section key={g}>
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="text-[15px] font-semibold text-gray-900">{g}</h3>
                       <button onClick={() => setPicking((p) => { const next = { ...p }; rows.forEach((a) => { if (allOn) delete next[a.name]; else next[a.name] = next[a.name] ?? String(a.qty); }); return next; })}
-                        className="h-9 px-2 text-sm font-medium text-primary hover:text-primary-dark">{allOn ? 'Tout décocher' : 'Tout cocher'}</button>
+                        className="h-10 px-2 text-sm font-medium text-primary hover:text-primary-dark">{allOn ? 'Tout décocher' : 'Tout cocher'}</button>
                     </div>
                     <ul className="space-y-1.5">
                       {rows.map((a) => {

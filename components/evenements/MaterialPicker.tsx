@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Modal from '@/components/ui/Modal';
+import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { Check } from './shared';
-import { EQUIPMENT_BASE, findBaseArticle, UNITS } from '@/lib/equipment';
+import { EQUIPMENT_BASE, findBaseArticle, matchesSearch, UNITS } from '@/lib/equipment';
 
 // Liste de matériel du traiteur : on coche ce qu'on emporte à l'événement au lieu de tout retaper.
 // La quantité proposée est fixe, ou calculée d'après le nombre de couverts.
@@ -48,6 +49,9 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
   const [unit, setUnit] = useState('pièce');
   const [perGuest, setPerGuest] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Recherche dans la liste ; les articles cochés restent cochés même quand elle les cache.
+  const [query, setQuery] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
 
   const suggested = (p: Preset) => (p.qty_per_guest && guests > 0 ? Math.ceil(Number(p.qty_per_guest) * guests) : Number(p.default_qty));
 
@@ -60,15 +64,38 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
   }, [userId]);
 
   const available = useMemo(() => (presets ?? []).filter((p) => !already.some((n) => same(n, p.name))), [presets, already]);
+  const found = useMemo(() => (presets ?? []).filter((p) => matchesSearch(query, p.name)), [presets, query]);
+  // « Tout cocher » ne touche qu'aux articles affichés par la recherche.
+  const foundAvailable = useMemo(() => available.filter((p) => matchesSearch(query, p.name)), [available, query]);
   const count = Object.keys(picked).length;
-  const allPicked = available.length > 0 && available.every((p) => p.id in picked);
+  const hiddenOn = Object.keys(picked).filter((id) => !found.some((p) => p.id === id)).length;
+  const allPicked = foundAvailable.length > 0 && foundAvailable.every((p) => p.id in picked);
+  const typed = query.trim();
 
   const toggle = (p: Preset, on: boolean) => setPicked((prev) => {
     const next = { ...prev };
     if (on) next[p.id] = String(suggested(p)); else delete next[p.id];
     return next;
   });
-  const toggleAll = () => setPicked(allPicked ? {} : Object.fromEntries(available.map((p) => [p.id, picked[p.id] ?? String(suggested(p))])));
+  const toggleAll = () => setPicked((prev) => {
+    const next = { ...prev };
+    foundAvailable.forEach((p) => { if (allPicked) delete next[p.id]; else next[p.id] = next[p.id] ?? String(suggested(p)); });
+    return next;
+  });
+
+  /** Nom du matériel saisi : un article de la liste de base apporte son unité et sa quantité. */
+  const typeName = (value: string) => {
+    const base = findBaseArticle(EQUIPMENT_BASE, value);
+    setName(base ? base.name : value);
+    if (base) { setUnit(base.unit); setQty(String(base.qty)); setPerGuest(false); }
+  };
+
+  // Rien trouvé : le formulaire « Ajouter à ma liste » reprend le texte cherché.
+  const addTyped = () => {
+    typeName(typed);
+    nameRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    nameRef.current?.focus({ preventScroll: true });
+  };
 
   const addPreset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +143,10 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
       </>}
     >
       <div className="space-y-4 pb-3">
+        {presets && presets.length > 0 && (
+          <SearchField sticky autoFocus value={query} onChange={setQuery} label="Rechercher dans ma liste de matériel"
+            placeholder="Rechercher : chafing, verre, nappe…" status={searchStatus(query, found.length, hiddenOn)} />
+        )}
         {error && <p role="alert" className="text-sm text-danger bg-white border border-danger/30 rounded-xl px-4 py-3">{error}</p>}
 
         {!presets ? (
@@ -127,11 +158,19 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
           </p>
         ) : (
           <>
-            {available.length > 1 && (
+            {foundAvailable.length > 1 && (
               <button onClick={toggleAll} className={cn(btnSecondary, 'h-10')}>{allPicked ? 'Tout décocher' : 'Tout cocher'}</button>
             )}
+            {typed && found.length === 0 && (
+              <div className="rounded-2xl bg-gray-50 px-4 py-4 space-y-3">
+                <p className="text-[15px] text-gray-700">Cet article n’est pas dans votre liste. Ajoutez-le ci-dessous.</p>
+                <button onClick={addTyped} className={cn(btnSecondary, 'h-auto min-h-11 py-2 max-w-full text-left')}>
+                  <Plus className="h-4 w-4 flex-shrink-0" /><span className="min-w-0 break-words">Ajouter « {typed} » à ma liste</span>
+                </button>
+              </div>
+            )}
             <ul className="space-y-2">
-              {presets.map((p) => {
+              {found.map((p) => {
                 const present = already.some((n) => same(n, p.name));
                 const on = p.id in picked;
                 return (
@@ -162,12 +201,8 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
 
         <form onSubmit={addPreset} className="pt-4 border-t border-gray-200 space-y-2">
           <p className="text-sm font-medium text-gray-700">Ajouter à ma liste</p>
-          <input value={name} list="equipment-base-picker" placeholder="Chafing dish, caisse isotherme, rallonge" aria-label="Nom du matériel" className={inputCls}
-            onChange={(e) => {
-              const base = findBaseArticle(EQUIPMENT_BASE, e.target.value);
-              setName(base ? base.name : e.target.value);
-              if (base) { setUnit(base.unit); setQty(String(base.qty)); setPerGuest(false); }
-            }} />
+          <input ref={nameRef} value={name} list="equipment-base-picker" placeholder="Chafing dish, caisse isotherme, rallonge" aria-label="Nom du matériel" className={inputCls}
+            onChange={(e) => typeName(e.target.value)} />
           <datalist id="equipment-base-picker">{EQUIPMENT_BASE.map((a) => <option key={a.name} value={a.name} />)}</datalist>
           <div className="flex gap-2">
             <input type="number" inputMode="decimal" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Quantité" className={cn(inputCls, 'w-24 text-center')} />

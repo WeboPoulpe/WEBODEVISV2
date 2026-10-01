@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ListChecks, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { findBaseArticle, RENTAL_BASE, sameName, UNITS } from '@/lib/equipment';
+import { findBaseArticle, matchesSearch, RENTAL_BASE, sameName, UNITS } from '@/lib/equipment';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/ui/Modal';
+import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +43,9 @@ export default function LocationTemplatesPage() {
   const [busy, setBusy] = useState(false);
   // Liste de base : articles cochés et leur quantité par couvert.
   const [picking, setPicking] = useState<Record<string, string> | null>(null);
+  // Recherche dans la liste de base ; les articles cochés restent cochés même quand elle les cache.
+  const [baseQuery, setBaseQuery] = useState('');
+  const openPicking = () => { setBaseQuery(''); setPicking({}); };
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -79,7 +83,7 @@ export default function LocationTemplatesPage() {
     } else {
       const res = await supabase.from('rental_template_sets').insert({ user_id: user.id, name }).select('id, name').single();
       if (res.error || !res.data) setError('Le modèle n’a pas pu être créé. Réessayez.');
-      else { const created = res.data as TemplateSet; setSets((list) => [...(list ?? []), created]); setActiveId(created.id); setPicking({}); }
+      else { const created = res.data as TemplateSet; setSets((list) => [...(list ?? []), created]); setActiveId(created.id); openPicking(); }
     }
     setBusy(false);
     setNaming(null);
@@ -153,6 +157,14 @@ export default function LocationTemplatesPage() {
     setPicking(null);
   };
 
+  // Article introuvable dans la liste de base : formulaire d'article prérempli avec le texte cherché.
+  // La liste reste ouverte dessous si des articles y sont cochés.
+  const addTyped = (text: string) => {
+    if (picking && Object.keys(picking).length === 0) setPicking(null);
+    setBaseQuery('');
+    setForm({ ...emptyItem, name: text });
+  };
+
   const removeItem = async (item: Item) => {
     if (!confirm(`Retirer « ${item.material_name} » du modèle ?`)) return;
     const previous = items;
@@ -210,7 +222,7 @@ export default function LocationTemplatesPage() {
                   <button onClick={() => setNaming({ id: active.id, name: active.name })} className={iconBtn} aria-label="Renommer le modèle"><Pencil className="h-4 w-4" /></button>
                   <button onClick={duplicate} disabled={busy} className={iconBtn} aria-label="Dupliquer le modèle"><Copy className="h-4 w-4" /></button>
                   <button onClick={removeSet} className={iconBtnDanger} aria-label="Supprimer le modèle"><Trash2 className="h-4 w-4" /></button>
-                  <button onClick={() => setPicking({})} className={cn(btnSecondary, 'ml-1')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
+                  <button onClick={openPicking} className={cn(btnSecondary, 'ml-1')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
                   <button onClick={() => setForm({ ...emptyItem })} className={btnSecondary}><Plus className="h-4 w-4" />Ajouter un article</button>
                 </div>
               </header>
@@ -260,8 +272,12 @@ export default function LocationTemplatesPage() {
 
       {picking && active && (() => {
         const available = RENTAL_BASE.filter((a) => !activeItems.some((i) => sameName(i.material_name, a.name)));
-        const groups = [...new Set(available.map((a) => a.group))];
+        const found = available.filter((a) => matchesSearch(baseQuery, a.name, a.group));
+        const groups = [...new Set(found.map((a) => a.group))];
         const count = Object.keys(picking).length;
+        const hiddenOn = Object.keys(picking).filter((n) => !found.some((a) => a.name === n)).length;
+        const typed = baseQuery.trim();
+        const owned = typed && found.length === 0 ? activeItems.filter((i) => matchesSearch(typed, i.material_name)) : [];
         return (
           <Modal
             title={`Ajouter à « ${active.name} »`}
@@ -272,17 +288,30 @@ export default function LocationTemplatesPage() {
             </>}
           >
             <div className="pb-3 space-y-5">
-              <p className="text-sm text-gray-600">Cochez ce que ce modèle contient. La quantité est par couvert : 0,1 pour une table de dix.</p>
+              {available.length > 0 && (
+                <SearchField sticky autoFocus value={baseQuery} onChange={setBaseQuery} label="Rechercher dans la liste de base"
+                  placeholder="Rechercher : assiette, verre, nappe…" status={searchStatus(baseQuery, found.length, hiddenOn)} />
+              )}
+              {(!typed || found.length > 0) && <p className="text-sm text-gray-600">Cochez ce que ce modèle contient. La quantité est par couvert : 0,1 pour une table de dix.</p>}
               {available.length === 0 && <p className="text-[15px] text-gray-700">Tous les articles de la liste sont déjà dans ce modèle.</p>}
+              {available.length > 0 && typed && found.length === 0 && (
+                <div className="rounded-2xl bg-gray-50 px-4 py-4 space-y-3">
+                  {owned.length > 0 && <p className="text-[15px] text-gray-700 break-words">Déjà dans ce modèle : {owned.map((i) => i.material_name).join(', ')}.</p>}
+                  <p className="text-[15px] text-gray-700">Cet article n’est pas dans la liste de base. Ajoutez-le vous-même à ce modèle.</p>
+                  <button onClick={() => addTyped(typed)} className={cn(btnSecondary, 'h-auto min-h-11 py-2 max-w-full text-left')}>
+                    <Plus className="h-4 w-4 flex-shrink-0" /><span className="min-w-0 break-words">Ajouter « {typed} »</span>
+                  </button>
+                </div>
+              )}
               {groups.map((g) => {
-                const rows = available.filter((a) => a.group === g);
+                const rows = found.filter((a) => a.group === g);
                 const allOn = rows.every((a) => a.name in picking);
                 return (
                   <section key={g}>
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="text-[15px] font-semibold text-gray-900">{g}</h3>
                       <button onClick={() => setPicking((p) => { const next = { ...p }; rows.forEach((a) => { if (allOn) delete next[a.name]; else next[a.name] = next[a.name] ?? String(a.perGuest); }); return next; })}
-                        className="h-9 px-2 text-sm font-medium text-primary hover:text-primary-dark">{allOn ? 'Tout décocher' : 'Tout cocher'}</button>
+                        className="h-10 px-2 text-sm font-medium text-primary hover:text-primary-dark">{allOn ? 'Tout décocher' : 'Tout cocher'}</button>
                     </div>
                     <ul className="space-y-1.5">
                       {rows.map((a) => {
