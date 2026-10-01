@@ -77,16 +77,19 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
       page-break-after: always !important; break-after: page !important;
     }
     .quote-doc .gastro-page { page-break-before: always !important; break-before: page !important; }
-    /* Une ligne du tableau ou le bloc des totaux ne sont jamais coupés entre deux pages. Un plat peut l'être : une
-       fiche longue qui ne tient pas sous le bandeau du menu laisserait sinon une page presque vide. Ses lignes, elles,
-       restent entières, et le bandeau reste collé au premier plat. */
+    /* Une ligne du tableau ou le bloc des totaux ne sont jamais coupés entre deux pages. */
     .quote-doc tr, .quote-doc [data-webo-financials] > div { page-break-inside: avoid; break-inside: avoid; }
-    /* Plat court (nom et description) : jamais coupé. Fiche longue (trois éléments ou plus) : peut continuer page suivante. */
-    .quote-doc .gastro-menu > div:not(:has(> :nth-child(3))) { page-break-inside: avoid; break-inside: avoid; }
-    .quote-doc .gastro-menu p, .quote-doc .gastro-menu li, .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3,
+    /* Le bandeau du menu n'est jamais coupé (son fond s'étirerait sur la page). Un plat ne l'est pas non plus, sauf
+       s'il est long : markLongDishes, lancé avant chaque impression, lui donne alors la classe webo-long et il
+       continue page suivante au lieu de laisser le bandeau seul sur une page presque vide. */
+    .quote-doc .gastro-header { page-break-inside: avoid; break-inside: avoid; }
+    .quote-doc .gastro-menu > div, .quote-doc .gastro-menu p, .quote-doc .gastro-menu li,
+    .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3,
     .quote-doc .gastro-menu .svc-desc { page-break-inside: avoid; break-inside: avoid; }
-    .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3 { page-break-after: avoid; break-after: avoid; }
-    .quote-doc .gastro-header { page-break-after: avoid; break-after: avoid; }
+    .quote-doc .gastro-menu .webo-long { page-break-inside: auto; break-inside: auto; }
+    /* Le nom d'un plat reste avec la suite. */
+    .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3,
+    .quote-doc .gastro-menu .webo-keep-next { page-break-after: avoid; break-after: avoid; }
     .quote-doc thead { display: table-header-group; }
     .quote-doc p, .quote-doc li { orphans: 2; widows: 2; }
     ${s.showDesc ? '' : '.quote-doc .svc-desc { display: none !important; }'}
@@ -97,6 +100,39 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
       .quote-doc [style*="-20mm -20mm 0"] { margin-top: -14mm !important; }
     }
   `;
+}
+
+/**
+ * Hauteur (px) au-delà de laquelle un plat de la carte peut continuer page suivante : la moitié de la hauteur
+ * utile d'une page A4 (297 mm moins les deux marges de 14 mm de .quote-gap, à 96 px par pouce). Un plat plus court
+ * n'est jamais coupé ; au pire, il laisse une demi-page blanche en passant à la page suivante.
+ */
+export const LONG_DISH_PX = Math.round(((297 - 2 * 14) * 96) / 25.4 / 2);
+
+/**
+ * Marque les plats trop hauts pour être gardés d'un seul tenant (classe webo-long, voir quoteOutputCss), et le
+ * nom de chacun d'eux (webo-keep-next), pour qu'il ne reste pas seul en bas de page. Les hauteurs sont mesurées
+ * à la largeur d'une feuille A4, quelle que soit celle de la fenêtre. À lancer avant chaque impression : la page
+ * d'impression de l'éditeur l'embarque telle quelle (d'où l'écriture sans dépendance), les pages /imprimer et /d
+ * l'appellent via PrintBreaks. Les classes ne vivent que dans la page imprimée, jamais dans le devis enregistré.
+ */
+export function markLongDishes(doc: Document, limit: number): void {
+  doc.querySelectorAll('.webo-long, .webo-keep-next').forEach((el) => el.classList.remove('webo-long', 'webo-keep-next'));
+  const tables = Array.from(doc.querySelectorAll<HTMLElement>('.quote-pages'));
+  const widths = tables.map((t) => t.style.width);
+  tables.forEach((t) => { t.style.width = '210mm'; });
+  const long = Array.from(doc.querySelectorAll<HTMLElement>(
+    '.quote-doc .gastro-menu > div, .quote-doc .gastro-menu p, .quote-doc .gastro-menu li, .quote-doc .gastro-menu .svc-desc',
+  )).filter((el) => el.getBoundingClientRect().height > limit);
+  tables.forEach((t, i) => { t.style.width = widths[i]; });
+  long.forEach((el) => {
+    el.classList.add('webo-long');
+    if (!el.parentElement?.classList.contains('gastro-menu')) return;
+    // Le nom du plat : premier élément de la fiche, en descendant dans les blocs qui l'enveloppent.
+    let box: Element = el;
+    while (box.children.length === 1 && /^(DIV|SECTION|ARTICLE)$/.test(box.children[0].tagName)) box = box.children[0];
+    if (box.children.length > 1) box.children[0].classList.add('webo-keep-next');
+  });
 }
 
 /** Le document, enveloppé pour que chaque page imprimée ait ses marges. */
@@ -137,10 +173,13 @@ export function buildQuotePrintPage(p: {
   ${p.photosHtml ?? ''}
   ${p.cgvHtml ?? ''}
   <script>
+    var markLongDishes = ${markLongDishes.toString()};
+    function pageBreaks() { markLongDishes(document, ${LONG_DISH_PX}); }
+    window.addEventListener('beforeprint', pageBreaks);
     // L'impression part quand les polices et les images sont là : sinon la mise en page bouge pendant l'aperçu.
     window.onload = function () {
       var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-      ready.then(function () { setTimeout(function () { window.print(); }, 250); });
+      ready.then(function () { pageBreaks(); setTimeout(function () { window.print(); }, 250); });
     };
   </script>
 </body>

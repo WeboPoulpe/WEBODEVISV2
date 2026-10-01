@@ -6,6 +6,7 @@ import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvH
 import { DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG } from '@/components/devis/weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/weboword/weboword.types';
 import { sanitizeHtml } from '@/lib/sanitize';
+import PrintBreaks from '@/components/devis/PrintBreaks';
 import { googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 
 export interface QuoteRenderProfile {
@@ -42,6 +43,7 @@ export default function QuoteRender({ quote, profile }: { quote: any; profile: Q
           <link rel="stylesheet" href={fontHref} />
         )}
         <style>{quoteOutputCss(settings)}</style>
+        <PrintBreaks />
         <div className="quote-render quote-out">
           {coverHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(coverHtml) }} />}
           {!coverHtml && logoHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(logoHtml) }} />}
