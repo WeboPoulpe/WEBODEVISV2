@@ -24,6 +24,12 @@ interface Props {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: string;
+  /** Hauteur au-delà de laquelle la zone défile (défaut : 13rem). */
+  maxHeight?: string;
+  /** Nom de la zone pour les lecteurs d'écran (sinon le texte indicatif). */
+  ariaLabel?: string;
+  /** Classes de texte de la zone de saisie (défaut : text-sm). */
+  textClassName?: string;
 }
 
 export default function RichTextEditor({
@@ -31,6 +37,9 @@ export default function RichTextEditor({
   onChange,
   placeholder = 'Description…',
   minHeight = '120px',
+  maxHeight = '13rem',
+  ariaLabel,
+  textClassName = 'text-sm',
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<Set<string>>(new Set());
@@ -119,16 +128,18 @@ export default function RichTextEditor({
     <button
       type="button"
       title={title}
+      aria-label={title}
+      aria-pressed={active.has(listKey ?? cmd)}
       // onMouseDown + preventDefault prevents the editor from losing focus
       onMouseDown={(e) => { e.preventDefault(); exec(cmd); }}
       className={[
-        'p-1.5 rounded transition-colors',
+        'inline-flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
         active.has(listKey ?? cmd)
           ? 'bg-primary text-white'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
       ].join(' ')}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className="h-4 w-4" />
     </button>
   );
 
@@ -136,7 +147,7 @@ export default function RichTextEditor({
     <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary transition-colors overflow-hidden">
 
       {/* ── Toolbar ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-0.5 px-1 py-0.5 border-b border-gray-200 bg-gray-50">
         <ToolBtn cmd="bold"   icon={Bold}   title="Gras (Ctrl+B)" />
         <ToolBtn cmd="italic" icon={Italic} title="Italique (Ctrl+I)" />
         <div className="w-px h-4 bg-gray-200 mx-1" />
@@ -146,9 +157,9 @@ export default function RichTextEditor({
           type="button"
           title="Structurer automatiquement le texte"
           onMouseDown={(e) => { e.preventDefault(); autoStructure(); }}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-primary/70 hover:bg-primary-50 hover:text-primary transition-colors"
+          className="flex items-center gap-1.5 h-10 px-2.5 rounded-lg text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
         >
-          <Wand2 className="h-3.5 w-3.5" />
+          <Wand2 className="h-4 w-4" />
           Structurer
         </button>
       </div>
@@ -158,15 +169,19 @@ export default function RichTextEditor({
         ref={ref}
         contentEditable
         suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-label={ariaLabel ?? placeholder}
         onInput={handleInput}
         onKeyUp={refreshActive}
         onMouseUp={refreshActive}
         onFocus={refreshActive}
         data-placeholder={placeholder}
-        style={{ minHeight }}
+        style={{ minHeight, maxHeight }}
         className={[
-          'px-3 py-2.5 text-sm text-gray-900 focus:outline-none',
-          'overflow-y-auto max-h-52',
+          'px-3 py-2.5 text-gray-900 focus:outline-none',
+          textClassName,
+          'overflow-y-auto overflow-x-hidden break-words',
           'description-html',
           // Show placeholder when empty via CSS attr()
           '[&:empty]:before:content-[attr(data-placeholder)]',
