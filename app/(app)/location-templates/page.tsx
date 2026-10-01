@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ListChecks, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { findBaseArticle, matchesSearch, RENTAL_BASE, sameName, UNITS } from '@/lib/equipment';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/ui/Modal';
 import SearchField, { searchStatus } from '@/components/ui/SearchField';
@@ -39,6 +40,8 @@ export default function LocationTemplatesPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [naming, setNaming] = useState<{ id: string | null; name: string } | null>(null);
+  // Action rapide du menu (lib/navMega.ts).
+  useUrlAction({ nouveau: () => setNaming({ id: null, name: '' }) });
   const [form, setForm] = useState<typeof emptyItem | null>(null);
   const [busy, setBusy] = useState(false);
   // Liste de base : articles cochés et leur quantité par couvert.

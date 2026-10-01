@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ListChecks, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { EQUIPMENT_BASE, findBaseArticle, matchesSearch, sameName, UNITS } from '@/lib/equipment';
 import Modal from '@/components/ui/Modal';
@@ -86,6 +87,8 @@ export default function MaterielPage() {
   };
 
   const openPicking = () => { setBaseQuery(''); setPicking({}); };
+  // Action rapide du menu (lib/navMega.ts).
+  useUrlAction({ 'liste-de-base': openPicking });
 
   // Article introuvable dans la liste de base : formulaire d'article perso prérempli avec le texte cherché.
   // La liste reste ouverte dessous si des articles y sont cochés.

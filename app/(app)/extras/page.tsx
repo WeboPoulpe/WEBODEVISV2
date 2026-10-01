@@ -7,6 +7,7 @@ import {
   UserPlus, CalendarDays, MapPin, Users, ArrowRight, Phone, Mail, Share2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
@@ -664,6 +665,8 @@ export default function ExtrasPage() {
   };
 
   const openNew = () => { setEditing(null); setShowModal(true); };
+  // Actions rapides du menu (lib/navMega.ts).
+  useUrlAction({ nouveau: openNew, agenda: () => setViewMode('agenda') });
 
   return (
     <div className="px-4 md:px-6 pb-8">

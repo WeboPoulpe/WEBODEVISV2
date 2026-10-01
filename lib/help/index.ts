@@ -36,6 +36,26 @@ export function searchGuides(query: string): HelpGuide[] {
   });
 }
 
+/**
+ * Guides d'une page du menu et de ses sous-pages (« /clients » reprend aussi « /clients/nouveau »),
+ * ceux de la page elle-même d'abord.
+ */
+export function guidesForPage(href: string): HelpGuide[] {
+  return HELP_GUIDES
+    .filter((g) => g.href && (href === '/' ? g.href === '/' : g.href === href || g.href.startsWith(`${href}/`)))
+    .sort((a, b) => (a.href?.length ?? 0) - (b.href?.length ?? 0));
+}
+
+/** Ouvre le centre d'aide depuis n'importe où : sur les guides d'une page, ou directement sur un guide. */
+export const HELP_OPEN_EVENT = 'aide:ouvrir';
+export interface HelpOpenDetail {
+  /** Page dont on veut les guides (« /devis »). */
+  page?: string;
+  /** Identifiant d'un guide à ouvrir directement. */
+  guide?: string;
+}
+export const openHelp = (detail: HelpOpenDetail = {}) => window.dispatchEvent(new CustomEvent<HelpOpenDetail>(HELP_OPEN_EVENT, { detail }));
+
 /** Guides qui concernent la page ouverte, du plus précis au plus général. */
 export function guidesForPath(pathname: string): HelpGuide[] {
   return HELP_GUIDES

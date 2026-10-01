@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { btnGhost, btnPrimary, cardCls, iconBtn, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
@@ -36,6 +37,8 @@ export default function UserCategoriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [addingCat, setAddingCat] = useState(false);
+  // Action rapide du menu (lib/navMega.ts).
+  useUrlAction({ nouveau: () => { setAddingCat(true); setNewCatName(''); } });
   const [newCatName, setNewCatName] = useState('');
   const [addingSubFor, setAddingSubFor] = useState<string | null>(null);
   const [newSubName, setNewSubName] = useState('');

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Minus, Search, Loader2, Package, History, TrendingUp, TrendingDown, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn, formatCurrency } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
@@ -43,6 +44,7 @@ export default function StockPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  useUrlAction({ alertes: () => setFilter('alert') });
   const [movementModal, setMovementModal] = useState<{ open: boolean; ingredient: Ingredient | null; type: 'in' | 'out' | 'adjust' }>({ open: false, ingredient: null, type: 'in' });
   const [historyModal, setHistoryModal] = useState<{ open: boolean; ingredient: Ingredient | null; movements: Movement[] }>({ open: false, ingredient: null, movements: [] });
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, MapPin } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatCurrency } from '@/lib/utils';
 import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
 import DateBlock from '@/components/ui/DateBlock';
@@ -55,6 +56,7 @@ export default function EvenementsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>('upcoming');
+  useUrlAction({ passes: () => setScope('past') });
 
   useEffect(() => {
     createClient()

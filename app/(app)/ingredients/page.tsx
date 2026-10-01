@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronRight, X, UploadCloud, ImagePlus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
@@ -445,6 +446,11 @@ export default function IngredientsPage() {
   const [search,      setSearch]      = useState('');
   const [catFilter,   setCatFilter]   = useState('Tous');
   const [modal,       setModal]       = useState<{ open: boolean; item: Partial<Ingredient> | null }>({ open: false, item: null });
+  // Actions rapides du menu (lib/navMega.ts). Le sélecteur de fichier s'ouvre grâce au clic fait dans le menu.
+  useUrlAction({
+    nouveau: () => setModal({ open: true, item: null }),
+    importer: () => fileInputRef.current?.click(),
+  });
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [newSupplier,   setNewSupplier]   = useState(false);
   const [csvRows,       setCsvRows]       = useState<CsvRow[]>([]);

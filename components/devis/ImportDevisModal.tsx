@@ -226,7 +226,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
   const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={isEdit ? 'Modifier l’import' : 'Importer un devis existant'}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !saving && onClose()} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}

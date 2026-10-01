@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowUpRight, Play, Search, X } from 'lucide-react';
-import { guidesForPath, HELP_CATEGORIES, HELP_GUIDES, HELP_MEDIA, searchGuides, type HelpCategoryId, type HelpGuide } from '@/lib/help';
+import { guidesForPage, guidesForPath, HELP_CATEGORIES, HELP_GUIDES, HELP_MEDIA, searchGuides, type HelpCategoryId, type HelpGuide } from '@/lib/help';
 import { btnSecondary, iconBtn, inputCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +11,14 @@ const duration = (seconds: number) => (seconds < 60 ? `${Math.round(seconds)} s`
 
 // Centre d'aide : une page entière posée par-dessus l'app. L'écran en cours reste tel quel dessous,
 // on le retrouve en fermant.
-export default function HelpCenter({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function HelpCenter({ open, onClose, page = null, guideId = null }: {
+  open: boolean;
+  onClose: () => void;
+  /** Ouvre sur les guides de cette page du menu plutôt que sur ceux de la page en cours. */
+  page?: string | null;
+  /** Ouvre directement ce guide. */
+  guideId?: string | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -19,16 +26,16 @@ export default function HelpCenter({ open, onClose }: { open: boolean; onClose: 
   const [guide, setGuide] = useState<HelpGuide | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
-  const here = useMemo(() => guidesForPath(pathname), [pathname]);
+  const here = useMemo(() => (page ? guidesForPage(page) : guidesForPath(pathname)), [page, pathname]);
 
-  // À l'ouverture : les guides de la page en cours d'abord, s'il y en a.
+  // À l'ouverture : les guides de la page en cours d'abord, s'il y en a (ou le guide demandé).
   useEffect(() => {
     if (!open) return;
-    setGuide(null);
+    setGuide(guideId ? HELP_GUIDES.find((g) => g.id === guideId) ?? null : null);
     setQuery('');
     setCategory(here.length > 0 ? 'ici' : 'tout');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, page, guideId]);
 
   useEffect(() => {
     if (!open) return;
@@ -55,7 +62,7 @@ export default function HelpCenter({ open, onClose }: { open: boolean; onClose: 
   if (!open) return null;
 
   const tabs: { id: HelpCategoryId | 'ici' | 'tout'; label: string }[] = [
-    ...(here.length > 0 ? [{ id: 'ici' as const, label: 'Sur cette page' }] : []),
+    ...(here.length > 0 ? [{ id: 'ici' as const, label: page && page !== pathname ? 'Pour cette page' : 'Sur cette page' }] : []),
     { id: 'tout', label: 'Tout' },
     ...HELP_CATEGORIES.filter((c) => HELP_GUIDES.some((g) => g.category === c.id)),
   ];

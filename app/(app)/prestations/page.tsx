@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatCurrency } from '@/lib/utils';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { useAuth } from '@/context/AuthContext';
@@ -417,6 +418,11 @@ export default function PrestationsPage() {
 
   // Révision des prix : un pourcentage appliqué aux prestations affichées (catégorie, recherche).
   const [raise, setRaise] = useState<{ percent: string; rounding: 'cent' | 'dime' | 'half'; saving: boolean; error: string | null } | null>(null);
+  // Actions rapides du menu (lib/navMega.ts). Le sélecteur de fichier s'ouvre grâce au clic fait dans le menu.
+  useUrlAction({
+    reviser: () => { if (items.length > 0) setRaise({ percent: '', rounding: 'dime', saving: false, error: null }); },
+    importer: () => fileInputRef.current?.click(),
+  }, !loading);
   const roundPrice = (n: number, mode: 'cent' | 'dime' | 'half') =>
     mode === 'half' ? Math.round(n * 2) / 2 : mode === 'dime' ? Math.round(n * 10) / 10 : Math.round(n * 100) / 100;
   const applyRaise = async (targets: Prestation[]) => {

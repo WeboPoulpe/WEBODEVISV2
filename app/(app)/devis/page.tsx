@@ -10,6 +10,7 @@ import {
   BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal, Send,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatDate, formatCurrency } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import DateBlock from '@/components/ui/DateBlock';
@@ -730,6 +731,13 @@ export default function DevisPage() {
     return () => window.removeEventListener('popstate', read);
   }, []);
 
+  // Actions rapides du menu (lib/navMega.ts) : modèles, import, devis envoyés.
+  useUrlAction({
+    modeles: () => setShowTemplates(true),
+    importer: () => setImportModal(true),
+    envoyes: () => { setView('list'); setScope('encours'); setStatusFilter('devis_envoye'); },
+  }, !loading);
+
   const navigateFolder = useCallback((id: string | null) => {
     setCurrentFolder(id);
     window.history.pushState({}, '', id ? `/devis?dossier=${id}` : '/devis');
@@ -1232,6 +1240,11 @@ export default function DevisPage() {
       {/* ── Modèles enregistrés ────────────────────────────────────────── */}
       {showTemplates && (
         <Modal title="Partir d’un modèle" onClose={() => setShowTemplates(false)} wide>
+          {templates.length === 0 && (
+            <p className="pb-4 text-[15px] text-gray-600 max-w-lg">
+              Vous n’avez pas encore de modèle. Dans un devis, choisissez Dupliquer puis cochez « Garder aussi ce devis comme modèle » : il apparaîtra ici.
+            </p>
+          )}
           <ul className="pb-3 grid grid-cols-2 md:grid-cols-3 gap-3">
             {templates.map((tpl) => {
               const count = Array.isArray(tpl.services) ? tpl.services.filter((s: { name?: string; isPageBreak?: boolean }) => s.name && !s.isPageBreak).length : 0;

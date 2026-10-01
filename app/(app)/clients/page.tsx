@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useId, useState, useCallback } from 'react';
+import { useEffect, useId, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus, Search, Users, Building2, User, Mail, Phone, FileText, Star,
   TrendingUp, StickyNote, Save, Loader2, CalendarDays, ChevronRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { isConfirmed, QUOTE_STATUS_LABELS } from '@/lib/quoteStatus';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import Sheet, { SheetTabs } from '@/components/ui/Sheet';
@@ -391,6 +392,13 @@ export default function ClientsPage() {
 
   useEffect(() => { loadCustomers(); }, [loadCustomers]);
 
+  // Actions rapides du menu (lib/navMega.ts).
+  const searchRef = useRef<HTMLInputElement>(null);
+  useUrlAction({
+    importer: () => setImporting(true),
+    rechercher: () => searchRef.current?.focus(),
+  });
+
   const filtered = customers.filter((c) => {
     const name = c.customer_type === 'entreprise' ? (c.company_name ?? '') : `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
     const matchSearch = !search || name.toLowerCase().includes(search.toLowerCase()) || c.email.toLowerCase().includes(search.toLowerCase());
@@ -432,7 +440,7 @@ export default function ClientsPage() {
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom ou email" aria-label="Rechercher un client"
+          <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom ou email" aria-label="Rechercher un client"
             className={cn(inputCls, 'pl-11')} />
         </div>
         <div className="flex p-1 rounded-xl bg-gray-200/70 overflow-x-auto scrollbar-none" role="tablist" aria-label="Clients affichés">

@@ -12,6 +12,7 @@ import Wordmark from '@/components/brand/Wordmark';
 import { useAuth } from '@/context/AuthContext';
 import { isNavActive, useEditorMode, useNavGroups, WEBO_PANELS, type Badges } from './nav';
 import QuoteEditorActions from '@/components/devis/QuoteEditorActions';
+import { useSidebarMega } from './SidebarMega';
 
 const PANEL_ICONS: Record<string, React.ElementType> = {
   client: User, services: Package, event: CalendarIcon, style: Palette, images: ImageIcon, cover: LayoutTemplate, photos: ImageIcon,
@@ -39,6 +40,8 @@ export default function Sidebar({ badges }: { badges: Badges }) {
   const groups = useNavGroups();
   const editor = useEditorMode(pathname);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // Mégamenu : survol, flèche droite ou appui long sur une entrée (pas dans les éditeurs plein écran).
+  const mega = useSidebarMega();
 
   const initials = [profile?.first_name?.[0], profile?.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?';
 
@@ -129,7 +132,10 @@ export default function Sidebar({ badges }: { badges: Badges }) {
                     const active = isNavActive(item, pathname);
                     const badge = item.badge ? badges[item.badge] : null;
                     return (
-                      <Link key={item.href} href={item.href} title={item.label} className={cn(itemBase, active ? itemActive : itemIdle)}>
+                      <Link
+                        key={item.href} href={item.href} {...mega.itemProps(item)}
+                        className={cn(itemBase, active ? itemActive : itemIdle, mega.openHref === item.href && !active && 'bg-white/[0.06] text-white')}
+                      >
                         <item.icon className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.8} />
                         <span className="sb-label truncate">{item.label}</span>
                         <span className="sb-label ml-auto"><Badge value={badge} /></span>
@@ -141,6 +147,7 @@ export default function Sidebar({ badges }: { badges: Badges }) {
               </div>
             );
           })}
+          {mega.panel}
         </nav>
       )}
 

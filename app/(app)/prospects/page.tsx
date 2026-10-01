@@ -9,6 +9,7 @@ import {
   Loader2, Trash2, RefreshCw, Eye, AlertCircle,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -878,6 +879,11 @@ function ProspectsPageInner() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Prospect | null>(null);
   const [showTokenManager, setShowTokenManager] = useState(false);
+  // Actions rapides du menu (lib/navMega.ts).
+  useUrlAction({
+    nouvelles: () => setStatusFilter('nouveau'),
+    formulaire: () => setShowTokenManager(true),
+  });
   const [createDevisFor, setCreateDevisFor] = useState<Prospect | null>(null);
 
   const load = useCallback(async () => {

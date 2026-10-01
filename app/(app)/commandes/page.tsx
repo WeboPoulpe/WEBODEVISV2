@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Loader2, Check, Trash2, Search, Send, CheckCircle2, Printer, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
@@ -47,6 +48,8 @@ export default function CommandesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [createModal, setCreateModal] = useState(false);
+  // Action rapide du menu (lib/navMega.ts).
+  useUrlAction({ nouveau: () => setCreateModal(true) });
   const [editingOrder, setEditingOrder] = useState<SupplierOrder | null>(null);
 
   const fetchAll = useCallback(async () => {

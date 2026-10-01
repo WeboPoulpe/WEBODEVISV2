@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Trash2, Loader2, Search, Truck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
@@ -30,6 +31,8 @@ export default function FournisseursPage() {
 
   // Formulaire
   const [showForm, setShowForm] = useState(false);
+  // Action rapide du menu (lib/navMega.ts).
+  useUrlAction({ nouveau: () => { resetForm(); setShowForm(true); } });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

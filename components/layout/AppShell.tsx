@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileTabBar from './MobileTabBar';
 import { useNavBadges } from './nav';
 import OnboardingOverlay from '@/components/onboarding/OnboardingOverlay';
 import HelpCenter from '@/components/help/HelpCenter';
+import { HELP_OPEN_EVENT, type HelpOpenDetail } from '@/lib/help';
 import { useAuth } from '@/context/AuthContext';
 import { isDemoUser } from '@/lib/demo';
 import { signOut as endSession } from 'next-auth/react';
@@ -15,6 +16,15 @@ import { signOut as endSession } from 'next-auth/react';
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [helpOpen, setHelpOpen] = useState(false);
+  // Le centre d'aide s'ouvre aussi par l'événement « aide:ouvrir » (mégamenu de la barre latérale),
+  // sur les guides d'une page précise ou directement sur un guide.
+  const [helpTarget, setHelpTarget] = useState<HelpOpenDetail>({});
+  const openHelp = () => { setHelpTarget({}); setHelpOpen(true); };
+  useEffect(() => {
+    const onOpen = (e: Event) => { setHelpTarget((e as CustomEvent<HelpOpenDetail>).detail ?? {}); setHelpOpen(true); };
+    window.addEventListener(HELP_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(HELP_OPEN_EVENT, onOpen);
+  }, []);
   const { user, profile, loading, actingAsAdmin, actAs } = useAuth();
   const leaveAccount = async () => {
     await actAs(null);
@@ -57,14 +67,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         )}
-        <Header onHelp={() => setHelpOpen(true)} />
+        <Header onHelp={openHelp} />
         <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'var(--tabbar-h)' }}>
           {children}
         </main>
       </div>
 
-      <MobileTabBar badges={badges} onHelp={() => setHelpOpen(true)} />
-      <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <MobileTabBar badges={badges} onHelp={openHelp} />
+      <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} page={helpTarget.page ?? null} guideId={helpTarget.guide ?? null} />
     </div>
   );
 }
