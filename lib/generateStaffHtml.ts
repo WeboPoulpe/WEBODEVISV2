@@ -8,6 +8,8 @@ export interface StaffMission {
   eventDate: string | null;
   eventLocation: string | null;
   arrivalTime: string | null;
+  /** Heure de fin prévue. */
+  departureTime?: string | null;
   missionNotes: string | null;
 }
 
@@ -53,6 +55,7 @@ function staffPage(m: StaffMission): string {
     <div style="flex:0 0 140px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:13px;text-align:center;">
       <p style="font-size:9px;font-weight:bold;color:#9c27b0;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 8px;">HEURE D'ARRIVÉE</p>
       <p style="font-size:28px;font-weight:bold;color:#6a1080;margin:0;">${m.arrivalTime ?? '—'}</p>
+      ${m.departureTime ? `<p style="font-size:12px;color:#555;margin:6px 0 0;">Fin vers ${m.departureTime}</p>` : ''}
     </div>
   </div>
 

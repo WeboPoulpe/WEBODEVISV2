@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Check, Building2, Upload, X, FileText, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Check, Building2, Upload, X, FileText, KeyRound, Eye, EyeOff, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fileToWebp } from '@/lib/imageToWebp';
 import { useAuth } from '@/context/AuthContext';
@@ -9,6 +9,8 @@ import RichTextEditor from '@/components/ui/RichTextEditor';
 import { errorCls } from '@/components/ui/kit';
 import { isDemoUser } from '@/lib/demo';
 import { changePassword } from '@/server/auth';
+import { subscribeMyDevice, unsubscribeMyDevice } from '@/server/extras';
+import { currentSubscription, pushSupport, subscribeDevice, unsubscribeDevice, type PushSupport } from '@/lib/pushClient';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Profile {
@@ -155,6 +157,97 @@ function PasswordSection({ locked }: { locked: string | null }) {
           </div>
         </form>
       )}
+    </section>
+  );
+}
+
+// ── Notifications sur cet appareil ───────────────────────────────────────────
+function NotificationsSection() {
+  const [support, setSupport] = useState<PushSupport | null>(null);
+  const [active, setActive] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = pushSupport();
+    setSupport(s);
+    if (s === 'ok') currentSubscription().then((sub) => setActive(!!sub)).catch(() => setActive(false));
+  }, []);
+
+  const enable = async () => {
+    setBusy(true); setError(null); setDone(null);
+    try {
+      const { subscription, error: err } = await subscribeDevice();
+      if (err || !subscription?.endpoint) { setError(err ?? 'Les notifications n’ont pas pu être activées. Réessayez.'); setSupport(pushSupport()); return; }
+      const res = await subscribeMyDevice({ endpoint: subscription.endpoint, keys: subscription.keys });
+      if (res.error) { setError(res.error); await unsubscribeDevice().catch(() => null); return; }
+      setActive(true);
+      setDone('Notifications activées sur cet appareil.');
+    } catch {
+      setError('Les notifications n’ont pas pu être activées. Réessayez.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async () => {
+    setBusy(true); setError(null); setDone(null);
+    try {
+      const endpoint = await unsubscribeDevice();
+      if (endpoint) await unsubscribeMyDevice(endpoint);
+      setActive(false);
+      setDone('Notifications coupées sur cet appareil.');
+    } catch {
+      setError('Les notifications n’ont pas pu être coupées. Réessayez.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="notif-title" className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+        <div className="p-2 bg-primary-50 rounded-lg">
+          <Bell className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 id="notif-title" className="font-semibold text-gray-900 text-sm">Notifications sur cet appareil</h2>
+          <p className="text-xs text-gray-400">Recevez une alerte quand un extra accepte ou refuse une mission.</p>
+        </div>
+      </div>
+      <div className="p-6 space-y-3">
+        {support === null ? (
+          <Loader2 className="h-5 w-5 text-gray-400 animate-spin" />
+        ) : support === 'ios-install' ? (
+          <div className="text-sm text-gray-700 space-y-1">
+            <p>Sur iPhone, les notifications marchent une fois l’application installée :</p>
+            <p>touchez Partager, puis « Sur l’écran d’accueil », et ouvrez WeboDevis depuis son icône. Revenez ensuite ici pour activer les notifications.</p>
+          </div>
+        ) : support === 'denied' ? (
+          <p className="text-sm text-gray-700">Les notifications sont bloquées pour ce site. Autorisez-les dans les réglages de votre navigateur (le cadenas à gauche de l’adresse), puis rechargez la page.</p>
+        ) : support === 'unsupported' ? (
+          <p className="text-sm text-gray-700">Ce navigateur ne permet pas les notifications. Essayez avec Chrome, Edge, Firefox ou Safari à jour.</p>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-700" data-testid="notif-state">
+              {active ? 'Activées : cet appareil reçoit les réponses de vos extras.' : 'Coupées sur cet appareil.'}
+            </p>
+            <button
+              onClick={active ? disable : enable}
+              disabled={busy}
+              className={active
+                ? 'flex items-center gap-2 px-4 min-h-[40px] bg-white border border-gray-200 text-gray-900 text-sm font-semibold rounded-lg hover:border-gray-300 disabled:opacity-60 transition-colors'
+                : 'flex items-center gap-2 px-4 min-h-[40px] bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition-colors'}
+            >
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {active ? 'Couper' : 'Activer'}
+            </button>
+          </div>
+        )}
+        {error && <p role="alert" className={errorCls}>{error}</p>}
+        {done && <p role="status" className="text-sm text-forest">{done}</p>}
+      </div>
     </section>
   );
 }
@@ -425,7 +518,10 @@ export default function ParametresPage() {
         </div>
       </section>
 
-      {/* ── Section 4: Mot de passe ─────────────────────────────────────────── */}
+      {/* ── Section 4: Notifications ─────────────────────────────────────────── */}
+      <NotificationsSection />
+
+      {/* ── Section 5: Mot de passe ─────────────────────────────────────────── */}
       <PasswordSection
         locked={
           isDemoUser(user?.id) ? 'Le mot de passe ne se change pas dans la démonstration.'

@@ -31,6 +31,7 @@ async function companyName(userId: string) {
   return p?.company || [p?.first, p?.last].filter(Boolean).join(' ') || 'Votre traiteur';
 }
 
+/** `unreachable` : affectations dont l'extra n'a reçu ni email ni notification (à joindre par SMS ou WhatsApp). */
 export interface InviteResult { error: string | null; emailed: number; notified: number; unreachable: string[] }
 
 /** Envoie la mission aux extras choisis : email (s'il en ont un) et notification sur leurs appareils. */
@@ -57,7 +58,7 @@ export async function inviteToMissions(assignmentIds: string[]): Promise<InviteR
     if (r.email) mailed = !(await sendMail({ to: r.email, fromName: company, ...missionInviteEmail({ mission, link }) })).error;
     if (pushed) notified++;
     if (mailed) emailed++;
-    if (!pushed && !mailed) unreachable.push(r.extraName);
+    if (!pushed && !mailed) unreachable.push(r.id);
     if (pushed || mailed) await db.update(event_extras).set({ invited_at: new Date().toISOString() }).where(eq(event_extras.id, r.id));
   }
   return { error: null, emailed, notified, unreachable };
