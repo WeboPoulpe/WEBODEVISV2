@@ -242,3 +242,56 @@ export function demoAccessEmail({ firstName, link, contactUrl }: { firstName: st
     }),
   };
 }
+
+// ── Extras ────────────────────────────────────────────────────────────────────
+export interface MissionDetails {
+  extraName: string;
+  companyName: string;
+  eventType: string | null;
+  eventDate: string | null;
+  location: string | null;
+  arrival: string | null;
+  departure: string | null;
+  notes: string | null;
+}
+
+const missionFacts = (m: MissionDetails): [string, string][] => [
+  ['Événement', esc(m.eventType || 'Événement')],
+  ...(m.eventDate ? [['Date', esc(new Date(m.eventDate.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))] as [string, string]] : []),
+  ...(m.arrival ? [['Horaires', esc(m.departure ? `${m.arrival} à ${m.departure}` : `Arrivée à ${m.arrival}`)] as [string, string]] : []),
+  ...(m.location ? [['Lieu', esc(m.location)] as [string, string]] : []),
+  ...(m.notes ? [['Consignes', esc(m.notes).replace(/\n/g, '<br>')] as [string, string]] : []),
+];
+
+/** À l'extra : une mission proposée, avec le lien pour répondre. */
+export function missionInviteEmail({ mission, link }: { mission: MissionDetails; link: string }): Email {
+  const first = mission.extraName.trim().split(/\s+/)[0] ?? '';
+  return {
+    subject: `Mission proposée par ${mission.companyName}`,
+    html: renderEmail({
+      brand: mission.companyName,
+      preheader: 'Dites si vous êtes disponible, en un clic.',
+      title: `Bonjour ${esc(first)}`,
+      paragraphs: [`${esc(mission.companyName)} vous propose une mission. Dites si vous êtes disponible depuis votre page de missions.`],
+      facts: missionFacts(mission),
+      button: { label: 'Voir et répondre', url: link },
+      note: 'Installez cette page sur votre téléphone pour recevoir vos prochaines missions en notification.',
+    }),
+  };
+}
+
+/** À l'extra, la veille : rappel de la mission confirmée. */
+export function missionReminderEmail({ mission, link }: { mission: MissionDetails; link: string }): Email {
+  const first = mission.extraName.trim().split(/\s+/)[0] ?? '';
+  return {
+    subject: `Rappel : mission demain avec ${mission.companyName}`,
+    html: renderEmail({
+      brand: mission.companyName,
+      preheader: mission.arrival ? `Arrivée à ${mission.arrival}.` : 'Votre mission de demain.',
+      title: `À demain, ${esc(first)}`,
+      paragraphs: ['Voici le rappel de votre mission de demain.'],
+      facts: missionFacts(mission),
+      button: { label: 'Voir ma mission', url: link },
+    }),
+  };
+}

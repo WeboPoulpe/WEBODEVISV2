@@ -34,6 +34,11 @@ export default function EvenementPage() {
   const [quote, setQuote] = useState<EventQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('checklist');
+  // Lien d'une notification (« Paul a confirmé ») : ?onglet=extras ouvre directement l'équipe.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('onglet');
+    if (wanted === 'checklist' || wanted === 'materiel' || wanted === 'courses' || wanted === 'extras') setTab(wanted);
+  }, []);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [edit, setEdit] = useState<{ date: string; location: string; guests: string; status: string } | null>(null);
   const [saving, setSaving] = useState(false);

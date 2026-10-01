@@ -5,6 +5,31 @@
 // hors ligne. Les données (devis, événements) ne sont pas mises en cache ici.
 const SCRIPT = String.raw`
 const CACHE = 'webodevis-v1';
+
+// Notifications push : { title, body, url, tag } envoyés par le serveur (lib/push.ts).
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'WeboDevis', {
+    body: data.body || '',
+    tag: data.tag,
+    icon: '/icons/192',
+    badge: '/icons/192',
+    data: { url: data.url || '/' },
+  }));
+});
+
+// Au toucher : la page déjà ouverte est ramenée au premier plan, sinon elle s'ouvre.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+    for (const w of wins) {
+      if (w.url === target && 'focus' in w) return w.focus();
+    }
+    return self.clients.openWindow(target);
+  }));
+});
 const OFFLINE_URL = '/hors-ligne';
 
 self.addEventListener('install', (event) => {

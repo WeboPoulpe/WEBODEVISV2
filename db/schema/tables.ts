@@ -63,7 +63,7 @@ export const notifications = pgTable("notifications", {
 	expires_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
 	check("notifications_priority_check", sql`priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])`),
-	check("notifications_type_check", sql`type = ANY (ARRAY['prospect_request'::text, 'upcoming_event'::text, 'invoice_due'::text, 'support_ticket'::text, 'system_update'::text, 'task_reminder'::text, 'stock_alert'::text])`),
+	check("notifications_type_check", sql`type = ANY (ARRAY['prospect_request'::text, 'upcoming_event'::text, 'invoice_due'::text, 'support_ticket'::text, 'system_update'::text, 'task_reminder'::text, 'stock_alert'::text, 'extra_response'::text])`),
 ]);
 
 export const collaborators = pgTable("collaborators", {
@@ -413,6 +413,8 @@ export const extras = pgTable("extras", {
 	role: text(),
 	access_token: text().default(sql`encode(gen_random_bytes(16), 'hex'::text)`),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+	// Jours où l'extra a indiqué ne pas être disponible (depuis sa page de missions).
+	unavailable_dates: date({ mode: 'string' }).array().default(sql`'{}'::date[]`).notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.user_id],
@@ -431,6 +433,14 @@ export const event_extras = pgTable("event_extras", {
 	mission_notes: text(),
 	assign_courses: boolean().default(false).notNull(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+	/** Heure de fin prévue. */
+	departure_time: text(),
+	/** Mission envoyée à l'extra (email, notification). */
+	invited_at: timestamp({ withTimezone: true, mode: 'string' }),
+	/** Réponse de l'extra depuis sa page (statut « confirme » ou « refuse »). */
+	responded_at: timestamp({ withTimezone: true, mode: 'string' }),
+	/** Rappel de la veille envoyé. */
+	reminded_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.extra_id],
@@ -1529,4 +1539,20 @@ export const material_presets = pgTable("material_presets", {
 			foreignColumns: [users.id],
 			name: "material_presets_user_id_fkey"
 		}).onDelete("cascade"),
+]);
+
+// Abonnements aux notifications push d'un appareil : celui d'un compte (traiteur) ou celui d'un extra (page de missions).
+export const push_subscriptions = pgTable("push_subscriptions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	endpoint: text().notNull(),
+	p256dh: text().notNull(),
+	auth: text().notNull(),
+	user_id: uuid(),
+	extra_id: uuid(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("push_subscriptions_endpoint_key").using("btree", table.endpoint.asc().nullsLast().op("text_ops")),
+	foreignKey({ columns: [table.user_id], foreignColumns: [users.id], name: "push_subscriptions_user_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.extra_id], foreignColumns: [extras.id], name: "push_subscriptions_extra_id_fkey" }).onDelete("cascade"),
+	check("push_subscriptions_owner_check", sql`(user_id IS NOT NULL) <> (extra_id IS NOT NULL)`),
 ]);
