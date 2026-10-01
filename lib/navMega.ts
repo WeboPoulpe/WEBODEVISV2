@@ -142,6 +142,7 @@ export const NAV_MEGA: Record<string, NavMegaEntry> = {
     summary: 'Le matériel que vous possédez : chafing dish, caisses isothermes, bacs gastro. Il se coche ensuite pour chaque événement.',
     actions: [
       { label: 'Depuis la liste de base', hint: 'Cochez ce que vous avez', href: '/materiel?action=liste-de-base', icon: ListChecks },
+      { label: 'Modèles de matériel', hint: 'Cocktail, dîner assis…', href: '/materiel?action=modeles', icon: LayoutTemplate },
       { label: 'Modèles de location', hint: 'La vaisselle louée selon les couverts', href: '/location-templates', icon: Wrench },
     ],
   },

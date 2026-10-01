@@ -5,11 +5,12 @@ import { ListChecks, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
-import { EQUIPMENT_BASE, findBaseArticle, matchesSearch, sameName, UNITS } from '@/lib/equipment';
+import { EQUIPMENT_BASE, findBaseArticle, formatPerGuest, matchesSearch, sameName, UNITS } from '@/lib/equipment';
 import Modal from '@/components/ui/Modal';
 import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import MaterialTemplates from '@/components/materiel/MaterialTemplates';
 
 // Mon matériel : ce que le traiteur possède et emporte sur ses événements. Dans la fiche d'un événement,
 // onglet Matériel, « Choisir dans ma liste » propose cette liste : on coche au lieu de retaper.
@@ -86,9 +87,11 @@ export default function MaterielPage() {
     setPicking(null);
   };
 
-  const openPicking = () => { setBaseQuery(''); setPicking({}); };
-  // Action rapide du menu (lib/navMega.ts).
-  useUrlAction({ 'liste-de-base': openPicking });
+  // Deux onglets : la liste de ce que l'on possède, et les modèles (cocktail, dîner assis…) appliqués aux événements.
+  const [tab, setTab] = useState<'liste' | 'modeles'>('liste');
+  const openPicking = () => { setTab('liste'); setBaseQuery(''); setPicking({}); };
+  // Actions rapides du menu (lib/navMega.ts) et lien « vos modèles de matériel » d'un événement.
+  useUrlAction({ 'liste-de-base': openPicking, modeles: () => setTab('modeles') });
 
   // Article introuvable dans la liste de base : formulaire d'article perso prérempli avec le texte cherché.
   // La liste reste ouverte dessous si des articles y sont cochés.
@@ -98,21 +101,35 @@ export default function MaterielPage() {
     setForm({ ...emptyForm, name: text });
   };
 
-  const qtyLabel = (i: Preset) => (i.qty_per_guest ? `${i.qty_per_guest.toLocaleString('fr-FR')} ${i.unit ?? 'pièce'} par couvert` : `${i.default_qty.toLocaleString('fr-FR')} ${i.unit ?? 'pièce'}`);
+  const qtyLabel = (i: Preset) => (i.qty_per_guest ? formatPerGuest(i.qty_per_guest, i.unit) : `${i.default_qty.toLocaleString('fr-FR')} ${i.unit ?? 'pièce'}`);
 
   return (
     <div className="px-4 md:px-6 pb-8">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
         <div>
           <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Matériel</h1>
-          <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">Ce que vous emportez sur vos événements. Dans un événement, onglet Matériel, vous le cochez au lieu de le retaper.</p>
+          {tab === 'liste' && <p className="text-sm text-gray-500 mt-0.5 max-w-2xl">Ce que vous emportez sur vos événements. Dans un événement, onglet Matériel, vous le cochez au lieu de le retaper.</p>}
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button onClick={openPicking} className={cn(btnSecondary, 'whitespace-nowrap')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
-          <button onClick={() => setForm({ ...emptyForm })} className={cn(btnPrimary, 'flex-1 sm:flex-none whitespace-nowrap')}><Plus className="h-4 w-4" />Nouvel article</button>
-        </div>
+        {tab === 'liste' && (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button onClick={openPicking} className={cn(btnSecondary, 'whitespace-nowrap')}><ListChecks className="h-4 w-4" />Depuis la liste</button>
+            <button onClick={() => setForm({ ...emptyForm })} className={cn(btnPrimary, 'flex-1 sm:flex-none whitespace-nowrap')}><Plus className="h-4 w-4" />Nouvel article</button>
+          </div>
+        )}
       </div>
 
+      <div className="flex gap-1 p-1 mb-5 rounded-xl bg-gray-100 w-full sm:w-fit" role="tablist" aria-label="Matériel">
+        {([['liste', 'Ma liste'], ['modeles', 'Modèles']] as const).map(([key, label]) => (
+          <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+            className={cn('flex-1 sm:flex-none h-10 px-5 rounded-lg text-[15px] font-medium transition-colors', tab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'modeles' && user && <MaterialTemplates userId={user.id} presets={items ?? []} />}
+
+      {tab === 'liste' && <>
       {error && <p role="alert" className={cn(errorCls, 'mb-4')}>{error}</p>}
 
       {items && items.length > 6 && (
@@ -148,6 +165,7 @@ export default function MaterielPage() {
           {shown.length === 0 && <li className="px-5 py-6 text-sm text-gray-500">Aucun article ne correspond à « {search} ».</li>}
         </ul>
       )}
+      </>}
 
       {picking && (() => {
         const available = EQUIPMENT_BASE.filter((a) => !(items ?? []).some((i) => sameName(i.name, a.name)));

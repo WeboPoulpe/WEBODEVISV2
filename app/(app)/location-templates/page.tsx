@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ListChecks, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { findBaseArticle, matchesSearch, RENTAL_BASE, sameName, UNITS } from '@/lib/equipment';
+import { findBaseArticle, formatPerGuest, matchesSearch, RENTAL_BASE, sameName, UNITS } from '@/lib/equipment';
+import PerGuestInput from '@/components/ui/PerGuestInput';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
@@ -239,7 +240,7 @@ export default function LocationTemplatesPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 break-words">{i.material_name}</p>
                         <p className="text-sm text-gray-500">
-                          {i.qty_per_guest.toLocaleString('fr-FR')} {i.unit || 'pièce'} par couvert
+                          {formatPerGuest(i.qty_per_guest, i.unit)}
                           {supplierName(i.default_supplier_id) && `, ${supplierName(i.default_supplier_id)}`}
                           {i.default_price_per_unit > 0 && <span className="sm:hidden">, {money(i.default_price_per_unit)} l’unité</span>}
                         </p>
@@ -295,7 +296,7 @@ export default function LocationTemplatesPage() {
                 <SearchField sticky autoFocus value={baseQuery} onChange={setBaseQuery} label="Rechercher dans la liste de base"
                   placeholder="Rechercher : assiette, verre, nappe…" status={searchStatus(baseQuery, found.length, hiddenOn)} />
               )}
-              {(!typed || found.length > 0) && <p className="text-sm text-gray-600">Cochez ce que ce modèle contient. La quantité est par couvert : 0,1 pour une table de dix.</p>}
+              {(!typed || found.length > 0) && <p className="text-sm text-gray-600">Cochez ce que ce modèle contient. Les quantités se lisent « 1 pour 10 couverts » : ajustez-les si besoin.</p>}
               {available.length === 0 && <p className="text-[15px] text-gray-700">Tous les articles de la liste sont déjà dans ce modèle.</p>}
               {available.length > 0 && typed && found.length === 0 && (
                 <div className="rounded-2xl bg-gray-50 px-4 py-4 space-y-3">
@@ -320,17 +321,18 @@ export default function LocationTemplatesPage() {
                       {rows.map((a) => {
                         const on = a.name in picking;
                         return (
-                          <li key={a.name} className="flex items-center gap-3 pl-3 pr-2 py-1 rounded-2xl bg-gray-50">
+                          <li key={a.name} className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-3 pr-2 py-1 rounded-2xl bg-gray-50">
                             <input type="checkbox" checked={on} aria-label={a.name} className="h-6 w-6 rounded-md accent-sage flex-shrink-0"
                               onChange={(e) => setPicking((p) => { const next = { ...p }; if (e.target.checked) next[a.name] = String(a.perGuest); else delete next[a.name]; return next; })} />
-                            <span className="flex-1 min-w-0 py-2 text-[15px] text-gray-900">{a.name}</span>
+                            <span className="flex-1 min-w-[8rem] py-2 text-[15px] text-gray-900">{a.name}</span>
                             {on ? (
-                              <input type="number" inputMode="decimal" min="0" step="any" value={picking[a.name]} aria-label={`Quantité par couvert, ${a.name}`}
-                                onChange={(e) => setPicking((p) => ({ ...p, [a.name]: e.target.value }))} className={cn(inputCls, 'w-20 h-10 px-2 text-center')} />
+                              <div className="pb-1 sm:pb-0">
+                                <PerGuestInput compact id={`base-${a.name}`} value={num(picking[a.name], a.perGuest)} unit={a.unit}
+                                  onChange={(q) => setPicking((p) => ({ ...p, [a.name]: String(q) }))} />
+                              </div>
                             ) : (
-                              <span className="text-sm text-gray-500 tabular-nums">{a.perGuest.toLocaleString('fr-FR')}</span>
+                              <span className="text-sm text-gray-500">{formatPerGuest(a.perGuest, a.unit)}</span>
                             )}
-                            <span className="w-24 text-sm text-gray-500">{a.unit} par couvert</span>
                           </li>
                         );
                       })}
@@ -364,11 +366,11 @@ export default function LocationTemplatesPage() {
                 }} />
               <datalist id="rental-base">{RENTAL_BASE.map((a) => <option key={a.name} value={a.name} />)}</datalist>
             </div>
+            <div>
+              <label htmlFor="tpl-qty" className={labelCls}>Quantité</label>
+              <PerGuestInput id="tpl-qty" value={num(form.qty, 1)} unit={form.unit} onChange={(q) => setForm({ ...form, qty: String(q) })} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="tpl-qty" className={labelCls}>Quantité par couvert</label>
-                <input id="tpl-qty" type="number" inputMode="decimal" min="0" step="any" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} className={inputCls} />
-              </div>
               <div>
                 <label htmlFor="tpl-unit" className={labelCls}>Unité</label>
                 <select id="tpl-unit" value={form.unit || 'pièce'} onChange={(e) => setForm({ ...form, unit: e.target.value })} className={inputCls}>
@@ -376,7 +378,6 @@ export default function LocationTemplatesPage() {
                 </select>
               </div>
             </div>
-            <p className="text-sm text-gray-500 -mt-2">Pour une table de dix, indiquez 0,1 : la quantité est arrondie à l’unité supérieure.</p>
             <div>
               <label htmlFor="tpl-price" className={labelCls}>Prix unitaire HT</label>
               <input id="tpl-price" type="number" inputMode="decimal" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className={inputCls} />

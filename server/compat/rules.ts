@@ -87,4 +87,10 @@ export const RULES: Record<string, TableRule> = {
   rental_templates: both(own('user_id')),
   rental_template_sets: both(own('user_id')),
   material_presets: both(own('user_id')),
+  material_template_sets: both(own('user_id')),
+  // Un article ne peut entrer que dans un de ses propres modèles.
+  material_templates: {
+    read: own('user_id'),
+    write: (t, u) => `(${t}.user_id = ${u} and exists (select 1 from public.material_template_sets ms where ms.id = ${t}.set_id and ms.user_id = ${u}))`,
+  },
 };

@@ -1541,6 +1541,49 @@ export const material_presets = pgTable("material_presets", {
 		}).onDelete("cascade"),
 ]);
 
+// Modèles de matériel : ce qu'on emporte pour un type de réception (cocktail, dîner assis…). Dans un événement,
+// on applique un modèle à « À préparer ». Distincts de material_presets (la liste de ce que le traiteur possède).
+export const material_template_sets = pgTable("material_template_sets", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	name: text().notNull(),
+	sort_order: integer().default(0).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_material_template_sets_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "material_template_sets_user_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+// Articles d'un modèle de matériel : quantité fixe (default_qty), ou par couvert quand qty_per_guest est renseigné.
+export const material_templates = pgTable("material_templates", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	set_id: uuid().notNull(),
+	user_id: uuid().notNull(),
+	name: text().notNull(),
+	unit: text(),
+	default_qty: numeric().default('1').notNull(),
+	qty_per_guest: numeric(),
+	sort_order: integer().default(0).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_material_templates_set_id").using("btree", table.set_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_material_templates_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.set_id],
+			foreignColumns: [material_template_sets.id],
+			name: "material_templates_set_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "material_templates_user_id_fkey"
+		}).onDelete("cascade"),
+]);
+
 // Abonnements aux notifications push d'un appareil : celui d'un compte (traiteur) ou celui d'un extra (page de missions).
 export const push_subscriptions = pgTable("push_subscriptions", {
 	id: uuid().defaultRandom().primaryKey().notNull(),

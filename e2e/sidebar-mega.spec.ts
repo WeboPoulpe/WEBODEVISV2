@@ -174,6 +174,7 @@ test('aucune action morte : chaque lien répond, chaque action ouvre ce qu’ell
       '/extras?action=agenda': null,
       '/fournisseurs?action=nouveau': /Nouveau fournisseur/,
       '/materiel?action=liste-de-base': /./,
+      '/materiel?action=modeles': null,
       '/parametres/categories?action=nouveau': null,
       '/location-templates?action=nouveau': /Nouveau modèle de location/,
     };

@@ -195,10 +195,12 @@ test.describe('administration', () => {
       const [quote] = await sql<{ id: string }>(
         `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status)
          values ($1, $1, 'Client location', current_date + 30, 'Cocktail', 50, 'valide') returning id`, [userId]);
-      const addItem = async (name: string, qty: string, price: string) => {
+      // Quantité dite comme on la pense : « 3 pour 2 couverts », « 1 pour 10 couverts ».
+      const addItem = async (name: string, count: string, per: string, price: string) => {
         await page.getByRole('button', { name: 'Ajouter un article' }).click();
         await page.locator('#tpl-name').fill(name);
-        await page.locator('#tpl-qty').fill(qty);
+        await page.locator('#tpl-qty').fill(count);
+        await page.locator('#tpl-qty-per').fill(per);
         await page.locator('#tpl-price').fill(price);
         await page.getByRole('button', { name: 'Enregistrer' }).click();
         await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -217,10 +219,10 @@ test.describe('administration', () => {
       await page.goto('/location-templates');
       await expect(page.getByText('Aucun modèle de location')).toBeVisible({ timeout: 20_000 });
       await createSet('Dîner assis');
-      await addItem('Assiette plate', '1', '0.3');
+      await addItem('Assiette plate', '1', '1', '0.3');
       await createSet('Cocktail');
-      await addItem('Flûte', '1.5', '0.25');
-      await addItem('Mange-debout', '0.1', '14');
+      await addItem('Flûte', '3', '2', '0.25');
+      await addItem('Mange-debout', '1', '10', '14');
       // 150 flûtes et 10 mange-debout pour 100 couverts : 37,50 + 140.
       await expect(page.getByText('environ 177,50')).toBeVisible();
       await testInfo.attach('modeles', { body: await page.screenshot(), contentType: 'image/png' });
@@ -237,10 +239,10 @@ test.describe('administration', () => {
         `select material_name, qty, source from public.rental_items where quote_id = $1 order by material_name`, [quote.id]);
       expect(rows.map((r) => [r.material_name, Number(r.qty), r.source])).toEqual([['Flûte', 75, 'template'], ['Mange-debout', 5, 'template']]);
 
-      // Changer d'avis : le dîner assis remplace ce qui avait été généré.
-      page.once('dialog', (d) => d.accept());
+      // Changer d'avis : la location n'est plus vide, une fenêtre demande d'ajouter ou de remplacer ; on remplace.
       await page.getByRole('button', { name: 'Appliquer un modèle' }).click();
       await dialog.getByRole('button', { name: /Dîner assis/ }).click();
+      await page.getByRole('dialog', { name: 'Appliquer « Dîner assis »' }).getByRole('button', { name: /Remplacer la location actuelle/ }).click();
       await expect(page.getByText('Assiette plate')).toBeVisible({ timeout: 15_000 });
       const after = await sql<{ material_name: string; qty: string }>(`select material_name, qty from public.rental_items where quote_id = $1`, [quote.id]);
       expect(after.map((r) => [r.material_name, Number(r.qty)])).toEqual([['Assiette plate', 50]]);

@@ -113,3 +113,42 @@ export function findBaseArticle<T extends { name: string }>(list: T[], name: str
 }
 
 export const sameName = (a: string, b: string) => fold(a) === fold(b);
+
+// ── Quantité par couvert, dite comme on la pense : « 1 nappe pour 8 couverts » ─────────────────────
+// En base, la quantité reste un nombre par couvert (1 pour 8 = 0,125) ; à l'écran, on écrit et on lit le ratio.
+
+export interface GuestRatio { count: number; per: number }
+
+/** 0,125 → 1 pour 8 ; 1,5 → 3 pour 2 ; 2 → 2 pour 1. Cherche le plus petit nombre de couverts qui tombe juste. */
+export function ratioFromPerGuest(q: number): GuestRatio {
+  if (!Number.isFinite(q) || q <= 0) return { count: 1, per: 1 };
+  for (let per = 1; per <= 100; per++) {
+    const count = q * per;
+    if (Math.abs(count - Math.round(count)) < 1e-6 && Math.round(count) >= 1) return { count: Math.round(count), per };
+  }
+  return { count: Math.round(q * 100) / 100, per: 1 };
+}
+
+/** 1 pour 8 → 0,125. */
+export const perGuestFromRatio = (count: number, per: number) => (per > 0 && count > 0 ? count / per : 0);
+
+const plural = (n: number, unit: string) => {
+  if (n <= 1) return unit;
+  if (/[sxz]$/.test(unit) || unit === 'kg') return unit;
+  if (unit === 'paire' || unit === 'boîte' || unit === 'bouteille') return `${unit}s`;
+  return unit.split(' ').map((w, i) => (i === 0 ? `${w}s` : w)).join(' ');
+};
+const nb = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+
+/** « 1 pièce par couvert », « 1 pièce pour 8 couverts », « 3 pièces pour 2 couverts ». */
+export function formatPerGuest(q: number, unit?: string | null): string {
+  const u = unit || 'pièce';
+  const { count, per } = ratioFromPerGuest(q);
+  return per === 1 ? `${nb(count)} ${plural(count, u)} par couvert` : `${nb(count)} ${plural(count, u)} pour ${per} couverts`;
+}
+
+/** « 4 pièces », « 1 boîte », « 2,5 kg ». */
+export const formatQty = (n: number, unit?: string | null) => `${nb(n)} ${plural(n, unit || 'pièce')}`;
+
+/** Quantité à prévoir pour un nombre de couverts, arrondie à l'unité supérieure (comme dans un événement). */
+export const quantityFor = (q: number, guests: number) => (q > 0 && guests > 0 ? Math.ceil(q * guests - 1e-9) : 0);

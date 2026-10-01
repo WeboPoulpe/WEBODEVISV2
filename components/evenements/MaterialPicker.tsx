@@ -8,7 +8,7 @@ import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { Check } from './shared';
-import { EQUIPMENT_BASE, findBaseArticle, matchesSearch, UNITS } from '@/lib/equipment';
+import { EQUIPMENT_BASE, findBaseArticle, formatPerGuest, matchesSearch, UNITS } from '@/lib/equipment';
 
 // Liste de matériel du traiteur : on coche ce qu'on emporte à l'événement au lieu de tout retaper.
 // La quantité proposée est fixe, ou calculée d'après le nombre de couverts.
@@ -180,7 +180,7 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
                       : <Check checked={on} onChange={(next) => toggle(p, next)} label={p.name} />}
                     <span className="flex-1 min-w-0 py-2">
                       <span className="block text-[15px] text-gray-900 break-words">{p.name}</span>
-                      {p.qty_per_guest && <span className="block text-sm text-gray-500">{Number(p.qty_per_guest).toLocaleString('fr-FR')} par couvert</span>}
+                      {p.qty_per_guest && <span className="block text-sm text-gray-500">{formatPerGuest(Number(p.qty_per_guest), p.unit)}</span>}
                     </span>
                     {present ? (
                       <span className={cn(pill, 'bg-white border border-gray-200 text-gray-600')}>Déjà ajouté</span>

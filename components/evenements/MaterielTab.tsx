@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ListChecks, Loader2, Pencil, Plus, Printer, Trash2, Wand2 } from 'lucide-react';
 import MaterialPicker, { rememberMaterial } from './MaterialPicker';
+import ApplyTemplateDialog, { type TemplateChoice } from './ApplyTemplateDialog';
 import { createClient } from '@/lib/supabase/client';
+import { quantityFor } from '@/lib/equipment';
+import type { ApplyPlan } from '@/lib/templateApply';
 import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
@@ -39,6 +42,19 @@ interface RentalTemplate {
   default_supplier_id: string | null;
   default_price_per_unit: number;
 }
+
+interface MaterialTemplateSet { id: string; name: string }
+
+interface MaterialTemplate {
+  id: string;
+  set_id: string;
+  name: string;
+  unit: string | null;
+  default_qty: number;
+  qty_per_guest: number | null;
+}
+
+type RentalData = { supplierId: string | null; price: number };
 
 const RENTAL_SELECT = '*, supplier:suppliers(id, name)';
 const NO_SUPPLIER = 'Sans fournisseur';
@@ -79,6 +95,45 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
     saveMaterials([...materials, { id: crypto.randomUUID(), name: value, qty: parseFloat(qty) || 1, unit: unit.trim(), checked: false }]);
     // Ce qui est saisi à la main rejoint la liste de matériel : la prochaine fois, il suffira de le cocher.
     if (user) rememberMaterial(user.id, value, parseFloat(qty) || 1, unit.trim());
+  };
+
+  // ── Modèles de matériel (cocktail, dîner assis…), appliqués à « À préparer » ─────
+  const guests = quote.guest_count ?? 0;
+  const [materialSets, setMaterialSets] = useState<MaterialTemplateSet[]>([]);
+  const [materialTemplates, setMaterialTemplates] = useState<MaterialTemplate[]>([]);
+  const [choosingMaterialSet, setChoosingMaterialSet] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    supabase.from('material_template_sets').select('id, name').eq('user_id', user.id).order('created_at')
+      .then(({ data }) => setMaterialSets((data ?? []) as MaterialTemplateSet[]));
+    supabase.from('material_templates').select('id, set_id, name, unit, default_qty, qty_per_guest').eq('user_id', user.id).order('sort_order')
+      .then(({ data }) => setMaterialTemplates((data ?? []) as MaterialTemplate[]));
+  }, [user]);
+
+  const materialChoices: TemplateChoice<null>[] = materialSets
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      lines: materialTemplates.filter((t) => t.set_id === s.id).map((t) => ({
+        name: t.name,
+        unit: t.unit,
+        qty: t.qty_per_guest != null ? quantityFor(Number(t.qty_per_guest), guests) : Number(t.default_qty),
+        data: null,
+      })),
+    }))
+    .filter((c) => c.lines.length > 0);
+
+  const applyMaterials = (plan: ApplyPlan<null>) => {
+    setChoosingMaterialSet(false);
+    const removed = new Set(plan.remove.map((r) => r.id));
+    const updated = new Map(plan.update.map((u) => [u.line.id, u.qty]));
+    saveMaterials([
+      // Une quantité qui augmente est à préparer de nouveau : la case se décoche.
+      ...materials.filter((m) => !removed.has(m.id)).map((m) => (updated.has(m.id) ? { ...m, qty: updated.get(m.id)!, checked: false } : m)),
+      ...plan.add.map((a) => ({ id: crypto.randomUUID(), name: a.name, qty: a.qty, unit: a.unit ?? '', checked: false })),
+    ]);
   };
 
   // ── Location ───────────────────────────────────────────────────────────────
@@ -151,32 +206,45 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
     if (!check(res, 'L’article n’a pas pu être supprimé. Réessayez.')) setRentals(previous);
   };
 
-  // Les modèles qui ont au moins un article ; un seul : il s'applique directement, plusieurs : on choisit.
-  const usableSets = templateSets.filter((s) => templates.some((t) => t.set_id === s.id));
-  const guests = quote.guest_count ?? 1;
-  const setTotal = (setId: string) => templates.filter((t) => t.set_id === setId).reduce((sum, t) => sum + Math.ceil(Number(t.qty_per_guest) * guests) * Number(t.default_price_per_unit), 0);
+  // Les modèles qui ont au moins un article, avec leurs quantités calculées pour les couverts de l'événement.
+  const rentalChoices: TemplateChoice<RentalData>[] = templateSets
+    .map((s) => {
+      const lines = templates.filter((t) => t.set_id === s.id).map((t) => ({
+        name: t.material_name,
+        unit: t.unit,
+        qty: quantityFor(Number(t.qty_per_guest), guests),
+        data: { supplierId: t.default_supplier_id, price: Number(t.default_price_per_unit) },
+      }));
+      return { id: s.id, name: s.name, lines, total: lines.reduce((sum, l) => sum + l.qty * l.data.price, 0) };
+    })
+    .filter((c) => c.lines.length > 0);
 
-  const generate = async (set: RentalTemplateSet) => {
-    const chosen = templates.filter((t) => t.set_id === set.id);
-    const replaced = rentals.filter((r) => r.source === 'template').length;
-    if (replaced > 0 && !confirm(`Appliquer « ${set.name} » pour ${guests} couverts ?\nLes ${replaced} articles générés précédemment seront remplacés ; ceux ajoutés à la main sont conservés.`)) return;
+  // Ajouter ou remplacer (voir lib/templateApply.ts) : les lignes déjà commandées ne sont jamais modifiées en silence.
+  const applyRental = async (plan: ApplyPlan<RentalData>) => {
     setChoosingSet(false);
     setGenerating(true);
     const supabase = createClient();
-    const generated = rentals.filter((r) => r.source === 'template').map((r) => r.id);
-    const removed = generated.length ? await supabase.from('rental_items').delete().in('id', generated) : { error: null };
-    const inserted = removed.error ? removed : await supabase.from('rental_items').insert(chosen.map((t) => ({
-      quote_id: quote.id,
-      material_name: t.material_name,
-      qty: Math.ceil(Number(t.qty_per_guest) * guests),
-      unit: t.unit,
-      supplier_id: t.default_supplier_id,
-      price_per_unit: t.default_price_per_unit,
-      source: 'template',
-    })));
-    check(inserted, 'La location n’a pas pu être générée. Réessayez.');
+    const failed = 'La location n’a pas pu être mise à jour entièrement. Vérifiez la liste et réessayez.';
+    let ok = true;
+    if (plan.remove.length) ok = check(await supabase.from('rental_items').delete().in('id', plan.remove.map((r) => r.id)), failed);
+    if (ok && plan.update.length) {
+      const results = await Promise.all(plan.update.map((u) => supabase.from('rental_items').update({ qty: u.qty }).eq('id', u.line.id)));
+      ok = check(results.find((r) => r.error) ?? { error: null }, failed);
+    }
+    if (ok && plan.add.length) {
+      ok = check(await supabase.from('rental_items').insert(plan.add.map((a) => ({
+        quote_id: quote.id,
+        material_name: a.name,
+        qty: a.qty,
+        unit: a.unit,
+        supplier_id: a.data.supplierId,
+        price_per_unit: a.data.price,
+        notes: a.complementOf ? 'Complément : une partie est déjà commandée' : null,
+        source: 'template',
+      }))), failed);
+    }
     const fresh = await supabase.from('rental_items').select(RENTAL_SELECT).eq('quote_id', quote.id).order('created_at');
-    setRentals((fresh.data ?? []) as RentalItem[]);
+    if (!fresh.error) setRentals((fresh.data ?? []) as RentalItem[]);
     setGenerating(false);
   };
 
@@ -208,7 +276,12 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-gray-900">À préparer</h3>
-          <button onClick={() => setPicking(true)} className={btnSecondary}><ListChecks className="h-4 w-4" />Choisir dans ma liste</button>
+          <div className="flex flex-wrap gap-2">
+            {materialChoices.length > 0 && (
+              <button onClick={() => setChoosingMaterialSet(true)} className={btnSecondary}><Wand2 className="h-4 w-4" />Appliquer un modèle de matériel</button>
+            )}
+            <button onClick={() => setPicking(true)} className={btnSecondary}><ListChecks className="h-4 w-4" />Choisir dans ma liste</button>
+          </div>
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); addMaterial(); }} className="flex flex-wrap gap-2">
@@ -243,6 +316,9 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
             })}
           </ul>
         )}
+        <p className="text-sm text-gray-500">
+          Le matériel qu’il faut pour un cocktail, un dîner assis… se prépare dans <Link href="/materiel?action=modeles" className="font-medium text-primary hover:underline">vos modèles de matériel</Link>.
+        </p>
       </section>
 
       {/* ── Location ─────────────────────────────────────────────────────── */}
@@ -250,10 +326,10 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-semibold text-gray-900">Location</h3>
           <div className="flex flex-wrap gap-2">
-            {usableSets.length > 0 && (
-              <button onClick={() => (usableSets.length === 1 ? generate(usableSets[0]) : setChoosingSet(true))} disabled={generating} className={btnSecondary}>
+            {rentalChoices.length > 0 && (
+              <button onClick={() => setChoosingSet(true)} disabled={generating || loading} className={btnSecondary}>
                 {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                {usableSets.length === 1 ? `Appliquer « ${usableSets[0].name} »` : 'Appliquer un modèle'}
+                Appliquer un modèle de location
               </button>
             )}
             {rentals.length > 0 && <button onClick={print} className={btnSecondary}><Printer className="h-4 w-4" />Imprimer</button>}
@@ -266,7 +342,7 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
         ) : rentals.length === 0 ? (
           <EmptyState
             title="Aucun matériel à louer"
-            hint={usableSets.length === 0 ? 'Créez vos modèles de location (dîner assis, cocktail…) pour générer la liste selon le nombre de couverts.' : undefined}
+            hint={rentalChoices.length === 0 ? 'Créez vos modèles de location (dîner assis, cocktail…) pour générer la liste selon le nombre de couverts.' : undefined}
           />
         ) : (
           <>
@@ -309,26 +385,33 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
       </section>
 
       {choosingSet && (
-        <Modal title="Quel modèle appliquer ?" onClose={() => setChoosingSet(false)}>
-          <p className="text-sm text-gray-500 mb-3">Quantités calculées pour {guests} couverts.</p>
-          <ul className="space-y-2 pb-3">
-            {usableSets.map((s) => {
-              const count = templates.filter((t) => t.set_id === s.id).length;
-              const total = setTotal(s.id);
-              return (
-                <li key={s.id}>
-                  <button onClick={() => generate(s)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-gray-50 hover:bg-gray-100 text-left transition-colors">
-                    <span className="min-w-0">
-                      <span className="block font-semibold text-gray-900 break-words">{s.name}</span>
-                      <span className="block text-sm text-gray-600">{count} article{count > 1 ? 's' : ''}</span>
-                    </span>
-                    {total > 0 && <span className="font-display font-bold text-gray-900 tabular-nums whitespace-nowrap">{money(total)}</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </Modal>
+        <ApplyTemplateDialog
+          sets={rentalChoices}
+          guests={guests}
+          current={rentals.map((r) => ({ id: r.id, name: r.material_name, qty: Number(r.qty), unit: r.unit, locked: !!(r.ordered || r.confirmed_individually) }))}
+          labels={{
+            add: 'Ajouter à la location actuelle',
+            replace: 'Remplacer la location actuelle',
+            current: (n) => `${n} article${n > 1 ? 's' : ''} de location`,
+          }}
+          onApply={(_, plan) => applyRental(plan)}
+          onClose={() => setChoosingSet(false)}
+        />
+      )}
+
+      {choosingMaterialSet && (
+        <ApplyTemplateDialog
+          sets={materialChoices}
+          guests={guests}
+          current={materials.map((m) => ({ id: m.id, name: m.name, qty: Number(m.qty), unit: m.unit || null }))}
+          labels={{
+            add: 'Ajouter au matériel à préparer',
+            replace: 'Remplacer le matériel à préparer',
+            current: (n) => `${n} article${n > 1 ? 's' : ''} à préparer`,
+          }}
+          onApply={(_, plan) => applyMaterials(plan)}
+          onClose={() => setChoosingMaterialSet(false)}
+        />
       )}
 
       {picking && user && (

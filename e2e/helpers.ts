@@ -79,6 +79,11 @@ export async function deleteAccount(userId: string): Promise<void> {
     `delete from public.devis_templates where user_id = $1`,
     `delete from public.quote_templates where user_id = $1 or owner_user_id = $1`,
     `delete from public.service_materials where user_id = $1`,
+    `delete from public.material_templates where user_id = $1`,
+    `delete from public.material_template_sets where user_id = $1`,
+    `delete from public.material_presets where user_id = $1`,
+    `delete from public.rental_templates where user_id = $1`,
+    `delete from public.rental_template_sets where user_id = $1`,
     `delete from public.notifications where user_id = $1`,
     `delete from public.users where id = $1 and email like 'e2e-%@${TEST_EMAIL_DOMAIN}'`,
   ]) await sql(query, [userId]);
