@@ -16,6 +16,7 @@ import { syncWeboDocument } from '@/lib/weboFinancials';
 import RecipientPicker from '@/components/devis/RecipientPicker';
 import CompanySearch from '@/components/clients/CompanySearch';
 import type { CompanyResult } from '@/lib/companies';
+import { VAT_RATES, vatLabel } from '@/lib/vat';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -795,10 +796,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   <div className="border-t border-gray-100 pt-3 space-y-3">
                     <div><label className={labelCls}>TVA (%)</label>
                       <select value={vatRate} onChange={(e) => setVatRate(parseFloat(e.target.value))} className={inputCls}>
-                        <option value={20}>20 %</option>
-                        <option value={10}>10 %</option>
-                        <option value={5.5}>5,5 %</option>
-                        <option value={0}>0 %</option>
+                        {[...VAT_RATES, ...((VAT_RATES as readonly number[]).includes(vatRate) ? [] : [vatRate])].map((r) => <option key={r} value={r}>{vatLabel(r)}</option>)}
                       </select>
                     </div>
                     <label className="flex items-center gap-2 cursor-pointer">

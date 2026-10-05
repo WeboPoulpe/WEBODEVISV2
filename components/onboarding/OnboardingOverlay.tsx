@@ -31,7 +31,7 @@ export default function OnboardingOverlay({ userId }: Props) {
         has_completed_onboarding: true,
         ...(companyName.trim() && { company_name: companyName.trim() }),
         ...(companyAddress.trim() && { company_address: companyAddress.trim() }),
-        ...(vatRate && { default_vat_rate: parseInt(vatRate) }),
+        ...(vatRate && { default_vat_rate: parseFloat(vatRate) }),
         ...(logoUrls[0] && { logo_url: logoUrls[0] }),
       })
       .eq('id', userId);
@@ -128,7 +128,7 @@ export default function OnboardingOverlay({ userId }: Props) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Taux de TVA par défaut</label>
               <div className="flex gap-2">
-                {['0', '5.5', '10', '20'].map((r) => (
+                {['20', '10', '8.5', '5.5', '2.1', '0'].map((r) => (
                   <button
                     key={r}
                     type="button"

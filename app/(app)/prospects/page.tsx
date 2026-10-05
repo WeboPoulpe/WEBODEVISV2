@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { defaultVatRate } from '@/lib/vat';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ProspectStatus =
@@ -362,7 +363,7 @@ ${prospect.message.trim()}`
           template: profile?.default_quote_style || 'classique',
           ...(profile?.default_quote_font ? { selected_font: profile.default_quote_font } : {}),
           language: 'fr',
-          vat_rate: 20,
+          vat_rate: defaultVatRate(profile),
           hide_price: false,
           client_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
           client_first_name: firstName.trim(),

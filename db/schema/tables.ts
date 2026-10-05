@@ -844,7 +844,7 @@ export const profiles = pgTable("profiles", {
 	// Style et police proposés à la création d'un devis (page Styles de devis).
 	default_quote_style: text(),
 	default_quote_font: text(),
-	default_vat_rate: integer().default(20),
+	default_vat_rate: numeric({ mode: 'number' }).default(20),
 	cgv: text(),
 	siret: text(),
 	logo_url: text(),

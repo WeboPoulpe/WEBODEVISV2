@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import { scaleToGuests } from '@/lib/quoteScale';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
+import { defaultVatRate } from '@/lib/vat';
 
 const EVENT_TYPES = [
   { key: 'Mariage', label: 'Mariage', icon: Heart },
@@ -227,7 +228,7 @@ export default function NouveauDevisOnboarding() {
       template,
       ...(profile?.default_quote_font ? { selected_font: profile.default_quote_font } : {}),
       language,
-      vat_rate: 20,
+      vat_rate: defaultVatRate(profile),
       hide_price: false,
       ...fromTemplate,
     }).select('id').single();

@@ -18,6 +18,7 @@ import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
 import CompanySearch from '@/components/clients/CompanySearch';
+import { VAT_RATES } from '@/lib/vat';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ServiceLine {
@@ -86,7 +87,6 @@ function totalHT(services: ServiceLine[]) {
 }
 
 const EVENT_TYPES = ['Mariage', 'Anniversaire', 'Cocktail', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
-const VAT_RATES   = [20, 10, 5.5, 0];
 const TEMPLATES: { key: QuoteTemplate; label: string }[] = [
   { key: 'classique', label: 'Classique' },
   { key: 'standard', label: 'Violet' },

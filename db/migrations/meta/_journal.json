@@ -113,6 +113,13 @@
       "when": 1790865708072,
       "tag": "0015_material_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791198620331,
+      "tag": "0016_vat_rate_decimal",
+      "breakpoints": true
     }
   ]
 }
