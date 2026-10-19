@@ -1,7 +1,7 @@
 import {
   FilePlus2, Library, UploadCloud, Send, UserPlus, Search, Link2, Inbox, CalendarPlus, CalendarRange, History,
   Printer, Plus, ShoppingBasket, Boxes, AlertTriangle, Percent, Carrot, CalendarDays, Truck, ListChecks, Wrench,
-  PackageOpen, LayoutTemplate, FolderTree, Bell, Building2, Users, ClipboardList, Settings, FileText,
+  PackageOpen, LayoutTemplate, FolderTree, Bell, Building2, Users, ClipboardList, Settings, FileText, Wallet,
 } from 'lucide-react';
 
 // Mégamenu de la barre latérale : une entrée par page du menu (même `href` que dans components/layout/nav.ts).
@@ -51,6 +51,14 @@ export const NAV_MEGA: Record<string, NavMegaEntry> = {
     ],
     preview: 'devis',
     shortcut: SEARCH_SHORTCUT,
+  },
+  '/factures': {
+    summary: 'Vos factures d’acompte, de solde et vos avoirs, préparées depuis les devis confirmés. Suivez ce qui reste à encaisser et relancez les retards.',
+    actions: [
+      { label: 'À encaisser', hint: 'Les factures émises pas encore réglées', href: '/factures?action=a-encaisser', icon: Wallet },
+      { label: 'En retard', hint: 'Échéance dépassée, à relancer', href: '/factures?action=en-retard', icon: AlertTriangle },
+      { label: 'Facturer un devis', hint: 'Depuis un devis confirmé', href: '/devis?action=confirmes', icon: FilePlus2 },
+    ],
   },
   '/clients': {
     summary: 'Les fiches de vos clients, particuliers et entreprises, avec leurs devis. Un client se retrouve à la création de chaque devis.',

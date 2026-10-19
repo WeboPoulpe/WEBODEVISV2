@@ -7,7 +7,7 @@ import {
   Plus, Heart, PartyPopper, UtensilsCrossed, Wine, Music, Briefcase,
   CalendarDays, Users, Eye, Pencil, Search, Filter, Printer, Trash2, LayoutTemplate,
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
-  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal, Send,
+  BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal, Send, Receipt,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
@@ -30,6 +30,11 @@ import SendQuoteModal from '@/components/devis/SendQuoteModal';
 import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
 import DuplicateQuoteModal from '@/components/devis/DuplicateQuoteModal';
+import BillQuoteModal from '@/components/factures/BillQuoteModal';
+import InvoiceStatusPill from '@/components/factures/InvoiceStatusPill';
+import { listInvoices, type Invoice } from '@/server/invoices';
+import { INVOICE_KIND_LABELS } from '@/lib/invoices';
+import { isConfirmed } from '@/lib/quoteStatus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -194,11 +199,18 @@ interface ProspectResult {
 
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked, onRenamed, folderLabel, onMoveFolder,
+  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked, onRenamed, folderLabel, onMoveFolder, onBill,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void; onBill: () => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
+  // Factures du devis (acomptes, solde, avoirs), lues par les actions serveur des factures.
+  const [invoices, setInvoices] = useState<Invoice[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listInvoices({ quoteId: quote.id }).then((list) => { if (!cancelled) setInvoices(list); }).catch(() => { if (!cancelled) setInvoices([]); });
+    return () => { cancelled = true; };
+  }, [quote.id]);
   const [notes, setNotes] = useState('');
   const [notesError, setNotesError] = useState<string | null>(null);
   // Les notes de suivi vivent dans la colonne internal_notes du devis.
@@ -426,6 +438,38 @@ function DevisSheet({
               <span className="text-lg font-bold text-gray-900">{formatCurrency(t)}</span>
             </div>
           ) : null; })()}
+          {/* Facturation : factures du devis et « Facturer » pour un devis confirmé */}
+          {(isConfirmed(status) || (invoices?.length ?? 0) > 0) && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Factures</p>
+              {invoices === null ? (
+                <div className="h-12 rounded-xl bg-gray-50 animate-pulse" />
+              ) : invoices.length > 0 ? (
+                <ul className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 mb-2">
+                  {invoices.map((inv) => (
+                    <li key={inv.id}>
+                      <Link href={`/factures/${inv.id}`} className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50">
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-gray-900 truncate">{inv.number ?? 'Brouillon'}</span>
+                          <span className="block text-xs text-gray-500 truncate">{INVOICE_KIND_LABELS[inv.kind]}</span>
+                        </span>
+                        <InvoiceStatusPill kind={inv.kind} status={inv.status} />
+                        <span className="w-24 text-right text-sm font-semibold tabular-nums text-gray-900">{formatCurrency(inv.total_ttc)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 mb-2">Aucune facture pour ce devis.</p>
+              )}
+              {isConfirmed(status) && (
+                <button onClick={onBill}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-primary/30 rounded-xl text-sm font-medium text-primary hover:bg-primary-50 transition-colors">
+                  <Receipt className="h-4 w-4" />Facturer
+                </button>
+              )}
+            </div>
+          )}
           {/* Gérer l'événement */}
           <Link
             href={`/evenements/${quote.id}`}
@@ -485,6 +529,9 @@ function DevisSheet({
     </Sheet>
   );
 }
+
+/** Suppression refusée par la base parce que le devis a des factures (clé étrangère). */
+const isInvoicedError = (e: { code?: string; message?: string }) => e.code === '23503' || /customer_invoices/.test(e.message ?? '');
 
 /** Brouillon (ou import) : ce qu'on supprime sans hésiter. Le reste a déjà été envoyé ou traité. */
 const isDraftQuote = (q: { status: string; imported?: boolean | null }) =>
@@ -707,6 +754,9 @@ export default function DevisPage() {
   const [importModal, setImportModal] = useState(false);
   const [editImportId, setEditImportId] = useState<string | null>(null);
   const [financeQuoteId, setFinanceQuoteId] = useState<string | null>(null);
+  // Facturer un devis confirmé (fenêtre ouverte depuis la fiche du devis)
+  const [billQuote, setBillQuote] = useState<Quote | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // ── Dossiers ───────────────────────────────────────────────────────────────
   const [folders, setFolders] = useState<QuoteFolder[]>([]);
@@ -739,6 +789,7 @@ export default function DevisPage() {
     modeles: () => setShowTemplates(true),
     importer: () => setImportModal(true),
     envoyes: () => { setView('list'); setScope('encours'); setStatusFilter('devis_envoye'); },
+    confirmes: () => { setView('list'); setScope('confirmes'); setStatusFilter(''); },
   }, !loading);
 
   const navigateFolder = useCallback((id: string | null) => {
@@ -850,7 +901,14 @@ export default function DevisPage() {
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Supprimer ce devis ? Cette action est irréversible.')) return;
-    await createClient().from('quotes').delete().eq('id', id);
+    setPageError(null);
+    const { error } = await createClient().from('quotes').delete().eq('id', id);
+    if (error) {
+      setPageError(isInvoicedError(error)
+        ? 'Ce devis a des factures : il ne peut plus être supprimé. Vous pouvez l’archiver.'
+        : 'Le devis n’a pas pu être supprimé. Vérifiez votre connexion et réessayez.');
+      return;
+    }
     setQuotes((prev) => prev.filter((q) => q.id !== id));
     setSheetQuote((prev) => prev?.id === id ? null : prev);
   }, []);
@@ -971,7 +1029,12 @@ export default function DevisPage() {
     const { error } = await createClient().from('quotes').delete().in('id', ids);
     setBulkBusy(false);
     setBulkDeleteOpen(false);
-    if (error) { setBulkError('Les devis n’ont pas pu être supprimés. Vérifiez votre connexion et réessayez.'); return; }
+    if (error) {
+      setBulkError(isInvoicedError(error)
+        ? 'Un des devis cochés a des factures : il ne peut plus être supprimé. Décochez-le, puis recommencez.'
+        : 'Les devis n’ont pas pu être supprimés. Vérifiez votre connexion et réessayez.');
+      return;
+    }
     const idSet = new Set(ids);
     setQuotes((prev) => prev.filter((q) => !idSet.has(q.id)));
     setSheetQuote((prev) => (prev && idSet.has(prev.id) ? null : prev));
@@ -1075,6 +1138,8 @@ export default function DevisPage() {
           )}
         </div>
       </div>
+
+      {pageError && <p role="alert" className={cn(errorCls, 'mb-4')}>{pageError}</p>}
 
       {/* Recherche, statut, tri */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -1288,10 +1353,17 @@ export default function DevisPage() {
         <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked}
           folderLabel={folderLabelOf(sheetQuote)}
           onMoveFolder={() => setMoveQuote(sheetQuote)}
+          onBill={() => setBillQuote(sheetQuote)}
           onRenamed={(id, name) => {
             setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, internal_name: name } : q));
             setSheetQuote((prev) => prev && prev.id === id ? { ...prev, internal_name: name } : prev);
           }} />
+      )}
+
+      {billQuote && (
+        <BillQuoteModal quoteId={billQuote.id}
+          quoteLabel={[billQuote.quote_number ? `Devis ${billQuote.quote_number}` : 'Devis', quoteDisplayName(billQuote)].join(', ')}
+          onClose={() => setBillQuote(null)} />
       )}
 
       {/* ── Déplacer un devis vers un dossier ─────────────────────────── */}
