@@ -29,7 +29,9 @@ export async function middleware(request: NextRequest) {
   // Public routes — no auth required
   if (isPublicRoute) return NextResponse.next();
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const raw = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  // Une session fermée (compte désactivé, mot de passe changé ailleurs) compte comme une absence de session.
+  const token = raw && !raw.revoked ? raw : null;
 
   // Sans session, l'adresse du site montre la présentation du logiciel. L'app installée s'ouvre avec
   // ?source=pwa : elle va droit à la connexion.

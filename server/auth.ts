@@ -3,10 +3,12 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { decode, encode } from 'next-auth/jwt';
+import { cookies } from 'next/headers';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { password_reset_tokens, profiles, users, type ProfileRow } from '@/db/schema';
-import { authOptions, normalizeEmail } from '@/lib/auth';
+import { authOptions, normalizeEmail, passwordTag } from '@/lib/auth';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { passwordChangedEmail, passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
@@ -15,6 +17,9 @@ import { isSignupOpen } from './settings';
 
 const MIN_PASSWORD = 6;
 const RESET_TTL_MS = 60 * 60 * 1000;
+// Emails « mot de passe oublié » par compte et par heure : au-delà, on ne renvoie rien (sans le dire).
+const MAX_RESETS_PER_HOUR = 3;
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -65,6 +70,12 @@ export async function requestPasswordReset(rawEmail: string): Promise<{ error: s
   const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   // Le compte de démonstration n'a pas de mot de passe à changer.
   if (!user || isDemoUser(user.id)) return { error: null };
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(password_reset_tokens)
+    // Un lien vit une heure : ceux qui n'ont pas encore expiré ont été demandés dans l'heure.
+    .where(and(eq(password_reset_tokens.user_id, user.id), gt(password_reset_tokens.expires_at, new Date(Date.now() + RESET_TTL_MS - 3600_000).toISOString())));
+  if (n >= MAX_RESETS_PER_HOUR) return { error: null };
 
   const token = crypto.randomBytes(32).toString('base64url');
   await db.insert(password_reset_tokens).values({
@@ -125,7 +136,23 @@ export async function changePassword(input: {
 
   const password_hash = await bcrypt.hash(input.newPassword, 10);
   await db.update(users).set({ password_hash }).where(eq(users.id, userId));
+  // Les autres appareils sont déconnectés (leur empreinte ne correspond plus) ; celui-ci reste connecté.
+  await keepCurrentSession(passwordTag(password_hash));
   // L'email de confirmation ne bloque pas le changement s'il ne part pas.
   await sendMail({ to: user.email, ...passwordChangedEmail({ loginUrl: `${await appOrigin()}/login` }) });
   return { error: null };
+}
+
+/** Réécrit le cookie de session de cet appareil avec l'empreinte du nouveau mot de passe. */
+async function keepCurrentSession(pw: string) {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) return;
+  const jar = await cookies();
+  for (const name of ['__Secure-next-auth.session-token', 'next-auth.session-token']) {
+    const raw = jar.get(name)?.value;
+    const token = raw ? await decode({ token: raw, secret }).catch(() => null) : null;
+    if (!token) continue;
+    const value = await encode({ token: { ...token, pw, checkedAt: Date.now() }, secret, maxAge: SESSION_MAX_AGE });
+    jar.set(name, value, { httpOnly: true, sameSite: 'lax', path: '/', secure: name.startsWith('__Secure-'), maxAge: SESSION_MAX_AGE });
+  }
 }

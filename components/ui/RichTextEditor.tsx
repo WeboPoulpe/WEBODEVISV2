@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Bold, Italic, List, Wand2 } from 'lucide-react';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface Props {
   /** Initial HTML string shown when the editor mounts */
@@ -47,7 +48,8 @@ export default function RichTextEditor({
   // ── Initialise DOM once on mount ─────────────────────────────────────────
   useEffect(() => {
     if (ref.current) {
-      ref.current.innerHTML = initialValue;
+      // Le texte vient de la base (CGV, descriptions) : il est nettoyé avant d'entrer dans l'éditeur.
+      ref.current.innerHTML = sanitizeHtml(initialValue);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -101,8 +103,10 @@ export default function RichTextEditor({
       })
       .join('');
 
-    ref.current.innerHTML = html;
-    onChange(html);
+    // Les lignes viennent du texte saisi : nettoyées, une balise tapée ne devient pas du code.
+    const clean = sanitizeHtml(html);
+    ref.current.innerHTML = clean;
+    onChange(clean);
   }, [onChange]);
 
   // ── Execute a formatting command without stealing focus ──────────────────

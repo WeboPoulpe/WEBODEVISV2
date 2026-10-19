@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface Props {
   prestationId: string;
@@ -146,7 +147,7 @@ export default function PrestationWeboEditor({
       // Now switch to EN tab to show the result
       // Re-capture FR before switching (editor still shows FR at this point)
       htmlFrRef.current = editorRef.current.innerHTML;
-      editorRef.current.innerHTML = htmlEnRef.current;
+      editorRef.current.innerHTML = sanitizeHtml(htmlEnRef.current);
       activeLangRef.current = 'en'; // SYNCHRONOUS update — critical
       setLanguage('en');
     } catch (err) {
@@ -172,7 +173,8 @@ export default function PrestationWeboEditor({
 
   useEffect(() => {
     if (!initDone.current && editorRef.current) {
-      editorRef.current.innerHTML = initialHtml || defaultHtmlFr;
+      // Le HTML vient de la base : il est nettoyé avant d'entrer dans l'éditeur.
+      editorRef.current.innerHTML = sanitizeHtml(initialHtml || defaultHtmlFr);
       initDone.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -192,8 +194,8 @@ export default function PrestationWeboEditor({
       console.log('[SWITCH] Saved EN:', currentEditorHtml.slice(0, 80));
     }
     // Load the other version
-    if (lang === 'fr') editorRef.current.innerHTML = htmlFrRef.current || defaultHtmlFr;
-    else editorRef.current.innerHTML = htmlEnRef.current || defaultHtmlEn;
+    if (lang === 'fr') editorRef.current.innerHTML = sanitizeHtml(htmlFrRef.current || defaultHtmlFr);
+    else editorRef.current.innerHTML = sanitizeHtml(htmlEnRef.current || defaultHtmlEn);
     activeLangRef.current = lang;
     setLanguage(lang);
   };
@@ -240,7 +242,7 @@ export default function PrestationWeboEditor({
       .map((s) => s.trim())
       .filter(Boolean);
     if (lines.length <= 1) return;
-    desc.innerHTML = lines
+    desc.innerHTML = sanitizeHtml(lines
       .map((line) => {
         const priceMatch = line.match(/(\+?\d+€\/pers\.?)$/);
         if (priceMatch) {
@@ -249,7 +251,7 @@ export default function PrestationWeboEditor({
         }
         return `<p style="margin:2px 0;">${line}</p>`;
       })
-      .join('');
+      .join(''));
   }, []);
 
   const handleSave = async () => {

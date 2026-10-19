@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
@@ -8,6 +9,12 @@ import { DEMO_USER_ID } from '@/lib/demo';
 import { readTicket } from '@/server/tickets';
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+/** Empreinte courte du mot de passe enregistré : quand il change, les sessions ouvertes avant sont fermées. */
+export const passwordTag = (hash: string) => crypto.createHash('sha256').update(hash).digest('base64url').slice(0, 16);
+
+// Une session est revérifiée en base au plus toutes les 5 minutes : compte désactivé, supprimé ou mot de passe changé.
+const RECHECK_MS = 5 * 60 * 1000;
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
@@ -47,7 +54,10 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      if (user) token.sub = user.id;
+      if (user) {
+        token.sub = user.id;
+        token.checkedAt = 0;
+      }
 
       // Un administrateur ouvre le compte d'un client (ou en ressort). La demande vient du navigateur :
       // le rôle est donc relu en base à chaque fois, à partir du compte d'origine.
@@ -71,6 +81,18 @@ export const authOptions: NextAuthOptions = {
             token.email = target.email;
           }
         }
+      }
+
+      // La personne réellement connectée (l'administrateur quand il est entré dans le compte d'un client).
+      const realId = (token.adminId as string | undefined) ?? token.sub;
+      if (realId && Date.now() - ((token.checkedAt as number | undefined) ?? 0) > RECHECK_MS) {
+        const [account] = await db.select({ hash: users.password_hash, active: profiles.is_active })
+          .from(users).leftJoin(profiles, eq(profiles.id, users.id)).where(eq(users.id, realId)).limit(1);
+        const tag = account ? passwordTag(account.hash) : null;
+        // Session fermée : plus d'identifiant, et le middleware renvoie vers la connexion.
+        if (!account || account.active === false || (token.pw && token.pw !== tag)) return { revoked: true };
+        token.pw = tag;
+        token.checkedAt = Date.now();
       }
       return token;
     },
