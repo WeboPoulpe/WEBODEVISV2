@@ -233,6 +233,8 @@ export async function createInvoiceDraft(input: { quoteId: string; kind: Exclude
     lines = quoteLines;
   }
 
+  // Vendeur en franchise de TVA : aucune TVA facturée, toutes les lignes à 0 %.
+  if (seller.vatExempt) lines = lines.map((l) => ({ ...l, vatRate: 0 }));
   const totals = invoiceTotals(lines);
   const [row] = await db.insert(customer_invoices).values({
     owner_user_id: company,
@@ -347,13 +349,16 @@ export async function issueInvoice(id: string): Promise<Result<{ number: string 
   if (!seller.vatExempt && !seller.vatNumber) return { error: 'Renseignez votre n° de TVA intracommunautaire (ou la franchise de TVA) dans Paramètres avant d’émettre une facture.' };
 
   const today = new Date().toISOString().slice(0, 10);
-  const totals = invoiceTotals(lines);
+  // Franchise de TVA déclarée depuis le brouillon : les lignes passent à 0 %.
+  const finalLines = seller.vatExempt ? lines.map((l) => ({ ...l, vatRate: 0 })) : lines;
+  const totals = invoiceTotals(finalLines);
   const number = await db.transaction(async (tx) => {
     const [{ n }] = (await tx.execute<{ n: string }>(sql`select public.next_document_number(${row.owner_user_id}::uuid, ${row.kind === 'avoir' ? 'credit' : 'invoice'}) as n`)).rows;
     await tx.update(customer_invoices).set({
       status: 'emise',
       number: n,
       seller,
+      lines: finalLines,
       issue_date: today,
       due_date: row.kind === 'avoir' ? null : addDays(today, paymentDays),
       total_ht: totals.ht,

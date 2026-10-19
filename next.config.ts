@@ -35,6 +35,8 @@ const config: NextConfig = {
   // (NEXT_DIST_DIR=.next-build npx next build) sans toucher au serveur de développement en cours.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   devIndicators: false,
+  // Polices du PDF des factures, lues sur le disque par la route : à embarquer dans la fonction Vercel.
+  outputFileTracingIncludes: { '/api/factures/[id]/pdf': ['./lib/facturx/fonts/*.ttf'] },
   // Test sur téléphone en développement : adresses du réseau local autorisées à charger l'app.
   allowedDevOrigins: ['192.168.1.*'],
   images: {
