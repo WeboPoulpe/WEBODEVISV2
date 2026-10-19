@@ -48,7 +48,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
 
   const [quote] = await db
     .select({
-      id: quotes.id, quote_number: quotes.quote_number, status: quotes.status, share_token: quotes.share_token, client_name: quotes.client_name, client_email: quotes.client_email,
+      id: quotes.id, quote_number: quotes.quote_number, status: quotes.status, share_token: quotes.share_token, valid_until: quotes.valid_until, client_name: quotes.client_name, client_email: quotes.client_email,
       client_first_name: quotes.client_first_name, event_type: quotes.event_type, event_date: quotes.event_date, guest_count: quotes.guest_count,
     })
     .from(quotes)
@@ -57,7 +57,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
   if (!quote) return { error: 'Devis introuvable.' };
 
   const [profile] = await db
-    .select({ email: profiles.email, company_name: profiles.company_name, company_email: profiles.company_email })
+    .select({ email: profiles.email, company_name: profiles.company_name, company_email: profiles.company_email, validity: profiles.quote_validity_days })
     .from(profiles).where(eq(profiles.id, user.id)).limit(1);
   const companyName = profile?.company_name || 'Votre traiteur';
 
@@ -103,7 +103,11 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
     // Lu par le trigger d'historique des statuts, qui note qui a fait le changement.
     await tx.execute(sql`select set_config('app.user_id', ${user.id}, true)`);
     await tx.update(quotes)
-      .set({ sent_at: new Date().toISOString(), status, client_email: clientEmail })
+      .set({
+        sent_at: new Date().toISOString(), status, client_email: clientEmail,
+        // Validité fixée au premier envoi : au-delà, le client ne peut plus accepter en ligne.
+        ...(quote.valid_until ? {} : { valid_until: new Date(Date.now() + (profile?.validity ?? 30) * 86400_000).toISOString().slice(0, 10) }),
+      })
       .where(eq(quotes.id, quote.id));
   });
   return { error: null, status, sent, failed, clientEmail, copySent };

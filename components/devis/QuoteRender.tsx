@@ -10,6 +10,28 @@ import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import PrintBreaks from '@/components/devis/PrintBreaks';
 import { googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 
+/** Accord signé en ligne par le client, imprimé à la fin du document. */
+export interface QuoteRenderAcceptance {
+  signerName: string;
+  signerRole: string | null;
+  signature: string;
+  acceptedAt: string;
+}
+
+function AcceptanceBlock({ acceptance }: { acceptance: QuoteRenderAcceptance }) {
+  const when = new Date(acceptance.acceptedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' });
+  return (
+    <div className="mx-[20mm] my-6 p-4 border border-gray-300 rounded-lg break-inside-avoid" style={{ fontFamily: 'system-ui, sans-serif' }}>
+      <p className="text-[12px] font-semibold text-gray-900">Bon pour accord, signé en ligne</p>
+      <p className="text-[11px] text-gray-600 mt-1">
+        Accepté le {when} par {acceptance.signerName}{acceptance.signerRole ? `, ${acceptance.signerRole}` : ''}.
+      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={acceptance.signature} alt={`Signature de ${acceptance.signerName}`} className="mt-2 h-20 w-auto" />
+    </div>
+  );
+}
+
 export interface QuoteRenderProfile {
   company_name?: string | null;
   company_address?: string | null;
@@ -23,7 +45,7 @@ export interface QuoteRenderProfile {
  * Une seule version du rendu : la page d'impression et la page publique l'utilisent toutes les deux.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function QuoteRender({ quote, profile }: { quote: any; profile: QuoteRenderProfile | null }) {
+export default function QuoteRender({ quote, profile, acceptance = null }: { quote: any; profile: QuoteRenderProfile | null; acceptance?: QuoteRenderAcceptance | null }) {
   // ── Devis rédigé dans l'éditeur : son contenu est rendu tel quel ─────────────
   if (quote.content_html) {
     const settings = outputSettings(quote);
@@ -52,6 +74,7 @@ export default function QuoteRender({ quote, profile }: { quote: any; profile: Q
           <div dangerouslySetInnerHTML={{ __html: wrapQuoteDoc(sanitizeHtml(content)) }} />
           {photosHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(photosHtml) }} />}
           {cgvHtml && !hasCgv && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />}
+          {acceptance && <AcceptanceBlock acceptance={acceptance} />}
         </div>
       </>
     );
@@ -98,6 +121,7 @@ export default function QuoteRender({ quote, profile }: { quote: any; profile: Q
       ) : (
         <QuoteDocument {...docProps} />
       )}
+      {acceptance && <AcceptanceBlock acceptance={acceptance} />}
     </div>
   );
 }

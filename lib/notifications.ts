@@ -18,7 +18,8 @@ const BY_TYPE: Record<string, string> = {
   upcoming_event: '/evenements',
   task_reminder: '/devis',
   stock_alert: '/stock',
-  invoice_due: '/devis',
+  invoice_due: '/factures',
+  quote_accepted: '/devis',
 };
 
 export function notificationHref(n: { type: string; action_url: string | null }): string {

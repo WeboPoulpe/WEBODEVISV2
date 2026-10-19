@@ -211,6 +211,21 @@ function DevisSheet({
     listInvoices({ quoteId: quote.id }).then((list) => { if (!cancelled) setInvoices(list); }).catch(() => { if (!cancelled) setInvoices([]); });
     return () => { cancelled = true; };
   }, [quote.id]);
+  // Suivi du lien envoyé : consultations, validité et accord signé en ligne.
+  const [tracking, setTracking] = useState<{
+    views: number; viewedAt: string | null; validUntil: string | null;
+    acceptance: { signer_name: string; signer_role: string | null; accepted_at: string; invalidated_at: string | null } | null;
+  } | null>(null);
+  useEffect(() => {
+    const sb = createClient();
+    Promise.all([
+      sb.from('quotes').select('view_count, viewed_at, valid_until').eq('id', quote.id).maybeSingle(),
+      sb.from('quote_acceptances').select('signer_name, signer_role, accepted_at, invalidated_at').eq('quote_id', quote.id).order('accepted_at', { ascending: false }).limit(1),
+    ]).then(([q, a]) => {
+      if (q.error) return; // colonnes pas encore créées : rien à afficher
+      setTracking({ views: q.data?.view_count ?? 0, viewedAt: q.data?.viewed_at ?? null, validUntil: q.data?.valid_until ?? null, acceptance: a.data?.[0] ?? null });
+    });
+  }, [quote.id]);
   const [notes, setNotes] = useState('');
   const [notesError, setNotesError] = useState<string | null>(null);
   // Les notes de suivi vivent dans la colonne internal_notes du devis.
@@ -432,6 +447,23 @@ function DevisSheet({
             </div>
           )}
 
+          {tracking && (tracking.acceptance || tracking.views > 0 || tracking.validUntil) && (
+            <div className="space-y-2">
+              {tracking.acceptance && (
+                <div className={cn('p-3 rounded-xl border text-sm', tracking.acceptance.invalidated_at ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900')}>
+                  <span className="font-semibold">Accepté en ligne</span> le {new Date(tracking.acceptance.accepted_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })} par {tracking.acceptance.signer_name}
+                  {tracking.acceptance.signer_role ? ` (${tracking.acceptance.signer_role})` : ''}.
+                  {tracking.acceptance.invalidated_at && ' Le devis a été modifié depuis : cet accord porte sur une version précédente.'}
+                </div>
+              )}
+              <p className="text-xs text-gray-500">
+                {tracking.views > 0
+                  ? `Consulté ${tracking.views} fois par le client${tracking.viewedAt ? `, la première le ${new Date(tracking.viewedAt).toLocaleDateString('fr-FR')}` : ''}.`
+                  : 'Pas encore consulté par le client.'}
+                {tracking.validUntil ? ` Valable jusqu’au ${new Date(`${tracking.validUntil}T12:00:00`).toLocaleDateString('fr-FR')}.` : ''}
+              </p>
+            </div>
+          )}
           {(() => { const t = computeQuoteTotal(quote); return t ? (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <span className="text-sm text-gray-600">Total TTC</span>
@@ -905,7 +937,7 @@ export default function DevisPage() {
     const { error } = await createClient().from('quotes').delete().eq('id', id);
     if (error) {
       setPageError(isInvoicedError(error)
-        ? 'Ce devis a des factures : il ne peut plus être supprimé. Vous pouvez l’archiver.'
+        ? 'Ce devis a des factures : il ne peut plus être supprimé, pour garder la trace de ce qui a été facturé.'
         : 'Le devis n’a pas pu être supprimé. Vérifiez votre connexion et réessayez.');
       return;
     }

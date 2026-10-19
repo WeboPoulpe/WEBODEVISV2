@@ -103,6 +103,8 @@ export const RULES: Record<string, TableRule> = {
   event_extras: both((t, u) =>
     `(exists (select 1 from public.extras pe where pe.id = ${t}.extra_id and pe.user_id = ${u}) and ${viaQuote(t, u)})`),
   event_ingredients: both(viaQuote),
+  // Accords signés en ligne : lisibles par le traiteur, écrits seulement par le serveur (page publique).
+  quote_acceptances: { read: viaQuote, write: () => 'false' },
   rental_items: both(viaQuote),
   rental_templates: both(own('user_id')),
   rental_template_sets: both(own('user_id')),

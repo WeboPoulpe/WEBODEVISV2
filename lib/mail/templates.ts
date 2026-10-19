@@ -146,6 +146,58 @@ export function quoteProposalEmail({ companyName, quoteNumber, clientName, event
   };
 }
 
+// ── Devis accepté en ligne ────────────────────────────────────────────────────
+export interface AcceptanceDetails {
+  companyName: string;
+  quoteNumber: string | null;
+  signerName: string;
+  eventType: string | null;
+  eventDate: string | null;
+  totalTTC: number | null;
+  acceptedAt: string;
+}
+
+const euroFr = (n: number | null) => (n == null ? '' : `${n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
+const acceptanceFacts = (a: AcceptanceDetails): [string, string][] => [
+  ['Devis n°', a.quoteNumber ?? ''],
+  ['Signé par', a.signerName],
+  ['Le', new Date(a.acceptedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' })],
+  ['Événement', a.eventType ?? ''],
+  ['Date', dateFr(a.eventDate)],
+  ['Montant TTC', euroFr(a.totalTTC)],
+];
+
+/** Au traiteur : son client vient d'accepter le devis en ligne. */
+export function quoteAcceptedOwnerEmail({ acceptance, link }: { acceptance: AcceptanceDetails; link: string }): Email {
+  return {
+    subject: `Devis accepté${acceptance.quoteNumber ? ` n° ${acceptance.quoteNumber}` : ''} par ${acceptance.signerName}`,
+    html: renderEmail({
+      preheader: `${acceptance.signerName} a signé le devis en ligne.`,
+      title: 'Votre devis est accepté',
+      paragraphs: [`${esc(acceptance.signerName)} a accepté et signé le devis en ligne. Il est passé au statut « Validé ».`],
+      facts: acceptanceFacts(acceptance),
+      button: { label: 'Voir le devis', url: link },
+      note: 'Pensez à préparer la facture d’acompte depuis la fiche du devis.',
+    }),
+  };
+}
+
+/** Au client : confirmation de son acceptation. */
+export function quoteAcceptedClientEmail({ acceptance, link }: { acceptance: AcceptanceDetails; link: string }): Email {
+  return {
+    subject: `Votre accord pour le devis ${acceptance.companyName}`,
+    html: renderEmail({
+      brand: acceptance.companyName,
+      preheader: 'Votre acceptation est bien enregistrée.',
+      title: 'Merci, votre accord est enregistré',
+      paragraphs: [`${esc(acceptance.companyName)} a bien reçu votre acceptation du devis. Vous pouvez le consulter à tout moment avec le lien ci-dessous.`],
+      facts: acceptanceFacts(acceptance),
+      button: { label: 'Revoir le devis', url: link },
+      footer: `Envoyé par ${acceptance.companyName} avec WeboDevis.`,
+    }),
+  };
+}
+
 // ── Demandes envoyées depuis le site de présentation ──────────────────────────
 export interface SiteRequestDetails {
   kind: 'devis' | 'message';

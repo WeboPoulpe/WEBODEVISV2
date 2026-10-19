@@ -63,7 +63,7 @@ export const notifications = pgTable("notifications", {
 	expires_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
 	check("notifications_priority_check", sql`priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])`),
-	check("notifications_type_check", sql`type = ANY (ARRAY['prospect_request'::text, 'upcoming_event'::text, 'invoice_due'::text, 'support_ticket'::text, 'system_update'::text, 'task_reminder'::text, 'stock_alert'::text, 'extra_response'::text])`),
+	check("notifications_type_check", sql`type = ANY (ARRAY['prospect_request'::text, 'upcoming_event'::text, 'invoice_due'::text, 'support_ticket'::text, 'system_update'::text, 'task_reminder'::text, 'stock_alert'::text, 'extra_response'::text, 'quote_accepted'::text])`),
 ]);
 
 export const collaborators = pgTable("collaborators", {
@@ -180,6 +180,11 @@ export const quotes = pgTable("quotes", {
 	recipient_contact_id: text(),
 	internal_name: text(),
 	folder_id: uuid(),
+	// Le devis ne peut plus être accepté en ligne après cette date (fixée au premier envoi).
+	valid_until: date(),
+	// Consultations du lien envoyé au client.
+	viewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+	view_count: integer().default(0).notNull(),
 }, (table) => [
 	index("idx_quotes_customer_id").using("btree", table.customer_id.asc().nullsLast().op("uuid_ops")),
 	index("idx_quotes_folder").using("btree", table.folder_id.asc().nullsLast().op("uuid_ops")),
@@ -933,6 +938,27 @@ export const customer_invoice_payments = pgTable("customer_invoice_payments", {
 	index("idx_customer_invoice_payments_invoice").using("btree", table.invoice_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({ columns: [table.invoice_id], foreignColumns: [customer_invoices.id], name: "customer_invoice_payments_invoice_id_fkey" }).onDelete("cascade"),
 	foreignKey({ columns: [table.created_by], foreignColumns: [users.id], name: "customer_invoice_payments_created_by_fkey" }),
+]);
+
+// « Bon pour accord » signé en ligne par le client depuis le lien du devis (/d/<jeton>).
+// content_hash : empreinte SHA-256 de ce qui a été accepté (lignes, totaux, document), pour prouver la version signée.
+// Une modification du devis après coup marque l'acceptation comme portant sur une version précédente (invalidated_at).
+export const quote_acceptances = pgTable("quote_acceptances", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	quote_id: uuid().notNull(),
+	signer_name: text().notNull(),
+	signer_role: text(),
+	// Signature tracée, en image PNG (data URL).
+	signature: text().notNull(),
+	content_hash: text().notNull(),
+	total_ttc: numeric({ precision: 12, scale: 2, mode: 'number' }),
+	ip: text(),
+	user_agent: text(),
+	accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	invalidated_at: timestamp({ withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("idx_quote_acceptances_quote").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "quote_acceptances_quote_id_fkey" }).onDelete("cascade"),
 ]);
 
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
