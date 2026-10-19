@@ -4,13 +4,10 @@ import type { QuoteDocumentProps } from './QuoteDocument';
 import type { ServiceLine } from '@/context/DevisContext';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { quoteVatBreakdown, vatRowsForDisplay } from '@/lib/quoteTotals';
+import { vatLabel } from '@/lib/vat';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function totalHT(services: ServiceLine[]) {
-  // Exclut sauts de page, lignes gratuites (incluses) et options (facultatives).
-  return services.reduce((sum, s) => sum + (s.isFree || s.isOption || s.isPageBreak ? 0 : s.quantity * s.unitPrice), 0);
-}
-
 function splitByPageBreaks(services: ServiceLine[]): ServiceLine[][] {
   const pages: ServiceLine[][] = [[]];
   for (const s of services) {
@@ -38,9 +35,11 @@ export default function QuoteDocumentBusiness({
   logoUrl, cgv, images,
 }: QuoteDocumentProps) {
   const realServices = services.filter((s) => !s.isPageBreak);
-  const ht = totalHT(services);
-  const tva = ht * (options.vatRate / 100);
-  const ttc = ht + tva;
+  // Totaux ventilés par taux de TVA (hors offertes, options et sauts de page).
+  const totals = quoteVatBreakdown(services, options.vatRate);
+  const ht = totals.ht;
+  const ttc = totals.ttc;
+  const vatRows = vatRowsForDisplay(totals, options.vatRate);
 
   const displayDate = quoteDate
     ? new Date(quoteDate).toLocaleDateString('fr-FR')
@@ -182,10 +181,12 @@ export default function QuoteDocumentBusiness({
                 <span>Total HT</span>
                 <span className="tabular-nums font-medium">{formatCurrency(ht)}</span>
               </div>
-              <div className="flex justify-between text-[10px] text-slate-600">
-                <span>TVA ({options.vatRate}%)</span>
-                <span className="tabular-nums">{formatCurrency(tva)}</span>
-              </div>
+              {vatRows.map((r) => (
+                <div key={r.rate} className="flex justify-between text-[10px] text-slate-600">
+                  <span>TVA {vatLabel(r.rate)}</span>
+                  <span className="tabular-nums">{formatCurrency(r.vat)}</span>
+                </div>
+              ))}
               <div className="h-px bg-slate-200 my-1" />
               {/* TTC — slate solid block */}
               <div className="flex justify-between items-center bg-slate-900 rounded-lg px-4 py-2.5">

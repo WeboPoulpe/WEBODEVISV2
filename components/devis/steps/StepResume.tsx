@@ -1,6 +1,8 @@
 'use client';
 
-import { useDevis, totalHT } from '@/context/DevisContext';
+import { useDevis } from '@/context/DevisContext';
+import { quoteVatBreakdown, vatRowsForDisplay } from '@/lib/quoteTotals';
+import { vatLabel } from '@/lib/vat';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { ArrowLeft, Pencil, Loader2, Printer, AlertTriangle, RefreshCw, FileEdit } from 'lucide-react';
 import { useState } from 'react';
@@ -24,10 +26,12 @@ export default function StepResume({ onBack }: Props) {
   const [newStatus, setNewStatus] = useState<string>(state.editingQuoteStatus ?? DEFAULT_QUOTE_STATUS);
 
   const realServices = services.filter((s) => !s.isPageBreak);
-  const ht    = totalHT(realServices);
+  // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
+  const totals = quoteVatBreakdown(realServices, options.vatRate);
+  const ht    = totals.ht;
   const optionHt = realServices.reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
-  const vatAmt = ht * (options.vatRate / 100);
-  const ttc   = ht + vatAmt;
+  const ttc   = totals.ttc;
+  const vatRows = vatRowsForDisplay(totals, options.vatRate);
 
   const clientName =
     clientInfo.type === 'particulier'
@@ -218,10 +222,12 @@ export default function StepResume({ onBack }: Props) {
                 <span className="tabular-nums">{formatCurrency(optionHt)}</span>
               </div>
             )}
-            <div className="flex justify-between text-gray-600">
-              <span>TVA ({options.vatRate}%)</span>
-              <span>{formatCurrency(vatAmt)}</span>
-            </div>
+            {vatRows.map((r) => (
+              <div key={r.rate} className="flex justify-between text-gray-600">
+                <span>TVA {vatLabel(r.rate)}</span>
+                <span>{formatCurrency(r.vat)}</span>
+              </div>
+            ))}
             <div className="flex justify-between font-bold text-gray-900 text-base pt-1 border-t border-gray-100">
               <span>Total TTC</span>
               <span>{formatCurrency(ttc)}</span>

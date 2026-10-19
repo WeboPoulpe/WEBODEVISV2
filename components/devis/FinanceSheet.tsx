@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, TrendingUp, TrendingDown, Loader2, Wallet, Receipt, Percent, Calculator } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
+import { quoteVatBreakdown } from '@/lib/quoteTotals';
 
 interface Props {
   open: boolean;
@@ -103,8 +104,8 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
   const totalChargesHT = totalCost + extraTotal;
   const margeHT = ca_ht - totalChargesHT;
   const margePercent = ca_ht > 0 ? (margeHT / ca_ht) * 100 : 0;
-  const tva = ca_ht * (vatRate / 100);
-  const ca_ttc = ca_ht + tva;
+  // TTC au taux de chaque ligne (sinon celui du devis) ; options comprises, comme le CA HT ci-dessus.
+  const ca_ttc = quoteVatBreakdown(activeServices, vatRate, 0, 0, { includeOptions: true }).ttc;
 
   const addExtra = () => setExtraCosts((prev) => [...prev, { id: crypto.randomUUID(), label: '', amount: 0 }]);
   const removeExtra = (id: string) => setExtraCosts((prev) => prev.filter((e) => e.id !== id));

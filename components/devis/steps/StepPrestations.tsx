@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useDevis, totalHT, ServiceLine } from '@/context/DevisContext';
+import { useDevis, ServiceLine } from '@/context/DevisContext';
 import { ArrowLeft, ArrowRight, Plus, Trash2, Search, X, AlignLeft, PencilLine, Scissors } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { quoteVatBreakdown, vatRowsForDisplay } from '@/lib/quoteTotals';
+import { vatLabel } from '@/lib/vat';
+import VatRateSelect from '@/components/devis/VatRateSelect';
 import { createClient } from '@/lib/supabase/client';
 
 interface Prestation {
@@ -124,15 +127,18 @@ function PrestationSearch({
 // ── Service row (handles normal lines, custom lines, and page-break markers) ──
 function ServiceRow({
   service,
+  defaultRate,
   onUpdate,
   onRemove,
 }: {
   service: ServiceLine;
+  /** Taux par défaut du devis (lignes sans taux propre). */
+  defaultRate: number;
   onUpdate: (field: string, value: string | number | boolean | null) => void;
   onRemove: () => void;
 }) {
   // Hooks must be called unconditionally (before any early return)
-  const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description);
+  const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description || service.vatRate != null);
   const descRef = useCallback((el: HTMLTextAreaElement | null) => {
     if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
   }, []);
@@ -311,6 +317,7 @@ function ServiceRow({
                 />
                 <span className="text-[10px] text-amber-600 font-medium">En option</span>
               </label>
+              <VatRateSelect value={service.vatRate} defaultRate={defaultRate} onChange={(r) => onUpdate('vatRate', r)} />
             </div>
           </div>
         )}
@@ -370,6 +377,7 @@ function ServiceRow({
               />
               <span className="text-[10px] text-amber-600 font-medium">Option</span>
             </label>
+            <VatRateSelect value={service.vatRate} defaultRate={defaultRate} onChange={(r) => onUpdate('vatRate', r)} />
           </div>
         </div>
         <div className="flex items-end gap-2">
@@ -433,10 +441,12 @@ export default function StepPrestations({ onNext, onBack }: Props) {
 
   // Exclude page-break markers from financial calculations
   const realServices = services.filter((s) => !s.isPageBreak);
-  const ht = totalHT(realServices);
+  // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
+  const totals = quoteVatBreakdown(realServices, options.vatRate);
+  const ht = totals.ht;
   const optionHt = realServices.reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
-  const vatAmt = ht * (options.vatRate / 100);
-  const ttc = ht + vatAmt;
+  const ttc = totals.ttc;
+  const vatRows = vatRowsForDisplay(totals, options.vatRate);
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -490,7 +500,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
           </div>
           {services.map((s) => (
             <ServiceRow
-              key={s.id} service={s}
+              key={s.id} service={s} defaultRate={options.vatRate}
               onUpdate={(field, value) => updateService(s.id, field, value)}
               onRemove={() => removeService(s.id)}
             />
@@ -503,7 +513,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
         <div className="sm:hidden space-y-2">
           {services.map((s) => (
             <ServiceRow
-              key={s.id} service={s}
+              key={s.id} service={s} defaultRate={options.vatRate}
               onUpdate={(field, value) => updateService(s.id, field, value)}
               onRemove={() => removeService(s.id)}
             />
@@ -534,7 +544,7 @@ export default function StepPrestations({ onNext, onBack }: Props) {
               <span className="tabular-nums">{formatCurrency(optionHt)}</span>
             </div>
           )}
-          <Row label={`TVA (${options.vatRate}%)`} value={formatCurrency(vatAmt)} />
+          {vatRows.map((r) => <Row key={r.rate} label={`TVA ${vatLabel(r.rate)}`} value={formatCurrency(r.vat)} />)}
           <div className="border-t border-gray-200 pt-1.5">
             <Row label="Total TTC" value={formatCurrency(ttc)} bold />
           </div>

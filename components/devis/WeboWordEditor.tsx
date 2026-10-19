@@ -562,6 +562,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             isFree: s.isFree,
             isOption: s.isOption,
             removed: s.removed,
+            vatRate: s.vatRate ?? null,
             gastroCardHtml: s.gastroCardHtml,
             gastroCardHtmlEn: s.gastroCardHtmlEn,
           })),

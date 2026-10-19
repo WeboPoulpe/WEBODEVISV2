@@ -44,6 +44,7 @@ function useQuoteHtml() {
               hideDescOnPdf: s.hideDescOnPdf,
               isFree: s.isFree,
               isOption: s.isOption,
+              vatRate: s.vatRate ?? null,
             })),
           vatRate: options.vatRate,
           remarks: options.remarks,

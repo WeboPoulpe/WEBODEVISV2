@@ -114,6 +114,7 @@ export default async function ModifierPage({
             isFree:       (s as ServiceLine & { isFree?: boolean }).isFree,
             isOption:     (s as ServiceLine & { isOption?: boolean }).isOption,
             removed:      (s as ServiceLine & { removed?: boolean }).removed,
+            vatRate:      (s as ServiceLine & { vatRate?: number | null }).vatRate ?? null,
             gastroCardHtml: (s as ServiceLine & { gastroCardHtml?: string | null }).gastroCardHtml,
             gastroCardHtmlEn: (s as ServiceLine & { gastroCardHtmlEn?: string | null }).gastroCardHtmlEn,
           })),

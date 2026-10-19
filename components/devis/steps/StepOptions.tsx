@@ -97,7 +97,10 @@ export default function StepOptions({ onNext, onBack }: Props) {
 
       {/* ── TVA ────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">Taux de TVA</label>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Taux par défaut du devis</label>
+          <p className="text-xs text-gray-400 mt-0.5">Appliqué aux lignes sans taux propre. Le taux d’une ligne se choisit dans son détail, à l’étape des prestations.</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {VAT_RATES.map((rate) => (
             <button

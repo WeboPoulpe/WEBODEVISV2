@@ -16,9 +16,10 @@ import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { syncWeboDocument } from '@/lib/weboFinancials';
-import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
+import { quoteVatBreakdown, vatRowsForDisplay, resolveGuestSplit } from '@/lib/quoteTotals';
+import VatRateSelect from '@/components/devis/VatRateSelect';
 import CompanySearch from '@/components/clients/CompanySearch';
-import { VAT_RATES } from '@/lib/vat';
+import { VAT_RATES, vatLabel } from '@/lib/vat';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ServiceLine {
@@ -34,6 +35,8 @@ export interface ServiceLine {
   hideDescOnPdf?: boolean;
   isFree?: boolean;
   isOption?: boolean;
+  /** Taux de TVA propre à la ligne. Absent → taux par défaut du devis. */
+  vatRate?: number | null;
 }
 
 interface ClientInfo {
@@ -77,13 +80,6 @@ interface Props {
   initialOptions: Options;
   /** True when the quote already has a saved WeboWord (content_html) */
   hasContentHtml?: boolean;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function totalHT(services: ServiceLine[]) {
-  return services
-    .filter((s) => !s.isPageBreak)
-    .reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
 }
 
 const EVENT_TYPES = ['Mariage', 'Anniversaire', 'Cocktail', 'Séminaire', 'Gala', 'Communion', 'Baptême', 'Autre'];
@@ -157,9 +153,9 @@ function PrestationSearch({
 
 // ── Service row ───────────────────────────────────────────────────────────────
 function ServiceRow({
-  service, onUpdate, onRemove,
-}: { service: ServiceLine; onUpdate: (field: string, value: string | number | boolean | null) => void; onRemove: () => void }) {
-  const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description || !!service.isOption || !!service.isFree);
+  service, defaultRate, onUpdate, onRemove,
+}: { service: ServiceLine; defaultRate: number; onUpdate: (field: string, value: string | number | boolean | null) => void; onRemove: () => void }) {
+  const [showDesc, setShowDesc] = useState(service.isCustom || !!service.description || !!service.isOption || !!service.isFree || service.vatRate != null);
   const base = 'text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors';
 
   if (service.isPageBreak) {
@@ -273,6 +269,7 @@ function ServiceRow({
               />
               <span className="text-[10px] text-amber-600 font-medium">En option</span>
             </label>
+            <VatRateSelect value={service.vatRate} defaultRate={defaultRate} onChange={(r) => onUpdate('vatRate', r)} />
           </div>
         </div>
       )}
@@ -331,6 +328,7 @@ function useLiveHtml(
             hideDescOnPdf: s.hideDescOnPdf,
             isFree:       s.isFree,
             isOption:     s.isOption,
+            vatRate:      s.vatRate ?? null,
           })),
         vatRate:   options.vatRate,
         remarks:   options.remarks   || null,
@@ -388,10 +386,13 @@ export default function QuoteInlineEditor({
     setServices((prev) => prev.map((s) => s.id === id ? { ...s, [field]: value } : s));
 
   // ── Totals ───────────────────────────────────────────────────────────────────
-  const ht     = totalHT(services);
+  // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
+  const totals = quoteVatBreakdown(services, options.vatRate);
+  const totalsWithOptions = quoteVatBreakdown(services, options.vatRate, 0, 0, { includeOptions: true });
+  const ht     = totals.ht;
   const optionHt = services.filter((s) => !s.isPageBreak).reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
-  const vatAmt = ht * (options.vatRate / 100);
-  const ttc    = ht + vatAmt;
+  const ttc    = totals.ttc;
+  const vatRows = vatRowsForDisplay(totals, options.vatRate);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -405,8 +406,7 @@ export default function QuoteInlineEditor({
       .select('content_html, selected_font, guest_count_adults, guest_count_children, language').eq('id', quoteId).maybeSingle();
     const split = resolveGuestSplit(event.guestCount, current?.guest_count_adults as number | null, current?.guest_count_children as number | null);
     const lines = services.filter((l) => !l.isPageBreak);
-    const htExact = lines.reduce((sum, l) => sum + (l.isFree || l.isOption ? 0 : lineTotalHT(l, split.adults, split.children)), 0);
-    const ttcExact = htExact * (1 + options.vatRate / 100);
+    const ttcExact = quoteVatBreakdown(lines, options.vatRate, split.adults, split.children).ttc;
     const clientName = client.type === 'particulier' ? `${client.firstName} ${client.lastName}`.trim() : client.companyName;
     const synced = current?.content_html
       ? syncWeboDocument(current.content_html as string, {
@@ -467,8 +467,7 @@ export default function QuoteInlineEditor({
   const handleRegenerateWeboWord = async () => {
     if (!user) return;
     setSaving(true); setError(null);
-    const ht2   = totalHT(services);
-    const ttc2  = ht2 + ht2 * (options.vatRate / 100);
+    const ttc2  = quoteVatBreakdown(services, options.vatRate).ttc;
     const payload = {
       client_first_name:   client.firstName,
       client_last_name:    client.lastName,
@@ -660,7 +659,7 @@ export default function QuoteInlineEditor({
                 </div>
                 {services.map((s) => (
                   <ServiceRow
-                    key={s.id} service={s}
+                    key={s.id} service={s} defaultRate={options.vatRate}
                     onUpdate={(field, value) => updateService(s.id, field, value)}
                     onRemove={() => removeService(s.id)}
                   />
@@ -682,12 +681,14 @@ export default function QuoteInlineEditor({
             {services.filter((s) => !s.isPageBreak).length > 0 && (
               <div className="mt-4 ml-auto w-fit min-w-[220px] bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-1.5">
                 <div className="flex justify-between gap-6 text-sm text-gray-600"><span>Sous-total HT</span><span className="tabular-nums">{formatCurrency(ht)}</span></div>
-                <div className="flex justify-between gap-6 text-sm text-gray-600"><span>TVA ({options.vatRate}%)</span><span className="tabular-nums">{formatCurrency(vatAmt)}</span></div>
+                {vatRows.map((r) => (
+                  <div key={r.rate} className="flex justify-between gap-6 text-sm text-gray-600"><span>TVA {vatLabel(r.rate)}</span><span className="tabular-nums">{formatCurrency(r.vat)}</span></div>
+                ))}
                 <div className="border-t border-gray-200 pt-1.5 flex justify-between gap-6 text-sm font-bold text-gray-900"><span>Total TTC</span><span className="tabular-nums">{formatCurrency(ttc)}</span></div>
                 {optionHt > 0 && (
                   <div className="mt-1.5 pt-1.5 border-t border-dashed border-amber-200 space-y-1">
                     <div className="flex justify-between gap-6 text-sm text-amber-600"><span>Options HT</span><span className="tabular-nums">+ {formatCurrency(optionHt)}</span></div>
-                    <div className="flex justify-between gap-6 text-sm font-bold text-amber-700"><span>Total TTC avec options</span><span className="tabular-nums">{formatCurrency((ht + optionHt) * (1 + options.vatRate / 100))}</span></div>
+                    <div className="flex justify-between gap-6 text-sm font-bold text-amber-700"><span>Total TTC avec options</span><span className="tabular-nums">{formatCurrency(totalsWithOptions.ttc)}</span></div>
                   </div>
                 )}
               </div>
@@ -715,7 +716,8 @@ export default function QuoteInlineEditor({
 
               {/* VAT */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Taux de TVA</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Taux par défaut du devis</p>
+                <p className="text-xs text-gray-400 mb-2">Appliqué aux lignes sans taux propre. Le taux d’une ligne se choisit dans son détail.</p>
                 <div className="flex gap-2">
                   {VAT_RATES.map((r) => (
                     <button
@@ -723,7 +725,7 @@ export default function QuoteInlineEditor({
                       onClick={() => setOptions((o) => ({ ...o, vatRate: r }))}
                       className={cn('flex-1 py-2 text-sm font-medium rounded-xl border transition-colors', options.vatRate === r ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}
                     >
-                      {r}%
+                      {vatLabel(r)}
                     </button>
                   ))}
                 </div>

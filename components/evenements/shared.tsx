@@ -14,6 +14,8 @@ export interface ServiceLine {
   category?: string;
   isPageBreak?: boolean;
   removed?: boolean;
+  /** Taux de TVA propre à la ligne. Absent → taux du devis. */
+  vatRate?: number | null;
 }
 
 export interface ChecklistItem { id: string; text: string; done: boolean }

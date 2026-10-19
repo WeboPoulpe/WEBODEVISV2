@@ -11,12 +11,13 @@ import { DEFAULT_TRANSFORM } from './weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from './weboword/weboword.types';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
-import { lineTotalHT, resolveGuestSplit } from '@/lib/quoteTotals';
+import { quoteVatBreakdown, resolveGuestSplit } from '@/lib/quoteTotals';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import RecipientPicker from '@/components/devis/RecipientPicker';
 import CompanySearch from '@/components/clients/CompanySearch';
 import type { CompanyResult } from '@/lib/companies';
 import { VAT_RATES, vatLabel } from '@/lib/vat';
+import VatRateSelect from '@/components/devis/VatRateSelect';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -51,7 +52,7 @@ const MENU_WIDTHS = [
 interface Client { id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null; customer_type?: 'particulier' | 'entreprise' | null; address?: string | null; siret_number?: string | null; contact_person_name?: string | null; }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; description?: string | null; photo_url?: string; [key: string]: any; }
+interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; vatRate?: number | null; description?: string | null; photo_url?: string; [key: string]: any; }
 
 export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
   // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
@@ -388,11 +389,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       parseInt(guestAdults) || null,
       parseInt(guestChildren) || null,
     );
-    const ht = services.reduce((sum, s) => {
-      if (s.removed || s.isFree || s.isOption || s.isPageBreak) return sum;
-      return sum + lineTotalHT(s, adults, children);
-    }, 0);
-    const totalTtc = ht * (1 + vatRate / 100);
+    // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
+    const totalTtc = quoteVatBreakdown(services, vatRate, adults, children).ttc;
 
     // ⚠️ On NE régénère JAMAIS tout le document WeboWord : le texte mis en forme
     // (page de garde, carte gastronomique, prose manuelle) est préservé.
@@ -465,6 +463,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           isFree: s.isFree,
           isOption: s.isOption,
           removed: s.removed,
+          vatRate: s.vatRate ?? null,
           gastroCardHtml: (s.gastroCardHtml as string | null | undefined) ?? null,
           gastroCardHtmlEn: (s.gastroCardHtmlEn as string | null | undefined) ?? null,
         });
@@ -730,8 +729,20 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               </select>
                             </div>
                           </div>
-                          {/* Photo per prestation */}
+                          {/* Photo per prestation + taux de TVA de la ligne */}
                           <div className="mt-2 flex items-center gap-2">
+                            <VatRateSelect
+                              value={svc.vatRate}
+                              defaultRate={vatRate}
+                              onChange={(r) => setServices((prev) => prev.map((s, i) => {
+                                if (i !== idx) return s;
+                                // Taux du devis → la ligne n'a plus de taux propre (clé retirée).
+                                const next: Service = { ...s, vatRate: r };
+                                if (r == null) delete next.vatRate;
+                                return next;
+                              }))}
+                              className="order-last ml-auto"
+                            />
                             {svc.photo_url ? (
                               <div className="relative w-12 h-12 rounded overflow-hidden border">
                                 <img src={svc.photo_url} className="w-full h-full object-cover" alt="" />
@@ -794,7 +805,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                   )}
                   <div><label className={labelCls}>Lieu</label><input value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} className={inputCls} placeholder="Château de Villebougis" /></div>
                   <div className="border-t border-gray-100 pt-3 space-y-3">
-                    <div><label className={labelCls}>TVA (%)</label>
+                    <div><label className={labelCls}>Taux de TVA par défaut du devis</label>
                       <select value={vatRate} onChange={(e) => setVatRate(parseFloat(e.target.value))} className={inputCls}>
                         {[...VAT_RATES, ...((VAT_RATES as readonly number[]).includes(vatRate) ? [] : [vatRate])].map((r) => <option key={r} value={r}>{vatLabel(r)}</option>)}
                       </select>

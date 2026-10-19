@@ -35,9 +35,76 @@ export function lineTotalHT(line: PricedLine, adults = 0, children = 0): number 
   return (line.quantity ?? 0) * unit;
 }
 
+/** Ligne de devis telle que vue par le calcul de TVA. */
+export interface VatLine extends PricedLine {
+  /** Taux de TVA propre à la ligne. Absent → taux par défaut du devis. */
+  vatRate?: number | null;
+  removed?: boolean;
+  isFree?: boolean;
+  isOption?: boolean;
+  isPageBreak?: boolean;
+}
+
+export interface VatBreakdown {
+  ht: number;
+  vat: number;
+  ttc: number;
+  /** Une entrée par taux présent, du plus élevé au plus bas (bases nulles exclues). */
+  byRate: { rate: number; base: number; vat: number }[];
+}
+
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+/** Taux effectif d'une ligne : le sien s'il est valable, sinon celui du devis. */
+export function lineVatRate(line: { vatRate?: number | null }, defaultRate: number): number {
+  const r = line.vatRate;
+  return r != null && Number.isFinite(Number(r)) ? Number(r) : defaultRate;
+}
+
+/**
+ * Totaux d'un devis ventilés par taux de TVA — source de vérité unique.
+ * Lignes retirées, offertes et sauts de page exclus ; lignes en option exclues sauf
+ * `includeOptions` (« total avec options »). Règle française : la TVA de chaque taux
+ * est calculée sur le total HT de ce taux, puis arrondie au centime.
+ */
+export function quoteVatBreakdown(
+  lines: readonly (VatLine | null | undefined)[] | null | undefined,
+  defaultRate: number,
+  adults = 0,
+  children = 0,
+  { includeOptions = false }: { includeOptions?: boolean } = {},
+): VatBreakdown {
+  const bases = new Map<number, number>();
+  for (const l of lines ?? []) {
+    if (!l || l.removed || l.isFree || l.isPageBreak) continue;
+    if (l.isOption && !includeOptions) continue;
+    const rate = lineVatRate(l, defaultRate);
+    bases.set(rate, (bases.get(rate) ?? 0) + lineTotalHT(l, adults, children));
+  }
+  const byRate = [...bases.entries()]
+    .filter(([, base]) => base !== 0)
+    .sort((a, b) => b[0] - a[0])
+    .map(([rate, base]) => ({ rate, base, vat: cents(base * rate / 100) }));
+  const ht = byRate.reduce((s, r) => s + r.base, 0);
+  const vat = cents(byRate.reduce((s, r) => s + r.vat, 0));
+  return { ht, vat, ttc: ht + vat, byRate };
+}
+
+/** Lignes « TVA x % » à afficher : une par taux présent, au moins une (taux du devis, 0 €) si le devis est vide. */
+export function vatRowsForDisplay(totals: VatBreakdown, defaultRate: number): VatBreakdown['byRate'] {
+  return totals.byRate.length > 0 ? totals.byRate : [{ rate: defaultRate, base: 0, vat: 0 }];
+}
+
+/** Taux du devis (colonne vat_rate), 20 % si absent ou illisible. */
+export function quoteDefaultRate(vatRate: number | string | null | undefined): number {
+  const n = vatRate == null || vatRate === '' ? 20 : Number(vatRate);
+  return Number.isFinite(n) ? n : 20;
+}
+
 /**
  * Total TTC d'un devis, hors options : calculé depuis ses lignes (sans les lignes offertes, en option
- * ou retirées) au taux de TVA du devis, sinon le montant enregistré. Le même que la liste des devis.
+ * ou retirées) au taux de chaque ligne (sinon celui du devis), sinon le montant enregistré.
+ * Le même que la liste des devis.
  */
 export function quoteTotalTTC(quote: {
   total_amount: number | string | null;
@@ -49,14 +116,8 @@ export function quoteTotalTTC(quote: {
 }): number | null {
   if (Array.isArray(quote.services) && quote.services.length > 0) {
     const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const services = quote.services as any[];
-    const ht = services.reduce((sum, s) => {
-      if (!s || s.removed || s.isFree || s.isOption || s.isPageBreak) return sum;
-      return sum + lineTotalHT(s, adults, children);
-    }, 0);
-    const vat = quote.vat_rate == null || quote.vat_rate === '' ? 20 : Number(quote.vat_rate);
-    if (ht > 0) return ht * (1 + (Number.isFinite(vat) ? vat : 20) / 100); // TTC au vrai taux de TVA du devis
+    const { ht, ttc } = quoteVatBreakdown(quote.services as VatLine[], quoteDefaultRate(quote.vat_rate), adults, children);
+    if (ht > 0) return ttc;
   }
   return quote.total_amount == null ? null : Number(quote.total_amount);
 }

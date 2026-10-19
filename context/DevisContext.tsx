@@ -23,6 +23,8 @@ export interface ServiceLine {
   isFree?: boolean;
   /** true = prestation en option (affichée avec badge "Option") */
   isOption?: boolean;
+  /** Taux de TVA propre à la ligne (ex. 20 % pour l'alcool). Absent → taux par défaut du devis. */
+  vatRate?: number | null;
   /** HTML pré-stylé de la carte gastronomique (depuis prestations.gastro_card_html) */
   gastroCardHtml?: string | null;
   /** Version anglaise du gastro card */
@@ -231,9 +233,4 @@ export function useDevis() {
   const ctx = useContext(DevisContext);
   if (!ctx) throw new Error('useDevis must be used within DevisProvider');
   return ctx;
-}
-
-// ── Selectors ────────────────────────────────────────────────────────────────
-export function totalHT(services: ServiceLine[]) {
-  return services.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : s.quantity * s.unitPrice), 0);
 }

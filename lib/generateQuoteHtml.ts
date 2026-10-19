@@ -9,7 +9,7 @@
  * Le séparateur `.screen-sep` est visible à l'écran mais caché à l'impression.
  */
 
-import { lineTotalHT, resolveGuestSplit } from './quoteTotals';
+import { lineTotalHT, quoteVatBreakdown, vatRowsForDisplay, resolveGuestSplit } from './quoteTotals';
 import { sanitizeHtml } from './sanitize';
 
 export interface QuoteHtmlData {
@@ -32,9 +32,12 @@ export interface QuoteHtmlData {
     isFree?: boolean;
     isOption?: boolean;
     removed?: boolean;
+    /** Taux de TVA propre à la ligne. Absent → taux du devis (vatRate). */
+    vatRate?: number | null;
     gastroCardHtml?: string | null;
     gastroCardHtmlEn?: string | null;
   }>;
+  /** Taux par défaut du devis (lignes sans taux propre). */
   vatRate: number;
   remarks?: string | null;
   hidePrice?: boolean;
@@ -228,13 +231,19 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   const activeServices = d.services.filter((s) => !s.removed);
   // Répartition adultes/enfants pour le tarif « au couvert » (prix enfant distinct).
   const { adults, children } = resolveGuestSplit(d.guestCount, d.guestCountAdults, d.guestCountChildren);
-  const htSansOption = activeServices.reduce((sum, s) => sum + (s.isFree || s.isOption ? 0 : lineTotalHT(s, adults, children)), 0);
-  const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + lineTotalHT(s, adults, children), 0);
-  // Total de référence = HORS options (les options sont facultatives, présentées à part).
-  const vat = htSansOption * (d.vatRate / 100);
-  const ttc = htSansOption + vat;
+  // Total de référence = HORS options (les options sont facultatives, présentées à part),
+  // TVA ventilée par taux (chaque ligne peut avoir le sien).
+  const totals = quoteVatBreakdown(activeServices, d.vatRate, adults, children);
+  const htSansOption = totals.ht;
+  const ttc = totals.ttc;
   // Total alternatif = AVEC options (jamais additionné au précédent : ce sont deux montants distincts).
-  const ttcAvecOptions = (htSansOption + optionHt) * (1 + d.vatRate / 100);
+  const avecOptions = quoteVatBreakdown(activeServices, d.vatRate, adults, children, { includeOptions: true });
+  const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + lineTotalHT(s, adults, children), 0);
+  const ttcAvecOptions = avecOptions.ttc;
+  // Taux affiché : « 10 % » en français, « 10% » en anglais.
+  const rateLabel = (r: number) => lang === 'en' ? `${r}%` : `${r.toLocaleString('fr-FR')} %`;
+  // Une ligne de TVA par taux présent (au moins une, au taux du devis, si le devis est vide).
+  const vatRows = vatRowsForDisplay(totals, d.vatRate);
   const today = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR');
   // Translate event type if devis is in English
   const eventTypeT = translateEventType(d.eventType || '', lang);
@@ -418,9 +427,13 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
         <span>${t.sousTotalHt}</span><span>${m(htSansOption)}</span>
       </div>
+      ${vatRows.map((r, i) => i < vatRows.length - 1 ? `
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
+        <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
+      </div>` : `
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
-        <span>${t.tva} (${d.vatRate}%)</span><span>${m(vat)}</span>
-      </div>
+        <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
+      </div>`).join('')}
       <div style="display:flex;justify-content:space-between;gap:14px;font-size:15px;font-weight:bold;color:${accentColor};">
         <span>${t.totalTtc}</span><span>${m(ttc)}</span>
       </div>

@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react';
 import type { ServiceLine } from '@/context/DevisContext';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { quoteVatBreakdown, vatRowsForDisplay, type VatBreakdown } from '@/lib/quoteTotals';
+import { vatLabel } from '@/lib/vat';
 
 // ── Category sort order ────────────────────────────────────────────────────────
 const GASTRO_ORDER = [
@@ -181,17 +183,12 @@ function TotalsRow({ label, value, bold, small, accent }: {
   );
 }
 
-function TvaBreakdown({ gastroHT, logistiqueHT, vatRate, hideLogistique }: {
-  gastroHT: number; logistiqueHT: number; vatRate: number; hideLogistique: boolean;
-}) {
-  const gastroTva = gastroHT * (vatRate / 100);
-  const logistiqueTva = logistiqueHT * (vatRate / 100);
-  if (hideLogistique || logistiqueHT === 0)
-    return <TotalsRow label={`TVA (${vatRate}%)`} value={formatCurrency(gastroTva)} />;
+/** Une ligne « TVA x % » par taux présent (au taux du devis si le devis est vide). */
+function TvaBreakdown({ totals, vatRate }: { totals: VatBreakdown; vatRate: number }) {
+  const rows = vatRowsForDisplay(totals, vatRate);
   return (
     <>
-      {gastroHT > 0 && <TotalsRow label={`TVA gastronomie (${vatRate}%)`} value={formatCurrency(gastroTva)} small />}
-      <TotalsRow label={`TVA services (${vatRate}%)`} value={formatCurrency(logistiqueTva)} small />
+      {rows.map((r) => <TotalsRow key={r.rate} label={`TVA ${vatLabel(r.rate)}`} value={formatCurrency(r.vat)} />)}
     </>
   );
 }
@@ -232,10 +229,10 @@ export default function QuoteDocument({
 
   const gastroHT     = totalHT(gastronomie);
   const logistiqueHT = totalHT(logistique);
-  const ht           = gastroHT + logistiqueHT;
-  const gastroTva    = gastroHT * (options.vatRate / 100);
-  const logistiqueTva = logistiqueHT > 0 ? logistiqueHT * (options.vatRate / 100) : 0;
-  const ttc          = ht + gastroTva + logistiqueTva;
+  // TVA ventilée par taux (chaque ligne peut avoir le sien, sinon celui du devis).
+  const totals       = quoteVatBreakdown(realServices, options.vatRate);
+  const ht           = totals.ht;
+  const ttc          = totals.ttc;
 
   const displayDate = quoteDate
     ? new Date(quoteDate).toLocaleDateString('fr-FR')
@@ -393,10 +390,7 @@ export default function QuoteDocument({
           <div className="flex justify-end">
             <div className="min-w-[200px] space-y-1">
               <TotalsRow label="Total HT" value={formatCurrency(ht)} />
-              <TvaBreakdown
-                gastroHT={gastroHT} logistiqueHT={logistiqueHT}
-                vatRate={options.vatRate} hideLogistique={logistique.length === 0}
-              />
+              <TvaBreakdown totals={totals} vatRate={options.vatRate} />
             </div>
           </div>
 
