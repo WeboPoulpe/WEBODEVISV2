@@ -44,6 +44,8 @@ interface QuoteService {
 
 interface Quote {
   id: string;
+  /** Numéro attribué par la base à la création (D-2026-0007). */
+  quote_number?: string | null;
   client_name: string;
   /** Nom interne du devis (visible uniquement par le traiteur). Fallback = client_name. */
   internal_name?: string | null;
@@ -75,9 +77,9 @@ type Scope = 'encours' | 'confirmes' | 'refuses' | 'prospects';
 /** Colonnes chargées pour la liste des devis (une seule source de vérité). */
 // ⚠️ Doit rester UN littéral d'une seule pièce : supabase-js infère le type des lignes
 // depuis la chaîne elle-même (une concaténation casse l'inférence).
-const QUOTE_COLUMNS = 'id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id';
+const QUOTE_COLUMNS = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id';
 /** Mêmes colonnes sans folder_id — utilisé tant que la migration lot E n'est pas appliquée. */
-const QUOTE_COLUMNS_LEGACY = 'id, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email';
+const QUOTE_COLUMNS_LEGACY = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email';
 
 /**
  * Charge les devis de l'utilisateur. Si la colonne `folder_id` n'existe pas encore
@@ -265,7 +267,7 @@ function DevisSheet({
   };
 
   return (
-    <Sheet open onClose={onClose} title={quoteDisplayName(quote)} subtitle={quote.event_type} width="w-[480px]">
+    <Sheet open onClose={onClose} title={quoteDisplayName(quote)} subtitle={[quote.quote_number, quote.event_type].filter(Boolean).join(' · ')} width="w-[480px]">
       <SheetTabs tabs={[{ key: 'apercu', label: 'Aperçu' }, { key: 'suivi', label: 'Suivi commercial' }]}
         active={tab} onChange={(k) => setTab(k as typeof tab)} />
 
@@ -525,6 +527,7 @@ function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, fol
             {!quote.user_id && <V1Badge />}
           </span>
           <span className="block text-sm text-gray-600 truncate mt-0.5">
+            {quote.quote_number && <span className="font-mono text-xs text-gray-500 mr-1.5">{quote.quote_number}</span>}
             <span className="capitalize">{quote.event_type || 'Événement'}</span>
             {quote.guest_count ? `, ${quote.guest_count} couverts` : ''}
             {folderLabel ? `, dossier ${folderLabel}` : ''}
@@ -998,7 +1001,7 @@ export default function DevisPage() {
   const base = useMemo(() => quotes.filter((q) => {
     if (!inFolderScope(q)) return false;
     if (!needle) return true;
-    return [q.internal_name, q.client_name, q.client_first_name, q.client_last_name, q.client_email, q.event_type]
+    return [q.quote_number, q.internal_name, q.client_name, q.client_first_name, q.client_last_name, q.client_email, q.event_type]
       .filter(Boolean).join(' ').toLowerCase().includes(needle);
   }), [quotes, inFolderScope, needle]);
 
@@ -1077,7 +1080,7 @@ export default function DevisPage() {
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrer par client ou événement" aria-label="Filtrer les devis"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrer par n°, client ou événement" aria-label="Filtrer les devis"
             className={cn(controlCls, 'w-full pl-10')} />
         </div>
         {view === 'list' && scope !== 'prospects' && (

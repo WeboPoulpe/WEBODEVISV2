@@ -116,8 +116,9 @@ export function prospectAckEmail({ companyName, prospect }: { companyName: strin
 }
 
 // ── Devis envoyé au client ────────────────────────────────────────────────────
-export function quoteProposalEmail({ companyName, clientName, eventType, eventDate, guestCount, message, link }: {
+export function quoteProposalEmail({ companyName, quoteNumber, clientName, eventType, eventDate, guestCount, message, link }: {
   companyName: string;
+  quoteNumber?: string | null;
   clientName: string;
   eventType: string | null;
   eventDate: string | null;
@@ -126,13 +127,14 @@ export function quoteProposalEmail({ companyName, clientName, eventType, eventDa
   link: string;
 }): Email {
   return {
-    subject: `Votre devis ${companyName}${eventType ? `, ${eventType.toLowerCase()}` : ''}`,
+    subject: `Votre devis ${companyName}${quoteNumber ? ` n° ${quoteNumber}` : ''}${eventType ? `, ${eventType.toLowerCase()}` : ''}`,
     html: renderEmail({
       brand: companyName,
       preheader: `${companyName} vous envoie sa proposition.`,
       title: clientName ? `Bonjour ${clientName}` : 'Bonjour',
       paragraphs: [multiline(message)],
       facts: [
+        ['Devis n°', quoteNumber ?? ''],
         ['Événement', eventType ?? ''],
         ['Date', dateFr(eventDate)],
         ['Couverts', guestCount ? String(guestCount) : ''],

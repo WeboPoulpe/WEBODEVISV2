@@ -6,6 +6,7 @@ import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvH
 import { DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG } from '@/components/devis/weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/weboword/weboword.types';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import PrintBreaks from '@/components/devis/PrintBreaks';
 import { googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 
@@ -27,7 +28,8 @@ export default function QuoteRender({ quote, profile }: { quote: any; profile: Q
   if (quote.content_html) {
     const settings = outputSettings(quote);
     const fontHref = googleFontHref(settings.font);
-    const content = quote.content_html as string;
+    // Le numéro attribué par la base est posé sous la date de l'en-tête.
+    const content = withQuoteNumber(quote.content_html as string, quote.quote_number, quote.language === 'en' ? 'en' : 'fr');
 
     const coverHtml = buildCoverPageHtml((quote.cover_page_config as CoverPageConfig) ?? DEFAULT_COVER_CONFIG);
     const photosHtml = buildPhotosPageHtml((quote.photos_page_config as PhotosPageConfig) ?? DEFAULT_PHOTOS_CONFIG);

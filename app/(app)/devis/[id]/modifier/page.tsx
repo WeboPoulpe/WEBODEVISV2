@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { DEFAULT_QUOTE_STATUS } from '@/lib/quoteStatus';
 import type { ServiceLine } from '@/context/DevisContext';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
+import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import QuoteInlineEditor from '@/components/devis/QuoteInlineEditor';
 import WeboWordEditor from '@/components/devis/WeboWordEditor';
 
@@ -140,7 +141,8 @@ export default async function ModifierPage({
     return (
       <WeboWordEditor
         quoteId={quote.id}
-        initialHtml={initialHtml}
+        // Le numéro attribué par la base apparaît sous la date, à l'écran comme à l'impression.
+        initialHtml={withQuoteNumber(initialHtml, quote.quote_number as string | null, quote.language === 'en' ? 'en' : 'fr')}
         clientName={clientName || undefined}
         selectedFont={(quote.selected_font as string | null) ?? undefined}
         selectedFontSize={(quote.selected_font_size as number | null) ?? 12}

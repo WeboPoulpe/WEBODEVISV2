@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fileToWebp } from '@/lib/imageToWebp';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
+import DocumentSettings from '@/components/parametres/DocumentSettings';
 import { errorCls } from '@/components/ui/kit';
 import { isDemoUser } from '@/lib/demo';
 import { changePassword } from '@/server/auth';
@@ -426,6 +427,9 @@ export default function ParametresPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Mentions légales et numérotation ─────────────────────────────────── */}
+      <DocumentSettings />
 
       {/* ── Section 2: Logo ─────────────────────────────────────────────────── */}
       <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">

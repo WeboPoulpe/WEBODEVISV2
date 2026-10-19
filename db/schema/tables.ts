@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, unique, foreignKey, check, boolean, jsonb, index, date, integer, numeric, time, varchar, uniqueIndex, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, uuid, text, timestamp, unique, foreignKey, check, boolean, jsonb, index, date, integer, numeric, time, varchar, uniqueIndex, pgEnum, primaryKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const customer_type = pgEnum("customer_type", ['particulier', 'entreprise'])
@@ -848,6 +848,18 @@ export const profiles = pgTable("profiles", {
 	cgv: text(),
 	siret: text(),
 	logo_url: text(),
+	// Format des numéros par type de document : { quote|invoice|credit: { prefix, withYear, digits } }.
+	numbering: jsonb(),
+	// Mentions légales imprimées sur les devis et les factures.
+	legal_form: text(),
+	share_capital: text(),
+	rcs: text(),
+	vat_number: text(),
+	// Micro-entreprise en franchise : « TVA non applicable, art. 293 B du CGI ».
+	vat_exempt: boolean().default(false).notNull(),
+	payment_terms_days: integer().default(30).notNull(),
+	deposit_percent: numeric({ mode: 'number' }).default(30).notNull(),
+	quote_validity_days: integer().default(30).notNull(),
 }, (table) => [
 	index("idx_profiles_company_siret").using("btree", table.company_siret.asc().nullsLast().op("text_ops")),
 	foreignKey({
@@ -862,6 +874,22 @@ export const profiles = pgTable("profiles", {
 		}).onDelete("set null"),
 	check("profiles_custom_vat_rate_check", sql`(custom_vat_rate >= (0)::numeric) AND (custom_vat_rate <= (100)::numeric)`),
 	check("profiles_subscription_type_check", sql`subscription_type = ANY (ARRAY['free'::text, 'premium'::text])`),
+]);
+
+// Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
+// Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
+export const document_counters = pgTable("document_counters", {
+	owner_user_id: uuid().notNull(),
+	kind: text().notNull(),
+	year: integer().notNull(),
+	last_value: integer().notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.owner_user_id, table.kind, table.year], name: "document_counters_pkey" }),
+	foreignKey({
+			columns: [table.owner_user_id],
+			foreignColumns: [users.id],
+			name: "document_counters_owner_user_id_fkey"
+		}).onDelete("cascade"),
 ]);
 
 export const user_prospect_tokens = pgTable("user_prospect_tokens", {

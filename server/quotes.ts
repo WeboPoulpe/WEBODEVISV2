@@ -48,7 +48,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
 
   const [quote] = await db
     .select({
-      id: quotes.id, status: quotes.status, share_token: quotes.share_token, client_name: quotes.client_name, client_email: quotes.client_email,
+      id: quotes.id, quote_number: quotes.quote_number, status: quotes.status, share_token: quotes.share_token, client_name: quotes.client_name, client_email: quotes.client_email,
       client_first_name: quotes.client_first_name, event_type: quotes.event_type, event_date: quotes.event_date, guest_count: quotes.guest_count,
     })
     .from(quotes)
@@ -70,6 +70,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
     replyTo: profile?.company_email || profile?.email || user.email,
     ...quoteProposalEmail({
       companyName,
+      quoteNumber: quote.quote_number,
       clientName: quote.client_first_name || quote.client_name || '',
       eventType: quote.event_type,
       eventDate: quote.event_date,
