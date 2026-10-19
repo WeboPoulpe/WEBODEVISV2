@@ -127,6 +127,13 @@
       "when": 1792426771604,
       "tag": "0017_numbering_legal",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792427291877,
+      "tag": "0018_customer_invoices",
+      "breakpoints": true
     }
   ]
 }

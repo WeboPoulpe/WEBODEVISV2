@@ -876,6 +876,65 @@ export const profiles = pgTable("profiles", {
 	check("profiles_subscription_type_check", sql`subscription_type = ANY (ARRAY['free'::text, 'premium'::text])`),
 ]);
 
+// Factures clients (acompte, solde, facture complète, avoir). Remplacent les tables invoices* de la v1,
+// laissées en place mais inutilisées. Une facture émise est figée : vendeur, client, lignes et totaux sont
+// recopiés à l'émission ; elle ne se modifie plus et ne se supprime pas (on l'annule par un avoir).
+export const customer_invoices = pgTable("customer_invoices", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	// Entreprise propriétaire (compte parent s'il y en a un) et auteur.
+	owner_user_id: uuid().notNull(),
+	created_by: uuid().notNull(),
+	quote_id: uuid(),
+	kind: text().notNull(),
+	status: text().default('brouillon').notNull(),
+	// Facture annulée par cet avoir.
+	credited_invoice_id: uuid(),
+	// Vide tant que la facture est un brouillon ; attribué à l'émission, sans trou.
+	number: text(),
+	issue_date: date(),
+	due_date: date(),
+	service_date: date(),
+	seller: jsonb().notNull(),
+	buyer: jsonb().notNull(),
+	lines: jsonb().notNull(),
+	total_ht: numeric({ precision: 12, scale: 2, mode: 'number' }).default(0).notNull(),
+	total_vat: numeric({ precision: 12, scale: 2, mode: 'number' }).default(0).notNull(),
+	total_ttc: numeric({ precision: 12, scale: 2, mode: 'number' }).default(0).notNull(),
+	vat_breakdown: jsonb().default([]).notNull(),
+	notes: text(),
+	pdf_url: text(),
+	issued_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_customer_invoices_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_customer_invoices_quote").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops")),
+	uniqueIndex("customer_invoices_owner_number_key").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops"), table.number.asc().nullsLast().op("text_ops")),
+	foreignKey({ columns: [table.owner_user_id], foreignColumns: [users.id], name: "customer_invoices_owner_user_id_fkey" }),
+	foreignKey({ columns: [table.created_by], foreignColumns: [users.id], name: "customer_invoices_created_by_fkey" }),
+	// Un devis lié à une facture émise ne peut plus être supprimé.
+	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "customer_invoices_quote_id_fkey" }).onDelete("restrict"),
+	foreignKey({ columns: [table.credited_invoice_id], foreignColumns: [table.id], name: "customer_invoices_credited_invoice_id_fkey" }),
+	check("customer_invoices_kind_check", sql`kind = ANY (ARRAY['acompte'::text, 'solde'::text, 'facture'::text, 'avoir'::text])`),
+	check("customer_invoices_status_check", sql`status = ANY (ARRAY['brouillon'::text, 'emise'::text, 'payee_partiellement'::text, 'payee'::text, 'annulee'::text])`),
+	check("customer_invoices_number_check", sql`(status = 'brouillon') = (number IS NULL)`),
+]);
+
+export const customer_invoice_payments = pgTable("customer_invoice_payments", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	invoice_id: uuid().notNull(),
+	paid_on: date().notNull(),
+	amount: numeric({ precision: 12, scale: 2, mode: 'number' }).notNull(),
+	method: text().default('virement').notNull(),
+	note: text(),
+	created_by: uuid().notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_customer_invoice_payments_invoice").using("btree", table.invoice_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.invoice_id], foreignColumns: [customer_invoices.id], name: "customer_invoice_payments_invoice_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.created_by], foreignColumns: [users.id], name: "customer_invoice_payments_created_by_fkey" }),
+]);
+
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
 // Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
 export const document_counters = pgTable("document_counters", {
