@@ -34,12 +34,20 @@ const quoteAccess: Predicate = (t, u) => `(${t}.user_id = ${u} or ${t}.owner_use
 const viaQuote: Predicate = (t, u) =>
   `exists (select 1 from public.quotes pq where pq.id = ${t}.quote_id and ${quoteAccess('pq', u)})`;
 const globalOrOwn: Predicate = (t, u) => `(${t}.user_id is null or ${t}.user_id = ${u})`;
+// Une ligne écrite ne peut pointer que vers des lignes que l'utilisateur a le droit de voir.
+const readableIngredient = (col: string): Predicate => (t, u) =>
+  `exists (select 1 from public.ingredients pi where pi.id = ${t}.${col} and (pi.user_id is null or pi.user_id = ${u}))`;
 const both = (p: Predicate): Pick<TableRule, 'read' | 'write'> => ({ read: p, write: p });
 
 const ALL: Op[] = ['select', 'insert', 'update', 'delete'];
 
 export const RULES: Record<string, TableRule> = {
-  quotes: { ...both(quoteAccess), admin: ['select', 'update'] },
+  quotes: {
+    read: quoteAccess,
+    // Un devis écrit reste dans l'entreprise de l'utilisateur : on ne peut pas le glisser dans un autre compte.
+    write: (t, u) => `(${quoteAccess(t, u)} and (${t}.owner_user_id is null or ${t}.owner_user_id = ${u} or ${company(t, u)}))`,
+    admin: ['select', 'update'],
+  },
   customers: both((t, u) => `(${t}.owner_user_id = ${u} or ${company(t, u)})`),
   customer_contacts: {
     ...both((t, u) =>
@@ -73,15 +81,27 @@ export const RULES: Record<string, TableRule> = {
   notifications: both(own('user_id')),
   suppliers: both((t, u) => `(${t}.user_id = ${u} or ${company(t, u)})`),
   ingredients: { read: globalOrOwn, write: own('user_id') },
-  service_ingredients: both(own('user_id')),
+  service_ingredients: {
+    read: own('user_id'),
+    write: (t, u) =>
+      `(${t}.user_id = ${u} and exists (select 1 from public.prestations pp where pp.id = ${t}.service_id and pp.user_id = ${u}) and ${readableIngredient('ingredient_id')(t, u)})`,
+  },
   service_materials: both(own('user_id')),
-  stock_movements: both(own('user_id')),
+  stock_movements: {
+    read: own('user_id'),
+    write: (t, u) =>
+      `(${t}.user_id = ${u} and ${readableIngredient('ingredient_id')(t, u)}`
+      + ` and (${t}.event_id is null or exists (select 1 from public.quotes pq where pq.id = ${t}.event_id and ${quoteAccess('pq', u)}))`
+      + ` and (${t}.order_id is null or exists (select 1 from public.supplier_orders po where po.id = ${t}.order_id and po.user_id = ${u})))`,
+  },
   supplier_orders: both(own('user_id')),
   supplier_order_items: both((t, u) =>
     `exists (select 1 from public.supplier_orders po where po.id = ${t}.order_id and po.user_id = ${u})`),
   extras: both(own('user_id')),
+  // L'extra ET le devis doivent appartenir à l'utilisateur : sinon la page mission de l'extra
+  // exposerait le devis (et la liste de courses) d'un autre compte.
   event_extras: both((t, u) =>
-    `exists (select 1 from public.extras pe where pe.id = ${t}.extra_id and pe.user_id = ${u})`),
+    `(exists (select 1 from public.extras pe where pe.id = ${t}.extra_id and pe.user_id = ${u}) and ${viaQuote(t, u)})`),
   event_ingredients: both(viaQuote),
   rental_items: both(viaQuote),
   rental_templates: both(own('user_id')),

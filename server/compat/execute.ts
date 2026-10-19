@@ -271,11 +271,13 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
       }
       const cols = keys.map((k) => c.column(d.table, k)).join(', ');
       const payload = p.add(JSON.stringify(rows));
-      mutation = `insert into ${T} (${cols}) select ${cols} from json_populate_recordset(null::${T}, ${payload}::json)`;
+      mutation = `insert into ${T} as t0 (${cols}) select ${cols} from json_populate_recordset(null::${T}, ${payload}::json)`;
       if (d.op === 'upsert') {
         const conflict = (d.onConflict ?? 'id').split(',').map((k) => c.column(d.table, k.trim()));
         const updates = keys.filter((k) => !conflict.includes(qi(k))).map((k) => `${qi(k)} = excluded.${qi(k)}`);
-        mutation += ` on conflict (${conflict.join(', ')}) ${updates.length ? `do update set ${updates.join(', ')}` : 'do nothing'}`;
+        // La ligne déjà en base doit être modifiable par l'utilisateur (USING) : sans cette condition,
+        // un upsert sur l'id ou le jeton d'une autre ligne la réattribuait à son compte.
+        mutation += ` on conflict (${conflict.join(', ')}) ${updates.length ? `do update set ${updates.join(', ')} where ${c.writeScope(d.table, 't0', 'update')}` : 'do nothing'}`;
       }
       mutation += ' returning *';
     } else if (d.op === 'update') {

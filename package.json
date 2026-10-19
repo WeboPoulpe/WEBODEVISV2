@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start --port 3001",
     "lint": "next lint",
+    "test": "vitest run",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
@@ -33,6 +34,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.7",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.4",
     "@types/pg": "^8.23.1",
