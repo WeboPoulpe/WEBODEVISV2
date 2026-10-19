@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FileText, Loader2, Printer, Receipt, RotateCcw, Save, Send, Trash2, Wallet } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Loader2, Printer, Receipt, RotateCcw, Save, Send, Trash2, Wallet } from 'lucide-react';
 import {
   createCreditNoteDraft, deleteInvoiceDraft, deletePayment, getInvoice, issueInvoice, listInvoices, updateInvoiceDraft,
   type Invoice,
@@ -192,9 +192,10 @@ export default function FacturePage() {
           </div>
         ) : (
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Link href={`/factures/${invoice.id}/imprimer?auto`} target="_blank" className={cn(btnSecondary, 'flex-1 sm:flex-none')}>
-              <Printer className="h-4 w-4" />Imprimer / PDF
-            </Link>
+            {/* PDF Factur-X (PDF/A-3 avec le fichier XML de la facture), servi par app/api/factures/[id]/pdf. */}
+            <a href={`/api/factures/${invoice.id}/pdf?telecharger=1`} className={cn(btnSecondary, 'flex-1 sm:flex-none')}>
+              <Download className="h-4 w-4" />Télécharger le PDF
+            </a>
             {canPay && (
               <button onClick={() => { setError(null); setPaying(true); }} className={cn(btnPrimary, 'flex-1 sm:flex-none')}>
                 <Wallet className="h-4 w-4" />Enregistrer un paiement
@@ -275,6 +276,9 @@ export default function FacturePage() {
 
             {/* Liens et correction */}
             <section className={cn(cardCls, 'p-2')} aria-label="Autres actions">
+              <Link href={`/factures/${invoice.id}/imprimer?auto`} target="_blank" className="flex items-center gap-3 h-12 px-3 rounded-xl text-[15px] font-medium text-gray-900 hover:bg-gray-50">
+                <Printer className="h-5 w-5 text-gray-500" />Imprimer
+              </Link>
               {quoteLink && (
                 <Link href={quoteLink} className="flex items-center gap-3 h-12 px-3 rounded-xl text-[15px] font-medium text-gray-900 hover:bg-gray-50">
                   <FileText className="h-5 w-5 text-gray-500" />Voir le devis{invoice.quote_number ? ` n° ${invoice.quote_number}` : ''}
