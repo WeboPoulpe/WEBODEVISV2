@@ -36,6 +36,8 @@ export function collectBlocks(root: HTMLElement, win: Window, rootTop: number, p
   const blocks: PageBlock[] = [];
   const paths: number[][] = [];
   let pendingForce = false;
+  // Marge des conteneurs qui ouvrent un saut forcé : elle se fond avec celle de leur premier bloc et reste en haut de page.
+  let pendingMargin = 0;
 
   const walk = (parent: Element, path: number[]) => {
     Array.from(parent.children).forEach((child, i) => {
@@ -59,25 +61,21 @@ export function collectBlocks(root: HTMLElement, win: Window, rootTop: number, p
         if (rect.height > 0 || force || marker) {
           const hasImg = child.tagName === 'IMG' || !!child.querySelector('img');
           const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
-          let repeatHeader: number | undefined;
-          if (row && child.parentElement?.tagName === 'TBODY') {
-            const thead = child.closest('table')?.querySelector(':scope > thead');
-            if (thead) repeatHeader = thead.getBoundingClientRect().height;
-          }
           blocks.push({
             top: rect.top - rootTop,
             height: marker ? 1 : rect.height,
             unbreakable: keepWhole || row || hasImg || marker,
             forceBreakBefore: force,
+            forcedMargin: force ? Math.max(pendingMargin, parseFloat(cs.marginTop) || 0) : undefined,
             keepWithNext: cs.breakAfter === 'avoid',
             lineHeight: keepWhole || row || hasImg ? undefined : lh,
-            repeatHeader,
           });
           paths.push(childPath);
           pendingForce = false;
+          pendingMargin = 0;
         }
       } else {
-        if (force) pendingForce = true;
+        if (force) { pendingForce = true; pendingMargin = Math.max(pendingMargin, parseFloat(cs.marginTop) || 0); }
         const before = blocks.length;
         walk(child, childPath);
         // « Ne pas couper après » un conteneur : son dernier bloc part avec la suite.
@@ -119,6 +117,8 @@ export interface MeasureResult {
   /** Pages avant le document (page de garde). */
   coverPages: number;
   totalPages: number;
+  /** Les conditions de vente seront ajoutées à l'impression sur une page à part. */
+  addCgv: boolean;
 }
 
 /**
@@ -178,5 +178,5 @@ export function measurePrintPages(idoc: Document, iwin: Window, input: MeasureIn
     const cgvPages = addCgv && cgv ? Math.max(1, Math.ceil((cgv.getBoundingClientRect().height - 1) / A4_PAGE_PX)) : 0;
     const totalPages = cover + result.pages + photoPages + cgvPages;
 
-  return { blocks, paths, result, coverPages: cover, totalPages };
+  return { blocks, paths, result, coverPages: cover, totalPages, addCgv };
 }

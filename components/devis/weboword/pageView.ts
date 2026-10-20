@@ -1,12 +1,14 @@
-// Vue en pages de l'éditeur : la feuille continue est découpée en feuilles A4, comme sur le papier.
+// Vue en pages de l'éditeur : la feuille continue est découpée en feuilles A4, exactement comme le papier.
 //
-// Le contenu du devis n'est jamais modifié. Une feuille de style à part (élément <style> dans <head>) écarte
-// l'élément qui commence chaque page : sa marge haute grandit du blanc laissé en bas de la page précédente,
-// des marges basse et haute du papier et de l'espace entre deux feuilles. Pour une ligne de tableau (sans
-// marge possible), c'est le haut de ses cellules qui grandit. Les bandes grises entre les feuilles sont
-// dessinées par-dessus (PageSheets), aux positions renvoyées ici.
+// La feuille de l'éditeur a la mise en page de la sortie papier (quoteEditorCss). Il reste à faire commencer
+// chaque page sur sa propre feuille : une feuille de style à part (élément <style> dans <head>, hors du contenu)
+// écarte l'élément qui ouvre chaque page, pour le poser à la même hauteur que sur le papier (marge haute de la
+// page). Pour une ligne de tableau, sans marge possible, ce sont ses cellules qui grandissent vers le haut. Le
+// contenu du devis n'est jamais modifié. Les bandes entre les feuilles sont dessinées par-dessus (PageSheets).
 
-import { PRINT_GAP_MM, A4_PAGE_PX } from '@/lib/quoteOutput';
+import { PRINT_GAP_MM, A4_PAGE_PX, PAGE_CONTENT_PX } from '@/lib/quoteOutput';
+import { NEARLY_EMPTY_FILL } from '@/lib/pageBreaks';
+import { resolvePath, type MeasureResult } from './printMeasure';
 
 const MM_TO_PX = 96 / 25.4;
 /** Marge haute et basse du papier, en pixels CSS. */
@@ -17,12 +19,18 @@ export const SHEET_GAP_PX = 24;
 export const SHEET_WIDTH_PX = 210 * MM_TO_PX;
 
 export interface PageViewBreak {
-  /** Chemin (index des enfants) de l'élément qui commence la page suivante ; null : rien à décaler (mentions légales). */
-  path: number[] | null;
+  /** Élément qui commence la page suivante (null : on ne sait pas le retrouver). */
+  el: Element | null;
+  /** Sélecteur CSS de cet élément, pour la feuille de style de la vue en pages. */
+  selector: string | null;
+  /** Hauteur de l'élément sous le haut de la feuille, sur le papier (marge haute de la page, ou 0). */
+  topGap: number;
   /** Numéro, dans le document imprimé, de la page qui commence. */
   nextPage: number;
   /** La page qui se termine est presque vide. */
   nearlyEmpty: boolean;
+  /** Coupure à l'intérieur de l'élément (px depuis son haut) : bloc plus haut qu'une page, coupé sur le papier. */
+  cutOffset?: number;
 }
 
 export interface PageBand {
@@ -30,16 +38,18 @@ export interface PageBand {
   top: number;
   nextPage: number;
   nearlyEmpty: boolean;
+  /** Bloc trop long coupé à cet endroit : pas de bande, un simple repère. */
+  cut?: boolean;
 }
 
 export interface PageViewResult {
   bands: PageBand[];
-  /** Hauteur totale des feuilles (la dernière fait au moins une page A4). */
+  /** Hauteur totale des feuilles (la dernière fait une page A4 entière). */
   height: number;
 }
 
 export interface PageViewRule {
-  path: number[];
+  selector: string;
   /** margin : marge haute de l'élément ; cells : haut des cellules d'une ligne de tableau. */
   kind: 'margin' | 'cells';
   px: number;
@@ -51,97 +61,118 @@ export function pathSelector(root: string, path: number[]): string {
 }
 
 /** Feuille de style de la vue en pages (écran seulement : l'impression de la page n'en tient pas compte). */
-export function pageViewCss(root: string, rules: PageViewRule[]): string {
+export function pageViewCss(rules: PageViewRule[]): string {
   if (rules.length === 0) return '';
   const lines = rules.map((r) => {
-    const sel = pathSelector(root, r.path);
-    const px = `${Math.max(0, Math.round(r.px * 10) / 10)}px`;
+    const px = `${Math.max(0, Math.round(r.px * 100) / 100)}px`;
     return r.kind === 'cells'
-      ? `${sel} > td, ${sel} > th { padding-top: ${px} !important; }`
-      : `${sel} { margin-top: ${px} !important; }`;
+      ? `${r.selector} > td, ${r.selector} > th { padding-top: ${px} !important; }`
+      : `${r.selector} { margin-top: ${px} !important; }`;
   });
   return `@media screen {\n${lines.join('\n')}\n}`;
 }
 
-function resolve(root: Element, path: number[]): Element | null {
-  let el: Element | null = root;
-  for (const i of path) {
-    el = el?.children[i] ?? null;
-    if (!el) return null;
-  }
-  return el;
-}
-
 /**
- * Applique la vue en pages à la feuille de l'éditeur et renvoie la place des bandes entre les feuilles.
- * @param editor Zone de texte de l'éditeur (racine des chemins).
- * @param sheet Feuille blanche qui l'entoure (origine des positions, affichée éventuellement avec un zoom).
+ * Applique la vue en pages et renvoie la place des bandes entre les feuilles.
+ * @param sheet Feuille blanche (origine des positions, affichée éventuellement avec un zoom).
  * @param style Élément <style> réservé à la vue en pages, hors du contenu.
- * @param root Sélecteur CSS de la zone de texte (ex. « #weboword-sheet »).
+ * @param contentEnd Bas du contenu imprimé dans la feuille (px CSS), lu après la pose des marges.
  */
-export function applyPageView(editor: HTMLElement, sheet: HTMLElement, style: HTMLStyleElement, root: string, breaks: PageViewBreak[]): PageViewResult {
+export function applyPageView(sheet: HTMLElement, style: HTMLStyleElement, breaks: PageViewBreak[], contentEnd: () => number): PageViewResult {
   // La page défilante garde sa position pendant que les marges sont reposées.
   let scroller: HTMLElement | null = sheet.parentElement;
   while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
   const scrollTop = scroller?.scrollTop ?? 0;
 
   const rules: PageViewRule[] = [];
-  const apply = () => { style.textContent = pageViewCss(root, rules); };
+  const apply = () => { style.textContent = pageViewCss(rules); };
   apply();
 
-  const sheetBox = () => {
-    const r = sheet.getBoundingClientRect();
-    return { top: r.top, scale: r.width > 0 ? r.width / SHEET_WIDTH_PX : 1 };
+  const scale = () => {
+    const w = sheet.getBoundingClientRect().width;
+    return w > 0 ? w / SHEET_WIDTH_PX : 1;
   };
-  const topOf = (el: Element) => {
-    const s = sheetBox();
-    return (el.getBoundingClientRect().top - s.top) / s.scale;
-  };
-  const contentBottom = () => {
-    const s = sheetBox();
-    const padding = parseFloat(getComputedStyle(editor).paddingBottom) || 0;
-    return (editor.getBoundingClientRect().bottom - s.top) / s.scale - padding;
-  };
+  const topOf = (el: Element) => (el.getBoundingClientRect().top - sheet.getBoundingClientRect().top) / scale();
 
   const bands: PageBand[] = [];
   let sheetTop = 0;
-  let previous: Element | null = null;
   for (const b of breaks) {
-    const el = b.path ? resolve(editor, b.path) : null;
-    // Un bloc plus haut qu'une page est coupé plusieurs fois : il n'est décalé qu'à sa première coupure.
-    const again = !!el && el === previous;
-    previous = el;
+    const el = b.el;
     const display = el ? getComputedStyle(el).display : '';
-    const movable = !!el && !again && display !== 'inline' && display !== 'contents' && display !== 'none';
-    // Fin du contenu de la page : là où commence l'élément suivant (ou la fin du texte).
-    const start = movable ? topOf(el!) : again ? sheetTop : contentBottom();
-    // La feuille fait une page A4, ou plus si le texte de l'éditeur, un peu plus haut qu'à l'impression, déborde.
-    const bandTop = Math.max(sheetTop + A4_PAGE_PX, start + PAGE_MARGIN_PX);
+    const movable = !!el && !!b.selector && display !== 'inline' && display !== 'contents' && display !== 'none';
+
+    if (el && b.cutOffset !== undefined) {
+      // Bloc plus haut qu'une page : le papier le coupe ; l'écran le laisse d'un tenant et marque la coupure.
+      const cut = topOf(el) + b.cutOffset;
+      bands.push({ top: cut, nextPage: b.nextPage, nearlyEmpty: b.nearlyEmpty, cut: true });
+      sheetTop = cut - b.topGap;
+      continue;
+    }
+
+    const start = movable ? topOf(el!) : contentEnd();
+    // Une feuille fait une page A4 ; elle ne s'allonge que si le texte déborde (ce qui ne devrait pas arriver).
+    const bandTop = Math.max(sheetTop + A4_PAGE_PX, start + (movable ? 0 : PAGE_MARGIN_PX));
     bands.push({ top: bandTop, nextPage: b.nextPage, nearlyEmpty: b.nearlyEmpty });
     sheetTop = bandTop + SHEET_GAP_PX;
-    if (!movable || !b.path) continue;
+    if (!movable) continue;
 
-    const target = sheetTop + PAGE_MARGIN_PX;
+    const target = sheetTop + b.topGap;
     if (el!.tagName === 'TR') {
       // Le haut de la ligne ne bouge pas : ses cellules s'agrandissent vers le haut.
       const cell = el!.querySelector(':scope > td, :scope > th');
       const base = cell ? parseFloat(getComputedStyle(cell).paddingTop) || 0 : 0;
-      rules.push({ path: b.path, kind: 'cells', px: base + (target - start) });
+      rules.push({ selector: b.selector!, kind: 'cells', px: base + (target - start) });
       apply();
       continue;
     }
     // Marge haute : quelques passes, car elle peut se fondre avec celle de l'élément précédent.
-    const rule: PageViewRule = { path: b.path, kind: 'margin', px: (parseFloat(getComputedStyle(el!).marginTop) || 0) + (target - start) };
+    const rule: PageViewRule = { selector: b.selector!, kind: 'margin', px: (parseFloat(getComputedStyle(el!).marginTop) || 0) + (target - start) };
     rules.push(rule);
-    for (let pass = 0; pass < 3; pass++) {
+    for (let pass = 0; pass < 4; pass++) {
       apply();
       const diff = target - topOf(el!);
-      if (Math.abs(diff) < 0.5) break;
+      if (Math.abs(diff) < 0.25) break;
       rule.px += diff;
     }
   }
 
-  const height = Math.max(sheetTop + A4_PAGE_PX, contentBottom() + PAGE_MARGIN_PX);
+  const height = Math.max(sheetTop + A4_PAGE_PX, contentEnd());
   if (scroller && scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
   return { bands, height };
+}
+
+/** Sélecteur des mentions légales affichées sous le texte, dans la feuille. */
+export const LEGAL_SELECTOR = '[data-weboword-legal]';
+
+/**
+ * Vue en pages d'après la mesure du papier (measurePrintPages) : retrouve dans la feuille l'élément qui commence
+ * chaque page et l'y place.
+ * @param editor Zone de texte (racine des chemins mesurés), de sélecteur `editorSelector`.
+ */
+export function layoutPages(measured: MeasureResult, editor: HTMLElement, editorSelector: string, sheet: HTMLElement, style: HTMLStyleElement): PageViewResult {
+  const legal = sheet.querySelector(LEGAL_SELECTOR);
+  const breaks: PageViewBreak[] = measured.result.ends.map((end) => {
+    const path = measured.paths[end.blockIndex];
+    const block = measured.blocks[end.blockIndex];
+    const isLegal = !!path && path.length === 0;
+    const el = isLegal ? legal : path ? resolvePath(editor, path) : null;
+    const tooLong = !!block && block.height > PAGE_CONTENT_PX + 0.5;
+    return {
+      el,
+      selector: isLegal ? LEGAL_SELECTOR : path ? pathSelector(editorSelector, path) : null,
+      // Les mentions légales sont hors du document : sur une nouvelle page, elles commencent en haut de la feuille.
+      // Après un saut forcé, la marge haute de l'élément est gardée.
+      topGap: isLegal ? 0 : PAGE_MARGIN_PX + (block?.forceBreakBefore ? block.forcedMargin ?? 0 : 0),
+      nextPage: end.page + 1 + measured.coverPages,
+      nearlyEmpty: end.fill < NEARLY_EMPTY_FILL,
+      cutOffset: end.offsetInBlock > 0 && tooLong ? end.offsetInBlock : undefined,
+    };
+  });
+  const contentEnd = () => {
+    const last = legal ?? editor;
+    const r = sheet.getBoundingClientRect();
+    const scale = r.width > 0 ? r.width / SHEET_WIDTH_PX : 1;
+    return (last.getBoundingClientRect().bottom - r.top) / scale;
+  };
+  return applyPageView(sheet, style, breaks, contentEnd);
 }

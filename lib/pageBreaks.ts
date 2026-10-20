@@ -18,6 +18,8 @@ export interface PageBlock {
   unbreakable?: boolean;
   /** Le bloc commence toujours une nouvelle page. */
   forceBreakBefore?: boolean;
+  /** Marge gardée au-dessus du bloc après un saut forcé (le navigateur ne la supprime qu'aux sauts ordinaires), px. */
+  forcedMargin?: number;
   /** Le bloc ne doit pas rester seul en bas de page : il part avec le bloc suivant. */
   keepWithNext?: boolean;
   /** Hauteur d'une ligne de texte (px) : le bloc ne se coupe qu'entre deux lignes. */
@@ -87,7 +89,7 @@ export function computePageBreaks(blocks: PageBlock[], pageHeight: number, first
     if (b.keepWithNext && next && !next.forceBreakBefore && next.unbreakable) {
       const top = Math.min(b.top, next.top);
       const bottom = Math.max(b.top + b.height, next.top + next.height);
-      merged.push({ block: { ...next, top, height: bottom - top, forceBreakBefore: b.forceBreakBefore, unbreakable: true, keepWithNext: next.keepWithNext }, index: i });
+      merged.push({ block: { ...next, top, height: bottom - top, forceBreakBefore: b.forceBreakBefore, forcedMargin: b.forcedMargin, unbreakable: true, keepWithNext: next.keepWithNext }, index: i });
       i += 1;
     } else {
       merged.push({ block: b, index: i });
@@ -99,7 +101,7 @@ export function computePageBreaks(blocks: PageBlock[], pageHeight: number, first
     let y = b.top + shift;
 
     // Saut forcé : la page en cours s'arrête là, même à moitié vide.
-    if (b.forceBreakBefore && hasContent) endPage(index, 0, y);
+    if (b.forceBreakBefore && hasContent) endPage(index, 0, y - (b.forcedMargin ?? 0));
 
     let h = b.height;
     let consumed = 0; // part du bloc déjà placée sur les pages précédentes

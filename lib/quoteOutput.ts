@@ -92,6 +92,17 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     .quote-doc .gastro-page { page-break-before: always !important; break-before: page !important; }
     /* Une ligne du tableau ou le bloc des totaux ne sont jamais coupés entre deux pages. */
     .quote-doc tr, .quote-doc [data-webo-financials] > div { page-break-inside: avoid; break-inside: avoid; }
+    /* Le papier ne coupe jamais un bloc de texte (paragraphe, titre, élément de liste, ligne de cases côte à côte,
+       bloc sans bloc enfant) : l'éditeur, qui montre les pages, ne sait pas couper un paragraphe en deux. Seul un
+       bloc plus haut qu'une page reste coupé ; l'éditeur le signale. Les coupures tombent donc entre deux blocs. */
+    .quote-doc p, .quote-doc li, .quote-doc h1, .quote-doc h2, .quote-doc h3, .quote-doc h4, .quote-doc h5, .quote-doc h6,
+    .quote-doc blockquote, .quote-doc pre, .quote-doc figure, .quote-doc img,
+    .quote-doc [style*="display:flex"], .quote-doc [style*="display: flex"], .quote-doc [style*="display:grid"], .quote-doc [style*="display: grid"],
+    .quote-doc div:not(:has(div, p, ul, ol, table, h1, h2, h3, h4, h5, h6, blockquote, pre, figure, section, article)) {
+      page-break-inside: avoid; break-inside: avoid;
+    }
+    /* Un titre reste avec ce qui le suit. */
+    .quote-doc h1, .quote-doc h2, .quote-doc h3, .quote-doc h4 { page-break-after: avoid; break-after: avoid; }
     /* Le bandeau du menu n'est jamais coupé (son fond s'étirerait sur la page). Un plat ne l'est pas non plus, sauf
        s'il est long : markLongDishes, lancé avant chaque impression, lui donne alors la classe webo-long et il
        continue page suivante au lieu de laisser le bandeau seul sur une page presque vide. */
@@ -103,7 +114,8 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     /* Le nom d'un plat reste avec la suite. */
     .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3,
     .quote-doc .gastro-menu .webo-keep-next { page-break-after: avoid; break-after: avoid; }
-    .quote-doc thead { display: table-header-group; }
+    /* L'en-tête d'un tableau n'est pas répété en haut de la page suivante (l'éditeur ne pourrait pas le montrer). */
+    .quote-doc thead { display: table-row-group; }
     /* Le cadre « Bon pour accord » n'est pas coupé, et ne commence pas seul en haut d'une page quand le texte
        qui le précède peut l'accompagner (repère posé par generateQuoteHtml ou par markSignature). */
     .quote-doc [data-webo-sign], .quote-doc .webo-sign { page-break-inside: avoid; break-inside: avoid; }
@@ -120,11 +132,56 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
 }
 
 /**
- * Hauteur (px) au-delà de laquelle un plat de la carte peut continuer page suivante : la moitié de la hauteur
- * utile d'une page A4 (297 mm moins les deux marges de 14 mm de .quote-gap, à 96 px par pouce). Un plat plus court
- * n'est jamais coupé ; au pire, il laisse une demi-page blanche en passant à la page suivante.
+ * Feuille de style de l'éditeur : la feuille à l'écran a exactement la mise en page du papier.
+ *  • Les styles de l'application qui changent la mise en page des balises (remise à zéro de Tailwind : marges
+ *    des paragraphes et titres, taille des titres, puces, images en bloc, bordures…, et l'espacement des titres
+ *    de l'application) sont annulés dans `paper` : on revient aux valeurs par défaut du navigateur, celles de la
+ *    fenêtre d'impression.
+ *  • Les règles de la sortie (quoteOutputCss), règles d'impression comprises, s'appliquent à la zone de texte
+ *    `root` (qui porte aussi la classe quote-doc), avec la marge haute et basse du papier (14 mm).
+ *  • Le repère « Saut de page » n'occupe aucune hauteur : il est dessiné par-dessus le texte.
+ * @param paper Sélecteur de la feuille (logo, zone de texte, mentions légales).
+ * @param root Sélecteur de la zone de texte.
  */
-export const LONG_DISH_PX = Math.round(PAGE_CONTENT_PX / 2);
+export function quoteEditorCss(s: QuoteOutputSettings, paper: string, root: string): string {
+  const doc = `${root}.quote-doc`;
+  const output = quoteOutputCss(s)
+    .replace(/@page\s*\{[^}]*\}/, '')
+    .replace('@media print', '@media all')
+    .replace(/\.quote-doc/g, doc);
+  const reset = (tags: string, props: string[]) => `${paper} :is(${tags}) { ${props.map((p) => `${p}: revert;`).join(' ')} }`;
+  return [
+    // Texte hors du document (logo, mentions) : police par défaut du navigateur, comme dans la page imprimée.
+    `${paper} { font: initial; letter-spacing: normal; }`,
+    `${paper} *, ${paper} *::before, ${paper} *::after { border-width: revert; border-style: revert; border-color: revert; }`,
+    reset('h1, h2, h3, h4, h5, h6', ['font-size', 'font-weight', 'margin', 'letter-spacing']),
+    reset('blockquote, dl, dd, figure, p, pre, hr', ['margin']),
+    reset('hr', ['height', 'color', 'border-top-width']),
+    reset('ol, ul, menu', ['list-style', 'margin', 'padding']),
+    reset('a', ['color', 'text-decoration']),
+    reset('b, strong', ['font-weight']),
+    reset('code, kbd, samp, pre, small', ['font-size']),
+    reset('sub, sup', ['font-size', 'line-height', 'position', 'vertical-align', 'top', 'bottom']),
+    reset('table', ['text-indent', 'border-color', 'border-collapse']),
+    reset('img, svg, video, canvas, audio, iframe, embed, object', ['display', 'vertical-align']),
+    reset('img, video', ['max-width', 'height']),
+    output,
+    `${doc} { padding-top: ${PRINT_GAP_MM}mm !important; padding-bottom: ${PRINT_GAP_MM}mm !important; }`,
+    `${doc} .screen-sep { display: block !important; position: relative !important; height: 0 !important; margin: 0 !important;`
+      + ` padding: 0 !important; border: 0 !important; font-size: 0 !important; line-height: 0 !important; color: transparent !important;`
+      + ` overflow: visible !important; visibility: visible !important; }`,
+    `${doc} .screen-sep::after { content: 'Saut de page'; position: absolute; left: -20mm; right: -20mm; top: -1px;`
+      + ` border-top: 2px dashed #E6DFD3; padding-top: 3px; text-align: center; color: #B4502D; letter-spacing: 0.08em;`
+      + ` font: 10px/1 system-ui, sans-serif; pointer-events: none; }`,
+  ].join('\n');
+}
+
+/**
+ * Hauteur (px) au-delà de laquelle un plat de la carte peut continuer page suivante : la hauteur utile d'une page
+ * A4 (297 mm moins les deux marges de 14 mm de .quote-gap, à 96 px par pouce). Un plat plus court n'est jamais
+ * coupé (comme dans l'éditeur, qui montre les pages) ; un plat plus long ne tiendrait sur aucune page.
+ */
+export const LONG_DISH_PX = Math.floor(PAGE_CONTENT_PX);
 
 /**
  * Marque les plats trop hauts pour être gardés d'un seul tenant (classe webo-long, voir quoteOutputCss), et le

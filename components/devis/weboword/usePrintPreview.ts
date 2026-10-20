@@ -10,11 +10,10 @@
 // Rien n'est écrit dans le contenu du devis.
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { NEARLY_EMPTY_FILL } from '@/lib/pageBreaks';
 import type { QuoteOutputSettings } from '@/lib/quoteOutput';
 import { hasCgvTitle } from '@/lib/cgvDetect';
 import { MEASURE_FRAME_DOC, measurePrintPages } from './printMeasure';
-import { applyPageView, type PageBand, type PageViewBreak } from './pageView';
+import { layoutPages, type PageBand } from './pageView';
 
 export interface PrintPreview {
   /** Bandes entre les feuilles de la vue en pages. */
@@ -25,6 +24,8 @@ export interface PrintPreview {
   totalPages: number | null;
   /** Le bloc des conditions générales ajouté automatiquement double un titre « Conditions Générales de Vente ». */
   cgvDuplicate: boolean;
+  /** Les conditions de vente de l'entreprise seront ajoutées à l'impression, sur une page à part. */
+  addCgv: boolean;
 }
 
 interface Options {
@@ -51,7 +52,7 @@ const DEBOUNCE_MS = 300;
 const EDITOR_SELECTOR = '#weboword-sheet';
 
 export function usePrintPreview(o: Options): PrintPreview {
-  const [preview, setPreview] = useState<PrintPreview>({ bands: [], sheetHeight: null, totalPages: null, cgvDuplicate: false });
+  const [preview, setPreview] = useState<PrintPreview>({ bands: [], sheetHeight: null, totalPages: null, cgvDuplicate: false, addCgv: false });
   const styleRef = useRef<HTMLStyleElement | null>(null);
   // Hauteur de la zone de texte après la pose de la vue en pages : un redimensionnement qui n'en vient pas
   // relance la mesure, celui que provoquent nos propres marges est ignoré.
@@ -89,27 +90,23 @@ export function usePrintPreview(o: Options): PrintPreview {
       html, settings, coverEnabled, photoPages, logoHtml, legalHtml, cgvHtml, cgvText,
     }, writtenRef.current);
     if (!measured) return;
-    const { paths, result, coverPages: cover, totalPages } = measured;
+    const { totalPages, addCgv } = measured;
 
     // Vue en pages : chaque page commence sur sa propre feuille, comme sur le papier.
     const style = styleRef.current;
     if (!style) return;
-    const breaks: PageViewBreak[] = result.ends.map((end) => {
-      const path = paths[end.blockIndex];
-      return { path: path && path.length > 0 ? path : null, nextPage: end.page + 1 + cover, nearlyEmpty: end.fill < NEARLY_EMPTY_FILL };
-    });
-    const view = applyPageView(editor, sheet, style, EDITOR_SELECTOR, breaks);
+    const view = layoutPages(measured, editor, EDITOR_SELECTOR, sheet, style);
     appliedHeightRef.current = editor.offsetHeight;
     // Le contenu enregistré ne doit jamais porter la vue en pages.
     if (process.env.NODE_ENV !== 'production' && editor.innerHTML !== html) console.error('Vue en pages : le contenu du devis a changé pendant la mesure.');
 
-    const bands = view.bands.map((b) => ({ ...b, top: Math.round(b.top) }));
+    const bands = view.bands.map((b) => ({ ...b, top: Math.round(b.top * 100) / 100 }));
     const sheetHeight = Math.ceil(view.height);
     setPreview((prev) => {
-      const same = prev.totalPages === totalPages && prev.cgvDuplicate === cgvDuplicate && prev.sheetHeight === sheetHeight
+      const same = prev.totalPages === totalPages && prev.cgvDuplicate === cgvDuplicate && prev.sheetHeight === sheetHeight && prev.addCgv === addCgv
         && prev.bands.length === bands.length
-        && prev.bands.every((m, i) => m.nextPage === bands[i].nextPage && m.top === bands[i].top && m.nearlyEmpty === bands[i].nearlyEmpty);
-      return same ? prev : { bands, sheetHeight, totalPages, cgvDuplicate };
+        && prev.bands.every((m, i) => m.nextPage === bands[i].nextPage && m.top === bands[i].top && m.nearlyEmpty === bands[i].nearlyEmpty && m.cut === bands[i].cut);
+      return same ? prev : { bands, sheetHeight, totalPages, cgvDuplicate, addCgv };
     });
   };
 

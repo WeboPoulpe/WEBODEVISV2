@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { buildQuotePrintPage, DEFAULT_LINE_HEIGHT, type QuoteEditorSettings } from '@/lib/quoteOutput';
+import { buildQuotePrintPage, googleFontHref, quoteEditorCss, DEFAULT_LINE_HEIGHT, type QuoteEditorSettings } from '@/lib/quoteOutput';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { useAuth } from '@/context/AuthContext';
@@ -340,7 +340,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       const link = document.createElement('link');
       link.id   = id;
       link.rel  = 'stylesheet';
-      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;600;700&display=swap`;
+      // Même feuille de police que l'impression (italique comprise) : mêmes largeurs de texte, mêmes pages.
+      link.href = googleFontHref(font) ?? '';
       document.head.appendChild(link);
     }
   }, [font]);
@@ -929,6 +930,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const previewLogoHtml = useMemo(() => sanitizeHtml(buildLogoHeaderHtml(companyAssets.logo_url)), [companyAssets.logo_url]);
   const previewLegalHtml = useMemo(() => sanitizeHtml(buildLegalFooterHtml(companyAssets.legal)), [companyAssets.legal]);
   const previewCgvHtml = useMemo(() => sanitizeHtml(buildCgvHtml(companyAssets.cgv)), [companyAssets.cgv]);
+  const editorSheetCss = useMemo(
+    () => quoteEditorCss({ font, fontSize, lineHeight, showDesc }, '.webo-paper', '#weboword-sheet'),
+    [font, fontSize, lineHeight, showDesc],
+  );
   const printPreview = usePrintPreview({
     editorRef,
     sheetRef,
@@ -1021,12 +1026,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   return (
     <div className="flex flex-col h-full bg-slate-100 relative">
 
-      {/* CSS: font override + font size + description toggle + gastro menu width */}
+      {/* Descriptions masquées. La police, la taille, l'interligne suivent la feuille du papier (quoteEditorCss) ;
+          la largeur de la carte est celle écrite dans le document (applyMenuWidth), comme à l'impression. */}
       <style>{`
-        #weboword-sheet, #weboword-sheet * { font-family: '${font}', Georgia, serif !important; }
-        #weboword-sheet { font-size: ${fontSize}px !important; line-height: ${lineHeight} !important; }
         ${!showDesc ? '.svc-desc { display: none !important; }' : ''}
-        .gastro-menu { max-width: ${menuWidth} !important; margin: 0 auto !important; }
       `}</style>
 
       {/* ── Toast ────────────────────────────────────────────────────────────── */}
@@ -1466,7 +1469,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           <>
             <div
               style={{ width: '210mm', minHeight: '297mm' }}
-              className="mx-auto shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full relative overflow-hidden"
+              className="mx-auto bg-white shadow-xl print:shadow-none print:w-full relative overflow-hidden"
             >
               <CoverPage config={coverConfig} onChange={setCoverConfig} />
             </div>
@@ -1474,47 +1477,24 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </>
         )}
 
-        {/* Devis editor (A4) */}
+        {/* Devis editor (A4) : la feuille a exactement la mise en page du papier (quoteEditorCss). */}
         <div
           ref={sheetRef}
-          style={{ width: '210mm', minHeight: printPreview.sheetHeight ?? undefined }}
-          className="relative mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full"
+          style={{ width: '210mm', minHeight: printPreview.sheetHeight ?? '297mm' }}
+          className="webo-paper quote-out relative mx-auto bg-white shadow-xl print:shadow-none print:w-full"
         >
           <style>{`
-            #weboword-sheet,
-            #weboword-sheet p,
-            #weboword-sheet li,
-            #weboword-sheet div,
-            #weboword-sheet span,
-            #weboword-sheet td,
-            #weboword-sheet th {
-              line-height: ${lineHeight} !important;
-            }
-            /* Restaure les puces/numéros (Tailwind preflight les supprime) */
-            #weboword-sheet ul { list-style: disc outside !important; padding-left: 1.6em !important; margin: 6px 0 !important; }
-            #weboword-sheet ol { list-style: decimal outside !important; padding-left: 1.6em !important; margin: 6px 0 !important; }
-            #weboword-sheet li { display: list-item !important; }
-            #weboword-sheet h1, #weboword-sheet h2, #weboword-sheet h3 { line-height: 1.25 !important; }
+            ${editorSheetCss}
             @media print {
               .no-print { display: none !important; }
-              #weboword-sheet {
-                padding: 0 !important;
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                min-height: 0 !important;
-                width: 100% !important;
-              }
-              .screen-sep {
-                border: none !important;
-                background: transparent !important;
-                color: transparent !important;
-                height: 0 !important;
-                overflow: hidden !important;
-                font-size: 0 !important;
-                line-height: 0 !important;
-              }
+              #weboword-sheet { padding: 0 !important; box-shadow: none !important; min-height: 0 !important; width: 100% !important; }
             }
           `}</style>
+
+          {/* Logo imprimé au-dessus du devis quand il n'y a pas de page de garde. */}
+          {!coverConfig.enabled && previewLogoHtml && (
+            <div contentEditable={false} className="select-none" dangerouslySetInnerHTML={{ __html: previewLogoHtml }} />
+          )}
 
           <div
             id="weboword-sheet"
@@ -1522,8 +1502,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             contentEditable
             suppressContentEditableWarning
             spellCheck
-            style={{ padding: '20mm', fontSize: `${fontSize}px`, lineHeight: lineHeight }}
-            className="outline-none min-h-[120px] prose prose-sm max-w-none focus:ring-2 focus:ring-primary/20 rounded-lg"
+            style={{ fontSize: `${fontSize}px`, lineHeight: lineHeight }}
+            className="quote-doc outline-none"
             data-placeholder="Cliquez ici pour commencer à modifier votre devis…"
             onPaste={(e) => {
               const html = e.clipboardData.getData('text/html');
@@ -1534,6 +1514,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               else if (e.clipboardData.files.length > 0) setToast('Les photos se placent avec la page photos ou la page de garde.');
             }}
           />
+
+          {/* Mentions légales imprimées sous le devis (non modifiables ici : Paramètres, Mon entreprise). */}
+          {previewLegalHtml && (
+            <div data-weboword-legal="" contentEditable={false} className="select-none" dangerouslySetInnerHTML={{ __html: previewLegalHtml }} />
+          )}
+
           {/* Vue en pages : bandes entre les feuilles, posées par-dessus, hors du texte du devis. */}
           <PageSheets bands={printPreview.bands} />
         </div>
@@ -1543,11 +1529,24 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           <>
             <PageBreakIndicator label="Page photos" />
             <div
-              style={{ width: '210mm' }}
-              className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full p-8"
+              style={{ width: '210mm', minHeight: `${297 * Math.max(1, photosConfig.pages.length)}mm`, padding: '20mm' }}
+              className="mx-auto bg-white shadow-xl print:shadow-none print:w-full"
             >
               <PhotosPage config={photosConfig} onChange={setPhotosConfig} />
             </div>
+          </>
+        )}
+
+        {/* Conditions de vente de l'entreprise, ajoutées à l'impression sur une page à part (absentes du texte). */}
+        {printPreview.addCgv && previewCgvHtml && (
+          <>
+            <PageBreakIndicator label="Conditions générales, ajoutées à l’impression" />
+            <div
+              contentEditable={false}
+              style={{ width: '210mm', minHeight: '297mm' }}
+              className="webo-paper quote-out mx-auto bg-white shadow-xl select-none print:hidden"
+              dangerouslySetInnerHTML={{ __html: previewCgvHtml }}
+            />
           </>
         )}
 

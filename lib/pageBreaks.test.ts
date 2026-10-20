@@ -104,4 +104,14 @@ describe('computePageBreaks', () => {
     expect(r.pages).toBe(2);
     expect(r.lastFill).toBeCloseTo(0.1);
   });
+  it('garde la marge haute d’un bloc après un saut forcé', () => {
+    // Le bandeau de la carte (marge 24) ouvre une page : 24 + 900 + 100 ne tiennent pas, le dernier bloc passe.
+    const r = computePageBreaks([
+      { top: 0, height: 100 },
+      { top: 124, height: 900, forceBreakBefore: true, forcedMargin: 24, unbreakable: true },
+      { top: 1024, height: 90, unbreakable: true },
+    ], H);
+    expect(r.pages).toBe(3);
+    expect(r.ends[1]).toMatchObject({ page: 2, blockIndex: 2 });
+  });
 });
