@@ -6,6 +6,7 @@
 // une unité qu'on ne sait pas rapprocher de celle du prix rend l'ingrédient « prix non comparable », et il est
 // laissé hors du total plutôt que de fausser le coût.
 
+import { staffTotals } from './staffCost';
 import { lineTotalHT } from '@/lib/quoteTotals';
 
 const cents = (n: number) => Math.round(n * 100) / 100;
@@ -162,6 +163,9 @@ export interface CostedQuoteLine {
 }
 
 export interface StaffRow {
+  /** Heures prévues (HH:MM), retenues quand les heures faites ne sont pas saisies. */
+  arrival_time?: string | null;
+  departure_time?: string | null;
   hours_worked: number | string | null;
   /** Taux de la mission. */
   hourly_rate: number | string | null;
@@ -171,16 +175,12 @@ export interface StaffRow {
   status?: string | null;
 }
 
-/** Coût du personnel : Σ heures faites × taux de la mission (sinon taux habituel de l'extra), missions refusées exclues. */
+/**
+ * Coût du personnel, calculé exactement comme la page « Heures et paie » (lib/staffCost.ts) : heures faites,
+ * sinon heures prévues, × taux de la mission, sinon taux de l'extra ; missions confirmées ou présentes seulement.
+ */
 export function staffCost(rows: readonly StaffRow[]): number {
-  let total = 0;
-  for (const r of rows) {
-    if (r.status === 'refuse') continue;
-    const hours = num(r.hours_worked);
-    const rate = num(r.hourly_rate) || num(r.extra_rate);
-    if (hours > 0 && rate > 0) total += hours * rate;
-  }
-  return cents(total);
+  return cents(staffTotals(rows.map((r) => ({ ...r, status: r.status ?? undefined, extraRate: r.extra_rate }))).cost);
 }
 
 /** Total des frais annexes du devis (colonne extra_costs). */

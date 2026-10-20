@@ -63,7 +63,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
 
         const [{ data: prestations }, missions] = await Promise.all([
           sb.from('prestations').select('id, name, cost_price'),
-          sb.from('event_extras').select('status, hours_worked, hourly_rate, extra:extras(hourly_rate)').eq('quote_id', quoteId),
+          sb.from('event_extras').select('status, arrival_time, departure_time, hours_worked, hourly_rate, extra:extras(hourly_rate)').eq('quote_id', quoteId),
         ]);
         const map: Record<string, number> = {};
         const ids: Record<string, string> = {};
@@ -80,9 +80,9 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
         // Colonnes absentes (migration pas encore appliquée) : pas de poste « personnel ».
         if (missions.error) setStaff({ available: false, cost: 0, missions: 0, incomplete: 0 });
         else {
-          type Row = { status: string | null; hours_worked: unknown; hourly_rate: unknown; extra: { hourly_rate: unknown } | null };
+          type Row = { status: string | null; arrival_time: string | null; departure_time: string | null; hours_worked: unknown; hourly_rate: unknown; extra: { hourly_rate: unknown } | null };
           const rows: StaffRow[] = ((missions.data ?? []) as Row[]).filter((r) => r.status !== 'refuse').map((r) => ({
-            status: r.status, hours_worked: r.hours_worked as StaffRow['hours_worked'],
+            status: r.status, arrival_time: r.arrival_time, departure_time: r.departure_time, hours_worked: r.hours_worked as StaffRow['hours_worked'],
             hourly_rate: r.hourly_rate as StaffRow['hourly_rate'], extra_rate: (r.extra?.hourly_rate ?? null) as StaffRow['extra_rate'],
           }));
           setStaff({

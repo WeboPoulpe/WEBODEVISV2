@@ -72,7 +72,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
   // Coût du personnel des événements confirmés de l'année : heures faites × taux (colonnes de la migration 0023).
   // Lu à part : tant que la base n'a pas ces colonnes, la requête échoue et le personnel n'est pas compté.
   const staffQuery = rows<StaffRow & { quote_id: string }>(sql`
-    select ee.quote_id, ee.status, ee.hours_worked::text as hours_worked, ee.hourly_rate::text as hourly_rate,
+    select ee.quote_id, ee.status, ee.arrival_time, ee.departure_time, ee.hours_worked::text as hours_worked, ee.hourly_rate::text as hourly_rate,
       e.hourly_rate::text as extra_rate
     from public.event_extras ee
     join public.extras e on e.id = ee.extra_id
