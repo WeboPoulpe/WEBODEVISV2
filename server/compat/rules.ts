@@ -100,6 +100,11 @@ export const RULES: Record<string, TableRule> = {
       + ` and (${t}.event_id is null or exists (select 1 from public.quotes pq where pq.id = ${t}.event_id and ${quoteAccess('pq', u)}))`
       + ` and (${t}.order_id is null or ${teamOrder(`${t}.order_id`, u)}))`,
   },
+  // Stock et seuil d'alerte de chaque ingrédient, propres à l'entreprise (même pour un ingrédient du catalogue commun).
+  ingredient_stocks: {
+    read: team('company_id'),
+    write: (t, u) => `(${team('company_id')(t, u)} and ${readableIngredient('ingredient_id')(t, u)})`,
+  },
   supplier_orders: both(team('user_id')),
   supplier_order_items: both((t, u) => teamOrder(`${t}.order_id`, u)),
   extras: both(team('user_id')),

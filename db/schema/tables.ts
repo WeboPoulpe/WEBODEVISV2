@@ -1042,6 +1042,21 @@ export const audit_log = pgTable("audit_log", {
 	index("idx_audit_log_created").using("btree", table.created_at.desc().nullsLast().op("timestamptz_ops")),
 ]);
 
+// Stock d'un ingrédient pour une entreprise (compte titulaire) : quantité et seuil d'alerte. Les ingrédients du
+// catalogue commun ont ainsi un stock propre à chaque entreprise. Tenu à jour par le déclencheur des mouvements
+// (apply_stock_movement) ; les colonnes ingredients.stock_quantity et min_stock_alert ne servent plus.
+export const ingredient_stocks = pgTable("ingredient_stocks", {
+	company_id: uuid().notNull(),
+	ingredient_id: uuid().notNull(),
+	quantity: numeric({ mode: 'number' }).default(0).notNull(),
+	min_alert: numeric({ mode: 'number' }).default(0).notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.company_id, table.ingredient_id], name: "ingredient_stocks_pkey" }),
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "ingredient_stocks_company_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.ingredient_id], foreignColumns: [ingredients.id], name: "ingredient_stocks_ingredient_id_fkey" }).onDelete("cascade"),
+]);
+
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
 // Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
 export const document_counters = pgTable("document_counters", {
