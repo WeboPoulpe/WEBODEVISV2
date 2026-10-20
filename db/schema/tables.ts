@@ -1071,6 +1071,27 @@ export const lifecycle_emails = pgTable("lifecycle_emails", {
 	foreignKey({ columns: [table.user_id], foreignColumns: [users.id], name: "lifecycle_emails_user_id_fkey" }).onDelete("cascade"),
 ]);
 
+// Journal des erreurs (navigateur et serveur), regroupées par empreinte : une ligne par erreur distincte,
+// avec un compteur. Consulté dans Administration → Erreurs ; l'équipe est prévenue à la première apparition.
+export const error_groups = pgTable("error_groups", {
+	fingerprint: text().primaryKey().notNull(),
+	source: text().notNull(),
+	message: text().notNull(),
+	stack: text(),
+	last_path: text(),
+	last_user_id: uuid(),
+	last_user_agent: text(),
+	digest: text(),
+	count: integer().default(1).notNull(),
+	first_seen: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	last_seen: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	notified_at: timestamp({ withTimezone: true, mode: 'string' }),
+	resolved_at: timestamp({ withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("idx_error_groups_last_seen").using("btree", table.last_seen.desc().nullsLast().op("timestamptz_ops")),
+	check("error_groups_source_check", sql`source = ANY (ARRAY['navigateur'::text, 'serveur'::text])`),
+]);
+
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
 // Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
 export const document_counters = pgTable("document_counters", {

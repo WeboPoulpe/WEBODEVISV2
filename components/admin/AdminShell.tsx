@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeft, FolderTree, Inbox, LayoutDashboard, LogOut, ScrollText, Settings2, Users } from 'lucide-react';
+import { ArrowLeft, Bug, FolderTree, Inbox, LayoutDashboard, LogOut, ScrollText, Settings2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import Wordmark from '@/components/brand/Wordmark';
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/admin/demandes', icon: Inbox, label: 'Demandes', exact: false },
   { href: '/admin/categories', icon: FolderTree, label: 'Catégories', exact: false },
   { href: '/admin/journal', icon: ScrollText, label: 'Journal', exact: false },
+  { href: '/admin/erreurs', icon: Bug, label: 'Erreurs', exact: false },
   { href: '/admin/reglages', icon: Settings2, label: 'Réglages', exact: false },
 ];
 

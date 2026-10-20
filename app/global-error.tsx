@@ -1,7 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
+import { reportError } from '@/lib/reportError';
+
 // Dernier filet : la mise en page elle-même a planté. Pas de feuille de style de l'app ici, d'où les styles en ligne.
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => { if (!error.digest) reportError(error); }, [error]);
   return (
     <html lang="fr">
       <body style={{ margin: 0, minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F3EEE6', fontFamily: 'system-ui, sans-serif', color: '#1f2937', textAlign: 'center', padding: 24 }}>

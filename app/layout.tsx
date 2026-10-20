@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Instrument_Sans, Inter, Playfair_Display } from 'n
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import RegisterServiceWorker from '@/components/pwa/RegisterServiceWorker';
+import ErrorReporter from '@/components/system/ErrorReporter';
 
 // Interface : Instrument Sans. Titres et grands chiffres : Bricolage Grotesque.
 const ui = Instrument_Sans({ subsets: ['latin'], variable: '--font-ui' });
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthProvider>{children}</AuthProvider>
         <RegisterServiceWorker />
+        <ErrorReporter />
       </body>
     </html>
   );

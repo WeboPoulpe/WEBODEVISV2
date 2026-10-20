@@ -2,11 +2,14 @@
 
 import { useEffect } from 'react';
 import Wordmark from '@/components/brand/Wordmark';
+import { reportError } from '@/lib/reportError';
 
 // Affichée quand une page plante au rendu, à la place de l'écran d'erreur brut de Next.
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('[page]', error.digest ?? '', error);
+    // Une erreur venue du serveur (avec un code) est déjà dans le journal ; celle du navigateur y est envoyée.
+    if (!error.digest) reportError(error);
   }, [error]);
 
   return (

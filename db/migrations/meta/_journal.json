@@ -183,6 +183,13 @@
       "when": 1792485181703,
       "tag": "0025_usage_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792486352031,
+      "tag": "0026_error_journal",
+      "breakpoints": true
     }
   ]
 }

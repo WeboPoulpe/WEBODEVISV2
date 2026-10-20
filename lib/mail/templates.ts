@@ -650,3 +650,20 @@ export function lifecycleEmail({ kind, firstName, appUrl, unsubscribe }: { kind:
     }),
   };
 }
+
+// ── Journal d'erreurs ─────────────────────────────────────────────────────────
+/** À l'équipe : une erreur nouvelle (ou revenue après résolution) dans l'application. */
+export function errorAlertEmail({ message, source, path, reappeared, appUrl }: { message: string; source: 'navigateur' | 'serveur'; path: string | null; reappeared: boolean; appUrl: string }): Email {
+  const short = message.length > 90 ? `${message.slice(0, 90)}…` : message;
+  return {
+    subject: `${reappeared ? 'Erreur revenue' : 'Nouvelle erreur'} : ${short}`,
+    html: renderEmail({
+      preheader: short,
+      title: reappeared ? 'Une erreur résolue est revenue' : 'Nouvelle erreur dans l’application',
+      paragraphs: [`<code style="font-size:13px;word-break:break-word;">${esc(message.slice(0, 500))}</code>`],
+      facts: [['Côté', source === 'navigateur' ? 'Navigateur' : 'Serveur'], ['Page', path ?? '']],
+      button: { label: 'Voir le journal', url: `${appUrl}/admin/erreurs` },
+      note: 'Vous ne recevrez pas d’autre email pour cette erreur avant une heure, même si elle se répète.',
+    }),
+  };
+}

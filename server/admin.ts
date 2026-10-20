@@ -312,3 +312,37 @@ export async function listAuditLog(): Promise<AuditEntry[]> {
     created_at: new Date(r.created_at).toISOString(),
   }));
 }
+
+// ── Journal d'erreurs ─────────────────────────────────────────────────────────
+export interface AdminErrorGroup {
+  fingerprint: string;
+  source: 'navigateur' | 'serveur';
+  message: string;
+  stack: string | null;
+  last_path: string | null;
+  last_user: string | null;
+  last_user_agent: string | null;
+  digest: string | null;
+  count: number;
+  first_seen: string;
+  last_seen: string;
+  resolved_at: string | null;
+}
+
+export async function listErrorGroups(): Promise<AdminErrorGroup[]> {
+  await requireAdmin();
+  const { rows } = await db.execute(sql`
+    select g.fingerprint, g.source, g.message, g.stack, g.last_path, g.last_user_agent, g.digest, g.count,
+      g.first_seen, g.last_seen, g.resolved_at, p.email as last_user
+    from public.error_groups g left join public.profiles p on p.id = g.last_user_id
+    order by g.resolved_at is not null, g.last_seen desc limit 200`);
+  const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
+  return (rows as unknown as AdminErrorGroup[]).map((r) => ({ ...r, first_seen: iso(r.first_seen)!, last_seen: iso(r.last_seen)!, resolved_at: iso(r.resolved_at) }));
+}
+
+/** Marque une erreur comme résolue (ou la rouvre). Si elle revient, l'équipe est prévenue de nouveau. */
+export async function setErrorResolved(fingerprint: string, resolved: boolean): Promise<Result> {
+  await requireAdmin();
+  await db.execute(sql`update public.error_groups set resolved_at = ${resolved ? sql`now()` : sql`null`} where fingerprint = ${fingerprint}`);
+  return { error: null };
+}
