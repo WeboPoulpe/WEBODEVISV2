@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { profiles, users } from '@/db/schema';
 import { DEMO_USER_ID } from '@/lib/demo';
 import { readTicket } from '@/server/tickets';
+import { logAudit } from './audit';
 import { clearLoginFailures, clientIp, isLoginBlocked, recordLoginFailure, TOO_MANY_ATTEMPTS } from './loginThrottle';
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -74,6 +75,7 @@ export const authOptions: NextAuthOptions = {
         const adminId = (token.adminId as string | undefined) ?? token.sub;
         if (session.actAs === null) {
           if (token.adminId) {
+            await logAudit({ actor: token.adminId as string, target: token.sub ?? null, action: 'sortie_compte_client' });
             token.sub = token.adminId as string;
             token.email = token.adminEmail as string;
             delete token.adminId;
@@ -87,6 +89,7 @@ export const authOptions: NextAuthOptions = {
             token.adminEmail = (token.adminEmail as string | undefined) ?? admin.email;
             token.adminId = adminId;
             token.sub = target.id;
+            await logAudit({ actor: adminId, target: target.id, action: 'entree_compte_client', details: { email: target.email } });
             token.email = target.email;
           }
         }

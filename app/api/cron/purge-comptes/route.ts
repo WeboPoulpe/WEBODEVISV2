@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { accountsDueForPurge, purgeAccountNow } from '@/server/accountPurge';
 import { purgeOldLoginAttempts } from '@/lib/loginThrottle';
+import { logAudit } from '@/lib/audit';
 
 // Purge des comptes dont la suppression a été demandée il y a plus de 30 jours. Lancé chaque nuit par Vercel
 // (vercel.json), qui envoie « Authorization: Bearer CRON_SECRET ». Un compte en échec n'empêche pas les autres.
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   for (const id of ids) {
     try {
       await purgeAccountNow(id);
+      await logAudit({ actor: null, target: id, action: 'compte_purge', details: { automatique: true } });
     } catch (e) {
       console.error('[purge]', id, e);
       failed.push(id);

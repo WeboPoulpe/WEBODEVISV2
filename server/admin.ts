@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { desc, eq, sql } from 'drizzle-orm';
+import { AUDIT_LABELS, logAudit, type AuditAction } from '@/lib/audit';
 import { db } from '@/db';
 import { password_reset_tokens, profiles, site_requests, users } from '@/db/schema';
 import { normalizeEmail } from '@/lib/auth';
@@ -128,6 +129,7 @@ export async function setAccountActive(id: string, active: boolean): Promise<Res
   const blocked = guard(admin.id, id);
   if (blocked) return { error: blocked };
   await db.update(profiles).set({ is_active: active }).where(eq(profiles.id, id));
+  await logAudit({ actor: admin.id, target: id, action: active ? 'compte_reactive' : 'compte_desactive' });
   return { error: null };
 }
 
@@ -136,12 +138,13 @@ export async function setAccountRole(id: string, role: 'admin' | 'user'): Promis
   const blocked = guard(admin.id, id);
   if (blocked) return { error: blocked };
   await db.update(profiles).set({ role: role === 'admin' ? 'admin' : 'user' }).where(eq(profiles.id, id));
+  await logAudit({ actor: admin.id, target: id, action: 'role_modifie', details: { role } });
   return { error: null };
 }
 
 /** Crée un compte et envoie à la personne un lien pour choisir son mot de passe. */
 export async function createAccount(input: { email: string; firstName: string; lastName: string; companyName: string; modules: string[] }): Promise<Result> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const email = normalizeEmail(input.email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'L’adresse email n’est pas valide.' };
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
@@ -161,6 +164,7 @@ export async function createAccount(input: { email: string; firstName: string; l
     });
     return user.id;
   });
+  await logAudit({ actor: admin.id, target: userId, action: 'compte_cree', details: { email } });
   const link = await createPasswordLink(userId, 7 * 24 * HOUR);
   const sent = await sendMail({ to: email, ...accountInviteEmail({ firstName: input.firstName.trim() || null, link }) });
   return sent.error ? { error: 'Le compte est créé, mais l’email d’invitation n’est pas parti. Utilisez « Envoyer un lien de mot de passe ».' } : { error: null };
@@ -168,7 +172,7 @@ export async function createAccount(input: { email: string; firstName: string; l
 
 /** Identité et options d'un compte. */
 export async function updateAccount(id: string, patch: { firstName: string; lastName: string; companyName: string; modules: string[] }): Promise<Result> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   if (id === DEMO_USER_ID) return { error: 'Le compte de démonstration ne se modifie pas.' };
   await db.update(profiles).set({
     first_name: patch.firstName.trim() || null,
@@ -176,15 +180,17 @@ export async function updateAccount(id: string, patch: { firstName: string; last
     company_name: patch.companyName.trim() || null,
     modules: enabledModules(patch.modules),
   }).where(eq(profiles.id, id));
+  await logAudit({ actor: admin.id, target: id, action: 'compte_modifie', details: { modules: enabledModules(patch.modules) } });
   return { error: null };
 }
 
 export async function sendAccountPasswordLink(id: string): Promise<Result> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   if (id === DEMO_USER_ID) return { error: 'Le compte de démonstration n’a pas de mot de passe.' };
   const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, id)).limit(1);
   if (!user) return { error: 'Compte introuvable.' };
   const link = await createPasswordLink(id, HOUR);
+  await logAudit({ actor: admin.id, target: id, action: 'lien_mot_de_passe' });
   return sendMail({ to: user.email, ...passwordResetEmail({ link }) });
 }
 
@@ -202,6 +208,7 @@ export async function deleteEmptyAccount(id: string): Promise<Result> {
   }
   try {
     await db.delete(users).where(eq(users.id, id));
+    await logAudit({ actor: admin.id, target: id, action: 'compte_supprime' });
     return { error: null };
   } catch {
     return { error: 'Ce compte a encore des données rattachées : désactivez-le plutôt que de le supprimer.' };
@@ -250,4 +257,31 @@ export async function setSignupOpen(open: boolean): Promise<Result> {
   // Le site public affiche ou retire « Créer un compte » aussitôt.
   revalidateTag(SETTINGS_TAG);
   return { error: null };
+}
+
+// ── Journal ───────────────────────────────────────────────────────────────────
+export interface AuditEntry {
+  id: string;
+  action: string;
+  label: string;
+  actor: string | null;
+  target: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+/** Les 300 dernières actions sensibles, avec l'email de leur auteur et du compte concerné. */
+export async function listAuditLog(): Promise<AuditEntry[]> {
+  await requireAdmin();
+  const { rows } = await db.execute(sql`
+    select a.id, a.action, a.details, a.created_at, pa.email as actor, pt.email as target
+    from public.audit_log a
+    left join public.profiles pa on pa.id = a.actor_id
+    left join public.profiles pt on pt.id = a.target_user_id
+    order by a.created_at desc limit 300`);
+  return (rows as unknown as Omit<AuditEntry, 'label'>[]).map((r) => ({
+    ...r,
+    label: AUDIT_LABELS[r.action as AuditAction] ?? r.action,
+    created_at: new Date(r.created_at).toISOString(),
+  }));
 }
