@@ -185,6 +185,9 @@ export const quotes = pgTable("quotes", {
 	// Consultations du lien envoyé au client.
 	viewed_at: timestamp({ withTimezone: true, mode: 'string' }),
 	view_count: integer().default(0).notNull(),
+	// Feuille de route : déroulé horaire [{ time, label, note }] et contact sur place.
+	run_sheet: jsonb().default([]).notNull(),
+	onsite_contact: text(),
 }, (table) => [
 	index("idx_quotes_customer_id").using("btree", table.customer_id.asc().nullsLast().op("uuid_ops")),
 	index("idx_quotes_folder").using("btree", table.folder_id.asc().nullsLast().op("uuid_ops")),
@@ -420,6 +423,8 @@ export const extras = pgTable("extras", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	// Jours où l'extra a indiqué ne pas être disponible (depuis sa page de missions).
 	unavailable_dates: date({ mode: 'string' }).array().default(sql`'{}'::date[]`).notNull(),
+	// Taux horaire brut habituel de l'extra, repris sur chaque mission.
+	hourly_rate: numeric({ precision: 8, scale: 2, mode: 'number' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.user_id],
@@ -446,6 +451,9 @@ export const event_extras = pgTable("event_extras", {
 	responded_at: timestamp({ withTimezone: true, mode: 'string' }),
 	/** Rappel de la veille envoyé. */
 	reminded_at: timestamp({ withTimezone: true, mode: 'string' }),
+	// Heures réellement faites et taux appliqué à cette mission (coût du personnel de l'événement).
+	hours_worked: numeric({ precision: 6, scale: 2, mode: 'number' }),
+	hourly_rate: numeric({ precision: 8, scale: 2, mode: 'number' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.extra_id],
@@ -872,6 +880,13 @@ export const profiles = pgTable("profiles", {
 	quote_validity_days: integer().default(30).notNull(),
 	// Suppression du compte demandée par son titulaire : compte désactivé, données purgées 30 jours plus tard.
 	deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+	// Relances automatiques par email : devis sans réponse et factures échues (désactivées par défaut).
+	auto_reminders: boolean().default(false).notNull(),
+	reminder_delay_days: integer().default(7).notNull(),
+	// Abonnement agenda (iCal) des événements : jeton secret de l'adresse, null tant qu'il n'est pas créé.
+	ical_token: text().unique(),
+	// Rôle dans l'entreprise pour un compte rattaché : gerant, commercial, cuisine, lecture.
+	company_role: text().default('gerant').notNull(),
 }, (table) => [
 	index("idx_profiles_company_siret").using("btree", table.company_siret.asc().nullsLast().op("text_ops")),
 	foreignKey({
@@ -978,6 +993,53 @@ export const login_attempts = pgTable("login_attempts", {
 }, (table) => [
 	index("idx_login_attempts_email").using("btree", table.email_hash.asc().nullsLast().op("text_ops"), table.created_at.asc().nullsLast().op("timestamptz_ops")),
 	index("idx_login_attempts_ip").using("btree", table.ip_hash.asc().nullsLast().op("text_ops"), table.created_at.asc().nullsLast().op("timestamptz_ops")),
+]);
+
+// Relances envoyées (devis sans réponse, factures échues) : une ligne par email, pour ne pas relancer deux fois.
+export const document_reminders = pgTable("document_reminders", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	owner_user_id: uuid().notNull(),
+	kind: text().notNull(),
+	quote_id: uuid(),
+	invoice_id: uuid(),
+	sent_to: text().notNull(),
+	sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_document_reminders_quote").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_document_reminders_invoice").using("btree", table.invoice_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.owner_user_id], foreignColumns: [users.id], name: "document_reminders_owner_user_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "document_reminders_quote_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.invoice_id], foreignColumns: [customer_invoices.id], name: "document_reminders_invoice_id_fkey" }).onDelete("cascade"),
+	check("document_reminders_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'facture'::text])`),
+]);
+
+// Invitations d'un collaborateur par le titulaire d'une entreprise (lien envoyé par email, valable 7 jours).
+export const company_invitations = pgTable("company_invitations", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	email: text().notNull(),
+	company_role: text().default('commercial').notNull(),
+	token_hash: text().notNull().unique(),
+	invited_by: uuid().notNull(),
+	expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+	accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "company_invitations_company_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.invited_by], foreignColumns: [users.id], name: "company_invitations_invited_by_fkey" }).onDelete("cascade"),
+]);
+
+// Journal des actions sensibles : entrée d'un administrateur dans un compte client, changements de rôle,
+// désactivations, suppressions. Lu dans l'administration.
+export const audit_log = pgTable("audit_log", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	actor_id: uuid(),
+	target_user_id: uuid(),
+	action: text().notNull(),
+	details: jsonb(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_audit_log_created").using("btree", table.created_at.desc().nullsLast().op("timestamptz_ops")),
 ]);
 
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
