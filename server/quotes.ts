@@ -9,7 +9,7 @@ import { appOrigin, sendMail } from '@/lib/mail';
 import { quoteProposalEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { MAX_RECIPIENTS, isValidEmail, normalizeEmail, splitEmails, uniqueEmails } from '@/lib/emailList';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 /** Statuts d'avant l'envoi : à l'envoi, le devis passe à « Devis envoyé ». */
 const BEFORE_SENT = ['nouveau', 'broch_envoyee', 'devis_a_faire'];
@@ -37,7 +37,7 @@ export interface SendQuoteResult {
  * pour une adresse n'empêche pas les autres de partir.
  */
 export async function sendQuoteToClient(input: { quoteId: string; to: string | string[]; message: string; copyToMe?: boolean }): Promise<SendQuoteResult> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const recipients = uniqueEmails(Array.isArray(input.to) ? input.to.flatMap(splitEmails) : splitEmails(input.to));
   if (recipients.length === 0) return { error: 'Indiquez l’adresse email du client.' };

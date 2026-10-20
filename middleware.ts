@@ -16,6 +16,8 @@ export async function middleware(request: NextRequest) {
     // /d/ : devis consulté par le client, à partir du lien reçu par email.
     pathname.startsWith('/d/') ||
     pathname.startsWith('/reset-password') ||
+    // /invitation/ : lien reçu par un collaborateur invité, qui n'a pas encore de compte.
+    pathname.startsWith('/invitation/') ||
     // /site : le site de présentation, ouvert à tous.
     SITE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
     pathname === '/sitemap.xml' ||

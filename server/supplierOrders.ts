@@ -1,13 +1,14 @@
 'use server';
 
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { ingredients, profiles, supplier_order_items, supplier_orders, suppliers } from '@/db/schema';
 import { sendMail } from '@/lib/mail';
 import { supplierOrderEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { isValidEmail, normalizeEmail } from '@/lib/emailList';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 // Envoi d'un bon de commande au fournisseur par email. La commande doit appartenir au compte connecté.
 
@@ -30,7 +31,7 @@ export async function sendSupplierOrder(input: {
   deliveryDate?: string | null;
   copyToMe?: boolean;
 }): Promise<SendSupplierOrderResult> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
 
   const to = normalizeEmail(input.to ?? '');
@@ -44,7 +45,7 @@ export async function sendSupplierOrder(input: {
   const [order] = await db
     .select({ id: supplier_orders.id, status: supplier_orders.status, supplier_id: supplier_orders.supplier_id })
     .from(supplier_orders)
-    .where(and(eq(supplier_orders.id, input.orderId), eq(supplier_orders.user_id, user.id)))
+    .where(and(eq(supplier_orders.id, input.orderId), sql`${supplier_orders.user_id} in ${companyIdsOf(user.id)}`))
     .limit(1);
   if (!order) return { error: 'Commande introuvable.' };
   if (!SENDABLE.includes(order.status)) {
@@ -96,14 +97,14 @@ export async function sendSupplierOrder(input: {
   const sentAt = new Date().toISOString();
   await db.update(supplier_orders)
     .set({ status: 'sent', ordered_at: sentAt, updated_at: sentAt })
-    .where(and(eq(supplier_orders.id, order.id), eq(supplier_orders.user_id, user.id), inArray(supplier_orders.status, SENDABLE)));
+    .where(and(eq(supplier_orders.id, order.id), sql`${supplier_orders.user_id} in ${companyIdsOf(user.id)}`, inArray(supplier_orders.status, SENDABLE)));
 
   // Le fournisseur n'avait pas d'adresse : on garde celle qui vient de servir pour la prochaine fois.
   await db.update(suppliers)
     .set({ email: to, updated_at: sentAt })
     .where(and(
       eq(suppliers.id, order.supplier_id),
-      sql`(${suppliers.user_id} = ${user.id} or ${suppliers.owner_user_id} = ${user.id})`,
+      sql`(${suppliers.user_id} in ${companyIdsOf(user.id)} or ${suppliers.owner_user_id} in ${companyIdsOf(user.id)})`,
       sql`coalesce(trim(${suppliers.email}), '') = ''`,
     ));
 

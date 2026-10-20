@@ -78,10 +78,12 @@ export default async function ModifierPage({
 
   // ── WeboWord editor ───────────────────────────────────────────────────────
   if (showWeboWord) {
+    // Nom et CGV de l'entreprise : ceux du titulaire, aussi pour un collaborateur.
+    const { data: me } = await supabase.from('profiles').select('parent_user_id').eq('id', user.id).maybeSingle();
     const { data: profileData } = await supabase
       .from('profiles')
       .select('company_name, cgv')
-      .eq('id', user.id)
+      .eq('id', (me as { parent_user_id?: string | null } | null)?.parent_user_id ?? user.id)
       .single();
 
     const clientName =

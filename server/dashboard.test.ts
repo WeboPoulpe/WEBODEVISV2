@@ -9,7 +9,7 @@ import { createTestDb } from '@/db/testDb';
 vi.mock('server-only', () => ({}));
 
 const ME = '00000000-0000-4000-8000-0000000000a1';
-vi.mock('./session', () => ({ requireUser: async () => ({ id: ME, email: 'x@y.fr' }) }));
+vi.mock('./session', () => ({ requireUser: async () => ({ id: ME, email: 'x@y.fr' }), requireWriter: async () => ({ id: ME, email: 'x@y.fr' }) }));
 
 let pg: PGlite;
 vi.mock('@/db', () => ({

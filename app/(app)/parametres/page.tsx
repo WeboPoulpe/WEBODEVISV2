@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 import DocumentSettings from '@/components/parametres/DocumentSettings';
 import MyDataSection from '@/components/parametres/MyDataSection';
+import TeamSection from '@/components/parametres/TeamSection';
 import RemindersSection from '@/components/parametres/RemindersSection';
 import CalendarFeedSection from '@/components/parametres/CalendarFeedSection';
 import { errorCls } from '@/components/ui/kit';
@@ -258,7 +259,9 @@ function NotificationsSection() {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ParametresPage() {
-  const { user, actingAsAdmin } = useAuth();
+  const { user, profile: me, actingAsAdmin } = useAuth();
+  // Collaborateur rattaché à une entreprise : les réglages de l'entreprise sont ceux du titulaire.
+  const isMember = !!me?.parent_user_id;
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -387,143 +390,152 @@ export default function ParametresPage() {
         <p className="text-sm text-gray-500 mt-0.5">Informations de votre entreprise et préférences</p>
       </div>
 
-      {/* ── Section 1: Identité ─────────────────────────────────────────────── */}
-      <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="p-2 bg-primary-50 rounded-lg">
-            <Building2 className="h-4 w-4 text-primary" />
+      {isMember ? (
+        // Un collaborateur travaille avec les réglages du titulaire : il ne les modifie pas d'ici.
+        <section className="bg-white border border-gray-200 rounded-2xl px-6 py-5 text-sm text-gray-600">
+          Les réglages de l’entreprise (identité, logo, conditions de vente, mentions légales, numérotation) sont gérés par le titulaire du compte. Vos devis et vos factures les reprennent automatiquement.
+        </section>
+      ) : (
+        <>
+        {/* ── Section 1: Identité ─────────────────────────────────────────────── */}
+        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+            <div className="p-2 bg-primary-50 rounded-lg">
+              <Building2 className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Identité de l&apos;entreprise</h2>
+              <p className="text-xs text-gray-400">Affiché sur tous vos devis</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-semibold text-gray-900 text-sm">Identité de l&apos;entreprise</h2>
-            <p className="text-xs text-gray-400">Affiché sur tous vos devis</p>
-          </div>
-        </div>
-        <div className="p-6 space-y-4">
-          <Field
-            label="Nom de l'entreprise"
-            value={profile.company_name}
-            onChange={(v) => setProfile((p) => ({ ...p, company_name: v }))}
-            placeholder="Traiteur Dupont"
-          />
-          <Field
-            label="Adresse"
-            value={profile.company_address}
-            onChange={(v) => setProfile((p) => ({ ...p, company_address: v }))}
-            placeholder="12 rue des Saveurs, 75001 Paris"
-          />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="p-6 space-y-4">
             <Field
-              label="Téléphone"
-              value={profile.company_phone}
-              onChange={(v) => setProfile((p) => ({ ...p, company_phone: v }))}
-              placeholder="+33 1 23 45 67 89"
+              label="Nom de l'entreprise"
+              value={profile.company_name}
+              onChange={(v) => setProfile((p) => ({ ...p, company_name: v }))}
+              placeholder="Traiteur Dupont"
             />
             <Field
-              label="SIRET"
-              value={profile.siret}
-              onChange={(v) => setProfile((p) => ({ ...p, siret: v }))}
-              placeholder="123 456 789 00012"
+              label="Adresse"
+              value={profile.company_address}
+              onChange={(v) => setProfile((p) => ({ ...p, company_address: v }))}
+              placeholder="12 rue des Saveurs, 75001 Paris"
             />
-          </div>
-          <div className="flex justify-end pt-1">
-            <SaveBtn loading={savingId} saved={savedId} onClick={saveIdentity} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Mentions légales et numérotation ─────────────────────────────────── */}
-      <DocumentSettings />
-
-      {/* ── Section 2: Logo ─────────────────────────────────────────────────── */}
-      <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="p-2 bg-primary-50 rounded-lg">
-            <Upload className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-gray-900 text-sm">Logo</h2>
-            <p className="text-xs text-gray-400">Affiché dans l&apos;en-tête du devis (PNG, JPG, WebP — max 2 Mo)</p>
-          </div>
-        </div>
-        <div className="p-6">
-          {profile.logo_url ? (
-            <div className="flex items-center gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={profile.logo_url}
-                alt="Logo"
-                className="h-16 max-w-[160px] object-contain rounded-lg border border-gray-200 bg-gray-50 p-2"
+            <div className="grid grid-cols-2 gap-4">
+              <Field
+                label="Téléphone"
+                value={profile.company_phone}
+                onChange={(v) => setProfile((p) => ({ ...p, company_phone: v }))}
+                placeholder="+33 1 23 45 67 89"
               />
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">Logo actuel</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => logoInputRef.current?.click()}
-                    className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
-                  >
-                    Remplacer
-                  </button>
-                  <button
-                    onClick={removeLogo}
-                    className="text-xs px-3 py-1.5 border border-red-200 rounded-lg hover:bg-red-50 text-red-500 transition-colors flex items-center gap-1"
-                  >
-                    <X className="h-3 w-3" /> Supprimer
-                  </button>
+              <Field
+                label="SIRET"
+                value={profile.siret}
+                onChange={(v) => setProfile((p) => ({ ...p, siret: v }))}
+                placeholder="123 456 789 00012"
+              />
+            </div>
+            <div className="flex justify-end pt-1">
+              <SaveBtn loading={savingId} saved={savedId} onClick={saveIdentity} />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Mentions légales et numérotation ─────────────────────────────────── */}
+        <DocumentSettings />
+
+        {/* ── Section 2: Logo ─────────────────────────────────────────────────── */}
+        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+            <div className="p-2 bg-primary-50 rounded-lg">
+              <Upload className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Logo</h2>
+              <p className="text-xs text-gray-400">Affiché dans l&apos;en-tête du devis (PNG, JPG, WebP — max 2 Mo)</p>
+            </div>
+          </div>
+          <div className="p-6">
+            {profile.logo_url ? (
+              <div className="flex items-center gap-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={profile.logo_url}
+                  alt="Logo"
+                  className="h-16 max-w-[160px] object-contain rounded-lg border border-gray-200 bg-gray-50 p-2"
+                />
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Logo actuel</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => logoInputRef.current?.click()}
+                      className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+                    >
+                      Remplacer
+                    </button>
+                    <button
+                      onClick={removeLogo}
+                      className="text-xs px-3 py-1.5 border border-red-200 rounded-lg hover:bg-red-50 text-red-500 transition-colors flex items-center gap-1"
+                    >
+                      <X className="h-3 w-3" /> Supprimer
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => logoInputRef.current?.click()}
-              disabled={uploadingLogo}
-              className="flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed border-gray-200 rounded-xl p-8 hover:border-primary/40 hover:bg-primary-50/20 transition-all"
-            >
-              {uploadingLogo
-                ? <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                : <Upload className="h-6 w-6 text-gray-300" />}
-              <span className="text-sm text-gray-500">
-                {uploadingLogo ? 'Envoi en cours…' : 'Cliquez pour ajouter votre logo'}
-              </span>
-            </button>
-          )}
-          <input
-            ref={logoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleLogoUpload}
-          />
-        </div>
-      </section>
-
-      {/* ── Section 3: CGV ──────────────────────────────────────────────────── */}
-      <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-          <div className="p-2 bg-primary-50 rounded-lg">
-            <FileText className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-gray-900 text-sm">Conditions Générales de Vente</h2>
-            <p className="text-xs text-gray-400">Ajoutées en page 2 de tous vos devis PDF</p>
-          </div>
-        </div>
-        <div className="p-6 space-y-4">
-          {!loadingProfile && (
-            <RichTextEditor
-              initialValue={cgvHtml}
-              onChange={setCgvHtml}
-              placeholder="Saisir vos CGV ici… (paiement, annulation, responsabilités…)"
-              minHeight="200px"
+            ) : (
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+                className="flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed border-gray-200 rounded-xl p-8 hover:border-primary/40 hover:bg-primary-50/20 transition-all"
+              >
+                {uploadingLogo
+                  ? <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  : <Upload className="h-6 w-6 text-gray-300" />}
+                <span className="text-sm text-gray-500">
+                  {uploadingLogo ? 'Envoi en cours…' : 'Cliquez pour ajouter votre logo'}
+                </span>
+              </button>
+            )}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
             />
-          )}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">
-              {cgvHtml ? 'Les CGV seront ajoutées en page 2 du PDF.' : 'Aucune CGV renseignée — page 2 absente.'}
-            </p>
-            <SaveBtn loading={savingCgv} saved={savedCgv} onClick={saveCgv} />
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* ── Section 3: CGV ──────────────────────────────────────────────────── */}
+        <section className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+            <div className="p-2 bg-primary-50 rounded-lg">
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900 text-sm">Conditions Générales de Vente</h2>
+              <p className="text-xs text-gray-400">Ajoutées en page 2 de tous vos devis PDF</p>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            {!loadingProfile && (
+              <RichTextEditor
+                initialValue={cgvHtml}
+                onChange={setCgvHtml}
+                placeholder="Saisir vos CGV ici… (paiement, annulation, responsabilités…)"
+                minHeight="200px"
+              />
+            )}
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-400">
+                {cgvHtml ? 'Les CGV seront ajoutées en page 2 du PDF.' : 'Aucune CGV renseignée — page 2 absente.'}
+              </p>
+              <SaveBtn loading={savingCgv} saved={savedCgv} onClick={saveCgv} />
+            </div>
+          </div>
+        </section>
+        </>
+      )}
 
       {/* ── Relances automatiques et abonnement agenda ─────────────────────── */}
       <RemindersSection />
@@ -540,6 +552,9 @@ export default function ParametresPage() {
             : null
         }
       />
+
+      {/* ── Équipe ──────────────────────────────────────────────────────────── */}
+      {!isDemoUser(user?.id) && <TeamSection />}
 
       {/* ── Section 6: Mes données ──────────────────────────────────────────── */}
       <MyDataSection

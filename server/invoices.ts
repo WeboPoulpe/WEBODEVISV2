@@ -8,7 +8,7 @@ import {
   addDays, balanceLines, cents, creditLines, depositLines, invoiceTotals, linesFromQuote, paymentStatus,
   PAYMENT_METHODS, type InvoiceKind, type InvoiceLine, type InvoiceStatus, type PaymentMethod, type RateTotal,
 } from '@/lib/invoices';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 // Factures clients. Tout passe par ces actions serveur (les tables ne sont pas exposées à /api/db) :
 // chacune vérifie que la facture appartient à l'entreprise de l'utilisateur connecté.
@@ -205,7 +205,7 @@ export async function quoteBillingSummary(quoteId: string): Promise<{ totalTTC: 
 
 /** Prépare un brouillon depuis un devis : acompte (pourcentage ou montant), solde ou facture complète. */
 export async function createInvoiceDraft(input: { quoteId: string; kind: Exclude<InvoiceKind, 'avoir'>; percent?: number; amountTTC?: number }): Promise<Result<{ id: string }>> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const quote = await loadQuote(user.id, input.quoteId);
   if (!quote) return { error: 'Devis introuvable.' };
@@ -255,7 +255,7 @@ export async function createInvoiceDraft(input: { quoteId: string; kind: Exclude
 
 /** Avoir : annule une facture émise, en reprenant ses lignes en négatif. */
 export async function createCreditNoteDraft(invoiceId: string): Promise<Result<{ id: string }>> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const row = await ownedInvoiceRow(user.id, invoiceId);
   if (!row) return { error: 'Facture introuvable.' };
@@ -288,7 +288,7 @@ export async function createCreditNoteDraft(invoiceId: string): Promise<Result<{
 
 /** Modifie un brouillon : lignes, client, date de prestation, notes. */
 export async function updateInvoiceDraft(id: string, patch: { lines?: InvoiceLine[]; buyer?: Party; serviceDate?: string | null; notes?: string | null }): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const row = await ownedInvoiceRow(user.id, id);
   if (!row) return { error: 'Facture introuvable.' };
@@ -316,7 +316,7 @@ export async function updateInvoiceDraft(id: string, patch: { lines?: InvoiceLin
 }
 
 export async function deleteInvoiceDraft(id: string): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const row = await ownedInvoiceRow(user.id, id);
   if (!row) return { error: 'Facture introuvable.' };
@@ -332,7 +332,7 @@ export async function deleteInvoiceDraft(id: string): Promise<Result> {
  * aujourd'hui, date d'émission et échéance. Ensuite la facture ne bouge plus.
  */
 export async function issueInvoice(id: string): Promise<Result<{ number: string }>> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const row = await ownedInvoiceRow(user.id, id);
   if (!row) return { error: 'Facture introuvable.' };
@@ -401,7 +401,7 @@ async function syncAfterPayment(invoiceId: string, uid: string) {
 }
 
 export async function recordPayment(invoiceId: string, input: { paidOn: string; amount: number; method: PaymentMethod; note?: string | null }): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const row = await ownedInvoiceRow(user.id, invoiceId);
   if (!row) return { error: 'Facture introuvable.' };
@@ -416,7 +416,7 @@ export async function recordPayment(invoiceId: string, input: { paidOn: string; 
 }
 
 export async function deletePayment(paymentId: string): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const [p] = await db.select({ invoice_id: customer_invoice_payments.invoice_id }).from(customer_invoice_payments).where(eq(customer_invoice_payments.id, paymentId)).limit(1);
   if (!p || !(await ownedInvoiceRow(user.id, p.invoice_id))) return { error: 'Paiement introuvable.' };

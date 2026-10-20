@@ -1,10 +1,11 @@
 'use server';
 
 import { and, eq, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { event_ingredients, ingredients, quotes, stock_movements } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 // Sortie de stock d'un événement : les quantités de la liste de courses quittent le stock en une fois.
 // Le stock de l'ingrédient est mis à jour par le déclencheur apply_stock_movement, qui ne réagit qu'aux
@@ -74,7 +75,7 @@ export async function getEventStockExit(quoteId: string): Promise<StockExitState
  * comme sur la page Stock. Une seule sortie à la fois par événement.
  */
 export async function withdrawEventStock(quoteId: string): Promise<StockExitResult> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const empty = { withdrawnAt: null, count: 0, shortages: [] };
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, ...empty };
 
@@ -95,7 +96,7 @@ export async function withdrawEventStock(quoteId: string): Promise<StockExitResu
       .innerJoin(ingredients, eq(ingredients.id, event_ingredients.ingredient_id))
       .where(and(
         eq(event_ingredients.quote_id, quoteId),
-        sql`(${ingredients.user_id} is null or ${ingredients.user_id} = ${user.id})`,
+        sql`(${ingredients.user_id} is null or ${ingredients.user_id} in ${companyIdsOf(user.id)})`,
       ))
       .groupBy(event_ingredients.ingredient_id, ingredients.name, ingredients.stock_quantity);
     const lines = needs.filter((n) => Number(n.quantity) > 0);
@@ -120,7 +121,7 @@ export async function withdrawEventStock(quoteId: string): Promise<StockExitResu
 
 /** Annule la dernière sortie de l'événement : chaque quantité retirée revient en stock. */
 export async function cancelEventStockExit(quoteId: string): Promise<StockExitResult> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const empty = { withdrawnAt: null, count: 0, shortages: [] };
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, ...empty };
 

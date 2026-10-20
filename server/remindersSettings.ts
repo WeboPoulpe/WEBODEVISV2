@@ -6,7 +6,7 @@ import { profiles } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { appOrigin } from '@/lib/mail';
 import { calendarFeedUrl, newCalendarToken } from './calendarFeed';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 // Paramètres : relances automatiques (réglage de l'entreprise) et abonnement agenda (adresse propre au compte).
 
@@ -46,7 +46,7 @@ export async function getReminderSettings(): Promise<ReminderSettings> {
 }
 
 export async function saveReminderSettings(input: { enabled: boolean; delayDays: number }): Promise<{ error: string | null }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const mine = await me(user.id);
   if (mine?.parent && mine.role !== 'gerant') return { error: 'Seul le titulaire du compte peut changer les relances.' };

@@ -11,7 +11,7 @@ const HEAD = '00000000-0000-4000-8000-0000000a0001';
 const MEMBER = '00000000-0000-4000-8000-0000000a0002';
 const OTHER = '00000000-0000-4000-8000-0000000a0003';
 let current = HEAD;
-vi.mock('./session', () => ({ requireUser: async () => ({ id: current, email: 'x@y.fr' }) }));
+vi.mock('./session', () => ({ requireUser: async () => ({ id: current, email: 'x@y.fr' }), requireWriter: async () => ({ id: current, email: 'x@y.fr' }) }));
 let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); } }));
 

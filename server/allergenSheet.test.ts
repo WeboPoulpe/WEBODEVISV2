@@ -9,7 +9,7 @@ vi.mock('server-only', () => ({}));
 const ME = '00000000-0000-4000-8000-0000000000d1';
 const OTHER = '00000000-0000-4000-8000-0000000000d2';
 let current = ME;
-vi.mock('./session', () => ({ requireUser: async () => ({ id: current, email: 'x@y.fr' }) }));
+vi.mock('./session', () => ({ requireUser: async () => ({ id: current, email: 'x@y.fr' }), requireWriter: async () => ({ id: current, email: 'x@y.fr' }) }));
 let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); } }));
 

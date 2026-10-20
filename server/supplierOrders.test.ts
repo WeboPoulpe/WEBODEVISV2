@@ -13,7 +13,7 @@ vi.mock('@/lib/mail', () => ({
 const ME = '00000000-0000-4000-8000-0000000000b1';
 const OTHER = '00000000-0000-4000-8000-0000000000b2';
 let current = ME;
-vi.mock('./session', () => ({ requireUser: async () => ({ id: current, email: 'chef@t.fr' }) }));
+vi.mock('./session', () => ({ requireUser: async () => ({ id: current, email: 'chef@t.fr' }), requireWriter: async () => ({ id: current, email: 'chef@t.fr' }) }));
 let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); } }));
 

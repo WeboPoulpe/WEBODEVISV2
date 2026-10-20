@@ -26,11 +26,14 @@ export default async function ImprimerPage({ params }: Props) {
 
   if (!quote) notFound();
 
-  const { data: profile } = user
+  // Logo, CGV et mentions viennent du titulaire de l'entreprise (un collaborateur n'a pas les siens).
+  const { data: me } = user ? await supabase.from('profiles').select('parent_user_id').eq('id', user.id).maybeSingle() : { data: null };
+  const companyId = (me as { parent_user_id?: string | null } | null)?.parent_user_id ?? user?.id;
+  const { data: profile } = companyId
     ? await supabase
         .from('profiles')
         .select(`company_phone, logo_url, cgv, ${LEGAL_PROFILE_COLUMNS}`)
-        .eq('id', user.id)
+        .eq('id', companyId)
         .single()
     : { data: null };
 

@@ -59,7 +59,9 @@ export const RULES: Record<string, TableRule> = {
     admin: ALL,
   },
   profiles: {
-    ...both(own('id')),
+    // Un collaborateur lit aussi le profil du titulaire (logo, CGV, mentions légales des documents), sans le modifier.
+    read: (t, u) => `(${t}.id = ${u} or ${t}.id = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${u}))`,
+    write: own('id'),
     admin: ['select', 'update'],
     adminOnlyColumns: ['modules', 'role', 'is_active', 'deletion_requested_at', 'company_role', 'ical_token', 'subscription_type', 'subscription_plan', 'max_linked_users', 'parent_user_id', 'can_view_all_company_data'],
   },

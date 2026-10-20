@@ -885,7 +885,7 @@ export const profiles = pgTable("profiles", {
 	reminder_delay_days: integer().default(7).notNull(),
 	// Abonnement agenda (iCal) des événements : jeton secret de l'adresse, null tant qu'il n'est pas créé.
 	ical_token: text().unique(),
-	// Rôle dans l'entreprise pour un compte rattaché : gerant, commercial, cuisine, lecture.
+	// Rôle dans l'entreprise pour un compte rattaché : gerant, collaborateur, lecture (voir lib/team.ts).
 	company_role: text().default('gerant').notNull(),
 }, (table) => [
 	index("idx_profiles_company_siret").using("btree", table.company_siret.asc().nullsLast().op("text_ops")),

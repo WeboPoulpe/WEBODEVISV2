@@ -576,3 +576,21 @@ export function supplierOrderEmail({ order }: { order: SupplierOrderDetails }): 
     html: html.replace(new RegExp(`<p[^>]*>${ORDER_TABLE}</p>`), orderItemsTable(order.items)),
   };
 }
+
+// ── Équipe ────────────────────────────────────────────────────────────────────
+/** Invitation d'un collaborateur à rejoindre une entreprise. */
+export function teamInviteEmail({ companyName, inviterName, roleLabel, link, days }: { companyName: string; inviterName: string; roleLabel: string; link: string; days: number }): Email {
+  return {
+    subject: `${inviterName} vous invite sur WeboDevis`,
+    html: renderEmail({
+      preheader: `Rejoignez ${companyName} sur WeboDevis.`,
+      title: `Rejoindre ${esc(companyName)}`,
+      paragraphs: [
+        `${esc(inviterName)} vous invite à rejoindre ${esc(companyName)} sur WeboDevis, comme ${esc(roleLabel)}. Vous travaillerez sur les mêmes devis, événements et catalogue.`,
+        `Choisissez votre mot de passe depuis le lien ci-dessous. Il est valable ${days} jours.`,
+      ],
+      button: { label: 'Créer mon accès', url: link },
+      note: 'Vous ne vous attendiez pas à cette invitation ? Ignorez simplement cet email.',
+    }),
+  };
+}

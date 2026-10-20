@@ -97,3 +97,21 @@ export async function accountsDueForPurge(): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
+
+/**
+ * Retrait d'un collaborateur : tout ce qu'il a créé (devis, clients, prestations, factures…) passe au titulaire
+ * de l'entreprise, pour que rien ne disparaisse ; ses notifications, appareils et liens de mot de passe sont effacés.
+ */
+export async function transferAccountData(fromUserId: string, toUserId: string): Promise<void> {
+  if (![fromUserId, toUserId].every((id) => /^[0-9a-f-]{36}$/i.test(id))) throw new Error('Identifiant de compte invalide');
+  await db.transaction(async (tx) => {
+    const from = `'${fromUserId}'::uuid`;
+    for (const t of ['notifications', 'push_subscriptions', 'password_reset_tokens']) {
+      await tx.execute(sql.raw(`delete from public.${qi(t)} where user_id = ${from}`));
+    }
+    for (const { table, col } of await ownerColumns(tx)) {
+      if (table === 'users' || table === 'profiles' || table === 'notifications' || table === 'push_subscriptions' || table === 'password_reset_tokens') continue;
+      await tx.execute(sql.raw(`update public.${qi(table)} set ${qi(col)} = '${toUserId}'::uuid where ${qi(col)} = ${from}`));
+    }
+  });
+}

@@ -15,6 +15,13 @@ const frDateTime = (iso: string) => new Date(iso).toLocaleString('fr-FR', { date
 
 // Le devis tel que le client le consulte, à partir du lien reçu par email. Aucun compte n'est nécessaire :
 // le jeton du lien est la seule clé, et il ne donne accès qu'à ce devis. Le client peut l'accepter et le signer ici.
+/** Profil de l'entreprise du devis : celui du titulaire, même si le devis a été fait par un collaborateur. */
+async function companyProfile(userId: string) {
+  const { data: me } = await adminSupabase.from('profiles').select('parent_user_id').eq('id', userId).maybeSingle();
+  return adminSupabase.from('profiles').select(`company_phone, logo_url, cgv, ${LEGAL_PROFILE_COLUMNS}`)
+    .eq('id', (me as { parent_user_id?: string | null } | null)?.parent_user_id ?? userId).maybeSingle();
+}
+
 export default async function DevisPublicPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) notFound();
@@ -23,7 +30,7 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
   if (!quote) notFound();
 
   const [{ data: profile }, state] = await Promise.all([
-    adminSupabase.from('profiles').select(`company_phone, logo_url, cgv, ${LEGAL_PROFILE_COLUMNS}`).eq('id', quote.owner_user_id ?? quote.user_id).maybeSingle(),
+    companyProfile(quote.owner_user_id ?? quote.user_id),
     // L'acceptation en ligne ne doit jamais empêcher d'afficher le devis.
     acceptanceState(token).catch(() => null),
     // Une consultation qui ne s'enregistre pas ne doit pas empêcher d'afficher le devis.

@@ -40,3 +40,18 @@ export async function requireAdmin(): Promise<SessionUser> {
   if (profile?.role !== 'admin') throw new UnauthorizedError('Réservé aux administrateurs');
   return user;
 }
+
+export class ReadOnlyError extends Error {
+  constructor() {
+    super('Votre accès est en consultation seule : demandez au gérant de modifier votre rôle.');
+    this.name = 'ReadOnlyError';
+  }
+}
+
+/** Comme requireUser, pour une action qui écrit : refusée à un collaborateur en consultation seule. */
+export async function requireWriter(): Promise<SessionUser> {
+  const user = await requireUser();
+  const [profile] = await db.select({ role: profiles.company_role }).from(profiles).where(eq(profiles.id, user.id)).limit(1);
+  if (profile?.role === 'lecture') throw new ReadOnlyError();
+  return user;
+}

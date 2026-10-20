@@ -8,7 +8,7 @@ import {
 } from '@/db/schema';
 import { computeIngredientNeeds, groupNeedsBySupplier, type PrestationRecipe, type QuoteLine } from '@/lib/events/needs';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 // Opérations en plusieurs étapes de la fiche événement. Chacune vérifie que le devis
 // appartient à l'utilisateur connecté, puis écrit dans une seule transaction.
@@ -43,7 +43,7 @@ export interface RecalculateResult {
  * et une ligne déjà cochée ou réaffectée à un fournisseur garde son état.
  */
 export async function recalculateCourses(quoteId: string): Promise<RecalculateResult> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const quote = await loadOwnedQuote(user.id, quoteId);
   const empty = { lines: 0, unmatched: [], withoutIngredients: [] };
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, ...empty };
@@ -116,7 +116,7 @@ export interface CreateOrdersResult {
  * les commandes envoyées ou reçues ne sont jamais touchées.
  */
 export async function createSupplierOrders(quoteId: string): Promise<CreateOrdersResult> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, created: 0, withoutSupplier: 0 };
   const quote = await loadOwnedQuote(user.id, quoteId);
   if (!quote) return { error: 'Événement introuvable.', created: 0, withoutSupplier: 0 };

@@ -233,18 +233,20 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
+    // Logo, CGV et mentions de l'entreprise : ceux du titulaire, aussi pour un collaborateur.
+    const companyId = profile?.parent_user_id ?? user.id;
     (async () => {
-      const { data } = await supabase.from('profiles').select('logo_url').eq('id', user.id).maybeSingle();
+      const { data } = await supabase.from('profiles').select('logo_url').eq('id', companyId).maybeSingle();
       let cgv: string | null = null;
       try {
-        const { data: c } = await supabase.from('profiles').select('cgv').eq('id', user.id).maybeSingle();
+        const { data: c } = await supabase.from('profiles').select('cgv').eq('id', companyId).maybeSingle();
         cgv = c?.cgv ?? null;
       } catch { /* colonne cgv absente */ }
       // Mentions légales du pied de devis (lues à part : une colonne absente ne doit pas priver du logo).
-      const { data: legal } = await supabase.from('profiles').select(LEGAL_PROFILE_COLUMNS).eq('id', user.id).maybeSingle();
+      const { data: legal } = await supabase.from('profiles').select(LEGAL_PROFILE_COLUMNS).eq('id', companyId).maybeSingle();
       setCompanyAssets({ logo_url: (data as { logo_url?: string | null } | null)?.logo_url ?? null, cgv, legal: (legal as LegalProfile | null) ?? null });
     })();
-  }, [user]);
+  }, [user, profile?.parent_user_id]);
 
   // Sync activePanel with URL query param (using window to avoid Suspense issue)
   useEffect(() => {
@@ -528,7 +530,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         .select('client_name, client_first_name, client_last_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, vat_rate, hide_price, remarks, template, language')
         .eq('id', quoteId).single(),
       user
-        ? supabase.from('profiles').select('company_name').eq('id', user.id).maybeSingle()
+        ? supabase.from('profiles').select('company_name').eq('id', profile?.parent_user_id ?? user.id).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
     if (!q) { setSaving(false); setError('Devis introuvable.'); return; }
