@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { SessionProvider, signIn as nextAuthSignIn, signOut as nextAuthSignOut, useSession } from 'next-auth/react';
+import { clearDayView } from '@/lib/offlineStore';
 import { getMyProfile, registerUser } from '@/server/auth';
 
 // ── Profile type (mirrors existing app profiles table) ──────────────────────
@@ -89,6 +90,8 @@ function AuthState({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // La copie hors ligne de « Ma journée » ne doit pas rester lisible par la personne suivante sur cet appareil.
+    if (userId) clearDayView(userId);
     await nextAuthSignOut({ redirect: false });
   };
 
