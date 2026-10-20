@@ -10,6 +10,7 @@ import { BUCKETS, type Bucket, type DashboardData, type TodoItem, type UpcomingE
 import type { MarginSummary, MarginTotals } from '@/lib/costing';
 import { getDashboard } from '@/server/dashboard';
 import DateBlock from '@/components/ui/DateBlock';
+import FirstSteps from '@/components/onboarding/FirstSteps';
 import { btnSecondary, cardCls, pill } from '@/components/ui/kit';
 
 // Tableau de bord : d'abord ce qu'il faut faire, trié par échéance, puis le résumé de l'activité.
@@ -76,6 +77,7 @@ export default function DashboardPage() {
         // Grand écran : à gauche ce qu'il faut faire et les prochains événements, à droite les chiffres.
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-3 items-start">
           <div className="space-y-3 min-w-0">
+            <FirstSteps />
             <TodoPanel data={data} />
             <UpcomingPanel data={data} />
           </div>

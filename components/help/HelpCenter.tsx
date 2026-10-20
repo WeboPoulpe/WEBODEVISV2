@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, Play, Search, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, MessageCircle, Play, Search, X } from 'lucide-react';
 import { guidesForPage, guidesForPath, HELP_CATEGORIES, HELP_GUIDES, HELP_MEDIA, searchGuides, type HelpCategoryId, type HelpGuide } from '@/lib/help';
 import { btnSecondary, iconBtn, inputCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import SupportDialog from './SupportDialog';
 
 const duration = (seconds: number) => (seconds < 60 ? `${Math.round(seconds)} s` : `${Math.floor(seconds / 60)} min ${String(Math.round(seconds % 60)).padStart(2, '0')}`);
 
@@ -24,6 +25,8 @@ export default function HelpCenter({ open, onClose, page = null, guideId = null 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<HelpCategoryId | 'ici' | 'tout'>('tout');
   const [guide, setGuide] = useState<HelpGuide | null>(null);
+  // « Écrire au support » : la seule entrée vers le support dans l'application.
+  const [support, setSupport] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
 
   const here = useMemo(() => (page ? guidesForPage(page) : guidesForPath(pathname)), [page, pathname]);
@@ -34,13 +37,15 @@ export default function HelpCenter({ open, onClose, page = null, guideId = null 
     setGuide(guideId ? HELP_GUIDES.find((g) => g.id === guideId) ?? null : null);
     setQuery('');
     setCategory(here.length > 0 ? 'ici' : 'tout');
+    setSupport(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, page, guideId]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      // La fenêtre du support, ouverte par-dessus, se ferme d'abord (elle écoute Échap elle-même).
+      if (e.key !== 'Escape' || support) return;
       if (guide) setGuide(null);
       else onClose();
     };
@@ -48,7 +53,7 @@ export default function HelpCenter({ open, onClose, page = null, guideId = null 
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previous; };
-  }, [open, guide, onClose]);
+  }, [open, guide, support, onClose]);
 
   useEffect(() => { scroller.current?.scrollTo({ top: 0 }); }, [guide, category]);
 
@@ -76,7 +81,10 @@ export default function HelpCenter({ open, onClose, page = null, guideId = null 
         ) : (
           <h1 className="font-display text-2xl font-bold text-gray-900">Aide</h1>
         )}
-        <button onClick={onClose} className={cn(iconBtn, 'ml-auto bg-white border border-gray-200')} aria-label="Fermer l’aide"><X className="h-5 w-5" /></button>
+        <button onClick={() => setSupport(true)} className={cn(btnSecondary, 'ml-auto px-3')}>
+          <MessageCircle className="h-4 w-4" /><span className="hidden min-[400px]:inline sm:hidden" aria-hidden>Support</span><span className="sr-only sm:not-sr-only">Écrire au support</span>
+        </button>
+        <button onClick={onClose} className={cn(iconBtn, 'bg-white border border-gray-200')} aria-label="Fermer l’aide"><X className="h-5 w-5" /></button>
       </header>
 
       <div ref={scroller} className="flex-1 overflow-y-auto" style={{ paddingBottom: 'max(32px, env(safe-area-inset-bottom))' }}>
@@ -114,6 +122,7 @@ export default function HelpCenter({ open, onClose, page = null, guideId = null 
           </div>
         )}
       </div>
+      {support && <SupportDialog onClose={() => setSupport(false)} />}
     </div>
   );
 }

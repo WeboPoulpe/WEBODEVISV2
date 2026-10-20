@@ -464,3 +464,56 @@ export function invoiceReminderEmail({ invoice }: { invoice: InvoiceReminderDeta
     }),
   };
 }
+
+// ── Support, depuis le centre d'aide de l'application ─────────────────────────
+export interface SupportRequestDetails {
+  /** « Question », « Problème » ou « Suggestion ». */
+  topic: string;
+  name: string;
+  email: string;
+  company?: string | null;
+  /** Le message tel qu'écrit, sans les informations techniques. */
+  message: string;
+  page?: string | null;
+  browser?: string | null;
+  accountId: string;
+}
+
+/** À l'équipe WeboDevis : un client écrit au support depuis l'application. */
+export function supportNotificationEmail({ request, appUrl }: { request: SupportRequestDetails; appUrl: string }): Email {
+  return {
+    subject: `Support (${request.topic}) : ${request.company || request.name}`,
+    html: renderEmail({
+      preheader: `${request.name}${request.company ? `, ${request.company}` : ''} écrit au support depuis l’application.`,
+      title: `${request.topic} d’un client`,
+      paragraphs: [`« ${multiline(request.message)} »`],
+      facts: [
+        ['Nom', request.name],
+        ['Entreprise', request.company ?? ''],
+        ['Email', request.email],
+        ['Page', request.page ?? ''],
+        ['Navigateur', request.browser ?? ''],
+        ['Compte', request.accountId],
+      ],
+      button: { label: 'Ouvrir dans l’administration', url: `${appUrl}/admin/demandes` },
+      note: 'Répondre à cet email écrit directement au client.',
+    }),
+  };
+}
+
+/** Au client : son message au support est bien arrivé. */
+export function supportAckEmail({ request }: { request: SupportRequestDetails }): Email {
+  return {
+    subject: 'Nous avons bien reçu votre message',
+    html: renderEmail({
+      preheader: 'Votre message au support WeboDevis est bien arrivé.',
+      title: `Merci ${request.name.split(/\s+/)[0]}`,
+      paragraphs: [
+        'Votre message au support est bien arrivé. Nous vous répondons par email, le plus vite possible.',
+        'Pour mémoire, voici ce que vous nous avez écrit :',
+        `« ${multiline(request.message)} »`,
+      ],
+      note: 'Pour ajouter une précision ou une capture d’écran, répondez simplement à cet email.',
+    }),
+  };
+}
