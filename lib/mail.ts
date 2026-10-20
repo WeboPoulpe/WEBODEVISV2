@@ -11,6 +11,8 @@ interface Mail {
   replyTo?: string | null;
   /** Adresses en copie visible (Cc). */
   cc?: string[];
+  /** Pièces jointes (contenu en base64), par exemple un rendez-vous au format agenda (.ics). */
+  attachments?: { filename: string; content: string }[];
 }
 
 const DEFAULT_FROM = 'WeboDevis <onboarding@resend.dev>';
@@ -22,7 +24,7 @@ export const isTestAddress = (email: string) => /\.(local|test|example|invalid)$
  * Envoi d'email via Resend. Sans RESEND_API_KEY (développement), le message n'est pas envoyé :
  * son objet et son destinataire sont écrits dans la console du serveur.
  */
-export async function sendMail({ to, subject, html, fromName, replyTo, cc }: Mail): Promise<{ error: string | null }> {
+export async function sendMail({ to, subject, html, fromName, replyTo, cc, attachments }: Mail): Promise<{ error: string | null }> {
   const key = process.env.RESEND_API_KEY;
   const configured = process.env.MAIL_FROM || DEFAULT_FROM;
   const address = /<([^>]+)>/.exec(configured)?.[1] ?? configured;
@@ -43,7 +45,7 @@ export async function sendMail({ to, subject, html, fromName, replyTo, cc }: Mai
     const post = () => fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}), ...(copies.length ? { cc: copies } : {}) }),
+      body: JSON.stringify({ from, to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}), ...(copies.length ? { cc: copies } : {}), ...(attachments?.length ? { attachments } : {}) }),
     });
     let res = await post();
     // Resend limite le nombre d'envois par seconde : plusieurs emails à la suite (un devis envoyé à

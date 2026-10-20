@@ -1107,6 +1107,39 @@ export const quote_events = pgTable("quote_events", {
 	check("quote_events_kind_check", sql`kind = ANY (ARRAY['envoi_email'::text, 'envoi_whatsapp'::text, 'consultation'::text])`),
 ]);
 
+// Rendez-vous de dégustation avec un client, rattaché ou non à un devis. Propre à l'entreprise (compte titulaire).
+// Date et heure de Paris, comme les événements. Le client peut recevoir une confirmation, un rappel trois jours
+// avant et la veille (tâche planifiée de 16 h, une seule fois chacun), et un email s'il est déplacé ou annulé.
+export const tastings = pgTable("tastings", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	owner_user_id: uuid().notNull(),
+	quote_id: uuid(),
+	client_name: text().notNull(),
+	client_email: text(),
+	client_phone: text(),
+	tasting_date: date().notNull(),
+	start_time: time().notNull(),
+	duration_minutes: integer().default(60).notNull(),
+	location: text(),
+	guest_count: integer(),
+	notes: text(),
+	status: text().default('prevu').notNull(),
+	notify_client: boolean().default(true).notNull(),
+	reminder_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+	early_reminder_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_by: uuid(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_tastings_owner_date").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops"), table.tasting_date.asc().nullsLast().op("date_ops")),
+	index("idx_tastings_quote").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.owner_user_id], foreignColumns: [users.id], name: "tastings_owner_user_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "tastings_quote_id_fkey" }).onDelete("set null"),
+	foreignKey({ columns: [table.created_by], foreignColumns: [users.id], name: "tastings_created_by_fkey" }).onDelete("set null"),
+	check("tastings_status_check", sql`status = ANY (ARRAY['prevu'::text, 'fait'::text, 'annule'::text])`),
+	check("tastings_duration_check", sql`duration_minutes > 0 AND duration_minutes <= 720`),
+]);
+
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
 // Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
 export const document_counters = pgTable("document_counters", {

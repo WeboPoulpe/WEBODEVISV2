@@ -667,3 +667,85 @@ export function errorAlertEmail({ message, source, path, reappeared, appUrl }: {
     }),
   };
 }
+
+// ── Dégustations ──────────────────────────────────────────────────────────────
+// Envoyés au client au nom du traiteur (nom d'expéditeur = entreprise, réponses vers le traiteur).
+
+export interface TastingDetails {
+  companyName: string;
+  clientName: string;
+  /** AAAA-MM-JJ. */
+  date: string;
+  /** HH:MM. */
+  start: string;
+  /** HH:MM. */
+  end: string;
+  location: string | null;
+  guestCount: number | null;
+  /** Téléphone du traiteur, pour prévenir d'un empêchement. */
+  phone: string | null;
+}
+
+export type TastingMailKind = 'confirmation' | 'rappel_veille' | 'rappel_avance' | 'changement' | 'annulation';
+
+const hourFr = (t: string) => t.replace(':', ' h ');
+
+const tastingFacts = (t: TastingDetails): [string, string][] => [
+  ['Date', dateFr(t.date)],
+  ['Horaire', `${hourFr(t.start)} – ${hourFr(t.end)}`],
+  ['Lieu', t.location ?? ''],
+  ['Personnes', t.guestCount ? String(t.guestCount) : ''],
+];
+
+/** Au client : rendez-vous de dégustation confirmé, rappelé, déplacé ou annulé. */
+export function tastingEmail({ kind, tasting }: { kind: TastingMailKind; tasting: TastingDetails }): Email {
+  const when = `${dateFr(tasting.date)} à ${hourFr(tasting.start)}`;
+  const contact = tasting.phone
+    ? `Un empêchement ? Répondez à cet email ou appelez-nous au ${esc(tasting.phone)}.`
+    : 'Un empêchement ? Répondez simplement à cet email.';
+  const agenda = 'Le rendez-vous est joint à cet email : ouvrez la pièce jointe pour l’ajouter à votre agenda.';
+  const copy: Record<TastingMailKind, { subject: string; preheader: string; title: string; paragraphs: string[] }> = {
+    confirmation: {
+      subject: `Votre dégustation avec ${tasting.companyName} : ${when}`,
+      preheader: `Rendez-vous le ${when}.`,
+      title: `Bonjour ${tasting.clientName}`,
+      paragraphs: [`Nous avons le plaisir de vous confirmer votre rendez-vous de dégustation le <strong>${esc(when)}</strong>.`, agenda, contact],
+    },
+    rappel_veille: {
+      subject: `Rappel : votre dégustation demain à ${hourFr(tasting.start)}`,
+      preheader: `Nous vous attendons demain à ${hourFr(tasting.start)}.`,
+      title: `À demain, ${tasting.clientName}`,
+      paragraphs: [`Petit rappel : votre dégustation avec ${esc(tasting.companyName)} a lieu demain, le <strong>${esc(when)}</strong>.`, contact],
+    },
+    rappel_avance: {
+      subject: `Votre dégustation approche : ${when}`,
+      preheader: `Rendez-vous le ${when}.`,
+      title: `Bonjour ${tasting.clientName}`,
+      paragraphs: [`Votre dégustation avec ${esc(tasting.companyName)} approche : rendez-vous le <strong>${esc(when)}</strong>.`, contact],
+    },
+    changement: {
+      subject: `Votre dégustation est déplacée : ${when}`,
+      preheader: `Nouvel horaire : ${when}.`,
+      title: `Bonjour ${tasting.clientName}`,
+      paragraphs: [`Le rendez-vous de votre dégustation a changé. Voici les nouvelles informations : <strong>${esc(when)}</strong>.`, agenda, contact],
+    },
+    annulation: {
+      subject: `Dégustation du ${dateFr(tasting.date)} annulée`,
+      preheader: `Le rendez-vous du ${when} est annulé.`,
+      title: `Bonjour ${tasting.clientName}`,
+      paragraphs: [`Votre rendez-vous de dégustation du <strong>${esc(when)}</strong> est annulé.`, 'Pour convenir d’une autre date, répondez simplement à cet email.'],
+    },
+  };
+  const c = copy[kind];
+  return {
+    subject: c.subject,
+    html: renderEmail({
+      brand: tasting.companyName,
+      preheader: c.preheader,
+      title: c.title,
+      paragraphs: c.paragraphs,
+      facts: kind === 'annulation' ? undefined : tastingFacts(tasting),
+      footer: `Envoyé par ${tasting.companyName} avec WeboDevis.`,
+    }),
+  };
+}

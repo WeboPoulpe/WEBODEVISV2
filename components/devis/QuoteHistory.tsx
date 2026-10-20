@@ -3,7 +3,7 @@
 // Historique d'un devis : une chronologie, du plus récent au plus ancien.
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Eye, FilePlus2, Mail, MessageCircle, Receipt, RefreshCw, Repeat, Wallet } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Eye, FilePlus2, Mail, MessageCircle, Receipt, RefreshCw, Repeat, Wallet } from 'lucide-react';
 import { getQuoteHistory, type HistoryEntry, type HistoryKind } from '@/server/quoteHistory';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,7 @@ const ICONS: Record<HistoryKind, { icon: typeof Mail; tone: string }> = {
   relance: { icon: RefreshCw, tone: 'bg-amber-50 text-amber-700' },
   facture: { icon: Receipt, tone: 'bg-primary-50 text-primary' },
   paiement: { icon: Wallet, tone: 'bg-emerald-50 text-emerald-700' },
+  degustation: { icon: CalendarClock, tone: 'bg-forest/10 text-forest' },
 };
 
 const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });

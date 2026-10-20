@@ -8,6 +8,7 @@ import { missionReminderEmail } from '@/lib/mail/templates';
 import { pushToExtra } from '@/lib/push';
 import { runLifecycleEmails } from '@/server/lifecycle';
 import { runReminders } from '@/server/reminders';
+import { runTastingReminders } from '@/server/tastingReminders';
 
 // Rappel de la veille aux extras confirmés : email et notification. Lancé chaque jour en fin d'après-midi par
 // Vercel (vercel.json), qui envoie « Authorization: Bearer CRON_SECRET ». Un rappel n'est envoyé qu'une fois.
@@ -67,5 +68,10 @@ export async function GET(request: NextRequest) {
     console.error('[conseils]', e instanceof Error ? e.message : e);
     return null;
   });
-  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances, conseils });
+  // Rappels de dégustation aux clients, trois jours avant et la veille (server/tastingReminders.ts), dans la même tâche.
+  const degustations = await runTastingReminders().catch((e) => {
+    console.error('[dégustations]', e instanceof Error ? e.message : e);
+    return null;
+  });
+  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances, conseils, degustations });
 }

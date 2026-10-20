@@ -4,10 +4,11 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { buildCalendar, type IcsEvent } from '@/lib/ical';
 import { CONFIRMED_STATUSES, isConfirmed, PENDING_STATUSES } from '@/lib/quoteStatus';
+import { durationLabel, tastingEnd } from '@/lib/tastings';
 
 // Abonnement agenda (iCal) : une adresse secrète, propre à chaque compte, que Google Agenda, Apple Calendrier
 // ou Outlook relisent régulièrement. Elle donne les événements confirmés et les devis envoyés en attente
-// (marqués « (option) »), sur douze mois passés et à venir. Le jeton ne s'écrit que côté serveur.
+// (marqués « (option) »), et les rendez-vous de dégustation non annulés, sur douze mois passés et à venir. Le jeton ne s'écrit que côté serveur.
 // Ce module n'est pas une action serveur : rien ici n'est appelable depuis le navigateur.
 
 /** Nouveau jeton : 32 octets aléatoires, lisibles dans une adresse. */
@@ -88,6 +89,34 @@ export async function calendarFeed(token: string, origin: string, now = new Date
       status: option ? 'TENTATIVE' : 'CONFIRMED',
     };
   });
+
+  // Dégustations de l'entreprise (table absente tant que la migration 0028 n'est pas appliquée : on s'en passe).
+  const tastings = await db.execute<{ id: string; client_name: string; tasting_date: string; start_time: string; duration_minutes: number; location: string | null; guest_count: number | null; client_phone: string | null; quote_id: string | null }>(sql`
+    select t.id, t.client_name, t.tasting_date::text as tasting_date, to_char(t.start_time, 'HH24:MI') as start_time, t.duration_minutes,
+      t.location, t.guest_count, t.client_phone, t.quote_id
+    from public.tastings t
+    where t.owner_user_id in (select cp.id from public.profiles cp
+        where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${uid}::uuid))
+      and t.status <> 'annule'
+      and t.tasting_date between ${shiftMonths(today, -12)}::date and ${shiftMonths(today, 12)}::date
+    order by t.tasting_date, t.start_time`).then((r) => r.rows).catch(() => []);
+  for (const t of tastings) {
+    events.push({
+      uid: `degustation-${t.id}@webodevis.fr`,
+      date: t.tasting_date,
+      start: t.start_time,
+      end: tastingEnd(t.start_time, Number(t.duration_minutes)),
+      summary: `Dégustation – ${t.client_name}`,
+      location: t.location,
+      description: [
+        `Rendez-vous de dégustation (${durationLabel(Number(t.duration_minutes))})`,
+        t.guest_count ? `${t.guest_count} personnes` : '',
+        t.client_phone ? `Téléphone du client : ${t.client_phone}` : '',
+        t.quote_id ? `Devis : ${origin}/devis` : `Agenda : ${origin}/calendrier`,
+      ].filter(Boolean).join('\n'),
+      status: 'CONFIRMED',
+    });
+  }
 
   return buildCalendar({
     prodId: '-//WeboDevis//Evenements//FR',

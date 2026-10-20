@@ -12,7 +12,7 @@ import { requireUser } from './session';
 // statut, envois (email, WhatsApp), consultations du client, signature en ligne, relances, factures et paiements.
 // Chaque source est lue à part et tolère une table absente (base pas encore à jour).
 
-export type HistoryKind = 'creation' | 'statut' | 'envoi_email' | 'envoi_whatsapp' | 'consultation' | 'acceptation' | 'relance' | 'facture' | 'paiement';
+export type HistoryKind = 'creation' | 'statut' | 'envoi_email' | 'envoi_whatsapp' | 'consultation' | 'acceptation' | 'relance' | 'facture' | 'paiement' | 'degustation';
 
 export interface HistoryEntry {
   at: string;
@@ -44,7 +44,7 @@ export async function getQuoteHistory(quoteId: string): Promise<HistoryEntry[] |
   if (!q) return null;
   const id = q.id;
 
-  const [creator, statuses, events, acceptances, reminders, invoices, payments] = await Promise.all([
+  const [creator, statuses, events, acceptances, reminders, invoices, payments, tastings] = await Promise.all([
     rows<{ email: string }>(sql`select email from public.profiles where id = ${q.user_id}`),
     rows<{ at: string; old_status: string | null; new_status: string; by: string | null }>(sql`
       select h.changed_at as at, h.old_status, h.new_status, p.email as by
@@ -63,6 +63,9 @@ export async function getQuoteHistory(quoteId: string): Promise<HistoryEntry[] |
     rows<{ at: string; amount: string; number: string | null; method: string }>(sql`
       select pay.created_at as at, pay.amount::text, i.number, pay.method
       from public.customer_invoice_payments pay join public.customer_invoices i on i.id = pay.invoice_id where i.quote_id = ${id}`),
+    rows<{ at: string; date: string; start: string; status: string; reminded: string | null; by: string | null }>(sql`
+      select t.created_at as at, t.tasting_date::text as date, to_char(t.start_time, 'HH24:MI') as start, t.status, t.reminder_sent_at as reminded, p.email as by
+      from public.tastings t left join public.profiles p on p.id = t.created_by where t.quote_id = ${id}`),
   ]);
 
   const out: HistoryEntry[] = [{ at: iso(q.created_at), kind: 'creation', title: 'Devis créé', by: creator[0]?.email ?? null }];
@@ -88,6 +91,12 @@ export async function getQuoteHistory(quoteId: string): Promise<HistoryEntry[] |
   for (const r of reminders) out.push({ at: iso(r.at), kind: 'relance', title: 'Relance automatique envoyée', detail: r.sent_to });
   for (const i of invoices) {
     out.push({ at: iso(i.at), kind: 'facture', title: `${INVOICE_KIND_LABELS[i.kind as InvoiceKind] ?? 'Facture'} n° ${i.number}`, detail: euro(i.total_ttc), by: i.by });
+  }
+  for (const t of tastings) {
+    const when = `${new Date(`${t.date}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })} à ${t.start.replace(':', ' h ')}`;
+    const state = t.status === 'annule' ? ' (annulée)' : t.status === 'fait' ? ' (faite)' : '';
+    out.push({ at: iso(t.at), kind: 'degustation', title: `Dégustation prévue${state}`, detail: when, by: t.by });
+    if (t.reminded) out.push({ at: iso(t.reminded), kind: 'degustation', title: 'Rappel de dégustation envoyé au client', detail: when });
   }
   for (const p of payments) out.push({ at: iso(p.at), kind: 'paiement', title: `Paiement reçu : ${euro(p.amount)}`, detail: p.number ? `Facture n° ${p.number}` : undefined });
 

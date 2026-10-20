@@ -28,6 +28,7 @@ import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib
 import FolderBar, { DragItem } from '@/components/devis/FolderBar';
 import TemplateThumb from '@/components/devis/TemplateThumb';
 import QuoteHistory from '@/components/devis/QuoteHistory';
+import QuoteTastings from '@/components/degustations/QuoteTastings';
 import SendQuoteModal from '@/components/devis/SendQuoteModal';
 import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
@@ -317,6 +318,8 @@ function DevisSheet({
               </div>
             </div>
           </div>
+          {/* Rendez-vous de dégustation avec le client */}
+          <QuoteTastings quoteId={quote.id} />
           {/* Nom interne du devis (visible uniquement par le traiteur) */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nom du devis (interne)</p>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChefHat, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { AlertTriangle, CalendarClock, ChefHat, ChevronLeft, ChevronRight, MapPin, Plus } from 'lucide-react';
 import { companyIds, companyQuotesFilter } from '@/lib/companyFilter';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +10,9 @@ import { isConfirmed, isPending, REJECTED_STATUSES } from '@/lib/quoteStatus';
 import { cn, formatCurrency } from '@/lib/utils';
 import DateBlock from '@/components/ui/DateBlock';
 import StatusPill from '@/components/ui/StatusPill';
+import TastingModal from '@/components/degustations/TastingModal';
+import { durationLabel, TASTING_STATUS_LABELS, timeFr, type Tasting } from '@/lib/tastings';
+import { listTastings } from '@/server/tastings';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Quote {
@@ -68,6 +71,32 @@ function EventRow({ quote, showDate }: { quote: Quote; showDate: boolean }) {
   );
 }
 
+/** Rendez-vous de dégustation : vert sapin, pour le distinguer des événements (terracotta). */
+function TastingRow({ tasting, showDate, onOpen }: { tasting: Tasting; showDate: boolean; onOpen: () => void }) {
+  const cancelled = tasting.status === 'annule';
+  return (
+    <button onClick={onOpen} className={cn('w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-colors', cancelled ? 'bg-gray-50 opacity-70' : 'bg-forest/[0.06] hover:bg-forest/10')}>
+      {showDate ? <DateBlock iso={tasting.tasting_date} /> : (
+        <span className="w-14 h-14 flex items-center justify-center rounded-xl bg-forest/10 text-forest flex-shrink-0"><CalendarClock className="h-5 w-5" /></span>
+      )}
+      <span className="flex-1 min-w-0">
+        <span className={cn('block font-semibold truncate', cancelled ? 'text-gray-500 line-through' : 'text-gray-900')}>{tasting.client_name}</span>
+        <span className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-forest text-white">Dégustation</span>
+          <span className="text-xs text-gray-600 tabular-nums">{timeFr(tasting.start_time)}, {durationLabel(tasting.duration_minutes)}</span>
+          {tasting.status !== 'prevu' && <span className="text-xs text-gray-600">{TASTING_STATUS_LABELS[tasting.status]}</span>}
+          {!!tasting.guest_count && <span className="text-xs text-gray-600">{tasting.guest_count} pers.</span>}
+        </span>
+        {tasting.location && (
+          <span className="flex items-center gap-1 text-xs text-gray-500 mt-1.5 truncate">
+            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />{tasting.location}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function CalendrierPage() {
   const now = new Date();
@@ -80,6 +109,12 @@ export default function CalendrierPage() {
   const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const { user, profile } = useAuth();
+  // Dégustations du mois affiché (actions serveur ; liste vide tant que la base n'est pas à jour).
+  const [tastings, setTastings] = useState<Tasting[]>([]);
+  const [canEditTastings, setCanEditTastings] = useState(false);
+  const [tastingsAvailable, setTastingsAvailable] = useState(false);
+  const [openTasting, setOpenTasting] = useState<Tasting | 'new' | null>(null);
+  const [tastingsVersion, setTastingsVersion] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -98,6 +133,20 @@ export default function CalendrierPage() {
   }, [user, profile]);
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    const last = new Date(year, month + 1, 0).getDate();
+    listTastings({ from: iso(year, month, 1), to: iso(year, month, last) })
+      .then((r) => { if (!alive) return; setTastings(r.tastings); setCanEditTastings(r.canEdit); setTastingsAvailable(r.available); })
+      .catch(() => { if (alive) setTastings([]); });
+    return () => { alive = false; };
+  }, [user, year, month, tastingsVersion]);
+  const tastingsByDay = useMemo(() => {
+    const map = new Map<string, Tasting[]>();
+    for (const t of tastings) map.set(t.tasting_date, [...(map.get(t.tasting_date) ?? []), t]);
+    return map;
+  }, [tastings]);
   const visible = useMemo(() => (confirmedOnly ? quotes.filter((q) => isConfirmed(q.status)) : quotes), [quotes, confirmedOnly]);
   const monthQuotes = useMemo(() => visible.filter((q) => dayKey(q).startsWith(monthPrefix)), [visible, monthPrefix]);
   const byDay = useMemo(() => {
@@ -118,6 +167,13 @@ export default function CalendrierPage() {
   const guests = monthQuotes.reduce((s, q) => s + (q.guest_count ?? 0), 0);
 
   const agenda = selectedDay ? byDay.get(selectedDay) ?? [] : monthQuotes;
+  const agendaTastings = selectedDay ? tastingsByDay.get(selectedDay) ?? [] : tastings;
+  const plannedTastings = tastings.filter((t) => t.status !== 'annule').length;
+  // Événements et dégustations dans l'ordre des jours (le jour même, la dégustation d'abord).
+  const agendaItems = [
+    ...agendaTastings.map((t) => ({ key: `${t.tasting_date}-0-${t.start_time}`, tasting: t, quote: null })),
+    ...agenda.map((q) => ({ key: `${dayKey(q)}-1`, tasting: null, quote: q })),
+  ].sort((a, b) => a.key.localeCompare(b.key));
   const selectedDate = selectedDay ? new Date(selectedDay + 'T00:00:00') : null;
   const selectedGuests = agenda.reduce((s, q) => s + (q.guest_count ?? 0), 0);
   const navButton = 'w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-700 hover:border-gray-300 transition-colors';
@@ -143,6 +199,7 @@ export default function CalendrierPage() {
           {loading ? 'Chargement…' : monthQuotes.length === 0
             ? 'Aucun événement ce mois-ci.'
             : `${confirmedCount} confirmé${confirmedCount > 1 ? 's' : ''}, ${pendingCount} en cours, ${guests} couverts`}
+          {!loading && plannedTastings > 0 && `${monthQuotes.length ? ',' : ''} ${plannedTastings} dégustation${plannedTastings > 1 ? 's' : ''}`}
         </p>
         <div className="flex p-1 rounded-xl bg-gray-200/70" role="tablist" aria-label="Événements affichés">
           {[{ v: false, label: 'Tous' }, { v: true, label: 'Confirmés' }].map((o) => (
@@ -171,6 +228,7 @@ export default function CalendrierPage() {
               if (day === null) return <div key={`empty-${i}`} />;
               const key = iso(year, month, day);
               const events = byDay.get(key) ?? [];
+              const dayTastings = (tastingsByDay.get(key) ?? []).filter((t) => t.status !== 'annule');
               const isToday = key === todayKey;
               const selected = key === selectedDay;
               return (
@@ -178,9 +236,9 @@ export default function CalendrierPage() {
                   key={key}
                   onClick={() => setSelectedDay(selected ? null : key)}
                   aria-pressed={selected}
-                  aria-label={`${day} ${MONTHS[month]}, ${events.length} événement${events.length > 1 ? 's' : ''}`}
+                  aria-label={`${day} ${MONTHS[month]}, ${events.length} événement${events.length > 1 ? 's' : ''}${dayTastings.length ? `, ${dayTastings.length} dégustation${dayTastings.length > 1 ? 's' : ''}` : ''}`}
                   className={cn('relative flex flex-col items-center md:items-stretch rounded-xl p-1 md:p-1.5 min-h-[52px] md:min-h-[104px] text-left transition-colors',
-                    selected ? 'bg-primary-50 ring-2 ring-primary' : events.length ? 'bg-gray-50 hover:bg-gray-100' : 'hover:bg-gray-50')}
+                    selected ? 'bg-primary-50 ring-2 ring-primary' : events.length || dayTastings.length ? 'bg-gray-50 hover:bg-gray-100' : 'hover:bg-gray-50')}
                 >
                   <span className={cn('w-7 h-7 flex items-center justify-center rounded-full text-sm tabular-nums',
                     isToday ? 'bg-primary text-white font-semibold' : 'text-gray-900 font-medium')}>
@@ -189,20 +247,26 @@ export default function CalendrierPage() {
 
                   {/* Téléphone : un point par événement (plein = confirmé) */}
                   <span className="md:hidden flex gap-0.5 mt-1 h-1.5">
-                    {events.slice(0, 4).map((q) => (
+                    {dayTastings.slice(0, 2).map((t) => <span key={t.id} className="w-1.5 h-1.5 rounded-sm bg-forest" />)}
+                    {events.slice(0, 4 - Math.min(2, dayTastings.length)).map((q) => (
                       <span key={q.id} className={cn('w-1.5 h-1.5 rounded-full', isConfirmed(q.status) ? 'bg-primary' : 'border border-primary')} />
                     ))}
                   </span>
 
                   {/* Tablette et ordinateur : le nom de chaque événement */}
                   <span className="hidden md:flex flex-col gap-1 mt-1 min-w-0">
-                    {events.slice(0, 2).map((q) => (
+                    {dayTastings.slice(0, 2).map((t) => (
+                      <span key={t.id} className="block px-1.5 py-0.5 rounded-md text-xs font-medium truncate bg-forest/10 text-forest">
+                        {t.start_time} {t.client_name}
+                      </span>
+                    ))}
+                    {events.slice(0, Math.max(0, 2 - dayTastings.length)).map((q) => (
                       <span key={q.id} className={cn('block px-1.5 py-0.5 rounded-md text-xs font-medium truncate',
                         isConfirmed(q.status) ? 'bg-primary text-white' : 'bg-white border border-primary/40 text-primary')}>
                         {q.client_name || q.event_type || 'Sans nom'}
                       </span>
                     ))}
-                    {events.length > 2 && <span className="px-1.5 text-xs text-gray-500">+{events.length - 2}</span>}
+                    {events.length + dayTastings.length > 2 && <span className="px-1.5 text-xs text-gray-500">+{events.length + dayTastings.length - 2}</span>}
                   </span>
                 </button>
               );
@@ -211,6 +275,7 @@ export default function CalendrierPage() {
           <p className="flex items-center gap-4 px-2 pt-3 text-xs text-gray-500">
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary" />Confirmé</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border border-primary" />En cours</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-forest" />Dégustation</span>
           </p>
         </section>
 
@@ -238,10 +303,16 @@ export default function CalendrierPage() {
               <button onClick={() => setSelectedDay(null)} className="flex-shrink-0 text-sm font-medium text-primary hover:underline">Voir tout le mois</button>
             )}
           </div>
+          {tastingsAvailable && canEditTastings && (
+            <button onClick={() => setOpenTasting('new')}
+              className="flex items-center gap-2 w-full mb-3 px-4 py-3 rounded-2xl border border-dashed border-forest/40 text-sm font-medium text-forest hover:bg-forest/[0.06] transition-colors">
+              <Plus className="h-4 w-4" />{selectedDay ? 'Planifier une dégustation ce jour-là' : 'Planifier une dégustation'}
+            </button>
+          )}
 
           {loading ? (
             <div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-[76px] rounded-2xl bg-gray-50 animate-pulse" />)}</div>
-          ) : agenda.length === 0 ? (
+          ) : agendaItems.length === 0 ? (
             <div className="rounded-2xl bg-gray-50 px-5 py-8 text-center">
               <p className="text-sm text-gray-600">{selectedDate ? 'Aucun événement ce jour-là.' : 'Aucun événement ce mois-ci.'}</p>
               <Link href={selectedDay ? `/devis/nouveau?date=${selectedDay}` : '/devis/nouveau'} className="inline-block mt-2 text-sm font-medium text-primary hover:underline">
@@ -250,7 +321,9 @@ export default function CalendrierPage() {
             </div>
           ) : (
             <ul className="space-y-2.5">
-              {agenda.map((q) => <li key={q.id}><EventRow quote={q} showDate={!selectedDate} /></li>)}
+              {agendaItems.map((it) => it.tasting
+                ? <li key={it.tasting.id}><TastingRow tasting={it.tasting} showDate={!selectedDate} onOpen={() => setOpenTasting(it.tasting)} /></li>
+                : <li key={it.quote!.id}><EventRow quote={it.quote!} showDate={!selectedDate} /></li>)}
               {selectedDay && (
                 <li><Link href={`/devis/nouveau?date=${selectedDay}`} className="block px-4 py-3 rounded-2xl border border-dashed border-gray-300 text-sm font-medium text-primary hover:bg-gray-50">Autre devis ce jour-là</Link></li>
               )}
@@ -258,6 +331,16 @@ export default function CalendrierPage() {
           )}
         </section>
       </div>
+
+      {openTasting && (
+        <TastingModal
+          tasting={openTasting === 'new' ? null : openTasting}
+          draft={openTasting === 'new' ? { tasting_date: selectedDay ?? undefined } : undefined}
+          canEdit={canEditTastings}
+          onClose={() => setOpenTasting(null)}
+          onSaved={() => setTastingsVersion((v) => v + 1)}
+        />
+      )}
     </div>
   );
 }
