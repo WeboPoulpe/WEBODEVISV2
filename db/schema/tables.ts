@@ -477,6 +477,8 @@ export const ingredients = pgTable("ingredients", {
 	min_stock_alert: numeric().default('0'),
 	volume_unit_price: numeric().default('0'),
 	preferred_supplier_id: uuid(),
+	// Allergènes cochés (clés de lib/allergens.ts). Vide (null) : pas encore renseigné, des suggestions sont tirées du nom.
+	allergens: text().array(),
 }, (table) => [
 	foreignKey({
 			columns: [table.owner_user_id],
@@ -779,6 +781,9 @@ export const prestations = pgTable("prestations", {
 	sub_category_id: uuid(),
 	child_unit_price: numeric(),
 	photo_url: text(),
+	// Allergènes ajoutés à la main (en plus de ceux de la recette), et liste confirmée par le traiteur.
+	allergens_extra: text().array().default(sql`'{}'::text[]`).notNull(),
+	allergens_checked: boolean().default(false).notNull(),
 }, (table) => [
 	index("idx_prestations_category_id").using("btree", table.category_id.asc().nullsLast().op("uuid_ops")),
 	index("idx_prestations_sub_category_id").using("btree", table.sub_category_id.asc().nullsLast().op("uuid_ops")),

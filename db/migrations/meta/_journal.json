@@ -141,6 +141,13 @@
       "when": 1792428276783,
       "tag": "0019_quote_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792480111453,
+      "tag": "0020_allergens",
+      "breakpoints": true
     }
   ]
 }
