@@ -3,12 +3,14 @@
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Carrot, Check, LayoutTemplate, Loader2, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, Carrot, Check, Loader2, Plus, Search, X } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
-import RichTextEditor from '@/components/ui/RichTextEditor';
-import PrestationQuotePreview from '@/components/prestations/PrestationQuotePreview';
+import PrestationQuotePreview, { PREVIEW_TEMPLATES, type PreviewTemplate } from '@/components/prestations/PrestationQuotePreview';
+import PrestationCarteSection from '@/components/prestations/PrestationCarteSection';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { createClient } from '@/lib/supabase/client';
+import { isBlankHtml } from '@/lib/prestationCard';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { PENDING_STATUSES } from '@/lib/quoteStatus';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -37,6 +39,7 @@ export interface PrestationRecord {
   description: string | null;
   is_option: boolean;
   gastro_card_html?: string | null;
+  gastro_card_html_en?: string | null;
   /** Absents tant que la migration 0020 n'est pas appliquée. */
   allergens_extra?: string[] | null;
   allergens_checked?: boolean | null;
@@ -62,6 +65,9 @@ interface IngredientOption {
   name: string;
   unit: string | null;
 }
+
+/** Fiche mise en page enregistrée : null si absente ou vide. */
+const cardOf = (html: string | null | undefined) => (html && !isBlankHtml(html) ? html : null);
 
 /** Retour à la liste : elle reprend son filtre et sa position ; `maj` y met la prestation enregistrée en évidence. */
 export const LIST_BACK = '/prestations?retour=1';
@@ -399,6 +405,8 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     categoryId: initial?.category_id ?? '',
     subCategoryId: initial?.sub_category_id ?? '',
     description: initial?.description ?? '',
+    cardFr: cardOf(initial?.gastro_card_html),
+    cardEn: cardOf(initial?.gastro_card_html_en),
     isOption: initial?.is_option ?? false,
     extra: sortAllergens(initial?.allergens_extra ?? []).join(','),
     checked: !!initial?.allergens_checked,
@@ -419,7 +427,9 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
   const [catError, setCatError] = useState<string | null>(null);
   const [description, setDescription] = useState(startValues.description);
   const [isOption, setIsOption] = useState(startValues.isOption);
-  const gastroHtml = initial?.gastro_card_html?.trim() ? initial.gastro_card_html : null;
+  // Fiches mises en page (française, anglaise) : quand elles existent, elles remplacent nom et description dans la carte.
+  const [cardFr, setCardFr] = useState<string | null>(startValues.cardFr);
+  const [cardEn, setCardEn] = useState<string | null>(startValues.cardEn);
 
   // ── Allergènes ─────────────────────────────────────────────────────────────
   // Colonnes présentes en base ? (migration 0020) Une fiche chargée le dit ; une création demande à la base.
@@ -450,7 +460,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     dbChecked.current = false;
     createClient().from('prestations').update({ allergens_checked: false }).eq('id', initial.id).then(() => {});
   }, [recipeKeys, initial, allergensReady]);
-  const [saving, setSaving] = useState<null | 'list' | 'fiche'>(null);
+  const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [syncDrafts, setSyncDrafts] = useState(false);
@@ -484,7 +494,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
       });
   }, [initial?.name]);
 
-  const syncDraftQuotes = async (newName: string, newDescription: string) => {
+  const syncDraftQuotes = async (newName: string, newDescription: string, cards: { fr: string | null; en: string | null }) => {
     if (!initial?.name) return;
     const supabase = createClient();
     const { data: drafts } = await supabase
@@ -499,7 +509,12 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updated = draft.services.map((s: any) =>
         s.name === initial.name
-          ? { ...s, name: newName, description: newDescription || null }
+          ? {
+            ...s, name: newName, description: newDescription || null,
+            // Le texte de la carte suit aussi (sans ajouter de clé vide aux lignes qui n'en ont pas).
+            ...(cards.fr !== null || 'gastroCardHtml' in s ? { gastroCardHtml: cards.fr } : {}),
+            ...(cards.en !== null || 'gastroCardHtmlEn' in s ? { gastroCardHtmlEn: cards.en } : {}),
+          }
           : s
       );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -561,6 +576,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     name !== startValues.name || price !== startValues.price || childPrice !== startValues.childPrice ||
     costPrice !== startValues.costPrice || categoryId !== startValues.categoryId || subCategoryId !== startValues.subCategoryId ||
     description !== startValues.description || isOption !== startValues.isOption ||
+    cardFr !== startValues.cardFr || cardEn !== startValues.cardEn ||
     (allergensReady && (extra.join(',') !== startValues.extra || allergensChecked !== startValues.checked)) ||
     (creatingCat && !!newCatName.trim()) || (creatingSubCat && !!newSubCatName.trim());
 
@@ -604,8 +620,8 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     return e;
   };
 
-  /** Enregistre, puis revient à la liste ou ouvre l'éditeur plein écran de la fiche. */
-  const save = async (then: 'list' | 'fiche') => {
+  /** Enregistre, puis revient à la liste. */
+  const save = async () => {
     if (saving) return;
     const found = validate();
     setErrors(found);
@@ -622,6 +638,11 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     }
     if (!user) { setSaveError('Votre session n’est pas encore prête. Patientez un instant, puis réessayez.'); return; }
     const child = parseAmount(childPrice);
+    // Texte modifié : nettoyé avant d'être enregistré ; un texte vide n'est pas gardé. Inchangé : tel quel.
+    const cleanText = (html: string | null) => (html === null || isBlankHtml(html) ? null : sanitizeHtml(html));
+    const descriptionOut = description === startValues.description ? (description.trim() || null) : cleanText(description);
+    const cardFrOut = cardFr === startValues.cardFr ? cardFr : cleanText(cardFr);
+    const cardEnOut = cardEn === startValues.cardEn ? cardEn : cleanText(cardEn);
     const payload = {
       name: name.trim(),
       unit_price: cents(priceValue ?? 0),
@@ -631,27 +652,30 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
       sub_category: subCategory.trim() || null,
       category_id: categoryId || null,
       sub_category_id: subCategoryId || null,
-      description: description.trim() || null,
+      description: descriptionOut,
       is_option: isOption,
+      // Les fiches ne sont écrites que si elles ont changé.
+      ...(cardFr !== startValues.cardFr ? { gastro_card_html: cardFrOut } : {}),
+      ...(cardEn !== startValues.cardEn ? { gastro_card_html_en: cardEnOut } : {}),
       user_id: user.id,
       // La case « vérifié » ne tient que pour la liste cochée : une liste modifiée est à revérifier.
       ...(allergensReady ? { allergens_extra: extra, allergens_checked: allergensChecked } : {}),
     };
-    setSaving(then);
+    setSaving(true);
     const supabase = createClient();
     const { data, error } = initial
       ? await supabase.from('prestations').update(payload).eq('id', initial.id).select().single()
       : await supabase.from('prestations').insert([payload]).select().single();
     if (!error) dbChecked.current = allergensReady && allergensChecked;
     if (error || !data) {
-      setSaving(null);
+      setSaving(false);
       setSaveError('La prestation n’a pas pu être enregistrée. Vérifiez votre connexion, puis réessayez.');
       return;
     }
-    if (initial && syncDrafts) await syncDraftQuotes(payload.name, payload.description ?? '');
+    if (initial && syncDrafts) await syncDraftQuotes(payload.name, payload.description ?? '', { fr: cardFrOut, en: cardEnOut });
     // Ce qui est enregistré devient la référence : plus rien à confirmer en quittant.
-    setStartValues({ name, price, childPrice, costPrice, categoryId, subCategoryId, description, isOption, extra: extra.join(','), checked: allergensChecked });
-    go(then === 'fiche' ? `/prestations/${data.id}/edit-webo` : listAfterSave(data.id));
+    setStartValues({ name, price, childPrice, costPrice, categoryId, subCategoryId, description, cardFr, cardEn, isOption, extra: extra.join(','), checked: allergensChecked });
+    go(listAfterSave(data.id));
   };
 
   // Échap dans un petit champ de création annule ce champ seulement.
@@ -664,10 +688,11 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
   const subs = subcategoriesFor(categoryId);
   const categoryName = dbCategories.find((c) => c.id === categoryId)?.name ?? (category || null);
   const profileStyle = profile as unknown as { default_quote_style?: string | null; default_quote_font?: string | null } | null;
-  const quoteStyle = profileStyle?.default_quote_style || 'classique';
+  const quoteStyle: PreviewTemplate = PREVIEW_TEMPLATES.includes(profileStyle?.default_quote_style as PreviewTemplate)
+    ? (profileStyle!.default_quote_style as PreviewTemplate) : 'classique';
   const quoteFont = profileStyle?.default_quote_font || 'Georgia';
   const styleLabel: Record<string, string> = { classique: 'Classique', standard: 'Standard', mariage: 'Mariage', business: 'Business' };
-  const previewData = useDeferredValue({ name, unitPrice: priceOk ? priceValue! : 0, isOption, description, gastroCardHtml: gastroHtml });
+  const previewData = useDeferredValue({ name, unitPrice: priceOk ? priceValue! : 0, isOption, description, gastroCardHtml: cardFr && !isBlankHtml(cardFr) ? cardFr : null });
 
   // Classes des deux mises en page : « W » = la page dispose d'au moins 940 px (requête de conteneur).
   return (
@@ -704,7 +729,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
         <div className="[@container(min-width:940px)]:grid [@container(min-width:940px)]:grid-cols-[minmax(0,1fr)_400px] [@container(min-width:1140px)]:grid-cols-[minmax(0,1fr)_440px] gap-8 pb-8">
           {/* ── Formulaire ── */}
           <div className={cn('min-w-0 space-y-5', tab === 'preview' && 'hidden [@container(min-width:940px)]:block')}>
-            <form id="prestation-form" noValidate onSubmit={(e) => { e.preventDefault(); save('list'); }} className="space-y-5">
+            <form id="prestation-form" noValidate onSubmit={(e) => { e.preventDefault(); save(); }} className="space-y-5">
               <Section id="presta-s-infos" title="Nom et prix">
                 <div>
                   <label htmlFor="presta-name" className={labelCls}>Nom de la prestation</label>
@@ -847,40 +872,15 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
 
               <Section
                 id="presta-s-desc"
-                title="Description et carte du menu"
-                hint={gastroHtml ? undefined : 'La description figure sous le nom de la prestation, dans la carte du menu du devis.'}
+                title="Texte de la carte du menu"
+                hint={<>Tapez directement dans la carte, telle qu’elle sort dans vos devis : même police, mêmes tailles, mêmes retours à la ligne (style {styleLabel[quoteStyle]}, police {quoteFont}).</>}
               >
-                {gastroHtml && (
-                  <div className="rounded-xl bg-primary-50 border border-primary-100 px-4 py-3 text-[15px] text-gray-800">
-                    Cette prestation a une <strong>fiche mise en page</strong> : c’est elle qui figure dans la carte du menu de vos devis.
-                    La description ci-dessous n’y apparaît pas ; pour changer la carte, modifiez la fiche.
-                  </div>
-                )}
-                <div>
-                  <p className={labelCls}>Description</p>
-                  <RichTextEditor
-                    initialValue={description}
-                    onChange={setDescription}
-                    placeholder="Détails, inclusions…"
-                    ariaLabel="Description"
-                    minHeight="18rem"
-                    maxHeight="min(36rem, 65dvh)"
-                    textClassName="text-[15px] leading-relaxed"
-                  />
-                </div>
-                <div className="rounded-xl bg-gray-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-medium text-gray-900">{gastroHtml ? 'Fiche mise en page' : 'Mettre en page la carte'}</p>
-                    <p className="text-sm text-gray-600 mt-0.5">
-                      Éditeur plein écran pour les longues cartes : polices, couleurs, alignement et version anglaise.
-                      Vos modifications d’ici sont enregistrées avant l’ouverture.
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => save('fiche')} disabled={!!saving} className={cn(btnSecondary, 'flex-shrink-0')}>
-                    {saving === 'fiche' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
-                    {gastroHtml ? 'Modifier la fiche' : 'Ouvrir l’éditeur de fiche'}
-                  </button>
-                </div>
+                <PrestationCarteSection
+                  name={name} isOption={isOption} template={quoteStyle} font={quoteFont}
+                  description={description} onDescription={setDescription}
+                  cardFr={cardFr} onCardFr={setCardFr}
+                  cardEn={cardEn} onCardEn={setCardEn}
+                />
               </Section>
 
               {/* Devis en cours qui contiennent cette prestation */}
@@ -893,7 +893,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
                     className="h-5 w-5 rounded border-gray-300 accent-primary flex-shrink-0"
                   />
                   <span className="text-[15px] text-gray-700">
-                    Mettre aussi à jour le nom et la description dans{' '}
+                    Mettre aussi à jour le nom et le texte de la carte dans{' '}
                     <strong className="font-semibold text-gray-900">{draftCount} devis en cours</strong>{' '}
                     qui contiennent cette prestation
                   </span>
@@ -938,9 +938,9 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
             {saveError ? '' : dirty ? 'Modifications non enregistrées' : initial ? 'Aucune modification' : ''}
           </p>
           <div className="flex items-center gap-2 ml-auto">
-            <button type="button" onClick={cancel} disabled={!!saving} className={btnGhost}>Annuler</button>
-            <button type="submit" form="prestation-form" disabled={!!saving} className={btnPrimary}>
-              {saving === 'list' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            <button type="button" onClick={cancel} disabled={saving} className={btnGhost}>Annuler</button>
+            <button type="submit" form="prestation-form" disabled={saving} className={btnPrimary}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               {initial ? 'Enregistrer' : 'Ajouter la prestation'}
             </button>
           </div>

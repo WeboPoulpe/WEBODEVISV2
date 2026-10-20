@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { generateQuoteHtml, type QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import { useHydrated } from '@/lib/useHydrated';
-import { googleFontHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
+import { appResetCss, googleFontHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
 import { sanitizeHtml } from '@/lib/sanitize';
 
 // Aperçu d'une prestation telle qu'elle sortira dans un devis : la ligne du tableau et son bloc dans la carte du menu.
@@ -19,15 +19,19 @@ const MENU_WIDTH = 400;
 /** En colonne étroite, le tableau est rendu sur au moins cette largeur avant réduction. */
 const TABLE_MIN_WIDTH = 460;
 
-type Template = NonNullable<QuoteHtmlOptions['template']>;
-const TEMPLATES: Template[] = ['standard', 'mariage', 'business', 'classique'];
+export type PreviewTemplate = NonNullable<QuoteHtmlOptions['template']>;
+type Template = PreviewTemplate;
+export const PREVIEW_TEMPLATES: Template[] = ['standard', 'mariage', 'business', 'classique'];
+const TEMPLATES = PREVIEW_TEMPLATES;
+/** Classe des morceaux de document : les styles de l'application y sont annulés, comme dans l'éditeur des devis. */
+const PAPER = 'presta-preview-paper';
 
 export interface PrestationPreviewData {
   name: string;
   unitPrice: number;
   isOption: boolean;
   description: string;
-  /** Fiche mise en page (éditeur plein écran) : quand elle existe, c'est elle qui figure dans la carte. */
+  /** Fiche mise en page : quand elle existe, c'est elle qui figure dans la carte. */
   gastroCardHtml: string | null;
 }
 
@@ -65,8 +69,9 @@ export default function PrestationQuotePreview({ data, style, font }: {
     };
   }, [hydrated, data.name, data.unitPrice, data.isOption, data.description, data.gastroCardHtml, template, fontName]);
 
-  // Feuille de sortie des devis, sans la règle @page (elle changerait l'impression de la page Prestations).
-  const css = useMemo(() => quoteOutputCss(outputSettings({ selected_font: fontName })).replace(/@page\s*\{[^}]*\}/, ''), [fontName]);
+  // Feuille de sortie des devis, sans la règle @page (elle changerait l'impression de la page Prestations), après
+  // l'annulation des styles de l'application (marges des paragraphes, puces…) : le rendu de la fenêtre d'impression.
+  const css = useMemo(() => `${appResetCss(`.${PAPER}`)}\n${quoteOutputCss(outputSettings({ selected_font: fontName })).replace(/@page\s*\{[^}]*\}/, '')}`, [fontName]);
   const fontHref = googleFontHref(fontName);
 
   return (
@@ -83,7 +88,7 @@ export default function PrestationQuotePreview({ data, style, font }: {
       <section>
         <h3 className="text-sm font-semibold text-gray-900 mb-1">Dans la carte du menu</h3>
         <p className="text-sm text-gray-500 mb-2">
-          {data.gastroCardHtml ? 'Votre fiche mise en page, telle qu’elle figure dans la carte.' : 'Le nom et la description, tels qu’ils figurent dans la carte.'}
+          {data.gastroCardHtml ? 'Votre mise en page libre, telle qu’elle figure dans la carte.' : 'Le nom et la description, tels qu’ils figurent dans la carte.'}
         </p>
         <ScaledDoc html={menu} width={MENU_WIDTH} label="Prestation dans la carte du menu" />
       </section>
@@ -133,7 +138,7 @@ function ScaledDoc({ html, width, minWidth = width, label }: { html: string; wid
       <div className="relative overflow-hidden mx-auto" style={{ width: box.natural * box.scale, height: box.height * box.scale }}>
         <div
           ref={inner}
-          className="quote-out absolute top-0 left-0 origin-top-left pointer-events-none select-none"
+          className={`${PAPER} quote-out absolute top-0 left-0 origin-top-left pointer-events-none select-none`}
           style={{ width: box.natural, padding: PAD, transform: `scale(${box.scale})`, visibility: box.scale ? 'visible' : 'hidden' }}
         >
           <div className="quote-doc" style={{ width: box.layout, padding: 0 }} dangerouslySetInnerHTML={{ __html: clean }} />

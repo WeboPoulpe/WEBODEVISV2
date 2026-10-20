@@ -74,6 +74,8 @@ test('ouvrir depuis la liste, modifier et enregistrer : les valeurs arrivent en 
     await page.getByLabel('Prix unitaire HT').fill('15,50');
     await expect(page.getByTestId('presta-margin')).toContainText('9,50');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cocktail prestige du soir');
+    // La description s'édite dans la carte du devis elle-même, avec sa mise en forme.
+    await expect(page.getByRole('textbox', { name: 'Description' })).toContainText('COCKTAIL DÎNATOIRE PRESTIGE');
     // L'aperçu suit la saisie : la ligne du devis porte le nouveau nom et le nouveau prix.
     await expect(page.getByTestId('prestation-preview')).toContainText('Cocktail prestige du soir');
     await expect(page.getByTestId('prestation-preview')).toContainText('15,50');
@@ -188,9 +190,10 @@ test('aperçu à toutes les largeurs : fiche mise en page large contenue, onglet
       const id = await addPrestation(userId, { name: 'Plateau du chef', price: 22, description: RICH, card: WIDE_CARD });
       await page.goto(`/prestations/${id}`);
       await expect(page.getByLabel('Nom de la prestation')).toHaveValue('Plateau du chef', { timeout: 30_000 });
-      // La fiche existe : la page le dit, et propose de la modifier en plein écran.
-      await expect(page.getByText('fiche mise en page', { exact: false }).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Modifier la fiche' })).toBeVisible();
+      // La fiche existe : la page le dit, et on la modifie sur place, dans la carte.
+      await expect(page.getByText('mise en page libre', { exact: false }).first()).toBeVisible();
+      await expect(page.getByRole('textbox', { name: 'Texte de la carte, en français' })).toContainText('Plateau du chef');
+      await expect(page.getByRole('button', { name: 'Revenir au nom et à la description' })).toBeVisible();
       if (viewport.width < 1100) {
         await expect(page.getByTestId('prestation-preview')).toBeHidden();
         await page.getByRole('tab', { name: 'Aperçu' }).click();
