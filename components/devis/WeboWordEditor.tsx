@@ -28,7 +28,7 @@ import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvH
 import { useFeedback } from '@/components/ui/Feedback';
 import { documentHasCgv } from '@/lib/cgvDetect';
 import { usePrintPreview } from './weboword/usePrintPreview';
-import { PageEndMarkers } from './weboword/PageEndMarkers';
+import { PageSheets } from './weboword/PageSheets';
 import { CgvDuplicateBanner } from './weboword/CgvDuplicateBanner';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
@@ -1422,7 +1422,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </TB>
 
           {printPreview.totalPages !== null && (
-            <span className="ml-auto pl-2 text-xs text-gray-500 whitespace-nowrap" title="Estimation : les fins de page sont marquées en pointillés sur la feuille">
+            <span className="ml-auto pl-2 text-xs text-gray-500 whitespace-nowrap" title="Estimation d’après la mise en page de l’impression">
               ≈ {printPreview.totalPages} page{printPreview.totalPages > 1 ? 's' : ''} à l’impression
             </span>
           )}
@@ -1477,7 +1477,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         {/* Devis editor (A4) */}
         <div
           ref={sheetRef}
-          style={{ width: '210mm' }}
+          style={{ width: '210mm', minHeight: printPreview.sheetHeight ?? undefined }}
           className="relative mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full"
         >
           <style>{`
@@ -1534,8 +1534,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               else if (e.clipboardData.files.length > 0) setToast('Les photos se placent avec la page photos ou la page de garde.');
             }}
           />
-          {/* Fins de page de l'impression : repères posés par-dessus la feuille, hors du texte du devis. */}
-          <PageEndMarkers markers={printPreview.markers} />
+          {/* Vue en pages : bandes entre les feuilles, posées par-dessus, hors du texte du devis. */}
+          <PageSheets bands={printPreview.bands} />
         </div>
 
         {/* Page photos */}

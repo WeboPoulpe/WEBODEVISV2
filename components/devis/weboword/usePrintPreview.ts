@@ -13,19 +13,14 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { NEARLY_EMPTY_FILL } from '@/lib/pageBreaks';
 import type { QuoteOutputSettings } from '@/lib/quoteOutput';
 import { hasCgvTitle } from '@/lib/cgvDetect';
-import { MEASURE_FRAME_DOC, measurePrintPages, resolvePath } from './printMeasure';
-
-export interface PageEndMarker {
-  /** Numéro de la page qui se termine, dans le document imprimé (page de garde comprise). */
-  page: number;
-  /** Position du repère dans la feuille de l'éditeur, en pixels (sans le zoom d'affichage). */
-  top: number;
-  /** Page remplie à moins de 15 %. */
-  nearlyEmpty: boolean;
-}
+import { MEASURE_FRAME_DOC, measurePrintPages } from './printMeasure';
+import { applyPageView, type PageBand, type PageViewBreak } from './pageView';
 
 export interface PrintPreview {
-  markers: PageEndMarker[];
+  /** Bandes entre les feuilles de la vue en pages. */
+  bands: PageBand[];
+  /** Hauteur des feuilles de la vue en pages (px CSS), null avant la première mesure. */
+  sheetHeight: number | null;
   /** Nombre total de pages à l'impression (null tant que la mesure n'est pas faite). */
   totalPages: number | null;
   /** Le bloc des conditions générales ajouté automatiquement double un titre « Conditions Générales de Vente ». */
@@ -51,12 +46,16 @@ interface Options {
   cgvText: string | null;
 }
 
-const MM_TO_PX = 96 / 25.4;
-const SHEET_WIDTH_PX = 210 * MM_TO_PX;
 const DEBOUNCE_MS = 300;
+/** Sélecteur de la zone de texte de l'éditeur, racine des règles de la vue en pages. */
+const EDITOR_SELECTOR = '#weboword-sheet';
 
 export function usePrintPreview(o: Options): PrintPreview {
-  const [preview, setPreview] = useState<PrintPreview>({ markers: [], totalPages: null, cgvDuplicate: false });
+  const [preview, setPreview] = useState<PrintPreview>({ bands: [], sheetHeight: null, totalPages: null, cgvDuplicate: false });
+  const styleRef = useRef<HTMLStyleElement | null>(null);
+  // Hauteur de la zone de texte après la pose de la vue en pages : un redimensionnement qui n'en vient pas
+  // relance la mesure, celui que provoquent nos propres marges est ignoré.
+  const appliedHeightRef = useRef<number | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,36 +89,27 @@ export function usePrintPreview(o: Options): PrintPreview {
       html, settings, coverEnabled, photoPages, logoHtml, legalHtml, cgvHtml, cgvText,
     }, writtenRef.current);
     if (!measured) return;
-    const { blocks, paths, result, coverPages: cover, totalPages } = measured;
+    const { paths, result, coverPages: cover, totalPages } = measured;
 
-    // Report sur la feuille de l'éditeur (affichée éventuellement réduite sur téléphone).
-    const sheetRect = sheet.getBoundingClientRect();
-    const scale = sheetRect.width > 0 ? sheetRect.width / SHEET_WIDTH_PX : 1;
-    const editorRect = editor.getBoundingClientRect();
-    const editorBottom = (editorRect.bottom - sheetRect.top) / scale - (parseFloat(getComputedStyle(editor).paddingBottom) || 0);
-    const markers: PageEndMarker[] = [];
-    for (const end of result.ends) {
+    // Vue en pages : chaque page commence sur sa propre feuille, comme sur le papier.
+    const style = styleRef.current;
+    if (!style) return;
+    const breaks: PageViewBreak[] = result.ends.map((end) => {
       const path = paths[end.blockIndex];
-      let top: number | null = null;
-      if (path && path.length === 0) top = editorBottom;
-      else if (path) {
-        const el = resolvePath(editor, path);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          const measured = blocks[end.blockIndex].height;
-          const inside = end.offsetInBlock > 0 && measured > 0 ? (end.offsetInBlock / measured) * (r.height / scale) : -3;
-          top = (r.top - sheetRect.top) / scale + inside;
-        }
-      }
-      if (top === null) continue;
-      markers.push({ page: end.page + cover, top: Math.round(top), nearlyEmpty: end.fill < NEARLY_EMPTY_FILL });
-    }
+      return { path: path && path.length > 0 ? path : null, nextPage: end.page + 1 + cover, nearlyEmpty: end.fill < NEARLY_EMPTY_FILL };
+    });
+    const view = applyPageView(editor, sheet, style, EDITOR_SELECTOR, breaks);
+    appliedHeightRef.current = editor.offsetHeight;
+    // Le contenu enregistré ne doit jamais porter la vue en pages.
+    if (process.env.NODE_ENV !== 'production' && editor.innerHTML !== html) console.error('Vue en pages : le contenu du devis a changé pendant la mesure.');
 
+    const bands = view.bands.map((b) => ({ ...b, top: Math.round(b.top) }));
+    const sheetHeight = Math.ceil(view.height);
     setPreview((prev) => {
-      const same = prev.totalPages === totalPages && prev.cgvDuplicate === cgvDuplicate
-        && prev.markers.length === markers.length
-        && prev.markers.every((m, i) => m.page === markers[i].page && m.top === markers[i].top && m.nearlyEmpty === markers[i].nearlyEmpty);
-      return same ? prev : { markers, totalPages, cgvDuplicate };
+      const same = prev.totalPages === totalPages && prev.cgvDuplicate === cgvDuplicate && prev.sheetHeight === sheetHeight
+        && prev.bands.length === bands.length
+        && prev.bands.every((m, i) => m.nextPage === bands[i].nextPage && m.top === bands[i].top && m.nearlyEmpty === bands[i].nearlyEmpty);
+      return same ? prev : { bands, sheetHeight, totalPages, cgvDuplicate };
     });
   };
 
@@ -136,6 +126,10 @@ export function usePrintPreview(o: Options): PrintPreview {
     frame.title = 'Mesure des pages';
     frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:200px;border:0;visibility:hidden;pointer-events:none;';
     frame.srcdoc = MEASURE_FRAME_DOC;
+    const style = document.createElement('style');
+    style.setAttribute('data-weboword-pages', '');
+    document.head.appendChild(style);
+    styleRef.current = style;
     const onFrameLoad = () => {
       readyRef.current = true;
       const idoc = frame.contentDocument;
@@ -151,7 +145,10 @@ export function usePrintPreview(o: Options): PrintPreview {
     const editor = optsRef.current.editorRef.current;
     const mutations = new MutationObserver(schedule);
     if (editor) mutations.observe(editor, { subtree: true, childList: true, characterData: true, attributes: true });
-    const resize = new ResizeObserver(schedule);
+    const resize = new ResizeObserver(() => {
+      if (editor && editor.offsetHeight === appliedHeightRef.current) return;
+      schedule();
+    });
     if (editor) resize.observe(editor);
     window.addEventListener('resize', schedule);
     document.fonts?.addEventListener?.('loadingdone', schedule);
@@ -165,6 +162,8 @@ export function usePrintPreview(o: Options): PrintPreview {
       frame.removeEventListener('load', onFrameLoad);
       frame.remove();
       frameRef.current = null;
+      style.remove();
+      styleRef.current = null;
       readyRef.current = false;
       writtenRef.current = new Map();
     };

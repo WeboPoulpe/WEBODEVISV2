@@ -32,7 +32,7 @@ function isLeaf(el: Element, win: Window): boolean {
 }
 
 /** Les blocs du document mesuré, dans l'ordre, avec pour chacun le chemin de l'élément (index des enfants). */
-export function collectBlocks(root: HTMLElement, win: Window, rootTop: number): { blocks: PageBlock[]; paths: number[][] } {
+export function collectBlocks(root: HTMLElement, win: Window, rootTop: number, pageHeight = Infinity): { blocks: PageBlock[]; paths: number[][] } {
   const blocks: PageBlock[] = [];
   const paths: number[][] = [];
   let pendingForce = false;
@@ -47,9 +47,12 @@ export function collectBlocks(root: HTMLElement, win: Window, rootTop: number): 
       const sideBySide = isSideBySide(cs);
       const leaf = row || child.tagName === 'IMG' || sideBySide || isLeaf(child, win);
       const childPath = [...path, i];
+      const rect = child.getBoundingClientRect();
+      // Un bloc « à ne pas couper » plus haut qu'une page est coupé quand même par le navigateur, entre ses
+      // enfants (lignes du tableau…) : on descend dedans.
+      const keepWhole = avoid && !(rect.height > pageHeight && !leaf);
 
-      if (avoid || leaf) {
-        const rect = child.getBoundingClientRect();
+      if (keepWhole || leaf) {
         // Un repère de saut sans hauteur (séparateur de l'éditeur) occupe quand même une page : s'il tombe juste
         // après la fin d'une page, le navigateur l'y pose seul, puis change de page (page blanche).
         const marker = rect.height === 0 && isPageBreak(cs.breakAfter);
@@ -64,10 +67,10 @@ export function collectBlocks(root: HTMLElement, win: Window, rootTop: number): 
           blocks.push({
             top: rect.top - rootTop,
             height: marker ? 1 : rect.height,
-            unbreakable: avoid || row || hasImg || marker,
+            unbreakable: keepWhole || row || hasImg || marker,
             forceBreakBefore: force,
             keepWithNext: cs.breakAfter === 'avoid',
-            lineHeight: avoid || row || hasImg ? undefined : lh,
+            lineHeight: keepWhole || row || hasImg ? undefined : lh,
             repeatHeader,
           });
           paths.push(childPath);
@@ -156,7 +159,7 @@ export function measurePrintPages(idoc: Document, iwin: Window, input: MeasureIn
     // Origine : le haut de la zone utile de la page (la cellule qui porte le document). Le bandeau d'en-tête
     // remonte au-dessus (marge négative), comme sur la feuille imprimée.
     const origin = (qd.parentElement ?? qd).getBoundingClientRect().top;
-    const { blocks, paths } = collectBlocks(qd, iwin, origin);
+    const { blocks, paths } = collectBlocks(qd, iwin, origin, PAGE_CONTENT_PX);
     const qdRect = qd.getBoundingClientRect();
     // Mentions légales : juste sous le document, sur sa dernière page si elles y tiennent.
     const legalBox = legal?.firstElementChild;
