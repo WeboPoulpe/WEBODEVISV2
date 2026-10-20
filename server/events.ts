@@ -6,6 +6,7 @@ import { db } from '@/db';
 import {
   event_ingredients, ingredients, prestations, quotes, service_ingredients, supplier_order_items, supplier_orders,
 } from '@/db/schema';
+import { toPurchaseUnit } from '@/lib/costing';
 import { computeIngredientNeeds, groupNeedsBySupplier, type PrestationRecipe, type QuoteLine } from '@/lib/events/needs';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { requireUser, requireWriter } from './session';
@@ -70,8 +71,8 @@ export async function recalculateCourses(quoteId: string): Promise<RecalculateRe
     name: p.name,
     ingredients: links.filter((l) => l.service_id === p.id).map((l) => ({
       ingredient_id: l.ingredient_id,
-      qty_per_person: Number(l.qty_per_person),
-      unit: l.unit ?? l.ingredient_unit,
+      // Les courses se font dans l'unité d'achat de l'ingrédient : 150 g par personne d'un ingrédient vendu au kg → 0,15 kg.
+      ...toPurchaseUnit(Number(l.qty_per_person), l.unit, l.ingredient_unit),
       preferred_supplier_id: l.preferred_supplier_id,
       unit_price: Number(l.volume_unit_price ?? 0),
     })),

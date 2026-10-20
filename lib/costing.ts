@@ -56,6 +56,36 @@ export function unitFactor(from: string | null | undefined, to: string | null | 
   return null;
 }
 
+/**
+ * Quantité par personne ramenée à l'unité d'achat de l'ingrédient quand elles se comparent (150 g → 0,15 kg) ;
+ * sinon elle reste dans l'unité de la recette.
+ */
+export function toPurchaseUnit(qty: number, unit: string | null | undefined, ingredientUnit: string | null | undefined): { qty_per_person: number; unit: string | null } {
+  const recipe = (unit ?? '').trim();
+  const purchase = (ingredientUnit ?? '').trim();
+  if (!recipe) return { qty_per_person: qty, unit: purchase || null };
+  const factor = purchase ? unitFactor(recipe, purchase) : null;
+  return factor == null ? { qty_per_person: qty, unit: recipe } : { qty_per_person: qty * factor, unit: purchase };
+}
+
+/** Unités proposées pour la quantité par personne : celles qui se convertissent vers l'unité d'achat de l'ingrédient. */
+export function recipeUnits(ingredientUnit: string | null | undefined): string[] {
+  const own = (ingredientUnit ?? '').trim();
+  const m = MEASURES[normalizeUnit(own)];
+  const family = m?.kind === 'masse' ? ['g', 'kg'] : m?.kind === 'volume' ? ['ml', 'cl', 'dl', 'L'] : null;
+  if (family) return family;
+  if (!own) return ['g', 'kg', 'ml', 'cl', 'L', 'pièce'];
+  return [own];
+}
+
+/** Unité de saisie la plus naturelle par personne : le gramme pour un ingrédient au kilo, le centilitre pour un au litre. */
+export function defaultRecipeUnit(ingredientUnit: string | null | undefined): string {
+  const u = normalizeUnit(ingredientUnit);
+  if (u === 'kg') return 'g';
+  if (u === 'l') return 'cl';
+  return recipeUnits(ingredientUnit).find((x) => normalizeUnit(x) === u) ?? recipeUnits(ingredientUnit)[0];
+}
+
 // ── Coût matière d'une prestation ─────────────────────────────────────────────
 export interface RecipeLine {
   name: string;

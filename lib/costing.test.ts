@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { margin, normalizeUnit, quoteCost, recipeCost, staffCost, sumMargins, unitFactor } from './costing';
+import { defaultRecipeUnit, margin, normalizeUnit, quoteCost, recipeCost, recipeUnits, staffCost, sumMargins, toPurchaseUnit, unitFactor } from './costing';
 
 describe('unités', () => {
   it('regroupe les écritures d’une même unité', () => {
@@ -109,5 +109,24 @@ describe('personnel et totaux', () => {
       { revenueHT: 500, totalCost: 0, hasCost: false },
     ]);
     expect(t).toEqual({ revenueHT: 1000, cost: 400, margin: 600, rate: 60, costed: 1, uncosted: 1 });
+  });
+});
+
+describe('quantité par personne', () => {
+  it('propose les unités qui se convertissent vers l’unité d’achat', () => {
+    expect(recipeUnits('kg')).toEqual(['g', 'kg']);
+    expect(recipeUnits('Litre')).toEqual(['ml', 'cl', 'dl', 'L']);
+    expect(recipeUnits('Botte')).toEqual(['Botte']);
+    expect(recipeUnits(null)).toContain('pièce');
+    expect(defaultRecipeUnit('kg')).toBe('g');
+    expect(defaultRecipeUnit('L')).toBe('cl');
+    expect(defaultRecipeUnit('Botte')).toBe('Botte');
+  });
+
+  it('ramène la quantité à l’unité d’achat pour les courses', () => {
+    expect(toPurchaseUnit(150, 'g', 'kg')).toEqual({ qty_per_person: 0.15, unit: 'kg' });
+    expect(toPurchaseUnit(1, 'kg', 'kg')).toEqual({ qty_per_person: 1, unit: 'kg' });
+    expect(toPurchaseUnit(2, null, 'Botte')).toEqual({ qty_per_person: 2, unit: 'Botte' });
+    expect(toPurchaseUnit(3, 'tranche', 'kg')).toEqual({ qty_per_person: 3, unit: 'tranche' });
   });
 });

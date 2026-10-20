@@ -18,7 +18,7 @@ import { usePrestationCategories } from '@/hooks/usePrestationCategories';
 import AllergenPicker from '@/components/allergens/AllergenPicker';
 import { ALLERGEN_LABELS, ingredientAllergens, prestationAllergens, sortAllergens, type AllergenKey } from '@/lib/allergens';
 import RecipeCostPanel from '@/components/costing/RecipeCostPanel';
-import { margin as computeMargin } from '@/lib/costing';
+import { defaultRecipeUnit, margin as computeMargin, recipeUnits } from '@/lib/costing';
 
 // Page d'une prestation du catalogue : création (/prestations/nouvelle) et modification (/prestations/[id]).
 // Grand écran : le formulaire à gauche, l'aperçu dans un devis à droite (colonne collante).
@@ -54,7 +54,7 @@ interface IngredientLink {
 }
 
 /** Ingrédient de la recette, tel que le calcul des allergènes le lit. */
-type RecipeItem = { name: string; allergens: string[] | null | undefined };
+type RecipeItem = { name: string; allergens: string[] | null | undefined; /** Quantité et unité, pour refaire le coût matière. */ amount?: string };
 
 // Sélection des liens de la recette. Sans la colonne des allergènes (migration pas encore appliquée), on s'en passe.
 const LINK_SELECT = 'id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit, allergens)';
@@ -118,6 +118,37 @@ function Section({ title, hint, children, id }: { title: string; hint?: React.Re
 }
 
 // ── Ingrédients liés (modification seulement) ────────────────────────────────
+/** Unités proposées pour un ingrédient, en gardant celle déjà enregistrée si elle sort de la liste. */
+const unitChoices = (ingredientUnit: string | null, current: string | null | undefined) => {
+  const list = recipeUnits(ingredientUnit);
+  return current && !list.includes(current) ? [current, ...list] : list;
+};
+
+/** Quantité et unité côte à côte : « 150 » « g ». */
+function QtyUnitFields({ id, qty, unit, units, onQty, onUnit, onEnter, autoFocus }: {
+  id: string; qty: string; unit: string; units: string[];
+  onQty: (v: string) => void; onUnit: (v: string) => void; onEnter: () => void; autoFocus?: boolean;
+}) {
+  return (
+    <span className="flex items-center gap-2">
+      <input
+        id={id} inputMode="decimal" value={qty} placeholder="150" autoFocus={autoFocus}
+        onChange={(e) => onQty(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } }}
+        className={cn(inputCls, 'w-24 h-10')}
+      />
+      {units.length > 1 ? (
+        <select value={unit} onChange={(e) => onUnit(e.target.value)} aria-label="Unité" className={cn(inputCls, 'w-auto h-10 pr-8')}>
+          {units.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+      ) : (
+        <span className="text-gray-700">{units[0]}</span>
+      )}
+      <span className="text-sm text-gray-500 whitespace-nowrap">/ pers.</span>
+    </span>
+  );
+}
+
 function IngredientsSection({ prestationId, userId, onRecipe }: {
   prestationId: string; userId: string;
   /** Recette à jour, pour le calcul des allergènes. */
@@ -130,8 +161,11 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
   const [search, setSearch] = useState('');
   const [options, setOptions] = useState<IngredientOption[]>([]);
   const [selected, setSelected] = useState<IngredientOption | null>(null);
-  const [qty, setQty] = useState('1');
+  const [qty, setQty] = useState('');
+  const [unit, setUnit] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Lien en cours de modification (quantité et unité). */
+  const [editing, setEditing] = useState<{ id: string; qty: string; unit: string; saving: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadLinks = useCallback(async () => {
@@ -149,7 +183,7 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
 
   // La recette change (chargement, ajout, retrait) : le calcul des allergènes suit.
   useEffect(() => {
-    if (!loadingLinks) onRecipe(links.map((l) => ({ name: l.ingredient.name, allergens: l.ingredient.allergens })));
+    if (!loadingLinks) onRecipe(links.map((l) => ({ name: l.ingredient.name, allergens: l.ingredient.allergens, amount: `${l.qty_per_person} ${l.unit ?? ''}` })));
   }, [links, loadingLinks, onRecipe]);
 
   useEffect(() => {
@@ -165,19 +199,36 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
     return () => clearTimeout(t);
   }, [search, showAdd, userId]);
 
+  const pick = (o: IngredientOption) => {
+    setSelected(o); setSearch(o.name); setOptions([]);
+    setUnit(defaultRecipeUnit(o.unit)); setQty('');
+  };
+
   const addLink = async () => {
     if (!selected) return;
     const amount = parseAmount(qty);
+    if (amount == null || Number.isNaN(amount) || amount <= 0) { setError('Indiquez la quantité par personne (par exemple 150).'); return; }
     setSaving(true); setError(null);
     const { data, error } = await createClient()
       .from('service_ingredients')
-      .insert({ service_id: prestationId, ingredient_id: selected.id, qty_per_person: amount && amount > 0 ? amount : 1, unit: selected.unit || null, user_id: userId })
+      .insert({ service_id: prestationId, ingredient_id: selected.id, qty_per_person: amount, unit: unit || selected.unit || null, user_id: userId })
       .select(linkSelect)
       .single();
     setSaving(false);
     if (error) { setError('L’ingrédient n’a pas pu être lié. Réessayez.'); return; }
     if (data) setLinks((p) => [...p, data as unknown as IngredientLink]);
-    setSelected(null); setSearch(''); setQty('1'); setShowAdd(false);
+    setSelected(null); setSearch(''); setQty(''); setUnit(''); setShowAdd(false);
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const amount = parseAmount(editing.qty);
+    if (amount == null || Number.isNaN(amount) || amount <= 0) { setError('Indiquez une quantité par personne supérieure à zéro.'); return; }
+    setEditing({ ...editing, saving: true }); setError(null);
+    const { error } = await createClient().from('service_ingredients').update({ qty_per_person: amount, unit: editing.unit || null }).eq('id', editing.id);
+    if (error) { setEditing({ ...editing, saving: false }); setError('La quantité n’a pas pu être enregistrée. Réessayez.'); return; }
+    setLinks((p) => p.map((l) => (l.id === editing.id ? { ...l, qty_per_person: amount, unit: editing.unit || null } : l)));
+    setEditing(null);
   };
 
   const removeLink = async (id: string) => {
@@ -194,11 +245,32 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
         <p className="text-[15px] text-gray-600">Aucun ingrédient lié.</p>
       ) : links.length > 0 && (
         <ul className="space-y-1.5">
-          {links.map((l) => (
+          {links.map((l) => editing?.id === l.id ? (
+            <li key={l.id} className="flex flex-wrap items-center gap-2 text-[15px] bg-gray-50 rounded-xl px-4 py-2">
+              <Carrot className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="flex-1 min-w-[8rem] text-gray-900 truncate">{l.ingredient.name}</span>
+              <QtyUnitFields
+                id={`ing-edit-${l.id}`} qty={editing.qty} unit={editing.unit} units={unitChoices(l.ingredient.unit, l.unit)}
+                onQty={(v) => setEditing({ ...editing, qty: v })} onUnit={(v) => setEditing({ ...editing, unit: v })}
+                onEnter={saveEdit} autoFocus
+              />
+              <button type="button" onClick={saveEdit} disabled={editing.saving} className={cn(btnPrimary, 'h-10')}>
+                {editing.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}OK
+              </button>
+              <button type="button" onClick={() => setEditing(null)} className={cn(btnGhost, 'h-10')}>Annuler</button>
+            </li>
+          ) : (
             <li key={l.id} className="flex items-center gap-2 text-[15px] bg-gray-50 rounded-xl pl-4">
               <Carrot className="h-4 w-4 text-primary flex-shrink-0" />
               <span className="flex-1 min-w-0 text-gray-900 truncate">{l.ingredient.name}</span>
-              <span className="text-gray-700 tabular-nums whitespace-nowrap">{String(l.qty_per_person).replace('.', ',')} {l.unit ?? l.ingredient.unit ?? ''} / pers.</span>
+              <button
+                type="button"
+                onClick={() => { setError(null); setEditing({ id: l.id, qty: String(l.qty_per_person).replace('.', ','), unit: l.unit ?? defaultRecipeUnit(l.ingredient.unit), saving: false }); }}
+                className="h-10 px-2 -mr-1 rounded-lg text-gray-700 tabular-nums whitespace-nowrap hover:bg-white hover:text-gray-900 underline decoration-dotted underline-offset-4"
+                aria-label={`Modifier la quantité de ${l.ingredient.name}`}
+              >
+                {String(l.qty_per_person).replace('.', ',')} {l.unit ?? l.ingredient.unit ?? ''} / pers.
+              </button>
               <button type="button" onClick={() => removeLink(l.id)} className={iconBtnDanger} aria-label={`Retirer ${l.ingredient.name}`}>
                 <X className="h-4 w-4" />
               </button>
@@ -225,7 +297,7 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
               {options.map((o) => (
                 <button
                   key={o.id} type="button"
-                  onClick={() => { setSelected(o); setSearch(o.name); setOptions([]); }}
+                  onClick={() => pick(o)}
                   className="w-full text-left px-4 min-h-11 py-2 text-[15px] hover:bg-primary-50 transition-colors border-b border-gray-100 last:border-0"
                 >
                   {o.name} {o.unit ? <span className="text-gray-500">({o.unit})</span> : null}
@@ -240,7 +312,7 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
             {selected && (
               <div>
                 <label htmlFor="ing-qty" className={labelCls}>Quantité par personne</label>
-                <input id="ing-qty" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} className={cn(inputCls, 'w-32')} />
+                <QtyUnitFields id="ing-qty" qty={qty} unit={unit} units={unitChoices(selected.unit, unit)} onQty={setQty} onUnit={setUnit} onEnter={addLink} autoFocus />
               </div>
             )}
             {selected && (
@@ -570,7 +642,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     ? computeMargin(priceValue!, costValue)
     : null;
   /** Recette lue par le calcul du coût matière : il est refait quand un ingrédient est lié ou retiré. */
-  const recipeKey = recipe ? recipe.map((r) => r.name).join('|') : '';
+  const recipeKey = recipe ? recipe.map((r) => `${r.name}:${r.amount ?? ''}`).join('|') : '';
 
   const dirty =
     name !== startValues.name || price !== startValues.price || childPrice !== startValues.childPrice ||
