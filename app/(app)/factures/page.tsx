@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { ArrowRight, Download, Receipt, Search } from 'lucide-react';
 import { listInvoices, type Invoice } from '@/server/invoices';
 import { INVOICE_KIND_LABELS } from '@/lib/invoices';
-import { invoicesCsv } from '@/lib/invoiceCsv';
 import { frDate } from '@/lib/invoiceMentions';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatCurrency } from '@/lib/utils';
 import { btnPrimary, btnSecondary, cardCls, errorCls, inputCls } from '@/components/ui/kit';
-import InvoiceStatusPill, { invoiceStatusLabel } from '@/components/factures/InvoiceStatusPill';
+import InvoiceStatusPill from '@/components/factures/InvoiceStatusPill';
+import AccountingExportModal from '@/components/factures/AccountingExportModal';
 
 type Filter = 'toutes' | 'brouillons' | 'a_encaisser' | 'en_retard' | 'payees' | 'avoirs';
 
@@ -100,6 +100,7 @@ export default function FacturesPage() {
   const [filter, setFilter] = useState<Filter>('toutes');
   const [search, setSearch] = useState('');
   const [today, setToday] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setToday(todayIso());
@@ -134,18 +135,6 @@ export default function FacturesPage() {
   const listed = searched.filter((i) => MATCH[filter](i, today));
   const countOf = (f: Filter) => searched.filter((i) => MATCH[f](i, today)).length;
 
-  const exportCsv = () => {
-    const csv = invoicesCsv(listed, (i) => invoiceStatusLabel(i.kind, i.status));
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `factures-${todayIso()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
   const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
 
   return (
@@ -156,12 +145,14 @@ export default function FacturesPage() {
           <p className="text-sm text-gray-600 mt-1">{loading ? 'Chargement…' : all.length === 0 ? 'Acomptes, soldes et avoirs de vos devis' : plural(all.length, 'facture au total', 'factures au total')}</p>
         </div>
         {all.length > 0 && (
-          <button onClick={exportCsv} disabled={listed.length === 0} className={cn(btnSecondary, 'w-full sm:w-auto')}
-            title="Les factures affichées, à ouvrir dans Excel ou à envoyer à votre comptable">
-            <Download className="h-4 w-4" />Exporter (CSV)
+          <button onClick={() => setExporting(true)} className={cn(btnSecondary, 'w-full sm:w-auto')}
+            title="Factures, avoirs et paiements d’une période, en CSV pour Excel ou au format FEC">
+            <Download className="h-4 w-4" />Export comptable
           </button>
         )}
       </div>
+
+      {exporting && <AccountingExportModal onClose={() => setExporting(false)} />}
 
       {error && <p role="alert" className={cn(errorCls, 'mb-4')}>{error}</p>}
 

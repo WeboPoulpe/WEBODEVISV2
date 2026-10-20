@@ -1,6 +1,6 @@
 // Heures et coût du personnel (extras) : heures prévues d'après l'arrivée et la fin, heures retenues,
 // taux appliqué, coût d'un événement, et récapitulatif mensuel par extra pour la paie (export CSV
-// pour Excel : séparateur « ; », décimales à virgule, BOM UTF-8, comme lib/invoiceCsv.ts).
+// pour Excel : séparateur « ; », décimales à virgule, BOM UTF-8, comme lib/accountingExport.ts).
 // Fonctions pures, sans accès à la base.
 
 import type { MissionStatus } from './extras';
