@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill, errorCls } from '@/components/ui/kit';
 import { ErrorBanner, esc, printDocument } from '@/components/evenements/shared';
 import { sendSupplierOrder } from '@/server/supplierOrders';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Supplier { id: string; name: string; email: string | null; phone: string | null; }
 interface Ingredient { id: string; name: string; unit: string | null; volume_unit_price: number | null; preferred_supplier_id: string | null; }
@@ -42,6 +43,7 @@ const num = (n: number) => n.toLocaleString('fr-FR');
 
 export default function CommandesPage() {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [orders, setOrders] = useState<SupplierOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,7 +237,7 @@ export default function CommandesPage() {
 
   async function markAsReceived(orderId: string) {
     if (!user) return;
-    if (!confirm('Marquer cette commande comme reçue ? Ses quantités seront ajoutées au stock.')) return;
+    if (!(await confirm({ title: 'Marquer cette commande comme reçue ?', message: 'Ses quantités seront ajoutées au stock.', confirmLabel: 'Marquer reçue' }))) return;
     const supabase = createClient();
     const order = orders.find((o) => o.id === orderId);
     if (!order || !order.items) return;
@@ -269,7 +271,7 @@ export default function CommandesPage() {
   }
 
   async function deleteOrder(orderId: string) {
-    if (!confirm('Supprimer cette commande ? Cette action est définitive.')) return;
+    if (!(await confirm({ title: 'Supprimer cette commande ?', message: 'Cette action est définitive.', danger: true }))) return;
     const { error: err } = await createClient().from('supplier_orders').delete().eq('id', orderId);
     if (err) { setError('La commande n’a pas pu être supprimée. Réessayez.'); return; }
     setError(null);

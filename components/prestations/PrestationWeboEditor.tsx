@@ -10,6 +10,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Props {
   prestationId: string;
@@ -77,6 +78,7 @@ export default function PrestationWeboEditor({
   prestationId, name, unitPrice, category, subCategory, initialHtml, initialHtmlEn, description,
 }: Props) {
   const router = useRouter();
+  const { confirm, notify } = useFeedback();
   const editorRef = useRef<HTMLDivElement>(null);
   const initDone = useRef(false);
 
@@ -97,7 +99,7 @@ export default function PrestationWeboEditor({
 
     // SAFETY: only allow translation if user is on FR tab (use sync ref, not state)
     if (activeLangRef.current !== 'fr') {
-      alert('Pour traduire, placez-vous d\'abord sur l\'onglet 🇫🇷 Français');
+      notify('Pour traduire, placez-vous d’abord sur l’onglet Français.', { tone: 'info' });
       return;
     }
 
@@ -110,12 +112,12 @@ export default function PrestationWeboEditor({
     tmpCheck.innerHTML = frHtml;
     const textContent = (tmpCheck.textContent || '').trim();
     if (!textContent) {
-      alert('Aucun contenu français à traduire');
+      notify('Il n’y a pas encore de texte en français à traduire.', { tone: 'info' });
       return;
     }
 
     if (htmlEnRef.current.trim() && htmlEnRef.current !== defaultHtmlEn) {
-      if (!confirm('La version anglaise existe déjà. Voulez-vous l\'écraser ?')) return;
+      if (!(await confirm({ title: 'Remplacer la version anglaise ?', message: 'La version anglaise existe déjà. Elle sera remplacée par la nouvelle traduction.', confirmLabel: 'Remplacer', danger: true }))) return;
     }
 
     setTranslating(true);
@@ -152,7 +154,8 @@ export default function PrestationWeboEditor({
       setLanguage('en');
     } catch (err) {
       setTranslating(false);
-      alert('Erreur de traduction: ' + (err as Error).message);
+      console.error('Traduction de la fiche', err);
+      notify('La traduction n’a pas pu être faite. Vérifiez votre connexion et réessayez.', { tone: 'error' });
     }
   };
 
@@ -279,14 +282,14 @@ export default function PrestationWeboEditor({
         .update({ gastro_card_html: htmlFrRef.current })
         .eq('id', prestationId);
       error = res.error;
-      if (!error) alert('La version française est enregistrée. La version anglaise n’a pas pu l’être : prévenez le support.');
+      if (!error) notify('La version française est enregistrée. La version anglaise n’a pas pu l’être : prévenez le support.', { tone: 'error' });
     }
     setSaving(false);
     if (!error) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } else {
-      alert('La fiche n’a pas pu être enregistrée. Vérifiez votre connexion et réessayez.');
+      notify('La fiche n’a pas pu être enregistrée. Vérifiez votre connexion et réessayez.', { tone: 'error' });
     }
   };
 

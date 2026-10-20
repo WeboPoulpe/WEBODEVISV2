@@ -6,6 +6,7 @@ import { ArrowLeft, Bug, FolderTree, Inbox, LayoutDashboard, LogOut, ScrollText,
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import Wordmark from '@/components/brand/Wordmark';
+import { FeedbackProvider } from '@/components/ui/Feedback';
 
 const NAV = [
   { href: '/admin', icon: LayoutDashboard, label: 'Vue d’ensemble', exact: true },
@@ -25,6 +26,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const leave = async () => { await signOut(); window.location.assign('/login'); };
 
   return (
+    <FeedbackProvider aboveTabBar={false}>
     <div className="flex h-[100dvh] overflow-hidden bg-page">
       <aside className="hidden lg:flex flex-col w-64 m-2 rounded-3xl bg-forest text-white flex-shrink-0">
         <div className="px-6 pt-7 pb-6">
@@ -77,5 +79,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </main>
       </div>
     </div>
+    </FeedbackProvider>
   );
 }

@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { REQUEST_KIND, REQUEST_STATUS } from '../labels';
+import { useFeedback } from '@/components/ui/Feedback';
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 const day = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
@@ -86,6 +87,7 @@ export default function AdminRequestsPage() {
 }
 
 function RequestDialog({ request, onClose, onChanged }: { request: AdminSiteRequest; onClose: () => void; onChanged: () => Promise<void> }) {
+  const { confirm } = useFeedback();
   const [status, setStatus] = useState(request.status as SiteRequestStatus);
   const [notes, setNotes] = useState(request.admin_notes ?? '');
   const [busy, setBusy] = useState(false);
@@ -101,7 +103,7 @@ function RequestDialog({ request, onClose, onChanged }: { request: AdminSiteRequ
     onClose();
   };
   const remove = async () => {
-    if (!confirm('Supprimer définitivement cette demande ?')) return;
+    if (!(await confirm({ title: 'Supprimer définitivement cette demande ?', danger: true }))) return;
     await deleteSiteRequest(request.id);
     await onChanged();
     onClose();

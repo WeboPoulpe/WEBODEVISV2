@@ -18,6 +18,7 @@ import CompanySearch from '@/components/clients/CompanySearch';
 import type { CompanyResult } from '@/lib/companies';
 import { VAT_RATES, vatLabel } from '@/lib/vat';
 import VatRateSelect from '@/components/devis/VatRateSelect';
+import { useFeedback } from '@/components/ui/Feedback';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -57,6 +58,7 @@ interface Service { name: string; quantity: number; unitPrice: number; isFree?: 
 export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
   // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
   const supabase = useMemo(() => createClient(), []);
+  const { notify } = useFeedback();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -513,7 +515,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
 
     setSaving(false);
-    if (error) { alert('Les modifications n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.'); return; }
+    if (error) { notify('Les modifications n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.', { tone: 'error' }); return; }
     const parts = [kept.includes('intro') && 'l’introduction', kept.includes('menuTitle') && 'le titre du menu'].filter(Boolean);
     onApplied(partiesChanged && parts.length
       ? `Client ou événement modifié : ${parts.join(' et ')}, réécrit${parts.length > 1 ? 's' : ''} à la main, n’${parts.length > 1 ? 'ont' : 'a'} pas été mis à jour. Relisez-l${parts.length > 1 ? 'es' : 'e'} dans le document.`

@@ -15,6 +15,7 @@ import { margin } from '@/lib/costing';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { useAuth } from '@/context/AuthContext';
 import { usePrestationCategories } from '@/hooks/usePrestationCategories';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Prestation {
@@ -276,6 +277,7 @@ const LIST_STATE = 'prestations:liste';
 
 export default function PrestationsPage() {
   const { user } = useAuth();
+  const { confirm, notify } = useFeedback();
   const [items, setItems] = useState<Prestation[]>([]);
   // Prestations dont les allergènes restent à vérifier (vide tant que la migration 0020 n'est pas appliquée).
   const [toCheck, setToCheck] = useState<Set<string>>(new Set());
@@ -426,9 +428,9 @@ export default function PrestationsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cette prestation ?')) return;
+    if (!(await confirm({ title: 'Supprimer cette prestation ?', danger: true }))) return;
     const { error } = await createClient().from('prestations').delete().eq('id', id);
-    if (error) { alert('La prestation n’a pas pu être supprimée. Réessayez.'); return; }
+    if (error) { notify('La prestation n’a pas pu être supprimée. Réessayez.', { tone: 'error' }); return; }
     setItems((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -516,7 +518,7 @@ export default function PrestationsPage() {
       gastro_card_html: full.gastro_card_html,
       gastro_card_html_en: full.gastro_card_html_en,
     }]).select().single();
-    if (error) { alert('La copie n’a pas pu être créée. Réessayez.'); return; }
+    if (error) { notify('La copie n’a pas pu être créée. Réessayez.', { tone: 'error' }); return; }
     // Refetch pour que la copie apparaisse tout de suite, au bon endroit (tri/groupes).
     await load();
   };

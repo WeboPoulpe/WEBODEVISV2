@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { btnGhost, btnPrimary, cardCls, iconBtn, iconBtnDanger, inputCls, pill } from '@/components/ui/kit';
 import { ErrorBanner } from '@/components/evenements/shared';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Category { id: string; name: string; icon: string | null; sort_order: number; user_id: string | null; }
 interface Subcategory { id: string; category_id: string; name: string; sort_order: number; user_id: string | null; }
@@ -31,6 +32,7 @@ function NameInput({ value, onChange, onSubmit, onCancel, placeholder, label }: 
 
 export default function UserCategoriesPage() {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [categories, setCategories] = useState<Category[]>([]);
   const [subs, setSubs] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +90,7 @@ export default function UserCategoriesPage() {
   };
 
   const deleteCategory = async (id: string) => {
-    if (!confirm('Supprimer cette catégorie ? Ses sous-catégories seront supprimées aussi.')) return;
+    if (!(await confirm({ title: 'Supprimer cette catégorie ?', message: 'Ses sous-catégories seront supprimées aussi.', danger: true }))) return;
     const res = await createClient().from('prestation_categories').delete().eq('id', id);
     if (!ok(res, 'La catégorie n’a pas pu être supprimée. Réessayez.')) return;
     fetchAll();
@@ -111,7 +113,7 @@ export default function UserCategoriesPage() {
   };
 
   const deleteSubcategory = async (id: string) => {
-    if (!confirm('Supprimer cette sous-catégorie ?')) return;
+    if (!(await confirm({ title: 'Supprimer cette sous-catégorie ?', danger: true }))) return;
     const res = await createClient().from('prestation_subcategories').delete().eq('id', id);
     if (!ok(res, 'La sous-catégorie n’a pas pu être supprimée. Réessayez.')) return;
     fetchAll();

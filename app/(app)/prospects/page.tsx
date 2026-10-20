@@ -14,6 +14,7 @@ import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { defaultVatRate } from '@/lib/vat';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ProspectStatus =
@@ -100,6 +101,7 @@ function formatDate(iso: string | null) {
 // ── Token Manager Modal ────────────────────────────────────────────────────────
 function TokenManagerModal({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [token, setToken] = useState<Token | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -155,7 +157,7 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
   };
 
   const regenerate = async () => {
-    if (!token || !confirm('Régénérer le lien ? L\'ancien lien ne fonctionnera plus.')) return;
+    if (!token || !(await confirm({ title: 'Régénérer le lien ?', message: 'L’ancien lien ne fonctionnera plus.', confirmLabel: 'Régénérer', danger: true }))) return;
     const supabase = createClient();
     const newToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
     const { data } = await supabase
@@ -528,6 +530,7 @@ ${prospect.message.trim()}`
 
 // ── Save prospect as customer button ──────────────────────────────────────────
 function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
+  const { notify } = useFeedback();
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [alreadyExists, setAlreadyExists] = useState(false);
@@ -560,7 +563,8 @@ function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
     });
     setLoading(false);
     if (error) {
-      alert('Erreur: ' + error.message);
+      console.error('Ajout du prospect au carnet clients', error);
+      notify('Le client n’a pas pu être ajouté au carnet. Vérifiez qu’un client avec cet email n’existe pas déjà, puis réessayez.', { tone: 'error' });
     } else {
       setSaved(true);
       setAlreadyExists(true);
@@ -870,6 +874,7 @@ function ProspectCard({
 // ── Main Page ──────────────────────────────────────────────────────────────────
 function ProspectsPageInner() {
   const { user, profile } = useAuth();
+  const { confirm } = useFeedback();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [prospectQuoteMap, setProspectQuoteMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -951,7 +956,7 @@ function ProspectsPageInner() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cette demande ?')) return;
+    if (!(await confirm({ title: 'Supprimer cette demande ?', danger: true }))) return;
     const supabase = createClient();
     await supabase.from('prospect_requests').delete().eq('id', id);
     setProspects((prev) => prev.filter((p) => p.id !== id));

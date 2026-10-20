@@ -13,6 +13,7 @@ import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, inputCls, l
 import { cn } from '@/lib/utils';
 import { Check, EmptyState, ErrorBanner, useActionError, type EventQuote } from './shared';
 import StaffCostSection from '@/components/extras/StaffCostSection';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Extra {
   id: string; name: string; phone: string | null; email: string | null; role: string | null;
@@ -56,6 +57,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : 
 
 export default function ExtrasTab({ quote }: { quote: EventQuote }) {
   const { user, profile } = useAuth();
+  const { confirm } = useFeedback();
   const { error, setError, check } = useActionError();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
@@ -124,7 +126,7 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
   };
 
   const remove = async (a: Assignment) => {
-    if (!confirm(`Retirer ${a.extra?.name ?? 'cet extra'} de l’événement ?`)) return;
+    if (!(await confirm({ title: `Retirer ${a.extra?.name ?? 'cet extra'} de l’événement ?`, confirmLabel: 'Retirer', danger: true }))) return;
     const previous = assignments;
     setAssignments((list) => list.filter((x) => x.id !== a.id));
     const res = await createClient().from('event_extras').delete().eq('id', a.id);

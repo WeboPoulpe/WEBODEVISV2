@@ -8,6 +8,7 @@ import { respondToMission, setUnavailableDates, subscribeExtraDevice, unsubscrib
 import { currentSubscription, isStandalone, pushSupport, subscribeDevice, unsubscribeDevice, type PushSupport } from '@/lib/pushClient';
 import { missionStatus } from '@/lib/extras';
 import { cn } from '@/lib/utils';
+import { FeedbackProvider, useFeedback } from '@/components/ui/Feedback';
 
 type Mission = MissionPage['missions'][number];
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
@@ -16,8 +17,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 const longDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 const btn = 'inline-flex items-center justify-center gap-2 h-12 px-4 rounded-2xl text-[15px] font-semibold transition-colors disabled:opacity-50';
 
-export default function MissionsApp({ token, initial }: { token: string; initial: MissionPage }) {
+// Page publique de l'extra, hors de la coque de l'app : elle a son propre fournisseur de fenêtres de confirmation.
+export default function MissionsApp(props: { token: string; initial: MissionPage }) {
+  return <FeedbackProvider aboveTabBar={false}><Missions {...props} /></FeedbackProvider>;
+}
+
+function Missions({ token, initial }: { token: string; initial: MissionPage }) {
   const router = useRouter();
+  const { confirm } = useFeedback();
   const [missions, setMissions] = useState(initial.missions);
   const [unavailable, setUnavailable] = useState(initial.extra.unavailableDates);
   const [busy, setBusy] = useState<string | null>(null);
@@ -37,7 +44,7 @@ export default function MissionsApp({ token, initial }: { token: string; initial
   const first = initial.extra.name.trim().split(/\s+/)[0];
 
   const answer = async (m: Mission, value: 'confirme' | 'refuse') => {
-    if (value === 'refuse' && m.status === 'confirme' && !confirm('Vous ne pourrez plus venir ? Votre traiteur sera prévenu tout de suite.')) return;
+    if (value === 'refuse' && m.status === 'confirme' && !(await confirm({ title: 'Vous ne pourrez plus venir ?', message: 'Votre traiteur sera prévenu tout de suite.', confirmLabel: 'Je ne peux plus venir', danger: true }))) return;
     setBusy(m.id); setError(null);
     const previous = missions;
     setMissions((list) => list.map((x) => (x.id === m.id ? { ...x, status: value, respondedAt: new Date().toISOString() } : x)));

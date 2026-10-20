@@ -9,6 +9,7 @@ import Modal from '@/components/ui/Modal';
 import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // Modèles de matériel : ce qu'on emporte pour un type de réception (« Cocktail » : 4 chafing dish, 6 caisses
 // isothermes, 1 rallonge pour 30 couverts…). Dans un événement, onglet Matériel, on applique un modèle à
@@ -38,6 +39,7 @@ export const qtyLabel = (i: { default_qty: number; qty_per_guest: number | null;
   (i.qty_per_guest ? formatPerGuest(i.qty_per_guest, i.unit) : formatQty(i.default_qty, i.unit));
 
 export default function MaterialTemplates({ userId, presets }: { userId: string; presets: Preset[] }) {
+  const { confirm } = useFeedback();
   const [sets, setSets] = useState<TemplateSet[] | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -109,7 +111,11 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
 
   const removeSet = async () => {
     if (!active) return;
-    if (!confirm(`Supprimer le modèle « ${active.name} » et ses ${activeItems.length} article${activeItems.length > 1 ? 's' : ''} ?\nLe matériel déjà ajouté à vos événements ne change pas.`)) return;
+    if (!(await confirm({
+      title: `Supprimer le modèle « ${active.name} » ?`,
+      message: `Ses ${activeItems.length} article${activeItems.length > 1 ? 's' : ''} seront supprimés aussi. Le matériel déjà ajouté à vos événements ne change pas.`,
+      danger: true,
+    }))) return;
     const res = await createClient().from('material_template_sets').delete().eq('id', active.id);
     if (res.error) { setError('Le modèle n’a pas pu être supprimé. Réessayez.'); return; }
     const rest = (sets ?? []).filter((s) => s.id !== active.id);
@@ -141,7 +147,7 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
   };
 
   const removeItem = async (item: Item) => {
-    if (!confirm(`Retirer « ${item.name} » du modèle ?`)) return;
+    if (!(await confirm({ title: `Retirer « ${item.name} » du modèle ?`, confirmLabel: 'Retirer', danger: true }))) return;
     const previous = items;
     setItems((list) => list.filter((i) => i.id !== item.id));
     const res = await createClient().from('material_templates').delete().eq('id', item.id);

@@ -17,6 +17,7 @@ import InvoiceDocument, { invoiceTitle, type InvoiceDocumentData } from '@/compo
 import InvoiceStatusPill from '@/components/factures/InvoiceStatusPill';
 import InvoiceDraftForm, { toEditLines, toInvoiceLines, type DraftState } from '@/components/factures/InvoiceDraftForm';
 import PaymentModal from '@/components/factures/PaymentModal';
+import { useFeedback } from '@/components/ui/Feedback';
 
 const FAILED = 'L’opération n’a pas abouti. Vérifiez votre connexion et réessayez.';
 
@@ -37,6 +38,8 @@ const previewLines = (d: DraftState) => savedLines(d).map((l) => ({
 
 export default function FacturePage() {
   const { id } = useParams<{ id: string }>();
+  // « ask » : le nom « confirm » est déjà pris par l'état des fenêtres de la page.
+  const { confirm: ask } = useFeedback();
   const router = useRouter();
   const [invoice, setInvoice] = useState<Invoice | null | undefined>(undefined);
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -126,7 +129,7 @@ export default function FacturePage() {
   };
 
   const onDeletePayment = async (paymentId: string, label: string) => {
-    if (!window.confirm(`Supprimer le paiement de ${label} ? Le reste à payer sera recalculé.`)) return;
+    if (!(await ask({ title: `Supprimer le paiement de ${label} ?`, message: 'Le reste à payer sera recalculé.', danger: true }))) return;
     setError(null);
     const res = await deletePayment(paymentId).catch(() => ({ error: FAILED }));
     if (res.error) { setError(res.error); return; }

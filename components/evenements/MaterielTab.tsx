@@ -16,6 +16,7 @@ import {
   Check, EmptyState, ErrorBanner, esc, isMaterielLine, isPersonnelLine, money, printDocument, useActionError,
   type EventQuote, type MaterialItem, type Supplier,
 } from './shared';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface RentalItem {
   id: string;
@@ -62,6 +63,7 @@ const emptyForm = { id: null as string | null, name: '', qty: '1', unit: '', sup
 
 export default function MaterielTab({ quote, onChange }: { quote: EventQuote; onChange: (patch: Partial<EventQuote>) => void }) {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const { error, setError, check } = useActionError();
 
   // ── À préparer : matériel ajouté à la main + lignes matériel / personnel du devis ──
@@ -199,7 +201,7 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   };
 
   const removeRental = async (item: RentalItem) => {
-    if (!confirm(`Supprimer « ${item.material_name} » de la location ?`)) return;
+    if (!(await confirm({ title: `Supprimer « ${item.material_name} » de la location ?`, danger: true }))) return;
     const previous = rentals;
     setRentals((list) => list.filter((r) => r.id !== item.id));
     const res = await createClient().from('rental_items').delete().eq('id', item.id);

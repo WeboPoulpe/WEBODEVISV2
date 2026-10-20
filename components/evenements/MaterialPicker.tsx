@@ -9,6 +9,7 @@ import { btnGhost, btnPrimary, btnSecondary, iconBtnDanger, inputCls, pill } fro
 import { cn } from '@/lib/utils';
 import { Check } from './shared';
 import { EQUIPMENT_BASE, findBaseArticle, formatPerGuest, matchesSearch, UNITS } from '@/lib/equipment';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // Liste de matériel du traiteur : on coche ce qu'on emporte à l'événement au lieu de tout retaper.
 // La quantité proposée est fixe, ou calculée d'après le nombre de couverts.
@@ -41,6 +42,7 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
   onClose: () => void;
   onAdd: (items: PickedMaterial[]) => void;
 }) {
+  const { confirm } = useFeedback();
   const [presets, setPresets] = useState<Preset[] | null>(null);
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
   };
 
   const removePreset = async (p: Preset) => {
-    if (!confirm(`Retirer « ${p.name} » de votre liste de matériel ?`)) return;
+    if (!(await confirm({ title: `Retirer « ${p.name} » de votre liste de matériel ?`, confirmLabel: 'Retirer', danger: true }))) return;
     const previous = presets;
     setPresets((list) => (list ?? []).filter((x) => x.id !== p.id));
     setPicked((prev) => { const next = { ...prev }; delete next[p.id]; return next; });

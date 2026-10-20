@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { Check, EmptyState, ErrorBanner, esc, printDocument, Progress, useActionError, type EventQuote, type Supplier } from './shared';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Ingredient { id: string; name: string; category: string | null; unit: string | null }
 
@@ -32,6 +33,7 @@ const emptyForm = { id: null as string | null, ingredient: null as Ingredient | 
 
 // Liste de courses de l'événement : lignes calculées depuis les prestations et lignes ajoutées à la main.
 export default function CoursesTab({ quote }: { quote: EventQuote }) {
+  const { confirm } = useFeedback();
   const { error, setError, check } = useActionError();
   const [lines, setLines] = useState<CourseLine[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -74,7 +76,7 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
 
   const recalc = async () => {
     const auto = lines.filter((l) => l.source === 'auto').length;
-    if (auto > 0 && !confirm('Recalculer les quantités à partir des prestations du devis ?\nLes lignes ajoutées à la main sont conservées.')) return;
+    if (auto > 0 && !(await confirm({ title: 'Recalculer les quantités ?', message: 'Les quantités sont recalculées à partir des prestations du devis. Les lignes ajoutées à la main sont conservées.', confirmLabel: 'Recalculer' }))) return;
     setBusy('recalc'); setNotice(null);
     const res = await recalculateCourses(quote.id);
     setBusy(null);
@@ -98,7 +100,7 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
   };
 
   const withdraw = async () => {
-    if (!confirm('Retirer du stock les quantités de cette liste de courses ?\nVous pourrez annuler la sortie ensuite.')) return;
+    if (!(await confirm({ title: 'Retirer ces quantités du stock ?', message: 'Les quantités de cette liste de courses sortent du stock. Vous pourrez annuler la sortie ensuite.', confirmLabel: 'Retirer du stock' }))) return;
     setBusy('stock'); setNotice(null);
     const res = await withdrawEventStock(quote.id).catch(() => null);
     setBusy(null);
@@ -110,7 +112,7 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
   };
 
   const cancelWithdraw = async () => {
-    if (!confirm('Annuler la sortie de stock ? Les quantités retirées reviennent dans le stock.')) return;
+    if (!(await confirm({ title: 'Annuler la sortie de stock ?', message: 'Les quantités retirées reviennent dans le stock.', confirmLabel: 'Remettre dans le stock' }))) return;
     setBusy('stock'); setNotice(null);
     const res = await cancelEventStockExit(quote.id).catch(() => null);
     setBusy(null);

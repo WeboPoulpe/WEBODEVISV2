@@ -9,6 +9,7 @@ import { isConfirmed, QUOTE_STATUSES, QUOTE_STATUS_LABELS } from '@/lib/quoteSta
 import { cn } from '@/lib/utils';
 import SendQuoteModal from './SendQuoteModal';
 import DuplicateQuoteModal from './DuplicateQuoteModal';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // Actions du devis depuis l'éditeur : statut, envoi au client, copie, événement. Plus besoin de repasser par la liste.
 // Envoyer et dupliquer enregistrent d'abord le document ouvert.
@@ -23,6 +24,7 @@ const saveOpenDocument = () => new Promise<boolean>((resolve) => {
 
 export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light }: { quoteId: string; itemBase: string; itemIdle: string; /** Menu clair (téléphone) plutôt que la barre latérale foncée. */ light?: boolean }) {
   const { user, profile } = useAuth();
+  const { notify } = useFeedback();
   const [meta, setMeta] = useState<QuoteMeta | null>(null);
   const [busy, setBusy] = useState<'send' | 'copy' | 'status' | null>(null);
   const [open, setOpen] = useState<'send' | 'copy' | null>(null);
@@ -40,7 +42,7 @@ export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light 
     const { error } = await supabase.from('quotes').update({ status }).eq('id', quoteId);
     if (!error && meta.prospect_id) await supabase.from('prospect_requests').update({ status }).eq('id', meta.prospect_id);
     setBusy(null);
-    if (error) { alert('Le statut n’a pas pu être changé. Réessayez.'); return; }
+    if (error) { notify('Le statut n’a pas pu être changé. Réessayez.', { tone: 'error' }); return; }
     setMeta({ ...meta, status });
   };
 

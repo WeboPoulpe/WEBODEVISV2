@@ -11,6 +11,7 @@ import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import MaterialTemplates from '@/components/materiel/MaterialTemplates';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // Mon matériel : ce que le traiteur possède et emporte sur ses événements. Dans la fiche d'un événement,
 // onglet Matériel, « Choisir dans ma liste » propose cette liste : on coche au lieu de retaper.
@@ -28,6 +29,7 @@ const emptyForm = { id: null as string | null, name: '', qty: '1', unit: 'pièce
 
 export default function MaterielPage() {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [items, setItems] = useState<Preset[] | null>(null);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export default function MaterielPage() {
   };
 
   const remove = async (item: Preset) => {
-    if (!confirm(`Retirer « ${item.name} » de votre liste ?`)) return;
+    if (!(await confirm({ title: `Retirer « ${item.name} » de votre liste ?`, confirmLabel: 'Retirer', danger: true }))) return;
     const previous = items;
     setItems((list) => (list ?? []).filter((i) => i.id !== item.id));
     const res = await createClient().from('material_presets').delete().eq('id', item.id);

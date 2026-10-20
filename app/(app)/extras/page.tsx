@@ -17,6 +17,7 @@ import MultiAssignModal, { StatusChoice, type NewAssignment } from '@/components
 import { EXTRA_ROLES, MISSION_STATUSES, roleFamily, type MissionStatus } from '@/lib/extras';
 import { notifyMissionChanged } from '@/server/extras';
 import { euros, toNumber } from '@/lib/staffCost';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Extra {
@@ -113,6 +114,7 @@ interface SheetProps {
 }
 
 function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, onSave }: SheetProps) {
+  const { confirm } = useFeedback();
   const [detail, setDetail]   = useState<QuoteDetail | null>(null);
   const [arrTime, setArrTime] = useState(assignment.arrival_time ?? '');
   const [depTime, setDepTime] = useState(assignment.departure_time ?? '');
@@ -145,7 +147,7 @@ function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, on
   };
 
   const remove = async () => {
-    if (!confirm(`Retirer ${extra.name} de cet événement ?`)) return;
+    if (!(await confirm({ title: `Retirer ${extra.name} de cet événement ?`, confirmLabel: 'Retirer', danger: true }))) return;
     if (await onRemove(assignment.id)) onClose();
     else setError('L’extra n’a pas pu être retiré. Réessayez.');
   };
@@ -559,6 +561,7 @@ const familyOf = (e: Extra): Family => roleFamily(e.role) ?? 'autre';
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function ExtrasPage() {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [extras,      setExtras]      = useState<Extra[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -631,7 +634,7 @@ export default function ExtrasPage() {
   };
 
   const handleDelete = async (extra: Extra) => {
-    if (!confirm(`Supprimer ${extra.name} de vos extras ?`)) return;
+    if (!(await confirm({ title: `Supprimer ${extra.name} de vos extras ?`, danger: true }))) return;
     const { error: err } = await createClient().from('extras').delete().eq('id', extra.id);
     if (err) { setError('L’extra n’a pas pu être supprimé. Réessayez.'); return; }
     setError(null);

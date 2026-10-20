@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { FolderTree, Plus, Trash2, Pencil, Loader2, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Category { id: string; name: string; icon: string | null; sort_order: number; user_id: string | null; }
 interface Subcategory { id: string; category_id: string; name: string; sort_order: number; user_id: string | null; }
 
 export default function AdminCategoriesPage() {
+  const { confirm } = useFeedback();
   const [categories, setCategories] = useState<Category[]>([]);
   const [subs, setSubs] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export default function AdminCategoriesPage() {
   };
 
   const deleteCategory = async (id: string) => {
-    if (!confirm('Supprimer cette catégorie globale ? Les sous-catégories liées seront supprimées aussi.')) return;
+    if (!(await confirm({ title: 'Supprimer cette catégorie globale ?', message: 'Les sous-catégories liées seront supprimées aussi.', danger: true }))) return;
     const sb = createClient();
     await sb.from('prestation_categories').delete().eq('id', id);
     fetchAll();
@@ -75,7 +77,7 @@ export default function AdminCategoriesPage() {
   };
 
   const deleteSubcategory = async (id: string) => {
-    if (!confirm('Supprimer cette sous-catégorie globale ?')) return;
+    if (!(await confirm({ title: 'Supprimer cette sous-catégorie globale ?', danger: true }))) return;
     const sb = createClient();
     await sb.from('prestation_subcategories').delete().eq('id', id);
     fetchAll();

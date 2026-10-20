@@ -12,6 +12,7 @@ import { MODULES } from '@/lib/modules';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import { useFeedback } from '@/components/ui/Feedback';
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const accountName = (a: AdminAccount) => a.company_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email;
@@ -147,6 +148,7 @@ export default function AdminAccountsPage() {
 
 // ── Fiche d'un compte ─────────────────────────────────────────────────────────
 function AccountDialog({ account, onClose, onChanged, onEnter }: { account: AdminAccount; onClose: () => void; onChanged: () => Promise<void>; onEnter: () => void }) {
+  const { confirm } = useFeedback();
   const [firstName, setFirstName] = useState(account.first_name ?? '');
   const [lastName, setLastName] = useState(account.last_name ?? '');
   const [companyName, setCompanyName] = useState(account.company_name ?? '');
@@ -171,11 +173,11 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
   const purgeOn = account.deletion_requested_at
     ? new Date(new Date(account.deletion_requested_at).getTime() + 30 * 86400_000).toISOString() : null;
   const purgeNow = async () => {
-    if (!confirm(`Effacer maintenant toutes les données de ${account.email} ? C’est définitif.`)) return;
+    if (!(await confirm({ title: `Effacer maintenant toutes les données de ${account.email} ?`, message: 'C’est définitif.', confirmLabel: 'Effacer', danger: true }))) return;
     if (await run('purge', () => purgeRequestedAccount(account.id))) onClose();
   };
   const remove = async () => {
-    if (!confirm(`Supprimer définitivement le compte ${account.email} ?`)) return;
+    if (!(await confirm({ title: `Supprimer définitivement le compte ${account.email} ?`, danger: true }))) return;
     if (await run('delete', () => deleteEmptyAccount(account.id))) onClose();
   };
 

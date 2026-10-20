@@ -16,6 +16,7 @@ import { isDemoUser } from '@/lib/demo';
 import { changePassword } from '@/server/auth';
 import { subscribeMyDevice, unsubscribeMyDevice } from '@/server/extras';
 import { currentSubscription, pushSupport, subscribeDevice, unsubscribeDevice, type PushSupport } from '@/lib/pushClient';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Profile {
@@ -260,6 +261,7 @@ function NotificationsSection() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ParametresPage() {
   const { user, profile: me, actingAsAdmin } = useAuth();
+  const { notify } = useFeedback();
   // Collaborateur rattaché à une entreprise : les réglages de l'entreprise sont ceux du titulaire.
   const isMember = !!me?.parent_user_id;
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
@@ -318,7 +320,7 @@ export default function ParametresPage() {
       .eq('id', user.id);
     if (error) {
       console.error('Erreur sauvegarde identité:', error);
-      alert('Vos informations n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.');
+      notify('Vos informations n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.', { tone: 'error' });
       setSavingId(false);
       return;
     }
@@ -342,7 +344,8 @@ export default function ParametresPage() {
       await supabase.from('profiles').update({ logo_url: url }).eq('id', user.id);
       setProfile((p) => ({ ...p, logo_url: url }));
     } else {
-      alert('Le logo n’a pas pu être envoyé. Essayez avec une image JPG ou PNG de moins de 5 Mo.');
+      console.error('Envoi du logo', error);
+      notify('Le logo n’a pas pu être envoyé. Essayez avec une image JPG ou PNG de moins de 5 Mo.', { tone: 'error' });
     }
     setUploadingLogo(false);
     e.target.value = '';
@@ -367,7 +370,7 @@ export default function ParametresPage() {
       .eq('id', user.id);
     if (error) {
       console.error('Erreur sauvegarde CGV:', error.message, error.code);
-      alert('Vos conditions générales n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.');
+      notify('Vos conditions générales n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.', { tone: 'error' });
       setSavingCgv(false);
       return;
     }

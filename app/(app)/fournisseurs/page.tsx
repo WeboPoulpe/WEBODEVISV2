@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, cardCls, errorCls, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { ErrorBanner } from '@/components/evenements/shared';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Supplier {
   id: string;
@@ -24,6 +25,7 @@ const initialsOf = (name: string) =>
 
 export default function FournisseursPage() {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -98,7 +100,7 @@ export default function FournisseursPage() {
   };
 
   const handleDelete = async (s: Supplier) => {
-    if (!confirm(`Supprimer « ${s.name} » ? Il sera retiré des articles de location qui lui sont rattachés.`)) return;
+    if (!(await confirm({ title: `Supprimer « ${s.name} » ?`, message: 'Il sera retiré des articles de location qui lui sont rattachés.', danger: true }))) return;
     const { error: err } = await createClient().from('suppliers').delete().eq('id', s.id);
     if (err) { setError('Le fournisseur n’a pas pu être supprimé. Réessayez.'); return; }
     setError(null);

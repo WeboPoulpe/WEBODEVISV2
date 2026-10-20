@@ -22,6 +22,7 @@ import { Upload } from 'lucide-react';
 import ImportClientsModal from '@/components/clients/ImportClientsModal';
 import CompanySearch from '@/components/clients/CompanySearch';
 import { cleanSiret } from '@/lib/companies';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Customer {
@@ -116,6 +117,7 @@ function CustomerSheet({
   onOpenCustomer: (id: string) => void;
 }) {
   const { user } = useAuth();
+  const { notify } = useFeedback();
   const [tab, setTab] = useState<'infos' | 'notes' | 'historique'>('infos');
   const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
@@ -159,7 +161,7 @@ function CustomerSheet({
       || form.contact_person_name?.trim()
       || `${form.first_name ?? ''} ${form.last_name ?? ''}`.trim();
     if (form.customer_type === 'entreprise' && (!form.company_name?.trim() || !contactPerson)) {
-      alert('Indiquez le nom de l’entreprise et ajoutez au moins un contact.');
+      notify('Indiquez le nom de l’entreprise et ajoutez au moins un contact.', { tone: 'error' });
       return;
     }
     setSaving(true);
@@ -176,9 +178,10 @@ function CustomerSheet({
     }).eq('id', customer.id);
     if (error) {
       setSaving(false);
-      alert(/siret/i.test(error.message ?? '')
+      console.error('Enregistrement de la fiche client', error);
+      notify(/siret/i.test(error.message ?? '')
         ? 'Un autre client de votre carnet porte déjà ce SIRET.'
-        : 'La fiche n’a pas pu être enregistrée. Vérifiez l’email (il doit être unique dans votre carnet) et réessayez.');
+        : 'La fiche n’a pas pu être enregistrée. Vérifiez l’email (il doit être unique dans votre carnet) et réessayez.', { tone: 'error' });
       return;
     }
     // Sans interlocuteur nommé, la liste n'est pas réécrite : le contact de la fiche (obligatoire pour
@@ -187,7 +190,7 @@ function CustomerSheet({
       const res = await saveContacts(customer.id, user.id, editContacts);
       if (res.error) {
         setSaving(false);
-        alert('Les contacts n’ont pas pu être enregistrés. Réessayez.');
+        notify('Les contacts n’ont pas pu être enregistrés. Réessayez.', { tone: 'error' });
         return;
       }
     }

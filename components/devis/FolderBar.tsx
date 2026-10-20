@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Plus, MoreHorizontal, Trash2, ChevronRight, Home, Loader2, X, FolderPlus } from 'lucide-react';
 import { QuoteFolder, childrenOf, folderPath, isSelfOrDescendant } from '@/lib/quoteFolders';
 import { FolderGlyph, FolderStylePicker, folderColor } from './folderVisuals';
+import { useFeedback } from '@/components/ui/Feedback';
 
 export type DragItem = { type: 'quote' | 'folder'; id: string } | null;
 
@@ -34,6 +35,7 @@ export default function FolderBar({
   folders, currentId, counts, totalCount, dragItem,
   onNavigate, onCreate, onUpdate, onDelete, onDropInto, onDragStart, onDragEnd,
 }: FolderBarProps) {
+  const { confirm } = useFeedback();
   const [overTarget, setOverTarget] = useState<string | null | undefined>(undefined); // undefined = rien
   const [form, setForm] = useState<{ mode: 'create' | 'edit'; id?: string; name: string; color: string; icon: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -91,10 +93,14 @@ export default function FolderBar({
 
   const handleDelete = async (f: QuoteFolder) => {
     const nb = counts.get(f.id) ?? 0;
-    const msg = nb > 0
-      ? `Supprimer le dossier « ${f.name} » ?\n\nLes ${nb} devis qu'il contient ne seront PAS supprimés : ils remonteront dans le dossier parent, comme ses éventuels sous-dossiers.`
-      : `Supprimer le dossier « ${f.name} » ?`;
-    if (!confirm(msg)) return;
+    const ok = await confirm({
+      title: `Supprimer le dossier « ${f.name} » ?`,
+      message: nb > 0
+        ? `Les ${nb} devis qu’il contient ne seront pas supprimés : ils remonteront dans le dossier parent, comme ses éventuels sous-dossiers.`
+        : undefined,
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(f.id);
     try { await onDelete(f.id); } finally { setDeleting(null); }
   };

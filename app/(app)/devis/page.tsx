@@ -36,6 +36,7 @@ import InvoiceStatusPill from '@/components/factures/InvoiceStatusPill';
 import { listInvoices, type Invoice } from '@/server/invoices';
 import { INVOICE_KIND_LABELS } from '@/lib/invoices';
 import { isConfirmed } from '@/lib/quoteStatus';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -206,6 +207,7 @@ function DevisSheet({
   quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void; onBill: () => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
+  const { notify } = useFeedback();
   // Factures du devis (acomptes, solde, avoirs), lues par les actions serveur des factures.
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
   useEffect(() => {
@@ -245,7 +247,7 @@ function DevisSheet({
     setSavingName(true);
     const { error } = await createClient().from('quotes').update({ internal_name: value }).eq('id', quote.id);
     setSavingName(false);
-    if (error) { alert('Erreur : ' + error.message); return; }
+    if (error) { console.error('Nom interne du devis', error); notify('Le nom interne n’a pas pu être enregistré. Réessayez.', { tone: 'error' }); return; }
     onRenamed(quote.id, value);
   };
   const [status, setStatus] = useState(quote.status);
@@ -762,6 +764,7 @@ function PipelineView({
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DevisPage() {
   const { user, profile } = useAuth();
+  const { confirm, notify } = useFeedback();
   // Comptes de l'entreprise : devis, dossiers et demandes de toute l'équipe.
   const ids = useMemo(() => (user ? companyIds(user.id, profile) : []), [user, profile]);
   const router = useRouter();
@@ -890,11 +893,11 @@ export default function DevisPage() {
   }, [router, currentFolder]);
 
   const deleteTemplate = useCallback(async (id: string) => {
-    if (!confirm('Supprimer ce modèle ?')) return;
+    if (!(await confirm({ title: 'Supprimer ce modèle ?', danger: true }))) return;
     await createClient().from('devis_templates').delete().eq('id', id);
     setTemplates((prev) => prev.filter((t) => t.id !== id));
     setPreviewTpl(null);
-  }, []);
+  }, [confirm]);
 
   // Vignettes des modèles : leurs documents sont chargés en une fois, à la première ouverture de la fenêtre.
   useEffect(() => {
@@ -935,7 +938,7 @@ export default function DevisPage() {
   }, [router]);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Supprimer ce devis ? Cette action est irréversible.')) return;
+    if (!(await confirm({ title: 'Supprimer ce devis ?', message: 'Cette action est irréversible.', danger: true }))) return;
     setPageError(null);
     const { error } = await createClient().from('quotes').delete().eq('id', id);
     if (error) {
@@ -946,7 +949,7 @@ export default function DevisPage() {
     }
     setQuotes((prev) => prev.filter((q) => q.id !== id));
     setSheetQuote((prev) => prev?.id === id ? null : prev);
-  }, []);
+  }, [confirm]);
 
   // Open duplication modal
   const handleDuplicate = useCallback((id: string) => {
@@ -961,15 +964,15 @@ export default function DevisPage() {
       .insert({ owner_user_id: user.id, name, color, icon, parent_id: parentId })
       .select('id, name, parent_id, color, icon, created_at')
       .single();
-    if (error) { alert('Impossible de créer le dossier : ' + error.message); return; }
+    if (error) { console.error('Création du dossier', error); notify('Le dossier n’a pas pu être créé. Réessayez.', { tone: 'error' }); return; }
     if (data) setFolders((prev) => [...prev, data as QuoteFolder]);
-  }, [user]);
+  }, [user, notify]);
 
   const updateFolder = useCallback(async (id: string, patch: { name: string; color: string; icon: string }) => {
     const { error } = await createClient().from('quote_folders').update(patch).eq('id', id);
-    if (error) { alert('Impossible de modifier le dossier : ' + error.message); return; }
+    if (error) { console.error('Modification du dossier', error); notify('Le dossier n’a pas pu être modifié. Réessayez.', { tone: 'error' }); return; }
     setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
-  }, []);
+  }, [notify]);
 
   /** Supprime un dossier SANS supprimer son contenu : devis et sous-dossiers remontent au parent. */
   const deleteFolder = useCallback(async (id: string) => {
@@ -980,15 +983,16 @@ export default function DevisPage() {
       supabase.from('quotes').update({ folder_id: parentId }).eq('folder_id', id),
     ]);
     if (subRes.error || quoteRes.error) {
-      alert('Impossible de vider le dossier : ' + (subRes.error?.message || quoteRes.error?.message));
+      console.error('Vidage du dossier', subRes.error ?? quoteRes.error);
+      notify('Le dossier n’a pas pu être vidé : son contenu n’a pas été déplacé. Réessayez.', { tone: 'error' });
       return;
     }
     const { error } = await supabase.from('quote_folders').delete().eq('id', id);
-    if (error) { alert('Impossible de supprimer le dossier : ' + error.message); return; }
+    if (error) { console.error('Suppression du dossier', error); notify('Le dossier n’a pas pu être supprimé. Réessayez.', { tone: 'error' }); return; }
     setFolders((prev) => prev.filter((f) => f.id !== id).map((f) => (f.parent_id === id ? { ...f, parent_id: parentId } : f)));
     setQuotes((prev) => prev.map((q) => (q.folder_id === id ? { ...q, folder_id: parentId } : q)));
     if (currentFolder === id) navigateFolder(parentId);
-  }, [folders, currentFolder, navigateFolder]);
+  }, [folders, currentFolder, navigateFolder, notify]);
 
   const moveQuoteToFolder = useCallback(async (quoteId: string, folderId: string | null) => {
     const previous = quotes.find((q) => q.id === quoteId)?.folder_id ?? null;
@@ -998,9 +1002,10 @@ export default function DevisPage() {
     const { error } = await createClient().from('quotes').update({ folder_id: folderId }).eq('id', quoteId);
     if (error) {
       setQuotes((prev) => prev.map((q) => (q.id === quoteId ? { ...q, folder_id: previous } : q)));
-      alert('Impossible de déplacer le devis : ' + error.message);
+      console.error('Déplacement du devis', error);
+      notify('Le devis n’a pas pu être déplacé. Réessayez.', { tone: 'error' });
     }
-  }, [quotes]);
+  }, [quotes, notify]);
 
   const moveFolderTo = useCallback(async (folderId: string, targetId: string | null) => {
     // Garde-fou : jamais dans soi-même ni dans sa propre descendance
@@ -1011,9 +1016,10 @@ export default function DevisPage() {
     const { error } = await createClient().from('quote_folders').update({ parent_id: targetId }).eq('id', folderId);
     if (error) {
       setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, parent_id: previous } : f)));
-      alert('Impossible de déplacer le dossier : ' + error.message);
+      console.error('Déplacement du dossier', error);
+      notify('Le dossier n’a pas pu être déplacé. Réessayez.', { tone: 'error' });
     }
-  }, [folders]);
+  }, [folders, notify]);
 
   const handleDropInto = useCallback((target: string | null) => {
     const item = dragItemRef.current;

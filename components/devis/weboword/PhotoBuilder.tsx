@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fileToWebp } from '@/lib/imageToWebp'
 import type { PhotoItem, PhotoTransform } from './weboword.types'
 import { DEFAULT_TRANSFORM } from './weboword.types'
+import { useFeedback } from '@/components/ui/Feedback'
 
 type Props = {
   initial?: PhotoItem
@@ -16,6 +17,7 @@ type Props = {
 }
 
 export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }: Props) {
+  const { notify } = useFeedback()
   const [url, setUrl] = useState(initial?.url ?? '')
   const [transform, setTransform] = useState<PhotoTransform>(initial?.transform ?? DEFAULT_TRANSFORM)
   const [caption, setCaption] = useState(initial?.caption ?? '')
@@ -59,7 +61,7 @@ export function PhotoBuilder({ initial, frameAspect = 4 / 3, onApply, onClose }:
     const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: false })
     if (error) {
       setIsUploading(false)
-      alert('La photo n’a pas pu être envoyée. Vérifiez votre connexion et le poids du fichier, puis réessayez.')
+      notify('La photo n’a pas pu être envoyée. Vérifiez votre connexion et le poids du fichier, puis réessayez.', { tone: 'error' })
       return
     }
     const { data: { publicUrl } } = supabase.storage.from('storage').getPublicUrl(path)

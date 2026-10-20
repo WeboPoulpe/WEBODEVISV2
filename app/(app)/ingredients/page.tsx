@@ -15,6 +15,7 @@ import { ErrorBanner } from '@/components/evenements/shared';
 import AllergenPicker from '@/components/allergens/AllergenPicker';
 import AllergenBadges from '@/components/allergens/AllergenBadges';
 import { ingredientAllergens, sortAllergens, suggestAllergens, type AllergenKey } from '@/lib/allergens';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Ingredient {
@@ -502,6 +503,7 @@ function IngredientRow({ ing, onEdit, onDelete, onView }: { ing: Ingredient; onE
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function IngredientsPage() {
   const { user, profile } = useAuth();
+  const { confirm } = useFeedback();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers,   setSuppliers]   = useState<Supplier[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -627,7 +629,7 @@ export default function IngredientsPage() {
   };
 
   const deleteIngredient = async (ing: Ingredient) => {
-    if (!confirm(`Supprimer « ${ing.name} » ?`)) return;
+    if (!(await confirm({ title: `Supprimer « ${ing.name} » ?`, danger: true }))) return;
     const { error: err } = await createClient().from('ingredients').delete().eq('id', ing.id);
     if (err) { setError('L’ingrédient n’a pas pu être supprimé. Il est peut-être utilisé dans une prestation ou une commande.'); return; }
     setError(null);
@@ -699,7 +701,7 @@ export default function IngredientsPage() {
   };
 
   const deleteSupplier = async (s: Supplier) => {
-    if (!confirm(`Supprimer le fournisseur « ${s.name} » ?`)) return;
+    if (!(await confirm({ title: `Supprimer le fournisseur « ${s.name} » ?`, danger: true }))) return;
     const { error: err } = await createClient().from('suppliers').delete().eq('id', s.id);
     if (err) { setError('Le fournisseur n’a pas pu être supprimé. Réessayez.'); return; }
     setError(null);

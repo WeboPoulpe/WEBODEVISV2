@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, UploadCloud, Loader2, Check, FileText, Trash2, ExternalLink, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useFeedback } from '@/components/ui/Feedback';
 
 interface Props {
   open: boolean;
@@ -28,6 +29,7 @@ type CustomerResult = {
 
 export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId = null, folderId = null }: Props) {
   const { user } = useAuth();
+  const { notify } = useFeedback();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [firstName, setFirstName] = useState('');
@@ -124,8 +126,8 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
 
   const handleSave = async () => {
     if (!user) return;
-    if (!firstName.trim() || !lastName.trim()) { alert('Prénom et nom requis'); return; }
-    if (!eventDate) { alert('Date de l\'événement requise'); return; }
+    if (!firstName.trim() || !lastName.trim()) { notify('Indiquez le prénom et le nom du client.', { tone: 'error' }); return; }
+    if (!eventDate) { notify('Indiquez la date de l’événement.', { tone: 'error' }); return; }
 
     setSaving(true);
     const supabase = createClient();
@@ -138,7 +140,8 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
       const path = `${user.id}/imported-devis/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('storage').upload(path, file);
       if (uploadErr) {
-        alert('Erreur upload fichier: ' + uploadErr.message + '\n\nVérifie que le bucket "storage" existe dans Supabase et que les RLS permettent l\'upload.');
+        console.error('Envoi du fichier du devis importé', uploadErr);
+        notify('Le fichier n’a pas pu être envoyé. Vérifiez votre connexion et réessayez.', { tone: 'error' });
         setSaving(false);
         return;
       }
@@ -209,7 +212,8 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
 
     setSaving(false);
     if (error) {
-      alert('Erreur: ' + error.message);
+      console.error('Enregistrement du devis importé', error);
+      notify('Le devis n’a pas pu être enregistré. Vérifiez votre connexion et réessayez.', { tone: 'error' });
       return;
     }
     reset();

@@ -11,6 +11,7 @@ import Modal from '@/components/ui/Modal';
 import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import { useFeedback } from '@/components/ui/Feedback';
 
 // Modèles de location : un par type de réception (dîner assis, cocktail, séminaire…). Chaque modèle liste
 // ses articles avec une quantité par couvert ; dans un événement, on choisit le modèle à appliquer.
@@ -35,6 +36,7 @@ const emptyItem = { id: null as string | null, name: '', qty: '1', unit: 'pièce
 
 export default function LocationTemplatesPage() {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const [sets, setSets] = useState<TemplateSet[] | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -115,7 +117,11 @@ export default function LocationTemplatesPage() {
 
   const removeSet = async () => {
     if (!active) return;
-    if (!confirm(`Supprimer le modèle « ${active.name} » et ses ${activeItems.length} article${activeItems.length > 1 ? 's' : ''} ?\nLes locations déjà générées dans vos événements ne changent pas.`)) return;
+    if (!(await confirm({
+      title: `Supprimer le modèle « ${active.name} » ?`,
+      message: `Ses ${activeItems.length} article${activeItems.length > 1 ? 's' : ''} seront supprimés aussi. Les locations déjà générées dans vos événements ne changent pas.`,
+      danger: true,
+    }))) return;
     const res = await createClient().from('rental_template_sets').delete().eq('id', active.id);
     if (res.error) { setError('Le modèle n’a pas pu être supprimé. Réessayez.'); return; }
     const rest = (sets ?? []).filter((s) => s.id !== active.id);
@@ -170,7 +176,7 @@ export default function LocationTemplatesPage() {
   };
 
   const removeItem = async (item: Item) => {
-    if (!confirm(`Retirer « ${item.material_name} » du modèle ?`)) return;
+    if (!(await confirm({ title: `Retirer « ${item.material_name} » du modèle ?`, confirmLabel: 'Retirer', danger: true }))) return;
     const previous = items;
     setItems((list) => list.filter((i) => i.id !== item.id));
     const res = await createClient().from('rental_templates').delete().eq('id', item.id);

@@ -25,6 +25,7 @@ import {
   DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG,
 } from './weboword/weboword.types';
 import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml, buildLegalFooterHtml, LEGAL_PROFILE_COLUMNS, type LegalProfile } from './weboword/printHelpers';
+import { useFeedback } from '@/components/ui/Feedback';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -181,6 +182,7 @@ const LINE_HEIGHTS = [
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt }: Props) {
   const router = useRouter();
   const { profile, user } = useAuth();
+  const { confirm, notify } = useFeedback();
   const editorRef  = useRef<HTMLDivElement>(null);
   const colorInput = useRef<HTMLInputElement>(null);
   const initDone   = useRef(false);
@@ -522,7 +524,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   // couverts, prix enfant…). Explicite et destructif : remplace la mise en forme
   // manuelle. Aucune autre action ne régénère automatiquement.
   const regenerateDocument = useCallback(async () => {
-    if (!confirm('Régénérer le document depuis les données du devis ?\n\nLe texte retouché à la main sera remplacé.')) return;
+    if (!(await confirm({ title: 'Régénérer le document ?', message: 'Le document est refait à partir des données du devis. Le texte retouché à la main sera remplacé.', confirmLabel: 'Régénérer', danger: true }))) return;
     setSaving(true);
     const supabase = createClient();
     const [{ data: q }, profRes] = await Promise.all([
@@ -585,7 +587,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setLocalDraft(null);
     setSaving(false);
     setToast('Document régénéré. Pensez à enregistrer.');
-  }, [quoteId, user, companyAssets.cgv, font]);
+  }, [quoteId, user, companyAssets.cgv, font, confirm]);
 
   // ── Admin fields: load from database ────────────────────────────────────────
   const openAdminModal = useCallback(async () => {
@@ -796,7 +798,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     }).eq('id', quoteId);
 
     if (saveErr) {
-      alert('Erreur sauvegarde: ' + saveErr.message);
+      console.error('Enregistrement des informations du devis', saveErr);
+      notify('Les informations du devis n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.', { tone: 'error' });
       setAdminModal(false);
       return;
     }
@@ -916,7 +919,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       return false;
     }
     if (!err && loadedStamp.current && (!written || written.length === 0)) {
-      const overwrite = confirm('Ce devis a été enregistré ailleurs (un autre onglet ou un autre appareil) depuis que vous l’avez ouvert.\n\nOK : enregistrer votre version à la place.\nAnnuler : ne rien enregistrer, pour recharger la page et voir l’autre version.');
+      const overwrite = await confirm({
+        title: 'Ce devis a été modifié ailleurs',
+        message: 'Il a été enregistré depuis un autre onglet ou un autre appareil depuis que vous l’avez ouvert.\n\nEnregistrer votre version remplace l’autre. Sinon, rien n’est enregistré : rechargez la page pour voir l’autre version.',
+        confirmLabel: 'Enregistrer ma version',
+        danger: true,
+      });
       if (!overwrite) { setSaving(false); return false; }
       ({ data: written, error: err } = await write(false));
     }

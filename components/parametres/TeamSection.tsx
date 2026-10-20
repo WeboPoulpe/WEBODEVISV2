@@ -8,12 +8,14 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary } from '@/components/ui/kit';
 import { COMPANY_ROLE_INFO, COMPANY_ROLES, type CompanyRole } from '@/lib/team';
 import { getTeam, inviteMember, removeMember, revokeInvitation, setMemberRole } from '@/server/team';
+import { useFeedback } from '@/components/ui/Feedback';
 
 type Team = NonNullable<Awaited<ReturnType<typeof getTeam>>>;
 
 const field = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary';
 
 export default function TeamSection() {
+  const { confirm } = useFeedback();
   const [team, setTeam] = useState<Team | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -79,7 +81,10 @@ export default function TeamSection() {
                     {COMPANY_ROLES.map((r) => <option key={r} value={r}>{COMPANY_ROLE_INFO[r].label}</option>)}
                   </select>
                   <button disabled={busy !== null} className={`${btnGhost} text-red-600`}
-                    onClick={() => { if (confirm(`Retirer ${m.name} de l’équipe ? Ce qu’il a créé vous revient, et son accès est désactivé.`)) run(`rm-${m.id}`, () => removeMember(m.id), `${m.name} a été retiré de l’équipe.`); }}>
+                    onClick={async () => {
+                      const ok = await confirm({ title: `Retirer ${m.name} de l’équipe ?`, message: 'Ce qu’il a créé vous revient, et son accès est désactivé.', confirmLabel: 'Retirer', danger: true });
+                      if (ok) run(`rm-${m.id}`, () => removeMember(m.id), `${m.name} a été retiré de l’équipe.`);
+                    }}>
                     {busy === `rm-${m.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Retirer'}
                   </button>
                 </span>
