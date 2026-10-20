@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { quoteStatusLabel } from '@/lib/quoteStatus';
 import { BUCKETS, type Bucket, type DashboardData, type TodoItem, type UpcomingEvent } from '@/lib/dashboard';
+import type { MarginSummary, MarginTotals } from '@/lib/costing';
 import { getDashboard } from '@/server/dashboard';
 import DateBlock from '@/components/ui/DateBlock';
 import { btnSecondary, cardCls, pill } from '@/components/ui/kit';
@@ -20,6 +21,8 @@ const localToday = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+/** Données du tableau de bord, avec la marge estimée. */
+type Data = DashboardData & { margin: MarginSummary };
 
 /** Couleur de l'échéance : rouge si en retard, terracotta aujourd'hui, neutre ensuite. */
 const BUCKET_TONE: Record<Bucket, { dot: string; text: string }> = {
@@ -34,7 +37,7 @@ const FIRST = 8;
 
 export default function DashboardPage() {
   const { profile } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
@@ -180,8 +183,15 @@ function TodoRow({ item }: { item: TodoItem }) {
 // ── Résumé ────────────────────────────────────────────────────────────────────
 const skeletonLine = (w: string) => <span className={cn('inline-block h-7 rounded-lg bg-current opacity-10 animate-pulse align-middle', w)} />;
 
-function RevenueCard({ data }: { data: DashboardData | null }) {
+/** Marge estimée « 4 200 € (38 %) » ; « – » tant qu'aucun devis n'a de coût. */
+function marginText(t: MarginTotals) {
+  if (t.costed === 0) return '–';
+  return `${euros(t.margin)}${t.rate != null ? ` (${Math.round(t.rate)} %)` : ''}`;
+}
+
+function RevenueCard({ data }: { data: Data | null }) {
   const s = data?.summary;
+  const mg = data?.margin;
   const max = Math.max(...(s?.months.map((m) => m.amount) ?? [0]), 1);
   return (
     <section className="rounded-2xl bg-forest text-white p-5" aria-labelledby="ca-title" data-testid="revenue">
@@ -190,6 +200,23 @@ function RevenueCard({ data }: { data: DashboardData | null }) {
       <p className="text-sm text-white/70 mt-1">
         {s ? <>{plural(s.caMonthEvents, 'événement confirmé', 'événements confirmés')} ce mois, TTC</> : ' '}
       </p>
+      {mg && (
+        <div className="mt-3 rounded-xl bg-white/10 px-3 py-2.5" data-testid="margin">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm text-white/80">Marge estimée du mois, HT</p>
+            <p className="font-display text-lg font-bold tabular-nums whitespace-nowrap">{marginText(mg.month)}</p>
+          </div>
+          <div className="flex items-baseline justify-between gap-3 mt-1">
+            <p className="text-sm text-white/80">Marge depuis le 1er janvier</p>
+            <p className="font-display font-bold tabular-nums whitespace-nowrap">{marginText(mg.year)}</p>
+          </div>
+          {mg.year.uncosted > 0 && (
+            <p className="text-sm text-white/70 mt-1">
+              {mg.year.uncosted} devis sans coût renseigné cette année, laissés hors de la marge
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex items-baseline justify-between gap-3 mt-4 pt-4 border-t border-white/15">
         <p className="text-sm text-white/70">Depuis le 1er janvier</p>
         <p className="font-display text-lg font-bold tabular-nums whitespace-nowrap">{s ? euros(s.caYear) : '…'}</p>
@@ -212,11 +239,13 @@ function RevenueCard({ data }: { data: DashboardData | null }) {
   );
 }
 
-function ActivityCard({ data }: { data: DashboardData | null }) {
+function ActivityCard({ data }: { data: Data | null }) {
   const s = data?.summary;
+  const basket = data?.margin.basketYear ?? null;
   const rate = s && s.conversion.total > 0 ? Math.round((s.conversion.confirmed / s.conversion.total) * 100) : null;
   const rows: { label: string; value: string; hint?: string; href?: string }[] = s ? [
     { label: 'Devis en cours', value: euros(s.pendingAmount), hint: plural(s.pendingCount, 'devis', 'devis'), href: '/devis' },
+    ...(basket != null ? [{ label: 'Panier moyen', value: euros(basket), hint: 'CA HT moyen par devis confirmé, cette année' }] : []),
     { label: 'Taux de transformation', value: rate == null ? '–' : `${rate} %`, hint: `${s.conversion.confirmed} confirmés sur ${s.conversion.total} devis, sur 12 mois` },
     { label: 'Couverts à venir', value: String(s.upcomingGuests), hint: plural(s.upcomingEvents, 'événement confirmé', 'événements confirmés'), href: '/calendrier' },
     ...(s.requestsMonth != null ? [{ label: 'Demandes reçues ce mois', value: String(s.requestsMonth), href: '/prospects' }] : []),

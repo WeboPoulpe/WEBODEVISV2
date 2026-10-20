@@ -10,7 +10,8 @@ import { checklistProgress, materialProgress } from '@/lib/events/prep';
 import { FAMILY_LABELS, roleFamily, suggestedStaff } from '@/lib/extras';
 import { enabledModules } from '@/lib/modules';
 import { CONFIRMED_STATUSES, PENDING_STATUSES } from '@/lib/quoteStatus';
-import { quoteTotalTTC } from '@/lib/quoteTotals';
+import { quoteDefaultRate, quoteTotalTTC, quoteVatBreakdown, resolveGuestSplit, type VatLine } from '@/lib/quoteTotals';
+import { catalogKey, quoteCost, staffCost, sumMargins, type MarginSummary, type StaffRow } from '@/lib/costing';
 import { requireUser } from './session';
 
 // Tableau de bord : tout ce qu'il faut faire, trié par échéance, et le résumé de l'activité.
@@ -30,7 +31,7 @@ interface QuoteRow {
   guest_count: number | null; guest_count_adults: number | null; guest_count_children: number | null;
   status: string; total_amount: string | null; vat_rate: string | null; services: unknown;
   created_day: string; sent_day: string | null;
-  checklist: unknown; event_materials: unknown; event_material_checks: unknown;
+  checklist: unknown; event_materials: unknown; event_material_checks: unknown; extra_costs: unknown;
 }
 
 const list = (values: readonly string[]) => sql.join(values.map((v) => sql`${v}`), sql`, `);
@@ -44,7 +45,7 @@ const onDay = (iso: string, today: string) => {
   return /^(dans|il y a|aujourd|demain|hier)/.test(rel) ? rel : `le ${rel}`;
 };
 
-export async function getDashboard(clientToday?: string): Promise<DashboardData> {
+export async function getDashboard(clientToday?: string): Promise<DashboardData & { margin: MarginSummary }> {
   const user = await requireUser();
   const uid = user.id;
   const today = clientToday && /^\d{4}-\d{2}-\d{2}$/.test(clientToday) ? clientToday : parisToday();
@@ -68,12 +69,24 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData>
   const paris = (col: SQL) => sql`(${col} at time zone 'Europe/Paris')::date::text`;
   const none = Promise.resolve([] as never[]);
 
-  const [quotes, [counts], prospects, assignments, extrasCount, courses, rentals, rentalModels, lowStock, orders, notifs] = await Promise.all([
+  // Coût du personnel des événements confirmés de l'année : heures faites × taux (colonnes de la migration 0023).
+  // Lu à part : tant que la base n'a pas ces colonnes, la requête échoue et le personnel n'est pas compté.
+  const staffQuery = rows<StaffRow & { quote_id: string }>(sql`
+    select ee.quote_id, ee.status, ee.hours_worked::text as hours_worked, ee.hourly_rate::text as hourly_rate,
+      e.hourly_rate::text as extra_rate
+    from public.event_extras ee
+    join public.extras e on e.id = ee.extra_id
+    join public.quotes q on q.id = ee.quote_id
+    where e.user_id = ${uid} and ${access} and q.status in (${confirmedIn})
+      and q.event_date >= ${yearStart}::date and q.event_date < ${`${+today.slice(0, 4) + 1}-01-01`}::date`)
+    .catch(() => null);
+
+  const [quotes, [counts], prospects, assignments, extrasCount, courses, rentals, rentalModels, lowStock, orders, notifs, catalogRows, staffRows] = await Promise.all([
     rows<QuoteRow>(sql`
       select q.id, q.client_name, q.internal_name, q.event_type, q.event_date::text as event_date, q.guest_count,
         q.guest_count_adults, q.guest_count_children, q.status, q.total_amount::text, q.vat_rate::text, q.services,
         ${paris(sql`q.created_at`)} as created_day, ${paris(sql`q.sent_at`)} as sent_day,
-        q.checklist, q.event_materials, q.event_material_checks
+        q.checklist, q.event_materials, q.event_material_checks, q.extra_costs
       from public.quotes q
       where ${access} and (
         (q.status in (${list(PENDING_STATUSES)}) and q.event_date >= ${today}::date)
@@ -132,6 +145,10 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData>
         and n.created_at >= ${addDays(today, -30)}::date
         and (n.expires_at is null or n.expires_at > now())
       order by n.created_at desc limit 10`),
+    // Prix de revient du catalogue, pour la marge estimée (rapprochement des lignes par leur nom).
+    rows<{ name: string; cost: string | null }>(sql`
+      select name, cost_price::text as cost from public.prestations where user_id = ${uid} and coalesce(cost_price, 0) > 0`),
+    staffQuery,
   ]);
 
   const todo: TodoItem[] = [];
@@ -308,6 +325,43 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData>
     if (q.event_date.slice(0, 4) === today.slice(0, 4)) { caYear += amount; caYearEvents++; }
   }
 
+  // ── Marge estimée et panier moyen (HT, devis confirmés) ─────────────────────
+  // Même calcul que la fiche « Marge du devis » : prix de revient des prestations rapprochées par leur nom
+  // (sinon coût de la ligne), frais annexes, personnel. Un devis sans aucun coût est compté à part.
+  const catalog = new Map(catalogRows.map((r) => [catalogKey(r.name), Number(r.cost) || 0]));
+  const staffOf = new Map<string, StaffRow[]>();
+  for (const r of staffRows ?? []) {
+    const list = staffOf.get(r.quote_id) ?? [];
+    list.push(r);
+    staffOf.set(r.quote_id, list);
+  }
+  const htOf = (q: QuoteRow) => {
+    const { adults, children } = resolveGuestSplit(q.guest_count, q.guest_count_adults, q.guest_count_children);
+    const rate = quoteDefaultRate(q.vat_rate);
+    const { ht } = quoteVatBreakdown(Array.isArray(q.services) ? q.services as VatLine[] : [], rate, adults, children);
+    if (ht > 0) return ht;
+    // Devis sans lignes (importé) : le montant enregistré est TTC.
+    return q.total_amount == null ? 0 : Math.round((Number(q.total_amount) / (1 + rate / 100)) * 100) / 100;
+  };
+  const costedOf = (q: QuoteRow) => {
+    const { adults, children } = resolveGuestSplit(q.guest_count, q.guest_count_adults, q.guest_count_children);
+    const c = quoteCost({
+      services: q.services, catalog, extraCosts: q.extra_costs,
+      staffCost: staffCost(staffOf.get(q.id) ?? []), adults, children,
+    });
+    return { revenueHT: htOf(q), totalCost: c.totalCost, hasCost: c.hasCost };
+  };
+  const inMonth = confirmed.filter((q) => q.event_date.slice(0, 7) === today.slice(0, 7));
+  const inYear = confirmed.filter((q) => q.event_date.slice(0, 4) === today.slice(0, 4));
+  const basket = (list: QuoteRow[]) => (list.length ? Math.round((list.reduce((s, q) => s + htOf(q), 0) / list.length) * 100) / 100 : null);
+  const marginSummary: MarginSummary = {
+    month: sumMargins(inMonth.map(costedOf)),
+    year: sumMargins(inYear.map(costedOf)),
+    basketMonth: basket(inMonth),
+    basketYear: basket(inYear),
+    staffCounted: staffRows !== null,
+  };
+
   const pipeline = PENDING_STATUSES
     .map((status) => {
       const of = pending.filter((q) => q.status === status);
@@ -327,6 +381,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData>
   return {
     today,
     modules,
+    margin: marginSummary,
     todo,
     upcoming,
     summary: {

@@ -11,6 +11,7 @@ import Modal from '@/components/ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatCurrency } from '@/lib/utils';
+import { margin } from '@/lib/costing';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { useAuth } from '@/context/AuthContext';
 import { usePrestationCategories } from '@/hooks/usePrestationCategories';
@@ -20,6 +21,7 @@ interface Prestation {
   id: string;
   name: string;
   unit_price: number;
+  cost_price?: number | string | null;
   category: string | null;
   sub_category: string | null;
   category_id: string | null;
@@ -229,6 +231,10 @@ function PrestationRow({
   allergensToCheck: boolean;
 }) {
   const excerpt = plainText(p.description);
+  // Taux de marge, seulement quand le prix de revient est connu.
+  const cost = Number(p.cost_price ?? 0);
+  const price = Number(p.unit_price) || 0;
+  const rate = cost > 0 && price > 0 ? Math.round(margin(price, cost).rate ?? 0) : null;
   return (
     <li data-prestation-id={p.id} className={cn('flex items-center gap-1 pr-2 transition-colors duration-700', selected ? 'bg-primary-50' : highlighted ? 'bg-sage-100' : 'hover:bg-gray-50')}>
       <label className="pl-1 sm:pl-2 cursor-pointer"><SelectBox checked={selected} onChange={onToggle} label={`Sélectionner ${p.name}`} /></label>
@@ -237,6 +243,11 @@ function PrestationRow({
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-semibold text-gray-900 line-clamp-2">{p.name}</span>
             {p.is_option && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Option</span>}
+            {rate != null && (
+              <span className={cn(pill, rate < 0 ? 'bg-danger/10 text-danger' : 'bg-gray-100 text-gray-700')} title="Marge sur le prix de revient">
+                Marge {rate} %
+              </span>
+            )}
             {allergensToCheck && (
               <span className={cn(pill, 'border border-dashed border-primary-300 text-primary-800')} title="Ouvrez la prestation pour vérifier ses allergènes">
                 Allergènes à vérifier

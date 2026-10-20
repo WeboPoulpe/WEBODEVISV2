@@ -15,6 +15,8 @@ import { useAuth } from '@/context/AuthContext';
 import { usePrestationCategories } from '@/hooks/usePrestationCategories';
 import AllergenPicker from '@/components/allergens/AllergenPicker';
 import { ALLERGEN_LABELS, ingredientAllergens, prestationAllergens, sortAllergens, type AllergenKey } from '@/lib/allergens';
+import RecipeCostPanel from '@/components/costing/RecipeCostPanel';
+import { margin as computeMargin } from '@/lib/costing';
 
 // Page d'une prestation du catalogue : création (/prestations/nouvelle) et modification (/prestations/[id]).
 // Grand écran : le formulaire à gauche, l'aperçu dans un devis à droite (colonne collante).
@@ -551,8 +553,10 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
   const priceOk = priceValue != null && !Number.isNaN(priceValue);
   const costValue = parseAmount(costPrice);
   const margin = priceOk && costValue != null && !Number.isNaN(costValue) && costValue > 0
-    ? { amount: cents(priceValue! - costValue), rate: priceValue! > 0 ? Math.round(((priceValue! - costValue) / priceValue!) * 100) : null }
+    ? computeMargin(priceValue!, costValue)
     : null;
+  /** Recette lue par le calcul du coût matière : il est refait quand un ingrédient est lié ou retiré. */
+  const recipeKey = recipe ? recipe.map((r) => r.name).join('|') : '';
 
   const dirty =
     name !== startValues.name || price !== startValues.price || childPrice !== startValues.childPrice ||
@@ -725,8 +729,16 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
                     <p data-testid="presta-margin" className={cn('text-[15px] mt-2', margin.amount < 0 ? 'text-danger' : 'text-gray-800')}>
                       {margin.amount < 0
                         ? <>Le prix de revient dépasse le prix de vente : perte de <strong>{formatCurrency(-margin.amount)}</strong> par unité.</>
-                        : <>Marge : <strong>{formatCurrency(margin.amount)}</strong> par unité{margin.rate != null && <>, soit <strong>{margin.rate} %</strong> du prix HT</>}.</>}
+                        : <>Marge : <strong>{formatCurrency(margin.amount)}</strong> par unité{margin.rate != null && <>, soit <strong>{String(margin.rate).replace('.', ',')} %</strong> du prix HT</>}{margin.coefficient != null && <>, coefficient <strong>{String(margin.coefficient).replace('.', ',')}</strong></>}.</>}
                     </p>
+                  )}
+                  {initial && (
+                    <RecipeCostPanel
+                      prestationId={initial.id} recipeKey={recipeKey}
+                      priceHT={priceOk ? priceValue : null}
+                      costHT={costValue != null && !Number.isNaN(costValue) ? costValue : null}
+                      onUse={(cost) => setCostPrice(amountField(cost))}
+                    />
                   )}
                 </div>
 
