@@ -32,7 +32,7 @@ export default function FeaturesIndexPage() {
       <HeroPanel
         crumbs={crumbs}
         title="Les fonctionnalités de WeboDevis"
-        lead="Dix fonctions, rangées dans l’ordre où vous en avez besoin&nbsp;: avant l’événement, pendant sa préparation, et au quotidien."
+        lead="Quatorze fonctions, rangées dans l’ordre où vous en avez besoin&nbsp;: avant l’événement, pendant sa préparation, et au quotidien."
         media={<DashboardPreview />}
       />
 
@@ -51,7 +51,7 @@ export default function FeaturesIndexPage() {
       <section aria-label="Pour aller plus loin" className={sectionGap}>
         <div className={container}>
           <p className="site-lead text-gray-700 max-w-[56ch]">
-            Les <TextLink href={GUIDES_INDEX.href}>guides pratiques</TextLink> reprennent ces sujets côté métier : le contenu d’un devis, les quantités par convive, la liste de courses, la marge. Pour une proposition adaptée à votre maison, vous pouvez aussi{' '}
+            Les <TextLink href={GUIDES_INDEX.href}>guides pratiques</TextLink> reprennent ces sujets côté métier : le contenu d’un devis, les quantités par convive, la liste de courses, la marge, la facture électronique, les allergènes. Pour une proposition adaptée à votre maison, vous pouvez aussi{' '}
             <TextLink href={QUOTE_REQUEST.href}>demander un devis</TextLink>.
           </p>
         </div>

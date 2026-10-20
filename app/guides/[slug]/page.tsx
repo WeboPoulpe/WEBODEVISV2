@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import AllergenesTraiteur from '@/components/site/guides/AllergenesTraiteur';
 import ChecklistEvenement from '@/components/site/guides/ChecklistEvenement';
 import ContenuDevis from '@/components/site/guides/ContenuDevis';
+import FactureElectronique from '@/components/site/guides/FactureElectronique';
 import ListeDeCourses from '@/components/site/guides/ListeDeCourses';
 import MargeTraiteur from '@/components/site/guides/MargeTraiteur';
 import QuantitesParConvive from '@/components/site/guides/QuantitesParConvive';
@@ -21,6 +23,8 @@ const BODIES: Record<string, () => React.ReactNode> = {
   'liste-de-courses-evenement': ListeDeCourses,
   'calculer-marge-traiteur': MargeTraiteur,
   'checklist-evenement-traiteur': ChecklistEvenement,
+  'facture-electronique-traiteur': FactureElectronique,
+  'allergenes-traiteur': AllergenesTraiteur,
 };
 
 export const dynamicParams = false;

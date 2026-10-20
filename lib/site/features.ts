@@ -5,7 +5,8 @@ import type { Faq } from './schema';
 // de l'app). Quand une chose n'existe pas, la question fréquente le dit.
 
 export type FeatureGroupId = 'avant' | 'pendant' | 'quotidien';
-export type FeaturePreview = 'demandes' | 'devis' | 'clients' | 'evenement' | 'courses' | 'extras' | 'stock' | 'calendrier' | 'finance' | 'mobile';
+export type FeaturePreview = 'demandes' | 'devis' | 'clients' | 'evenement' | 'courses' | 'extras' | 'stock' | 'calendrier' | 'finance' | 'mobile'
+  | 'signature' | 'factures' | 'facturx' | 'allergenes';
 
 export interface FeatureSection {
   title: string;
@@ -39,6 +40,8 @@ export interface Feature {
   related: string[];
   /** Guide lié (slug). */
   guide?: string;
+  /** Date ISO de la dernière mise à jour du texte (reprise dans le sitemap). */
+  updated?: string;
 }
 
 const feature = (f: Omit<Feature, 'href'>): Feature => ({ ...f, href: `/fonctionnalites/${f.slug}` });
@@ -143,7 +146,7 @@ export const FEATURES: Feature[] = [
         ],
         points: [
           'Adultes et enfants comptés séparément, avec un prix enfant défini sur la prestation',
-          'Un taux de TVA par devis, et la possibilité de masquer les prix',
+          'Un taux de TVA par défaut, modifiable ligne par ligne, et la possibilité de masquer les prix',
           'Page de garde, pages de photos, polices et couleurs',
           'Votre logo en tête, vos conditions générales en fin de document',
         ],
@@ -159,18 +162,77 @@ export const FEATURES: Feature[] = [
         title: 'Envoyer, puis suivre',
         body: [
           'Vous envoyez le devis depuis l’application, avec votre message. Le client reçoit un email et un bouton « Consulter le devis » : il l’ouvre en ligne sans créer de compte, l’imprime ou l’enregistre en PDF. S’il répond à l’email, sa réponse arrive chez vous.',
-          'Le statut passe à « Devis envoyé ». Vous suivez ensuite vos devis en liste ou en colonnes, une par statut, et vous gardez vos notes de relance sur chacun.',
+          'Le statut passe à « Devis envoyé ». Votre client peut aussi accepter le devis et le signer en ligne, depuis ce même lien. Vous suivez ensuite vos devis en liste ou en colonnes, une par statut, et vous gardez vos notes de relance sur chacun.',
         ],
       },
     ],
     faqs: [
-      { q: 'Mon client peut-il accepter le devis en ligne ?', a: 'Pas dans la version 0.1. Votre client consulte le devis, l’imprime ou l’enregistre en PDF. Le document se termine par un cadre « Bon pour accord » à dater et à signer ; vous passez ensuite vous-même le devis au statut « Validé ».' },
+      { q: 'Mon client peut-il accepter le devis en ligne ?', a: 'Oui. Depuis le lien reçu, il accepte le devis et le signe au doigt ou à la souris ; le devis passe alors au statut « Validé » et vous êtes prévenu. S’il préfère le papier, le document se termine toujours par un cadre « Bon pour accord » à dater et à signer.' },
       { q: 'Comment présenter les options et ce que j’offre ?', a: 'Chaque ligne du devis a un statut. Une ligne « Option » reste hors du total et le document affiche à part le montant des options. Une ligne « Inclus » apparaît dans le devis avec la mention « Inclus », sans être comptée.' },
       { q: 'Puis-je faire un devis en anglais ?', a: 'Oui. À la création, vous choisissez la langue du devis, français ou anglais : les intitulés du document sont traduits.' },
       { q: 'Puis-je garder mes anciens devis ?', a: 'Oui. L’import crée une fiche avec le client, la date, le nombre de couverts et le montant, et y joint votre fichier (PDF, document ou image). Le fichier est conservé tel quel, il n’est pas converti en devis modifiable.' },
     ],
-    related: ['demandes-de-devis', 'evenements', 'suivi-financier'],
+    related: ['demandes-de-devis', 'signature-devis-en-ligne', 'evenements', 'facturation'],
     guide: 'contenu-devis-traiteur',
+    updated: '2026-10-20',
+  }),
+
+  feature({
+    slug: 'signature-devis-en-ligne',
+    icon: 'signature',
+    label: 'Signature en ligne',
+    blurb: 'Le client accepte et signe le devis depuis son lien.',
+    group: 'avant',
+    metaTitle: 'Signature de devis en ligne pour traiteur | WeboDevis',
+    description: 'Votre client ouvre le devis depuis le lien reçu par email, l’accepte et le signe au doigt ou à la souris. Horodatage, empreinte du devis, passage au statut « Validé » et email de confirmation.',
+    keyword: 'signature devis en ligne traiteur',
+    h1: 'Faire signer le devis en ligne',
+    lead: 'Votre client ouvre le devis depuis le lien reçu, l’accepte et le signe au doigt ou à la souris. Le devis passe au statut « Validé » et vous êtes prévenu.',
+    preview: 'signature',
+    highlights: [
+      'Une signature au doigt sur le téléphone, ou à la souris.',
+      'Le devis passe en « Validé » sans que vous y touchiez.',
+      'Vous savez si le devis a été ouvert, et combien de fois.',
+    ],
+    sections: [
+      {
+        title: 'Accepter depuis le lien reçu',
+        body: [
+          'Le devis envoyé depuis WeboDevis arrive avec un bouton « Consulter le devis ». Votre client l’ouvre sans créer de compte. Sous le document, un bloc lui propose de l’accepter.',
+          'Il indique ses prénom et nom, et sa fonction s’il signe pour une entreprise. Il coche la case qui accepte le devis et les conditions de vente, puis signe dans le cadre prévu : au doigt sur un téléphone, à la souris sur un ordinateur.',
+        ],
+      },
+      {
+        title: 'Ce qui est enregistré',
+        body: [
+          'L’acceptation garde le nom du signataire, sa signature, la date et l’heure données par le serveur, l’adresse IP et le navigateur utilisés. Elle garde aussi une empreinte du devis accepté : ses lignes, sa TVA, sa date et son nombre de couverts au moment de la signature.',
+          'C’est une signature électronique simple, qui conserve la trace de l’accord de votre client. Un devis déjà accepté ne peut pas l’être une seconde fois.',
+        ],
+      },
+      {
+        title: 'Après la signature',
+        body: [
+          'Le devis passe au statut « Validé ». S’il est daté, il apparaît dans vos événements et en plein sur le calendrier. Vous recevez un email et une notification dans l’application.',
+          'Votre client reçoit de son côté un email de confirmation à votre nom, avec le lien vers le devis signé. S’il y répond, sa réponse vous parvient.',
+        ],
+      },
+      {
+        title: 'Validité et consultations',
+        body: [
+          'À l’envoi, chaque devis reçoit une date de validité, d’après la durée que vous choisissez dans vos paramètres. Passé cette date, il ne peut plus être accepté en ligne : votre client est invité à vous en demander un à jour.',
+          'Dans la liste des devis, vous voyez si le devis a été consulté, combien de fois, et quand il l’a été pour la première fois. Vos propres ouvertures ne sont pas comptées.',
+        ],
+      },
+    ],
+    faqs: [
+      { q: 'Mon client doit-il créer un compte pour signer ?', a: 'Non. Le lien reçu par email suffit : il ouvre le devis, l’accepte et le signe sans compte ni mot de passe.' },
+      { q: 'Que se passe-t-il quand le devis a expiré ?', a: 'Le bloc d’acceptation n’est plus proposé. Votre client voit que le devis a expiré et qu’il doit vous en demander un à jour.' },
+      { q: 'La signature en ligne remplace-t-elle le « Bon pour accord » imprimé ?', a: 'Les deux restent possibles. Le document garde son cadre « Bon pour accord » pour le client qui préfère imprimer et signer ; vous passez alors vous-même le devis au statut « Validé ».' },
+      { q: 'Suis-je prévenu quand mon client signe ?', a: 'Oui, par un email et par une notification dans l’application. Le devis est déjà passé au statut « Validé ».' },
+    ],
+    related: ['devis-traiteur', 'facturation', 'evenements'],
+    guide: 'contenu-devis-traiteur',
+    updated: '2026-10-20',
   }),
 
   feature({
@@ -270,8 +332,9 @@ export const FEATURES: Feature[] = [
       { q: 'La checklist est-elle déjà remplie ?', a: 'Non. Elle part vide et vous y ajoutez vos tâches, événement par événement. Le guide « La checklist d’un événement » propose une trame à adapter.' },
       { q: 'Puis-je regrouper la location de plusieurs événements ?', a: 'Oui. Vous choisissez une période, et WeboDevis cumule la location des événements confirmés par fournisseur, avec le détail par date, à imprimer.' },
     ],
-    related: ['liste-de-courses', 'extras', 'calendrier'],
+    related: ['liste-de-courses', 'extras', 'allergenes', 'calendrier'],
     guide: 'checklist-evenement-traiteur',
+    updated: '2026-10-20',
   }),
 
   feature({
@@ -326,6 +389,66 @@ export const FEATURES: Feature[] = [
     ],
     related: ['evenements', 'stock-et-fournisseurs', 'application-mobile'],
     guide: 'calculer-quantites-par-convive',
+  }),
+
+  feature({
+    slug: 'allergenes',
+    icon: 'shield-alert',
+    label: 'Allergènes',
+    blurb: 'Les 14 allergènes, de l’ingrédient à la fiche du buffet.',
+    group: 'pendant',
+    metaTitle: 'Allergènes pour traiteur : recettes et fiche par événement | WeboDevis',
+    description: 'Les 14 allergènes réglementaires notés sur vos ingrédients, repris sur vos prestations à partir de la recette, et une fiche allergènes imprimable pour chaque événement.',
+    keyword: 'fiche allergènes traiteur',
+    h1: 'Les allergènes, de l’ingrédient à la fiche du buffet',
+    lead: 'Vous notez les allergènes de vos ingrédients une fois. Vos prestations les reprennent depuis leur recette, et chaque événement a sa fiche : les plats du menu face aux 14 allergènes, à remettre au client ou à afficher près du buffet.',
+    preview: 'allergenes',
+    highlights: [
+      'Les 14 allergènes de la réglementation européenne.',
+      'Notés sur l’ingrédient, repris par la recette.',
+      'Une fiche par événement : les plats en lignes, les allergènes en colonnes.',
+    ],
+    sections: [
+      {
+        title: 'Sur les ingrédients',
+        body: [
+          'Chaque ingrédient porte ses allergènes, choisis parmi les 14 de l’annexe II du règlement européen n° 1169/2011.',
+          'Tant que vous ne les avez pas cochés, WeboDevis en suggère d’après le nom de l’ingrédient : « Beurre doux » fait penser au lait, « Farine de blé » au gluten. Ce ne sont que des suggestions, signalées comme telles. C’est vous qui confirmez.',
+        ],
+        points: [
+          'Gluten, crustacés, œufs, poissons, arachides, soja, lait',
+          'Fruits à coque, céleri, moutarde, sésame, sulfites, lupin, mollusques',
+        ],
+      },
+      {
+        title: 'Sur les prestations',
+        body: [
+          'Une prestation réunit les allergènes de tous les ingrédients de sa recette. Vous en ajoutez à la main pour ce que la recette ne dit pas : une sauce achetée toute prête, une garniture, un risque de traces.',
+          'Pour chaque allergène, vous voyez d’où il vient : de quel ingrédient, ou ajouté à la main. Une fois la liste relue, vous la marquez comme vérifiée.',
+        ],
+      },
+      {
+        title: 'La fiche allergènes de l’événement',
+        body: [
+          'Depuis la fiche d’un événement, « Fiche allergènes » met les plats du devis en lignes et les 14 allergènes en colonnes. Un point marque chaque allergène présent. L’en-tête reprend votre nom, le type d’événement, sa date, le client et le nombre de couverts.',
+          'La fiche s’imprime, pour être remise au client avec le menu ou affichée près du buffet.',
+        ],
+        points: [
+          'Un avertissement tant que des plats n’ont pas d’allergènes vérifiés',
+          'Les lignes du devis absentes du catalogue signalées à l’écran, pas oubliées en silence',
+          'La date d’établissement en bas de la fiche',
+        ],
+      },
+    ],
+    faqs: [
+      { q: 'Les suggestions d’allergènes sont-elles fiables ?', a: 'Ce sont des indices tirés du nom de l’ingrédient, pas une analyse. Elles ne remplacent ni la fiche technique de vos produits ni votre relecture : c’est pour cela qu’une prestation se marque comme vérifiée à part.' },
+      { q: 'Comment un plat du devis est-il relié à sa recette ?', a: 'Par son nom : la ligne du devis est rapprochée de la prestation du catalogue qui porte le même nom. Une ligne saisie à la main, sans prestation au catalogue, n’est pas reprise sur la fiche ; elle est listée à l’écran pour que vous la complétiez.' },
+      { q: 'La fiche distingue-t-elle les traces ?', a: 'Non. Un point signale que le plat contient l’allergène ou peut en contenir des traces. Ajoutez à la main, sur la prestation, les allergènes qui ne sont présents qu’à l’état de traces.' },
+      { q: 'WeboDevis garantit-il l’exactitude de la fiche ?', a: 'Non. WeboDevis met en forme ce que vous saisissez. L’exactitude dépend de vos recettes et des produits achetés : relisez les allergènes à chaque changement de recette ou de fournisseur.' },
+    ],
+    related: ['evenements', 'liste-de-courses', 'devis-traiteur'],
+    guide: 'allergenes-traiteur',
+    updated: '2026-10-20',
   }),
 
   feature({
@@ -517,11 +640,145 @@ export const FEATURES: Feature[] = [
     ],
     faqs: [
       { q: 'Le coût de revient est-il calculé à partir des ingrédients ?', a: 'Non. Vous saisissez le coût de revient de chaque prestation. Il est ensuite réutilisé dans tous vos devis.' },
-      { q: 'WeboDevis suit-il les acomptes et les paiements ?', a: 'Les statuts « Acompte reçu » et « Payé » indiquent où en est un devis. La version 0.1 n’enregistre pas les montants versés et n’émet pas de factures.' },
+      { q: 'WeboDevis suit-il les acomptes et les paiements ?', a: 'Oui, par les factures. Vous facturez l’acompte puis le solde depuis le devis, et vous enregistrez chaque paiement reçu. Quand l’acompte est réglé, le devis passe à « Acompte reçu » ; quand le solde l’est, à « Payé ».' },
       { q: 'Le coût des extras et de la location est-il repris automatiquement ?', a: 'Non. Vous les ajoutez en frais additionnels sur la fiche « Marge et coûts » du devis.' },
     ],
-    related: ['devis-traiteur', 'extras', 'stock-et-fournisseurs'],
+    related: ['devis-traiteur', 'facturation', 'extras', 'stock-et-fournisseurs'],
     guide: 'calculer-marge-traiteur',
+    updated: '2026-10-20',
+  }),
+
+  feature({
+    slug: 'facturation',
+    icon: 'receipt',
+    label: 'Factures',
+    blurb: 'Acompte, solde, avoir et paiements, depuis le devis.',
+    group: 'quotidien',
+    metaTitle: 'Logiciel de facturation pour traiteur : acompte, solde, avoir | WeboDevis',
+    description: 'Facturez depuis le devis : facture d’acompte, facture de solde qui déduit les acomptes, facture complète, avoir. Numérotation continue, TVA ventilée par taux, paiements et export CSV pour le comptable.',
+    keyword: 'logiciel facturation traiteur',
+    h1: 'Les factures du traiteur, à partir du devis',
+    lead: 'Le devis accepté donne ses factures : l’acompte, puis le solde qui déduit ce qui a déjà été facturé. Les numéros se suivent sans trou, les paiements s’enregistrent, et votre comptable reçoit un fichier.',
+    preview: 'factures',
+    highlights: [
+      'Acompte, solde, facture complète ou avoir : tout part du devis.',
+      'Une numérotation continue, propre à votre entreprise.',
+      'Une facture émise ne se modifie plus : on l’annule par un avoir.',
+    ],
+    sections: [
+      {
+        title: 'Facturer depuis le devis',
+        body: [
+          'Depuis un devis, « Facturer » propose trois types de facture. L’acompte se calcule en pourcentage du devis, ou à partir d’un montant. Le solde reprend les lignes du devis et déduit chaque acompte déjà facturé, avec son numéro. La facture complète couvre tout le devis en une fois.',
+          'Les lignes en option, offertes ou retirées du devis ne sont pas facturées. Une prestation avec un prix enfant donne une ligne pour les adultes et une pour les enfants.',
+        ],
+        points: [
+          'Acompte : un pourcentage proposé par défaut, réglable dans vos paramètres',
+          'Solde : les acomptes déjà facturés déduits, taux de TVA par taux de TVA',
+          'Avoir : les lignes de la facture annulée, reprises en négatif',
+        ],
+      },
+      {
+        title: 'Un brouillon, puis une facture émise',
+        body: [
+          'Une facture commence en brouillon : vous relisez les lignes, le client, la date de la prestation, une note. À l’émission, elle reçoit son numéro et sa date d’échéance, calculée d’après le délai de paiement de vos paramètres.',
+          'Une facture émise ne se modifie plus et ne se supprime pas. Pour la corriger, vous établissez un avoir : il reprend ses lignes en négatif et, une fois émis, la facture d’origine passe au statut « Annulée par avoir ».',
+        ],
+      },
+      {
+        title: 'Des numéros qui se suivent',
+        body: [
+          'Factures et avoirs ont chacun leur suite de numéros, propre à votre entreprise et sans trou : le numéro n’est attribué qu’à l’émission, jamais à un brouillon. Comme pour vos devis, vous réglez le préfixe des numéros dans vos paramètres.',
+        ],
+      },
+      {
+        title: 'TVA par ligne et mentions légales',
+        body: [
+          'Chaque ligne du devis peut avoir son taux de TVA : 5,5 %, 10 %, 20 %. La facture reprend ces taux et ventile la TVA par taux sous les totaux. Le taux qui convient à chaque prestation se valide avec votre comptable.',
+          'Le pied de facture reprend vos mentions : forme juridique, capital, RCS, SIRET, numéro de TVA ou mention de franchise « TVA non applicable, art. 293 B du CGI », échéance, IBAN. Pour un client professionnel, les pénalités de retard et l’indemnité forfaitaire de recouvrement s’y ajoutent.',
+        ],
+      },
+      {
+        title: 'Paiements et export comptable',
+        body: [
+          'Vous enregistrez chaque paiement reçu : date, montant, moyen de paiement (virement, chèque, espèces, carte) et une note. La facture passe à « Payée en partie », puis à « Payée ». Le devis suit : « Acompte reçu » quand l’acompte est réglé, « Payé » quand le solde l’est.',
+          'La liste des factures s’exporte en CSV, à transmettre à votre comptable ou à ouvrir dans un tableur : numéro, type, dates, client, montants HT, TVA et TTC, montant payé, statut. Chaque facture émise se télécharge en PDF au format Factur-X.',
+        ],
+      },
+    ],
+    faqs: [
+      { q: 'Puis-je modifier une facture déjà émise ?', a: 'Non. Une facture émise est figée. Pour la corriger, vous établissez un avoir qui l’annule, puis une nouvelle facture. Tant qu’elle est en brouillon, en revanche, tout se modifie et elle peut être supprimée.' },
+      { q: 'Comment le solde tient-il compte des acomptes ?', a: 'La facture de solde reprend toutes les lignes du devis, puis déduit chaque facture d’acompte déjà émise, avec son numéro, taux de TVA par taux de TVA.' },
+      { q: 'Je suis en franchise de TVA : comment sont faites mes factures ?', a: 'Vous cochez la franchise en base dans vos paramètres. Vos factures sont alors établies sans TVA et portent la mention « TVA non applicable, art. 293 B du CGI ».' },
+      { q: 'WeboDevis remplace-t-il mon logiciel de comptabilité ?', a: 'Non. WeboDevis établit vos factures et suit leurs paiements. L’export CSV et les PDF Factur-X se transmettent à votre comptable ou à votre logiciel comptable.' },
+    ],
+    related: ['facture-electronique', 'devis-traiteur', 'suivi-financier'],
+    guide: 'facture-electronique-traiteur',
+    updated: '2026-10-20',
+  }),
+
+  feature({
+    slug: 'facture-electronique',
+    icon: 'file-check',
+    label: 'Facture électronique',
+    blurb: 'Le PDF Factur-X aujourd’hui, la plateforme agréée ensuite.',
+    group: 'quotidien',
+    metaTitle: 'Facture électronique pour traiteur : Factur-X et réforme | WeboDevis',
+    description: 'WeboDevis produit vos factures au format Factur-X : un PDF/A-3 qui contient les données de la facture en XML, au profil EN 16931. Ce qui est prêt pour la réforme de la facturation électronique, et ce qui est prévu.',
+    keyword: 'facture électronique traiteur',
+    h1: 'La facture électronique, au format Factur-X',
+    lead: 'Chaque facture émise dans WeboDevis se télécharge au format Factur-X : un PDF que votre client lit comme d’habitude, avec à l’intérieur les données de la facture dans un fichier structuré. Le raccordement à une plateforme agréée est prévu pour la suite.',
+    preview: 'facturx',
+    highlights: [
+      'Un PDF pour votre client, un fichier XML pour les logiciels.',
+      'Le format Factur-X, au profil EN 16931.',
+      'Le raccordement à une plateforme agréée : prévu, pas encore disponible.',
+    ],
+    sections: [
+      {
+        title: 'Ce qu’est une facture Factur-X',
+        body: [
+          'Factur-X est un format de facture hybride. Le fichier est un PDF ordinaire, que votre client ouvre et imprime comme n’importe quelle facture. À l’intérieur, un fichier XML reprend les mêmes informations sous une forme qu’un logiciel sait lire sans ressaisie : vendeur, client, lignes, taux de TVA, totaux, échéance.',
+          'C’est l’un des formats retenus par l’administration pour la facturation électronique entre entreprises, avec UBL et CII.',
+        ],
+      },
+      {
+        title: 'Ce que produit WeboDevis',
+        body: [
+          'Une facture émise se télécharge en PDF/A-3, la version du PDF prévue pour l’archivage et qui accepte un fichier joint. Le fichier factur-x.xml y est joint, au profil EN 16931, la norme européenne de la facture électronique.',
+          'Le PDF est reconstruit à partir de la facture telle qu’elle a été émise : le même fichier est produit à chaque téléchargement. Un brouillon se télécharge en simple aperçu, marqué « Brouillon ».',
+        ],
+        points: [
+          'PDF/A-3, avec le fichier XML joint',
+          'Profil EN 16931',
+          'Factures, acomptes, soldes et avoirs',
+          'Les mêmes mentions et la même TVA ventilée dans le PDF et dans le XML',
+        ],
+      },
+      {
+        title: 'La réforme, en bref',
+        body: [
+          'La France généralise la facture électronique entre entreprises assujetties à la TVA. Selon le calendrier annoncé par l’administration, les PME et les micro-entreprises devront émettre leurs factures à leurs clients professionnels sous forme électronique à partir de septembre 2027.',
+          'Ces factures ne s’envoient plus alors par simple email : elles passent par une plateforme agréée par l’administration. Les ventes aux particuliers, elles, ne donnent pas lieu à une facture électronique, mais la réforme prévoit d’en transmettre les données à l’administration.',
+        ],
+      },
+      {
+        title: 'Ce qui est prêt, ce qui est prévu',
+        body: [
+          'Prêt : vos factures, acomptes, soldes et avoirs au format Factur-X, avec une numérotation continue et les mentions de votre entreprise.',
+          'Prévu : le raccordement de WeboDevis à une plateforme agréée, pour lui transmettre vos factures. Il n’est pas encore disponible ; nous l’annoncerons sur la page des nouveautés. D’ici là, vous transmettez vos factures comme aujourd’hui, en PDF.',
+        ],
+      },
+    ],
+    faqs: [
+      { q: 'Mes factures WeboDevis sont-elles déjà des factures électroniques au sens de la réforme ?', a: 'Leur format, oui : Factur-X est l’un des formats retenus. Mais au sens de la réforme, une facture électronique passe aussi par une plateforme agréée, et ce raccordement n’est pas encore disponible dans WeboDevis.' },
+      { q: 'Mes clients particuliers sont-ils concernés ?', a: 'Pas par la facture électronique elle-même, qui concerne les échanges entre entreprises. Pour les ventes aux particuliers, la réforme prévoit une transmission de données à l’administration. Votre comptable vous dira ce qui s’applique à votre situation.' },
+      { q: 'Mon comptable peut-il lire ces factures ?', a: 'Oui. Le PDF se lit comme une facture ordinaire, et un logiciel qui accepte le format Factur-X en lit directement les données. La liste des factures s’exporte aussi en CSV.' },
+      { q: 'Où trouver les informations officielles ?', a: 'Sur impots.gouv.fr, dans la rubrique consacrée à la facturation électronique, et sur economie.gouv.fr. Le calendrier et la liste des plateformes agréées y sont publiés.' },
+    ],
+    related: ['facturation', 'suivi-financier', 'clients'],
+    guide: 'facture-electronique-traiteur',
+    updated: '2026-10-20',
   }),
 
   feature({
@@ -578,9 +835,9 @@ export const FEATURES: Feature[] = [
 
 /** Les étapes du métier, dans l'ordre du menu. */
 export const FEATURE_GROUPS: { id: FeatureGroupId; title: string; slugs: string[] }[] = [
-  { id: 'avant', title: 'Avant l’événement', slugs: ['demandes-de-devis', 'devis-traiteur', 'clients'] },
-  { id: 'pendant', title: 'Pendant la préparation', slugs: ['evenements', 'liste-de-courses', 'extras', 'stock-et-fournisseurs'] },
-  { id: 'quotidien', title: 'Au quotidien', slugs: ['calendrier', 'suivi-financier', 'application-mobile'] },
+  { id: 'avant', title: 'Avant l’événement', slugs: ['demandes-de-devis', 'devis-traiteur', 'signature-devis-en-ligne', 'clients'] },
+  { id: 'pendant', title: 'Pendant la préparation', slugs: ['evenements', 'liste-de-courses', 'allergenes', 'extras', 'stock-et-fournisseurs'] },
+  { id: 'quotidien', title: 'Au quotidien', slugs: ['calendrier', 'suivi-financier', 'facturation', 'facture-electronique', 'application-mobile'] },
 ];
 
 export const featureBySlug = (slug: string) => FEATURES.find((f) => f.slug === slug);

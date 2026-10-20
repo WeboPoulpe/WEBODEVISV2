@@ -84,6 +84,30 @@ export const GUIDES: GuideMeta[] = [
     published: '2026-09-30',
     features: ['evenements', 'extras'],
   }),
+  guide({
+    slug: 'facture-electronique-traiteur',
+    icon: 'file-check',
+    title: 'Facture électronique : ce qui change pour un traiteur',
+    metaTitle: 'Facture électronique : ce qui change pour un traiteur',
+    description: 'La réforme de la facturation électronique expliquée à un traiteur : qui est concerné, selon quel calendrier, les clients particuliers et professionnels, les plateformes agréées, et quoi préparer dès maintenant.',
+    keyword: 'facture électronique traiteur',
+    blurb: 'Le calendrier, les plateformes agréées, ce qu’il faut préparer.',
+    minutes: 7,
+    published: '2026-10-20',
+    features: ['facture-electronique', 'facturation'],
+  }),
+  guide({
+    slug: 'allergenes-traiteur',
+    icon: 'shield-alert',
+    title: 'Allergènes : ce que le traiteur doit indiquer à ses clients',
+    metaTitle: 'Allergènes : ce que le traiteur doit indiquer à ses clients',
+    description: 'Les 14 allergènes à déclaration obligatoire, l’information due au client pour des plats non préemballés, et une méthode pour la tenir à jour, de la recette au buffet.',
+    keyword: 'allergènes traiteur obligation',
+    blurb: 'Les 14 allergènes, et comment en informer vos clients.',
+    minutes: 6,
+    published: '2026-10-20',
+    features: ['allergenes', 'evenements'],
+  }),
 ];
 
 export const guideBySlug = (slug: string) => GUIDES.find((g) => g.slug === slug);

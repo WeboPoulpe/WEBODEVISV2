@@ -29,6 +29,8 @@ export interface Audience {
   sections: AudienceSection[];
   /** Guides conseillés (slugs). */
   guides: string[];
+  /** Date ISO de la dernière mise à jour du texte (reprise dans le sitemap). */
+  updated?: string;
 }
 
 const audience = (a: Omit<Audience, 'href'>): Audience => ({ ...a, href: `/pour/${a.slug}` });
@@ -161,6 +163,90 @@ export const AUDIENCES: Audience[] = [
       },
     ],
     guides: ['calculer-marge-traiteur', 'calculer-quantites-par-convive', 'checklist-evenement-traiteur'],
+  }),
+
+  audience({
+    slug: 'chef-a-domicile',
+    menuText: 'Seul en cuisine chez vos clients, souvent en micro-entreprise : des devis signés, des factures en règle, les allergènes notés.',
+    icon: 'cooking-pot',
+    label: 'Chef à domicile',
+    blurb: 'Devis signés et factures en règle, sans bureau.',
+    metaTitle: 'Logiciel pour chef à domicile : devis, factures, allergènes | WeboDevis',
+    description: 'Le logiciel du chef à domicile : devis signés en ligne, factures d’acompte et de solde avec la mention de franchise de TVA, allergènes du menu et liste de courses, depuis le téléphone.',
+    keyword: 'logiciel chef à domicile',
+    h1: 'Le logiciel du chef à domicile',
+    lead: 'Vous cuisinez chez vos clients, vous faites les courses, et vous gérez seul tout le reste. WeboDevis réunit les devis, les factures et le menu au même endroit, sur le téléphone comme sur l’ordinateur.',
+    preview: 'signature',
+    sections: [
+      {
+        title: 'Un devis signé avant de faire les courses',
+        body: 'Votre client reçoit le devis par un lien, l’accepte et le signe au doigt sur son téléphone. Le devis passe au statut « Validé », vous êtes prévenu, et la date s’inscrit sur votre calendrier. Vous savez aussi s’il a ouvert le devis, et combien de fois.',
+        feature: 'signature-devis-en-ligne',
+        linkLabel: 'Voir la signature en ligne',
+      },
+      {
+        title: 'Des factures en règle, même sans TVA',
+        body: 'Beaucoup de chefs à domicile exercent en micro-entreprise, en franchise de TVA. Vous la cochez une fois dans vos paramètres : vos factures sont établies sans TVA et portent la mention « TVA non applicable, art. 293 B du CGI ». L’acompte, puis le solde, partent du devis, avec des numéros qui se suivent.',
+        feature: 'facturation',
+        linkLabel: 'Voir les factures',
+      },
+      {
+        title: 'Le menu et ses allergènes',
+        body: 'Chez un particulier, la question des allergies vient vite. Les allergènes de vos recettes se retrouvent sur une fiche par événement, plat par plat, que vous remettez avec le menu.',
+        feature: 'allergenes',
+        linkLabel: 'Voir les allergènes',
+      },
+      {
+        title: 'Les courses, sans recompter',
+        body: 'La liste de courses se calcule depuis le devis : la quantité par personne de chaque ingrédient, multipliée par le nombre de couverts. Vous la cochez sur le téléphone, au marché ou chez le primeur.',
+        feature: 'liste-de-courses',
+        linkLabel: 'Voir la liste de courses',
+      },
+    ],
+    guides: ['facture-electronique-traiteur', 'allergenes-traiteur', 'calculer-quantites-par-convive'],
+    updated: '2026-10-20',
+  }),
+
+  audience({
+    slug: 'traiteur-cocktail-buffet',
+    menuText: 'Des centaines de pièces, des invités qui se servent seuls : des quantités justes et des allergènes affichés.',
+    icon: 'martini',
+    label: 'Traiteur cocktail et buffet',
+    blurb: 'Des pièces par convive, des allergènes affichés.',
+    metaTitle: 'Logiciel pour traiteur cocktail et buffet | WeboDevis',
+    description: 'Le logiciel du traiteur de cocktails et de buffets : devis à la pièce ou au couvert, quantités calculées sur le nombre de convives, fiche allergènes à afficher près du buffet, location du matériel.',
+    keyword: 'logiciel traiteur cocktail buffet',
+    h1: 'Le logiciel du traiteur de cocktails et de buffets',
+    lead: 'Un cocktail, ce sont des centaines de pièces, une dizaine de recettes et des invités qui se servent seuls. WeboDevis calcule les quantités sur le nombre de convives et met les allergènes du buffet sur une fiche.',
+    preview: 'allergenes',
+    sections: [
+      {
+        title: 'Un devis à la pièce ou au couvert',
+        body: 'Chaque ligne du devis a sa quantité et son prix unitaire : des pièces cocktail à l’unité, un buffet au couvert, un plateau à la pièce. Les options, comme un bar ou une animation, restent hors du total. Un cocktail réussi se duplique ou s’enregistre comme modèle pour le client suivant.',
+        feature: 'devis-traiteur',
+        linkLabel: 'Voir les devis',
+      },
+      {
+        title: 'Les quantités, à partir du nombre de convives',
+        body: 'Dans votre catalogue, chaque pièce porte ses ingrédients et leur quantité par personne : pour une pièce servie deux fois par invité, la quantité par personne compte les deux. La liste de courses multiplie ces quantités par le nombre de couverts et les regroupe par fournisseur. Si le nombre d’invités change, vous recalculez.',
+        feature: 'liste-de-courses',
+        linkLabel: 'Voir la liste de courses',
+      },
+      {
+        title: 'Les allergènes, affichés près du buffet',
+        body: 'Au buffet, personne ne décrit chaque plat à chaque invité. La fiche allergènes de l’événement met les pièces du menu en lignes et les 14 allergènes en colonnes : vous l’affichez près du buffet, ou vous la remettez au client.',
+        feature: 'allergenes',
+        linkLabel: 'Voir les allergènes',
+      },
+      {
+        title: 'Verres, plateaux, nappage',
+        body: 'La location se calcule par convive à partir de vos modèles, puis se regroupe par fournisseur. Le matériel à emporter et la checklist se préparent sur la même fiche d’événement.',
+        feature: 'evenements',
+        linkLabel: 'Voir les événements',
+      },
+    ],
+    guides: ['calculer-quantites-par-convive', 'allergenes-traiteur', 'liste-de-courses-evenement'],
+    updated: '2026-10-20',
   }),
 ];
 

@@ -8,5 +8,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     url: absoluteUrl(entry.path),
     changeFrequency: entry.changeFrequency,
     priority: entry.priority,
+    ...(entry.lastModified ? { lastModified: entry.lastModified } : {}),
   }));
 }

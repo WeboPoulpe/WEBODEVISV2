@@ -105,17 +105,26 @@ export const FOOTER: SiteLinkGroup[] = [
   { title: 'WeboDevis', links: [HOME, RELEASES, CONTACT, LOGIN, ...LEGAL] },
 ];
 
-export interface SitemapEntry { path: string; priority: number; changeFrequency: 'weekly' | 'monthly' | 'yearly' }
+export interface SitemapEntry {
+  path: string;
+  priority: number;
+  changeFrequency: 'weekly' | 'monthly' | 'yearly';
+  /** Date ISO de la dernière mise à jour, quand elle est connue. */
+  lastModified?: string;
+}
+
+/** Date de la dernière entrée de la page des nouveautés. */
+export const RELEASES_UPDATED = '2026-10-20';
 
 /** Toutes les pages publiques à référencer (la démo et la connexion n'en font pas partie). */
 export const SITEMAP: SitemapEntry[] = [
   { path: '/', priority: 1, changeFrequency: 'weekly' },
   { path: FEATURES_INDEX.href, priority: 0.9, changeFrequency: 'monthly' },
-  ...FEATURES.map((f) => ({ path: f.href, priority: 0.8, changeFrequency: 'monthly' as const })),
-  ...AUDIENCES.map((a) => ({ path: a.href, priority: 0.7, changeFrequency: 'monthly' as const })),
+  ...FEATURES.map((f) => ({ path: f.href, priority: 0.8, changeFrequency: 'monthly' as const, lastModified: f.updated })),
+  ...AUDIENCES.map((a) => ({ path: a.href, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: a.updated })),
   { path: GUIDES_INDEX.href, priority: 0.7, changeFrequency: 'weekly' },
-  ...GUIDES.map((g) => ({ path: g.href, priority: 0.7, changeFrequency: 'monthly' as const })),
-  { path: RELEASES.href, priority: 0.5, changeFrequency: 'weekly' },
+  ...GUIDES.map((g) => ({ path: g.href, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: g.published })),
+  { path: RELEASES.href, priority: 0.5, changeFrequency: 'weekly', lastModified: RELEASES_UPDATED },
   { path: CONTACT.href, priority: 0.5, changeFrequency: 'yearly' },
   ...LEGAL.map((l) => ({ path: l.href, priority: 0.2, changeFrequency: 'yearly' as const })),
 ];

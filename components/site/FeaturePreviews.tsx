@@ -1,4 +1,4 @@
-import { Building2, Check, Clock, Truck } from 'lucide-react';
+import { Building2, Check, Clock, Download, FileCode2, FileText, Paperclip, Truck } from 'lucide-react';
 import DateBlock from '@/components/ui/DateBlock';
 import type { FeaturePreview } from '@/lib/site/features';
 import { cn } from '@/lib/utils';
@@ -342,6 +342,163 @@ function CoursesPreview() {
   );
 }
 
+// ── Signature en ligne ─────────────────────────────────────────────────────────
+function SignaturePreview() {
+  return (
+    <Preview label="Aperçu du bloc d’acceptation d’un devis consulté en ligne : nom du signataire, case d’acceptation cochée, signature tracée et bouton Accepter et signer. À côté, le devis passé au statut Validé, consulté trois fois. Données d’exemple." className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3">
+      <div className={cn(panel, 'p-4 sm:p-6')}>
+        <p className="text-lg font-semibold text-gray-900">Accepter ce devis</p>
+        <p className="text-sm text-gray-600 mt-1">Valable jusqu’au 30 novembre</p>
+        <div className="mt-4">
+          <p className="text-sm font-medium text-gray-700">Prénom et nom</p>
+          <p className="mt-1.5 px-3.5 py-2.5 rounded-xl border border-gray-200 text-gray-900">Camille Roussel</p>
+        </div>
+        <p className="flex items-start gap-3 mt-4 text-sm text-gray-700">
+          <span className="w-5 h-5 mt-0.5 rounded-md bg-primary text-white flex items-center justify-center flex-shrink-0"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>
+          J’accepte le devis et les conditions de vente.
+        </p>
+        <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 h-[110px] flex items-center justify-center">
+          <svg viewBox="0 0 220 70" className="w-[200px] h-auto text-gray-900" aria-hidden>
+            <path d="M8 48 C 24 10, 34 12, 36 40 S 52 62, 60 34 S 74 8, 82 38 C 86 52, 96 50, 104 36 S 120 22, 128 40 C 134 52, 146 46, 156 34 S 178 28, 190 40 L 212 36" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <span className="mt-4 flex items-center justify-center h-12 rounded-xl bg-primary text-white font-semibold">Accepter et signer</span>
+      </div>
+      <div className={cn(panel, 'p-4 sm:p-6 self-start')}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 truncate">Camille &amp; Antoine</p>
+            <p className="text-xs text-gray-500">Mariage, 120 couverts</p>
+          </div>
+          <Pill tone="sage">Validé</Pill>
+        </div>
+        <div className="mt-4 text-sm">
+          {[['Consulté', '3 fois'], ['Signé par', 'Camille Roussel'], ['Le', '14 octobre, 21 h 42']].map(([k, v]) => (
+            <p key={k} className="flex justify-between gap-4 py-2.5 border-t border-gray-100">
+              <span className="text-gray-600">{k}</span><span className="font-medium text-gray-900 text-right">{v}</span>
+            </p>
+          ))}
+        </div>
+      </div>
+    </Preview>
+  );
+}
+
+// ── Factures ───────────────────────────────────────────────────────────────────
+const INVOICES = [
+  { number: 'FAC-2026-0041', kind: 'Facture d’acompte, 30 %', ttc: '3 762,00 €', status: 'Payée', tone: 'sage' as const },
+  { number: 'FAC-2026-0057', kind: 'Facture de solde', ttc: '8 778,00 €', status: 'Payée en partie', tone: 'terracotta' as const },
+];
+
+function InvoicesPreview() {
+  return (
+    <Preview label="Aperçu des factures d’un devis de mariage : une facture d’acompte payée et une facture de solde payée en partie, avec leurs numéros et montants TTC, la TVA ventilée et le bouton Exporter en CSV. Données d’exemple." className={cn(panel, 'p-4 sm:p-6')}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="font-display text-[26px] font-bold text-gray-900 leading-tight tracking-[-0.015em]">Factures</p>
+          <p className="text-sm text-gray-600">Camille &amp; Antoine, 120 couverts</p>
+        </div>
+        <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-200 text-[13px] font-medium text-gray-900"><Download className="h-4 w-4" />Exporter (CSV)</span>
+      </div>
+      <div className="mt-4 divide-y divide-gray-100 border-t border-gray-100">
+        {INVOICES.map((i) => (
+          <div key={i.number} className="flex items-center gap-3 py-3">
+            <span className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center flex-shrink-0"><FileText className="h-4 w-4" /></span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 truncate tabular-nums">{i.number}</p>
+              <p className="text-xs text-gray-500">{i.kind}</p>
+            </div>
+            <Pill tone={i.tone} className="hidden sm:inline-flex">{i.status}</Pill>
+            <p className="w-[96px] text-right font-display font-bold text-gray-900 tabular-nums">{i.ttc}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2.5 mt-4 text-sm">
+        {[['TVA 10 %', '1 140,00 €'], ['Facturé TTC', '12 540,00 €'], ['Encaissé', '9 762,00 €']].map(([k, v]) => (
+          <div key={k} className="rounded-2xl bg-gray-50 p-3">
+            <p className="text-xs text-gray-500">{k}</p>
+            <p className="font-display font-bold text-gray-900 tabular-nums mt-1.5">{v}</p>
+          </div>
+        ))}
+      </div>
+    </Preview>
+  );
+}
+
+// ── Facture électronique ───────────────────────────────────────────────────────
+function FacturXPreview() {
+  return (
+    <Preview label="Aperçu d’une facture au format Factur-X : un fichier PDF/A-3 qui contient en pièce jointe le fichier factur-x.xml au profil EN 16931. Le PDF Factur-X est prêt, le raccordement à une plateforme agréée est prévu. Données d’exemple." className={cn(panel, 'p-4 sm:p-6 max-w-[620px]')}>
+      <div className="flex items-start gap-3">
+        <span className="w-12 h-12 rounded-xl bg-primary-100 text-primary flex items-center justify-center flex-shrink-0"><FileText className="h-6 w-6" /></span>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 truncate tabular-nums">FAC-2026-0057.pdf</p>
+          <p className="text-xs text-gray-500">Facture de solde, Camille &amp; Antoine</p>
+        </div>
+        <Pill tone="sage">PDF/A-3</Pill>
+      </div>
+      <div className="mt-4 ml-6 pl-5 border-l-2 border-dashed border-gray-200">
+        <div className="flex items-start gap-3 rounded-2xl bg-gray-50 p-3.5">
+          <span className="w-10 h-10 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center flex-shrink-0"><FileCode2 className="h-5 w-5" /></span>
+          <div className="flex-1 min-w-0">
+            <p className="flex items-center gap-1.5 font-medium text-gray-900"><Paperclip className="h-3.5 w-3.5 text-gray-400" />factur-x.xml</p>
+            <p className="text-xs text-gray-500">Profil EN 16931</p>
+          </div>
+        </div>
+        <div className="mt-3 text-sm">
+          {[['Vendeur et client', 'SIRET, n° de TVA'], ['Lignes', '6'], ['TVA ventilée', '10 %'], ['Échéance', '30 jours']].map(([k, v]) => (
+            <p key={k} className="flex justify-between gap-4 py-2 border-t border-gray-100">
+              <span className="text-gray-600">{k}</span><span className="font-medium text-gray-900">{v}</span>
+            </p>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-5">
+        <Pill tone="sage">Prêt : PDF Factur-X</Pill>
+        <Pill tone="neutral">Prévu : plateforme agréée</Pill>
+      </div>
+    </Preview>
+  );
+}
+
+// ── Allergènes ─────────────────────────────────────────────────────────────────
+const ALLERGEN_COLS = ['Gluten', 'Crustacés', 'Œufs', 'Poissons', 'Arachides', 'Soja', 'Lait', 'Fruits à coque', 'Céleri', 'Moutarde', 'Sésame', 'Sulfites', 'Lupin', 'Mollusques'];
+const DISHES: { name: string; has: number[] }[] = [
+  { name: 'Gougères au comté', has: [0, 2, 6] },
+  { name: 'Tartare de saumon au sésame', has: [3, 10] },
+  { name: 'Crevettes, sauce cocktail', has: [1, 2, 9] },
+  { name: 'Velouté de céleri', has: [6, 8] },
+  { name: 'Financiers aux noisettes', has: [0, 2, 6, 7] },
+];
+const allergenGrid = 'grid grid-cols-[minmax(0,1fr)_repeat(7,1.5rem)] sm:grid-cols-[minmax(0,1fr)_repeat(14,1.5rem)] gap-x-0.5';
+
+function AllergensPreview() {
+  return (
+    <Preview label="Aperçu d’une fiche allergènes d’événement : cinq plats en lignes, les quatorze allergènes en colonnes, un point pour chaque allergène présent. Données d’exemple." className={cn(panel, 'p-4 sm:p-6')}>
+      <p className="text-[11px] uppercase tracking-wide text-gray-500">Votre maison</p>
+      <p className="font-display text-[22px] font-bold text-gray-900 leading-tight">Allergènes du menu</p>
+      <p className="text-xs text-gray-600 mt-1">Cocktail · 80 couverts</p>
+      <div className={cn(allergenGrid, 'items-end mt-4 pb-2 border-b-2 border-gray-800 text-[10px] font-semibold text-gray-700')}>
+        <p className="text-xs">Plat</p>
+        {ALLERGEN_COLS.map((a, i) => (
+          <p key={a} className={cn('h-[78px] items-center justify-end whitespace-nowrap [writing-mode:vertical-rl] rotate-180', i >= 7 ? 'hidden sm:flex' : 'flex')}>{a}</p>
+        ))}
+      </div>
+      {DISHES.map((d) => (
+        <div key={d.name} className={cn(allergenGrid, 'items-center py-2 border-b border-gray-100')}>
+          <p className="text-sm font-medium text-gray-900 truncate">{d.name}</p>
+          {ALLERGEN_COLS.map((a, i) => (
+            <span key={a} className={cn('justify-center', i >= 7 ? 'hidden sm:flex' : 'flex')}>
+              {d.has.includes(i) && <span className="w-2.5 h-2.5 rounded-full bg-gray-900" />}
+            </span>
+          ))}
+        </div>
+      ))}
+      <p className="text-[11px] text-gray-500 mt-3">● : le plat contient cet allergène ou des traces.</p>
+    </Preview>
+  );
+}
+
 // ── Application mobile ─────────────────────────────────────────────────────────
 function MobilePreview() {
   return (
@@ -366,5 +523,9 @@ export default function FeaturePreviewFor({ kind }: { kind: FeaturePreview }) {
     case 'calendrier': return <CalendarPreview />;
     case 'finance': return <FinancePreview />;
     case 'mobile': return <MobilePreview />;
+    case 'signature': return <SignaturePreview />;
+    case 'factures': return <InvoicesPreview />;
+    case 'facturx': return <FacturXPreview />;
+    case 'allergenes': return <AllergensPreview />;
   }
 }

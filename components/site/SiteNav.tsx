@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Boxes, Briefcase, CalendarDays, CalendarRange, ChefHat, ChevronDown, FileText, Heart, Inbox, ListChecks, Menu,
-  Scale, ShoppingBasket, Smartphone, TrendingUp, UserCheck, Users, X, type LucideIcon,
+  Boxes, Briefcase, CalendarDays, CalendarRange, ChefHat, ChevronDown, CookingPot, FileCheck, FileText, Heart, Inbox, ListChecks,
+  Martini, Menu, Receipt, Scale, ShieldAlert, ShoppingBasket, Signature, Smartphone, TrendingUp, UserCheck, Users, X, type LucideIcon,
 } from 'lucide-react';
 import Wordmark from '@/components/brand/Wordmark';
 import type { SiteLink, SiteMenuEntry } from '@/lib/site/pages';
@@ -33,6 +33,12 @@ const ICONS: Record<string, LucideIcon> = {
   'chef-hat': ChefHat,
   scale: Scale,
   'list-checks': ListChecks,
+  signature: Signature,
+  'shield-alert': ShieldAlert,
+  receipt: Receipt,
+  'file-check': FileCheck,
+  'cooking-pot': CookingPot,
+  martini: Martini,
 };
 
 /** Délais d'intention : on n'ouvre pas au simple passage de la souris, on ne ferme pas au premier écart. */
