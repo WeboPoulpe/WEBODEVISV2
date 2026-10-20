@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALLERGENS, ingredientAllergens, prestationAllergens, sortAllergens, suggestAllergens } from './allergens';
+import { ALLERGENS, allergenSheet, ingredientAllergens, prestationAllergens, sortAllergens, suggestAllergens } from './allergens';
 
 describe('les 14 allergènes', () => {
   it('sont tous là, une seule fois', () => {
@@ -58,5 +58,16 @@ describe('allergènes d’un ingrédient et d’une prestation', () => {
     expect(r.sources.oeufs).toEqual(['ajouté à la main']);
     expect(r.sources.gluten).toEqual(['Farine de blé']);
     expect(r).toMatchObject({ checked: true, hasSuggestions: true });
+  });
+});
+
+describe('fiche allergènes d’un devis', () => {
+  it('rapproche les lignes du catalogue, sans doublon, et met de côté le reste', () => {
+    const { rows, unmatched } = allergenSheet(
+      [{ name: 'Tarte aux noix' }, { name: 'tarte aux NOIX' }, { name: 'Location de vaisselle' }, { name: 'Retiré', removed: true }, { name: '', isPageBreak: true }],
+      [{ name: 'Tarte aux noix', allergens_checked: true, ingredients: [{ name: 'Noix', allergens: ['fruits_coque'] }] }],
+    );
+    expect(rows).toEqual([{ dish: 'Tarte aux noix', keys: ['fruits_coque'], checked: true, hasSuggestions: false }]);
+    expect(unmatched).toEqual(['Location de vaisselle']);
   });
 });

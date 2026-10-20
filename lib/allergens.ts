@@ -107,3 +107,46 @@ export function prestationAllergens(p: PrestationAllergenInput): PrestationAller
   for (const k of sortAllergens(p.allergens_extra ?? [])) (sources[k] ??= []).push('ajouté à la main');
   return { keys: sortAllergens(Object.keys(sources)), sources, checked: !!p.allergens_checked, hasSuggestions };
 }
+
+// ── Fiche allergènes d'un devis ──────────────────────────────────────────────
+
+export interface AllergenSheetRow {
+  dish: string;
+  keys: AllergenKey[];
+  checked: boolean;
+  hasSuggestions: boolean;
+}
+
+const dishKey = (name: string) => normalize(name).trim();
+
+/**
+ * Plats du devis et leurs allergènes : chaque ligne est rapprochée de la prestation du catalogue du même nom.
+ * Une prestation présente sur plusieurs lignes n'apparaît qu'une fois ; les lignes sans prestation (location,
+ * personnel, plats saisis à la main) sont listées à part.
+ */
+export function allergenSheet(
+  lines: { name?: string | null; removed?: boolean; isPageBreak?: boolean }[],
+  prestations: PrestationAllergenInput[],
+): { rows: AllergenSheetRow[]; unmatched: string[] } {
+  const byName = new Map<string, PrestationAllergenInput>();
+  for (const p of prestations) {
+    const k = dishKey(p.name);
+    // Deux prestations du même nom : celle qui a une recette l'emporte.
+    if (!byName.has(k) || (p.ingredients.length > 0 && byName.get(k)!.ingredients.length === 0)) byName.set(k, p);
+  }
+  const rows: AllergenSheetRow[] = [];
+  const unmatched: string[] = [];
+  const seen = new Set<string>();
+  for (const l of lines) {
+    const name = (l.name ?? '').trim();
+    if (!name || l.removed || l.isPageBreak) continue;
+    const k = dishKey(name);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const p = byName.get(k);
+    if (!p) { unmatched.push(name); continue; }
+    const a = prestationAllergens(p);
+    rows.push({ dish: name, keys: a.keys, checked: a.checked, hasSuggestions: a.hasSuggestions });
+  }
+  return { rows, unmatched };
+}

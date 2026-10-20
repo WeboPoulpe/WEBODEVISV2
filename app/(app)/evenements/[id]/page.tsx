@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, FileText, Loader2, MapPin, Pencil, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, CalendarDays, FileText, Loader2, MapPin, Pencil, ShieldAlert, Users, Wallet } from 'lucide-react';
 import FinanceSheet from '@/components/devis/FinanceSheet';
 import { createClient } from '@/lib/supabase/client';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -120,6 +120,7 @@ export default function EvenementPage() {
           ><Pencil className="h-4 w-4" />Modifier</button>
           <button onClick={() => setFinanceOpen(true)} className={btnSecondary}><Wallet className="h-4 w-4" />Marge et coûts</button>
           <Link href={`/devis/${quote.id}/modifier`} className={btnSecondary}><FileText className="h-4 w-4" />Voir le devis</Link>
+          <Link href={`/devis/${quote.id}/allergenes`} className={btnSecondary}><ShieldAlert className="h-4 w-4" />Fiche allergènes</Link>
         </div>
       </header>
 
