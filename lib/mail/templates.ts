@@ -517,3 +517,62 @@ export function supportAckEmail({ request }: { request: SupportRequestDetails })
     }),
   };
 }
+
+// ── Bon de commande envoyé au fournisseur ─────────────────────────────────────
+// Envoyé au nom du traiteur (nom d'expéditeur = entreprise, réponses vers le traiteur).
+
+export interface SupplierOrderDetails {
+  companyName: string;
+  /** Référence courte de la commande, reprise sur le bon imprimé. */
+  reference: string;
+  message: string;
+  /** Date de livraison souhaitée (AAAA-MM-JJ), facultative. */
+  deliveryDate: string | null;
+  items: { name: string; quantity: number; unit: string | null }[];
+  /** Coordonnées du traiteur, pour que le fournisseur puisse le joindre. */
+  contact: { name: string | null; phone: string | null; email: string | null; address: string | null };
+}
+
+// Repère remplacé par le tableau des articles : le gabarit commun n'accepte que des paragraphes.
+const ORDER_TABLE = '<!--articles-de-la-commande-->';
+
+function orderItemsTable(items: SupplierOrderDetails['items']): string {
+  const cell = 'padding:10px 12px;font-size:14px;border-top:1px solid #E6DFD3;';
+  const head = 'padding:10px 12px;font-size:12px;font-weight:600;color:#57534C;text-align:left;';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;background:#F7F3EC;border-radius:14px;border-collapse:separate;">
+        <tr><td style="${head}">Ingrédient</td><td style="${head}text-align:right;">Quantité</td><td style="${head}">Unité</td></tr>
+        ${items.map((i) => `<tr>
+          <td style="${cell}font-weight:600;color:#1B1A17;">${esc(i.name)}</td>
+          <td style="${cell}text-align:right;font-weight:600;color:#1B1A17;white-space:nowrap;">${esc(i.quantity.toLocaleString('fr-FR'))}</td>
+          <td style="${cell}color:#57534C;">${esc(i.unit ?? '')}</td>
+        </tr>`).join('')}
+      </table>`;
+}
+
+/** Au fournisseur : la commande du traiteur, article par article. */
+export function supplierOrderEmail({ order }: { order: SupplierOrderDetails }): Email {
+  const delivery = order.deliveryDate ? dateFr(order.deliveryDate) : '';
+  const html = renderEmail({
+    brand: order.companyName,
+    preheader: `${order.companyName} vous adresse une commande de ${order.items.length} article${order.items.length > 1 ? 's' : ''}.`,
+    title: `Commande n° ${order.reference}`,
+    paragraphs: [
+      ...(order.message.trim() ? [multiline(order.message.trim())] : []),
+      ORDER_TABLE,
+      ...(delivery ? [`Livraison souhaitée le <strong>${esc(delivery)}</strong>.`] : []),
+    ],
+    facts: [
+      ['Commandé par', order.companyName],
+      ['Contact', order.contact.name ?? ''],
+      ['Téléphone', order.contact.phone ?? ''],
+      ['Email', order.contact.email ?? ''],
+      ['Adresse', order.contact.address ?? ''],
+    ],
+    note: 'Pour confirmer la commande ou signaler un article manquant, répondez simplement à cet email.',
+    footer: `Envoyé par ${order.companyName} avec WeboDevis.`,
+  });
+  return {
+    subject: `Commande ${order.companyName} n° ${order.reference}${delivery ? `, livraison le ${delivery}` : ''}`,
+    html: html.replace(new RegExp(`<p[^>]*>${ORDER_TABLE}</p>`), orderItemsTable(order.items)),
+  };
+}

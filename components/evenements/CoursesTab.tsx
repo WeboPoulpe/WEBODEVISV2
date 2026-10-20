@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Pencil, Plus, Printer, RefreshCw, Search, ShoppingBasket, Smartphone, Trash2 } from 'lucide-react';
+import { Loader2, PackageMinus, Pencil, Plus, Printer, RefreshCw, Search, ShoppingBasket, Smartphone, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { createSupplierOrders, recalculateCourses } from '@/server/events';
+import { cancelEventStockExit, getEventStockExit, withdrawEventStock } from '@/server/stockExit';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
@@ -35,7 +36,9 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
   const [lines, setLines] = useState<CourseLine[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<'recalc' | 'orders' | null>(null);
+  const [busy, setBusy] = useState<'recalc' | 'orders' | 'stock' | null>(null);
+  // Date de la sortie de stock de l'événement, null s'il n'est pas retiré du stock.
+  const [withdrawnAt, setWithdrawnAt] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [form, setForm] = useState<typeof emptyForm | null>(null);
   const [search, setSearch] = useState('');
@@ -50,6 +53,9 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
   }, [quote.id, check]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    getEventStockExit(quote.id).then((res) => setWithdrawnAt(res.withdrawnAt)).catch(() => {});
+  }, [quote.id]);
   useEffect(() => {
     createClient().from('suppliers').select('id, name').order('name').then(({ data }) => setSuppliers((data ?? []) as Supplier[]));
   }, []);
@@ -89,6 +95,30 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
     if (res.error) { setError(res.error); return; }
     setError(null);
     setNotice(`${res.created} commande${res.created > 1 ? 's' : ''} en brouillon ${res.created > 1 ? 'créées' : 'créée'}.${res.withoutSupplier ? ` ${res.withoutSupplier} ingrédient${res.withoutSupplier > 1 ? 's' : ''} sans fournisseur ${res.withoutSupplier > 1 ? 'n’y figurent' : 'n’y figure'} pas.` : ''}`);
+  };
+
+  const withdraw = async () => {
+    if (!confirm('Retirer du stock les quantités de cette liste de courses ?\nVous pourrez annuler la sortie ensuite.')) return;
+    setBusy('stock'); setNotice(null);
+    const res = await withdrawEventStock(quote.id).catch(() => null);
+    setBusy(null);
+    if (!res) { setError('La sortie de stock n’a pas pu être enregistrée. Réessayez.'); return; }
+    if (res.withdrawnAt) setWithdrawnAt(res.withdrawnAt);
+    if (res.error) { setError(res.error); return; }
+    setError(null);
+    setNotice(`${res.count} ingrédient${res.count > 1 ? 's' : ''} ${res.count > 1 ? 'retirés' : 'retiré'} du stock.${res.shortages.length ? ` Stock insuffisant, désormais négatif : ${res.shortages.join(', ')}.` : ''}`);
+  };
+
+  const cancelWithdraw = async () => {
+    if (!confirm('Annuler la sortie de stock ? Les quantités retirées reviennent dans le stock.')) return;
+    setBusy('stock'); setNotice(null);
+    const res = await cancelEventStockExit(quote.id).catch(() => null);
+    setBusy(null);
+    if (!res) { setError('L’annulation n’a pas pu être enregistrée. Réessayez.'); return; }
+    if (res.error) { setError(res.error); return; }
+    setError(null);
+    setWithdrawnAt(null);
+    setNotice(`Sortie annulée : ${res.count} ingrédient${res.count > 1 ? 's' : ''} remis en stock.`);
   };
 
   const toggle = async (line: CourseLine, checked: boolean) => {
@@ -159,11 +189,26 @@ export default function CoursesTab({ quote }: { quote: EventQuote }) {
             <button onClick={makeOrders} disabled={busy !== null} className={btnSecondary}>
               {busy === 'orders' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBasket className="h-4 w-4" />}Créer les commandes
             </button>
+            {!withdrawnAt && (
+              <button onClick={withdraw} disabled={busy !== null} className={btnSecondary}>
+                {busy === 'stock' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageMinus className="h-4 w-4" />}Retirer du stock
+              </button>
+            )}
             <Link href={`/evenements/${quote.id}/courses`} className={btnSecondary}><Smartphone className="h-4 w-4" />Mode courses</Link>
             <button onClick={print} className={btnSecondary}><Printer className="h-4 w-4" />Imprimer</button>
           </>
         )}
       </div>
+
+      {withdrawnAt && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
+          <PackageMinus className="h-4 w-4 text-gray-500 flex-shrink-0" />
+          <span className="flex-1 min-w-0">Déjà retiré du stock le {new Date(withdrawnAt).toLocaleDateString('fr-FR')}.</span>
+          <button onClick={cancelWithdraw} disabled={busy !== null} className="inline-flex items-center gap-1.5 min-h-10 font-medium text-primary hover:underline disabled:opacity-50">
+            {busy === 'stock' && <Loader2 className="h-4 w-4 animate-spin" />}Annuler la sortie
+          </button>
+        </p>
+      )}
 
       {loading ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 rounded-2xl bg-gray-50 animate-pulse" />)}</div>

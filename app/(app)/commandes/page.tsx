@@ -9,6 +9,7 @@ import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill, errorCls } from '@/components/ui/kit';
 import { ErrorBanner, esc, printDocument } from '@/components/evenements/shared';
+import { sendSupplierOrder } from '@/server/supplierOrders';
 
 interface Supplier { id: string; name: string; email: string | null; phone: string | null; }
 interface Ingredient { id: string; name: string; unit: string | null; volume_unit_price: number | null; preferred_supplier_id: string | null; }
@@ -51,6 +52,8 @@ export default function CommandesPage() {
   // Action rapide du menu (lib/navMega.ts).
   useUrlAction({ nouveau: () => setCreateModal(true) });
   const [editingOrder, setEditingOrder] = useState<SupplierOrder | null>(null);
+  const [sendingOrder, setSendingOrder] = useState<SupplierOrder | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -107,6 +110,7 @@ export default function CommandesPage() {
       </div>
 
       {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+      {notice && <p role="status" className="mb-4 text-sm text-sage bg-sage-100 rounded-xl px-4 py-3">{notice}</p>}
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
         <div className="relative flex-1">
@@ -165,8 +169,8 @@ export default function CommandesPage() {
                 </button>
                 <div className="flex items-center gap-1 w-full md:w-auto pl-3 sm:pl-4 md:pl-2 pb-3 md:pb-0">
                   {order.status === 'draft' && (
-                    <button onClick={() => updateStatus(order.id, 'sent')} className={cn(btnSecondary, 'h-10 flex-1 md:flex-none whitespace-nowrap')}>
-                      <Send className="h-4 w-4" />Marquer envoyée
+                    <button onClick={() => { setNotice(null); setSendingOrder(order); }} className={cn(btnSecondary, 'h-10 flex-1 md:flex-none whitespace-nowrap')}>
+                      <Send className="h-4 w-4" />Envoyer au fournisseur
                     </button>
                   )}
                   {order.status === 'sent' && (
@@ -195,6 +199,20 @@ export default function CommandesPage() {
           suppliers={suppliers}
           onClose={() => setCreateModal(false)}
           onCreated={() => { setCreateModal(false); fetchAll(); }}
+        />
+      )}
+
+      {sendingOrder && (
+        <SendOrderModal
+          order={sendingOrder}
+          accountEmail={user?.email ?? null}
+          onClose={() => setSendingOrder(null)}
+          onMarkSent={() => { const id = sendingOrder.id; setSendingOrder(null); updateStatus(id, 'sent'); }}
+          onSent={(to, copySent) => {
+            setSendingOrder(null);
+            setNotice(`Commande envoyée à ${to}.${copySent === true ? ' Une copie vous a été envoyée.' : copySent === false ? ' La copie à votre adresse n’a pas pu partir.' : ''}`);
+            fetchAll();
+          }}
         />
       )}
 
@@ -306,6 +324,87 @@ function buildOrderBody(order: SupplierOrder): string {
   </table>
   ${order.notes ? `<p style="margin-top:18px;padding:10px 12px;background:#f7f3ec;border-radius:8px;font-size:12px">${esc(order.notes)}</p>` : ''}
   <p class="muted" style="margin-top:36px;text-align:center">Document préparé avec WeboDevis</p>`;
+}
+
+// ── Envoi au fournisseur ─────────────────────────────────────────────────────
+// Note ajoutée par la création automatique depuis la liste de courses : interne, elle ne part pas au fournisseur.
+const AUTO_ORDER_NOTE = 'Commande générée depuis la liste de courses';
+
+function defaultMessage(order: SupplierOrder): string {
+  const notes = order.notes?.trim() && !order.notes.startsWith(AUTO_ORDER_NOTE) ? `\n\n${order.notes.trim()}` : '';
+  return `Bonjour,\n\nPourriez-vous nous préparer la commande ci-dessous ? Merci de nous confirmer sa bonne réception.${notes}\n\nBien cordialement`;
+}
+
+function SendOrderModal({ order, accountEmail, onClose, onSent, onMarkSent }: {
+  order: SupplierOrder;
+  accountEmail: string | null;
+  onClose: () => void;
+  onSent: (to: string, copySent: boolean | undefined) => void;
+  onMarkSent: () => void;
+}) {
+  const [to, setTo] = useState(order.supplier?.email ?? '');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [message, setMessage] = useState(() => defaultMessage(order));
+  const [copyToMe, setCopyToMe] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const n = order.items?.length ?? 0;
+
+  const submit = async () => {
+    if (!to.trim()) { setError('Indiquez l’adresse email du fournisseur.'); return; }
+    setSending(true); setError(null);
+    const res = await sendSupplierOrder({ orderId: order.id, to, message, deliveryDate: deliveryDate || null, copyToMe }).catch(() => null);
+    setSending(false);
+    if (!res) { setError('L’email n’a pas pu être envoyé. Réessayez dans un instant.'); return; }
+    if (res.error) { setError(res.error); return; }
+    onSent(to.trim().toLowerCase(), res.copySent);
+  };
+
+  return (
+    <Modal
+      title={`Envoyer à ${order.supplier?.name ?? 'au fournisseur'}`}
+      onClose={onClose}
+      footer={<>
+        <button onClick={onClose} className={btnGhost}>Annuler</button>
+        <button onClick={submit} disabled={sending || n === 0} className={btnPrimary}>
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Envoyer
+        </button>
+      </>}
+    >
+      <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4 pb-3">
+        {error && <p role="alert" className={errorCls}>{error}</p>}
+        <div>
+          <label htmlFor="order-to" className={labelCls}>Adresse du fournisseur</label>
+          <input id="order-to" type="email" inputMode="email" autoComplete="off" autoCapitalize="off" spellCheck={false}
+            value={to} onChange={(e) => setTo(e.target.value)} placeholder="commandes@fournisseur.fr" className={inputCls} />
+          {!order.supplier?.email && <p className="mt-1.5 text-sm text-gray-500">Ce fournisseur n’a pas d’adresse enregistrée : celle-ci sera retenue.</p>}
+        </div>
+        <div>
+          <label htmlFor="order-delivery" className={labelCls}>Livraison souhaitée le (facultatif)</label>
+          <input id="order-delivery" type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label htmlFor="order-message" className={labelCls}>Message</label>
+          <textarea id="order-message" rows={6} value={message} onChange={(e) => setMessage(e.target.value)} className={cn(inputCls, 'h-auto py-3 resize-none')} />
+        </div>
+        {accountEmail && (
+          <label className="flex items-center gap-3 min-h-10 cursor-pointer text-[15px] text-gray-700">
+            <input type="checkbox" checked={copyToMe} onChange={(e) => setCopyToMe(e.target.checked)} className="w-5 h-5 rounded accent-[rgb(var(--p-600))]" />
+            <span>M’envoyer une copie <span className="text-gray-500 break-all">({accountEmail})</span></span>
+          </label>
+        )}
+        <p className="text-sm text-gray-500">
+          L’email contient le détail des {n} article{n > 1 ? 's' : ''} (quantités et unités, sans les prix) et vos coordonnées. Les réponses arriveront dans votre boîte. La commande passera en « Envoyée ».
+        </p>
+        {order.status === 'draft' && (
+          <p className="text-sm text-gray-500">
+            Commande passée par téléphone ?{' '}
+            <button type="button" onClick={onMarkSent} className="font-medium text-primary hover:underline">La marquer envoyée sans email</button>
+          </p>
+        )}
+      </form>
+    </Modal>
+  );
 }
 
 // ── Nouvelle commande ────────────────────────────────────────────────────────
