@@ -27,6 +27,7 @@ import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES, QUOTE_STATUSES
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
 import FolderBar, { DragItem } from '@/components/devis/FolderBar';
 import TemplateThumb from '@/components/devis/TemplateThumb';
+import QuoteHistory from '@/components/devis/QuoteHistory';
 import SendQuoteModal from '@/components/devis/SendQuoteModal';
 import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
@@ -206,7 +207,7 @@ function DevisSheet({
 }: {
   quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void; onBill: () => void;
 }) {
-  const [tab, setTab] = useState<'apercu' | 'suivi'>('apercu');
+  const [tab, setTab] = useState<'apercu' | 'suivi' | 'historique'>('apercu');
   const { notify } = useFeedback();
   // Factures du devis (acomptes, solde, avoirs), lues par les actions serveur des factures.
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
@@ -299,7 +300,7 @@ function DevisSheet({
 
   return (
     <Sheet open onClose={onClose} title={quoteDisplayName(quote)} subtitle={[quote.quote_number, quote.event_type].filter(Boolean).join(' · ')} width="w-[480px]">
-      <SheetTabs tabs={[{ key: 'apercu', label: 'Aperçu' }, { key: 'suivi', label: 'Suivi commercial' }]}
+      <SheetTabs tabs={[{ key: 'apercu', label: 'Aperçu' }, { key: 'suivi', label: 'Suivi' }, { key: 'historique', label: 'Historique' }]}
         active={tab} onChange={(k) => setTab(k as typeof tab)} />
 
       {tab === 'apercu' && (
@@ -541,6 +542,12 @@ function DevisSheet({
               <Trash2 className="h-4 w-4" />{quote.imported ? 'Supprimer cet import' : 'Supprimer ce brouillon'}
             </button>
           )}
+        </div>
+      )}
+
+      {tab === 'historique' && (
+        <div className="p-6">
+          <QuoteHistory quoteId={quote.id} />
         </div>
       )}
 

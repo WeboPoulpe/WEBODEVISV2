@@ -1092,6 +1092,21 @@ export const error_groups = pgTable("error_groups", {
 	check("error_groups_source_check", sql`source = ANY (ARRAY['navigateur'::text, 'serveur'::text])`),
 ]);
 
+// Événements d'un devis qui ne laissent pas d'autre trace : envois (email, WhatsApp) et consultations du client.
+// L'historique du devis les réunit avec les statuts, la signature, les relances, les factures et les paiements.
+export const quote_events = pgTable("quote_events", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	quote_id: uuid().notNull(),
+	kind: text().notNull(),
+	actor_id: uuid(),
+	details: jsonb(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_quote_events_quote").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops"), table.created_at.asc().nullsLast().op("timestamptz_ops")),
+	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "quote_events_quote_id_fkey" }).onDelete("cascade"),
+	check("quote_events_kind_check", sql`kind = ANY (ARRAY['envoi_email'::text, 'envoi_whatsapp'::text, 'consultation'::text])`),
+]);
+
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
 // Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
 export const document_counters = pgTable("document_counters", {

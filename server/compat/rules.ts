@@ -115,6 +115,8 @@ export const RULES: Record<string, TableRule> = {
   event_ingredients: both(viaQuote),
   // Accords signés en ligne : lisibles par le traiteur, écrits seulement par le serveur (page publique).
   quote_acceptances: { read: viaQuote, write: () => 'false' },
+  // Envois et consultations d'un devis : lisibles par l'entreprise, écrits seulement par le serveur.
+  quote_events: { read: viaQuote, write: () => 'false' },
   rental_items: both(viaQuote),
   rental_templates: both(team('user_id')),
   rental_template_sets: both(team('user_id')),

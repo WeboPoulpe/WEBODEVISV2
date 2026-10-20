@@ -4,7 +4,8 @@ import crypto from 'node:crypto';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
-import { customer_contacts, customers, profiles, quotes } from '@/db/schema';
+import { customer_contacts, customers, profiles, quote_events, quotes } from '@/db/schema';
+import { whatsappNumber } from '@/lib/extras';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { quoteProposalEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
@@ -124,7 +125,40 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
       })
       .where(eq(quotes.id, quote.id));
   });
+  await db.insert(quote_events).values({ quote_id: quote.id, kind: 'envoi_email', actor_id: user.id, details: { to: sent, cc: cc.length && ccPending.length === 0 ? cc : [] } })
+    .catch((e) => console.error('[historique]', e));
   return { error: null, status, sent, failed, clientEmail, copySent, cc: cc.length && ccPending.length === 0 ? cc : undefined };
+}
+
+/**
+ * Envoi par WhatsApp, depuis le téléphone ou l'ordinateur du traiteur : prépare le lien du devis (créé s'il
+ * manque), passe le devis en « Devis envoyé » comme un envoi par email, et le note dans l'historique.
+ * Le message part de WhatsApp lui-même : l'app ne peut pas savoir s'il a vraiment été envoyé.
+ */
+export async function shareQuoteByWhatsapp(quoteId: string): Promise<{ error: string | null; link?: string; phone?: string | null; status?: string }> {
+  const user = await requireWriter();
+  if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
+  const [quote] = await db
+    .select({ id: quotes.id, status: quotes.status, share_token: quotes.share_token, valid_until: quotes.valid_until, client_phone: quotes.client_phone })
+    .from(quotes)
+    .where(and(eq(quotes.id, quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id} or ${quotes.owner_user_id} in ${companyIdsOf(user.id)})`))
+    .limit(1);
+  if (!quote) return { error: 'Devis introuvable.' };
+  const [profile] = await db.select({ validity: profiles.quote_validity_days }).from(profiles).where(eq(profiles.id, user.id)).limit(1);
+
+  const token = quote.share_token ?? crypto.randomBytes(18).toString('base64url');
+  const status = BEFORE_SENT.includes(quote.status) ? 'devis_envoye' : quote.status;
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.user_id', ${user.id}, true)`);
+    await tx.update(quotes).set({
+      share_token: token, sent_at: new Date().toISOString(), status,
+      ...(quote.valid_until ? {} : { valid_until: new Date(Date.now() + (profile?.validity ?? 30) * 86400_000).toISOString().slice(0, 10) }),
+    }).where(eq(quotes.id, quote.id));
+  });
+  const phone = whatsappNumber(quote.client_phone);
+  await db.insert(quote_events).values({ quote_id: quote.id, kind: 'envoi_whatsapp', actor_id: user.id, details: { phone } })
+    .catch((e) => console.error('[historique]', e));
+  return { error: null, link: `${await appOrigin()}/d/${token}`, phone, status };
 }
 
 export interface RecipientSuggestion {

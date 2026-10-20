@@ -190,6 +190,13 @@
       "when": 1792486352031,
       "tag": "0026_error_journal",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792489929420,
+      "tag": "0027_quote_events",
+      "breakpoints": true
     }
   ]
 }

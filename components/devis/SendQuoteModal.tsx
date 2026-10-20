@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, Send, X } from 'lucide-react';
+import { Loader2, MessageCircle, Plus, Send, X } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
-import { btnGhost, btnPrimary, errorCls, inputCls, labelCls } from '@/components/ui/kit';
-import { quoteRecipientSuggestions, sendQuoteToClient, type RecipientSuggestion, type SendQuoteResult } from '@/server/quotes';
+import { btnGhost, btnPrimary, btnSecondary, errorCls, inputCls, labelCls } from '@/components/ui/kit';
+import { quoteRecipientSuggestions, sendQuoteToClient, shareQuoteByWhatsapp, type RecipientSuggestion, type SendQuoteResult } from '@/server/quotes';
 import { MAX_RECIPIENTS, isValidEmail, normalizeEmail, splitEmails } from '@/lib/emailList';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +45,26 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SendQuoteResult | null>(null);
+  // Envoi par WhatsApp : WhatsApp s'ouvre avec le message et le lien du devis, prêts à partir.
+  const [whatsappDone, setWhatsappDone] = useState(false);
+  const [whatsappPhone, setWhatsappPhone] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+
+  const shareWhatsapp = async () => {
+    setError(null);
+    // La fenêtre est ouverte tout de suite (dans le clic) : ouverte après l'attente, elle serait bloquée.
+    const win = window.open('about:blank', '_blank');
+    setSharing(true);
+    const res = await shareQuoteByWhatsapp(quote.id).catch(() => ({ error: 'L’envoi a échoué. Réessayez dans un instant.' } as { error: string; link?: string; phone?: string | null; status?: string }));
+    setSharing(false);
+    if (res.error || !res.link) { win?.close(); setError(res.error ?? 'L’envoi a échoué.'); return; }
+    const text = `${message.trim()}\n\n${res.link}`;
+    const url = `https://wa.me/${res.phone ?? ''}?text=${encodeURIComponent(text)}`;
+    if (win) win.location.href = url; else window.location.href = url;
+    setWhatsappPhone(res.phone ?? null);
+    setWhatsappDone(true);
+    onSent?.({ status: res.status, to: [] });
+  };
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -126,12 +146,15 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
 
   return (
     <Modal
-      title={result ? 'Devis envoyé' : 'Envoyer le devis au client'}
+      title={result ? 'Devis envoyé' : whatsappDone ? 'WhatsApp est ouvert' : 'Envoyer le devis au client'}
       onClose={onClose}
-      footer={result
+      footer={result || whatsappDone
         ? <button onClick={onClose} className={btnPrimary}>Fermer</button>
         : <>
             <button onClick={onClose} className={btnGhost}>Annuler</button>
+            <button onClick={shareWhatsapp} onMouseDown={(e) => e.preventDefault()} disabled={sending || sharing} className={btnSecondary}>
+              {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}WhatsApp
+            </button>
             {/* Pas de perte de focus au clic : l'adresse en cours de saisie ne devient pas une pastille
                 (ce qui déplacerait le bouton sous le pointeur) ; l'envoi la reprend lui-même. */}
             <button onClick={submit} onMouseDown={(e) => e.preventDefault()} disabled={sending} className={btnPrimary}>
@@ -139,7 +162,12 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
             </button>
           </>}
     >
-      {result ? (
+      {whatsappDone && !result ? (
+        <div className="space-y-3 pb-3 text-[15px] text-gray-700">
+          <p>WhatsApp s’est ouvert avec votre message et le lien du devis. {whatsappPhone ? ' Il ne reste qu’à appuyer sur Envoyer.' : ' Le numéro du client n’étant pas connu, choisissez le contact dans WhatsApp, puis envoyez.'}</p>
+          <p>Le devis est noté comme envoyé, et l’envoi apparaît dans son historique.</p>
+        </div>
+      ) : result ? (
         <div className="space-y-3 pb-3 text-[15px] text-gray-700">
           {sent.length === 1 ? (
             <p>L’email est parti à <strong className="text-gray-900">{sent[0]}</strong>.</p>

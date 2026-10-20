@@ -86,6 +86,11 @@ export async function recordQuoteView(token: string): Promise<void> {
     view_count: sql`${quotes.view_count} + 1`,
     viewed_at: sql`coalesce(${quotes.viewed_at}, now())`,
   }).where(eq(quotes.id, q.id));
+  // Historique : une consultation notée au plus toutes les 6 heures (un client qui rouvre le lien dix fois n'en fait pas dix lignes).
+  await db.execute(sql`insert into public.quote_events (quote_id, kind)
+    select ${q.id}::uuid, 'consultation'
+    where not exists (select 1 from public.quote_events e where e.quote_id = ${q.id}::uuid and e.kind = 'consultation' and e.created_at > now() - interval '6 hours')`)
+    .catch(() => {});
 }
 
 export async function acceptQuote(input: {
