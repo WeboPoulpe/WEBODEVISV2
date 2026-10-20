@@ -594,3 +594,59 @@ export function teamInviteEmail({ companyName, inviterName, roleLabel, link, day
     }),
   };
 }
+
+// ── Conseils (premiers pas, inactivité) ───────────────────────────────────────
+export type LifecycleKind = 'catalogue' | 'premier_devis' | 'envoi_en_ligne' | 'inactif';
+
+const LIFECYCLE: Record<LifecycleKind, { subject: string; title: string; paragraphs: string[]; button: string; path: string }> = {
+  catalogue: {
+    subject: 'Commencez par votre carte',
+    title: 'Votre carte, en quelques minutes',
+    paragraphs: [
+      'Tout part de vos prestations : vos menus, cocktails et buffets, avec leur prix. Une fois saisies, un devis se compose en quelques clics.',
+      'Vous avez déjà une carte dans un tableur ? Importez-la d’un coup depuis la page Prestations.',
+    ],
+    button: 'Ajouter mes prestations', path: '/prestations',
+  },
+  premier_devis: {
+    subject: 'Votre premier devis avec WeboDevis',
+    title: 'Faites votre premier devis',
+    paragraphs: [
+      'Choisissez le client, la date et le nombre de couverts, puis vos prestations : le total, la TVA et le document se font tout seuls.',
+      'Vous pouvez aussi partir d’un modèle et l’adapter.',
+    ],
+    button: 'Créer un devis', path: '/devis/nouveau',
+  },
+  envoi_en_ligne: {
+    subject: 'Envoyez vos devis, faites-les signer en ligne',
+    title: 'Un devis accepté sans imprimer',
+    paragraphs: [
+      'Envoyez votre devis par email depuis WeboDevis : votre client l’ouvre sur son téléphone, l’accepte et le signe du doigt. Vous êtes prévenu tout de suite.',
+      'Ensuite, la facture d’acompte se prépare en un clic depuis le devis.',
+    ],
+    button: 'Voir mes devis', path: '/devis',
+  },
+  inactif: {
+    subject: 'Ce qui a changé sur WeboDevis',
+    title: 'Des nouveautés vous attendent',
+    paragraphs: [
+      'Factures et acomptes, signature des devis en ligne, fiche allergènes, fiche de production : WeboDevis s’est beaucoup enrichi ces dernières semaines.',
+      'Vos devis et votre carte sont toujours là, prêts à servir.',
+    ],
+    button: 'Ouvrir WeboDevis', path: '/',
+  },
+};
+
+export function lifecycleEmail({ kind, firstName, appUrl, unsubscribe }: { kind: LifecycleKind; firstName: string | null; appUrl: string; unsubscribe: string }): Email {
+  const c = LIFECYCLE[kind];
+  return {
+    subject: c.subject,
+    html: renderEmail({
+      preheader: c.paragraphs[0],
+      title: firstName ? `${esc(firstName)}, ${c.title.charAt(0).toLowerCase()}${c.title.slice(1)}` : c.title,
+      paragraphs: c.paragraphs,
+      button: { label: c.button, url: `${appUrl}${c.path}` },
+      note: `Vous ne souhaitez plus recevoir ces conseils ? <a href="${esc(unsubscribe)}" style="color:inherit;">Se désinscrire</a>.`,
+    }),
+  };
+}

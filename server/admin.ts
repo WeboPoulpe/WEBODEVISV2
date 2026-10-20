@@ -39,8 +39,25 @@ export interface AdminOverview {
   quotes: number;
   quotes30d: number;
   pendingRequests: number;
+  /** Usage : comptes vus dans l'app sur 7 et 30 jours, titulaires ayant envoyé au moins un devis, comptes à relancer. */
+  seen7d: number;
+  seen30d: number;
+  owners: number;
+  activated: number;
+  atRisk: { id: string; name: string; email: string; last_seen_at: string | null }[];
   recentAccounts: { id: string; name: string; email: string; created_at: string }[];
   recentRequests: { id: string; kind: string; name: string; company: string | null; status: string; created_at: string }[];
+}
+
+/** Titulaires actifs qui ne sont pas venus depuis 30 jours (ou jamais, après 14 jours) : à rappeler. */
+async function accountsAtRisk(): Promise<AdminOverview['atRisk']> {
+  const { rows } = await db.execute(sql`
+    select p.id, p.email, p.last_seen_at, coalesce(p.company_name, nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''), p.email) as name
+    from public.profiles p
+    where p.id <> ${DEMO_USER_ID} and p.parent_user_id is null and p.role = 'user' and p.is_active and p.deletion_requested_at is null
+      and ((p.last_seen_at is null and p.created_at < now() - interval '14 days') or p.last_seen_at < now() - interval '30 days')
+    order by p.last_seen_at nulls first limit 10`);
+  return (rows as unknown as AdminOverview['atRisk']).map((r) => ({ ...r, last_seen_at: r.last_seen_at ? new Date(r.last_seen_at).toISOString() : null }));
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
@@ -53,7 +70,12 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       (select count(*)::int from public.profiles where id <> ${DEMO_USER_ID} and created_at > now() - interval '30 days') as new_accounts,
       (select count(*)::int from public.quotes where owner_user_id <> ${DEMO_USER_ID}) as quotes,
       (select count(*)::int from public.quotes where owner_user_id <> ${DEMO_USER_ID} and created_at > now() - interval '30 days') as quotes_30d,
-      (select count(*)::int from public.site_requests where status = 'nouvelle') as pending_requests`);
+      (select count(*)::int from public.site_requests where status = 'nouvelle') as pending_requests,
+      (select count(*)::int from public.profiles where id <> ${DEMO_USER_ID} and last_seen_at > now() - interval '7 days') as seen_7d,
+      (select count(*)::int from public.profiles where id <> ${DEMO_USER_ID} and last_seen_at > now() - interval '30 days') as seen_30d,
+      (select count(*)::int from public.profiles where id <> ${DEMO_USER_ID} and parent_user_id is null and role = 'user') as owners,
+      (select count(*)::int from public.profiles p where p.id <> ${DEMO_USER_ID} and p.parent_user_id is null and p.role = 'user'
+         and exists (select 1 from public.quotes q where q.sent_at is not null and q.owner_user_id in (select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = p.id))) as activated`);
   const c = rows[0] as Record<string, number>;
 
   const recentAccounts = await db
@@ -66,6 +88,8 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   return {
     accounts: c.accounts, activeAccounts: c.active_accounts, newAccounts30d: c.new_accounts,
     quotes: c.quotes, quotes30d: c.quotes_30d, pendingRequests: c.pending_requests,
+    seen7d: c.seen_7d, seen30d: c.seen_30d, owners: c.owners, activated: c.activated,
+    atRisk: await accountsAtRisk(),
     recentAccounts: recentAccounts.map((a) => ({
       id: a.id, email: a.email, created_at: a.created_at,
       name: a.company_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email,
@@ -93,12 +117,14 @@ export interface AdminAccount {
   last_quote_at: string | null;
   /** Suppression demandée par le titulaire (purge 30 jours plus tard). */
   deletion_requested_at: string | null;
+  /** Dernière activité dans l'app. */
+  last_seen_at: string | null;
 }
 
 export async function listAccounts(): Promise<AdminAccount[]> {
   const admin = await requireAdmin();
   const { rows } = await db.execute(sql`
-    select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at, p.deletion_requested_at,
+    select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at, p.deletion_requested_at, p.last_seen_at,
            (select count(*)::int from public.quotes q where q.owner_user_id = p.id) as quotes,
            (select count(*)::int from public.customers c where c.owner_user_id = p.id) as customers,
            (select max(q.updated_at) from public.quotes q where q.owner_user_id = p.id) as last_quote_at
@@ -110,6 +136,7 @@ export async function listAccounts(): Promise<AdminAccount[]> {
     created_at: new Date(r.created_at).toISOString(),
     last_quote_at: r.last_quote_at ? new Date(r.last_quote_at).toISOString() : null,
     deletion_requested_at: r.deletion_requested_at ? new Date(r.deletion_requested_at).toISOString() : null,
+    last_seen_at: r.last_seen_at ? new Date(r.last_seen_at).toISOString() : null,
     is_demo: r.id === DEMO_USER_ID,
     is_self: r.id === admin.id,
   }));

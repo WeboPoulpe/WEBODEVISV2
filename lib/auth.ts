@@ -105,6 +105,10 @@ export const authOptions: NextAuthOptions = {
         if (!account || account.active === false || (token.pw && token.pw !== tag)) return { revoked: true };
         token.pw = tag;
         token.checkedAt = Date.now();
+        // Dernière activité du compte (pas celle d'un administrateur entré dans le compte d'un client).
+        if (!token.adminId) {
+          await db.update(profiles).set({ last_seen_at: new Date().toISOString() }).where(eq(profiles.id, realId)).catch(() => {});
+        }
       }
       return token;
     },

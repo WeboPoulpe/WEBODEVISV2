@@ -887,6 +887,10 @@ export const profiles = pgTable("profiles", {
 	ical_token: text().unique(),
 	// Rôle dans l'entreprise pour un compte rattaché : gerant, collaborateur, lecture (voir lib/team.ts).
 	company_role: text().default('gerant').notNull(),
+	// Dernière activité dans l'app (mise à jour au plus toutes les 5 minutes), pour les statistiques d'usage.
+	last_seen_at: timestamp({ withTimezone: true, mode: 'string' }),
+	// Le titulaire ne veut plus recevoir les conseils par email (premiers pas, relance d'inactivité).
+	tips_opt_out: boolean().default(false).notNull(),
 }, (table) => [
 	index("idx_profiles_company_siret").using("btree", table.company_siret.asc().nullsLast().op("text_ops")),
 	foreignKey({
@@ -1055,6 +1059,16 @@ export const ingredient_stocks = pgTable("ingredient_stocks", {
 	primaryKey({ columns: [table.company_id, table.ingredient_id], name: "ingredient_stocks_pkey" }),
 	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "ingredient_stocks_company_id_fkey" }).onDelete("cascade"),
 	foreignKey({ columns: [table.ingredient_id], foreignColumns: [ingredients.id], name: "ingredient_stocks_ingredient_id_fkey" }).onDelete("cascade"),
+]);
+
+// Emails de conseils déjà envoyés à un compte (premiers pas, inactivité) : chacun ne part qu'une fois.
+export const lifecycle_emails = pgTable("lifecycle_emails", {
+	user_id: uuid().notNull(),
+	kind: text().notNull(),
+	sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.user_id, table.kind], name: "lifecycle_emails_pkey" }),
+	foreignKey({ columns: [table.user_id], foreignColumns: [users.id], name: "lifecycle_emails_user_id_fkey" }).onDelete("cascade"),
 ]);
 
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).

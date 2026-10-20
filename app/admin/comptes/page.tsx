@@ -130,7 +130,7 @@ export default function AdminAccountsPage() {
                 </span>
                 <span className="hidden md:block w-40 text-sm text-gray-700">
                   {a.quotes} devis, {a.customers} client{a.customers > 1 ? 's' : ''}
-                  <span className="block text-gray-500">{a.last_quote_at ? `Actif le ${day(a.last_quote_at)}` : 'Aucune activité'}</span>
+                  <span className="block text-gray-500">{a.last_seen_at ? `Vu le ${day(a.last_seen_at)}` : a.last_quote_at ? `Dernier devis le ${day(a.last_quote_at)}` : 'Jamais venu'}</span>
                 </span>
                 <span className="hidden sm:block w-28 text-right text-sm text-gray-500 whitespace-nowrap">{day(a.created_at)}</span>
               </button>

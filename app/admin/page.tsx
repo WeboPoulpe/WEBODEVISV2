@@ -19,13 +19,15 @@ export default function AdminOverviewPage() {
     { label: 'Comptes', value: data?.accounts, hint: data ? `${data.activeAccounts} actifs` : ' ' },
     { label: 'Nouveaux comptes', value: data?.newAccounts30d, hint: 'Sur 30 jours' },
     { label: 'Devis créés', value: data?.quotes, hint: data ? `${data.quotes30d} sur 30 jours` : ' ' },
+    { label: 'Utilisateurs actifs', value: data?.seen7d, hint: data ? `sur 7 jours, ${data.seen30d} sur 30 jours` : ' ' },
+    { label: 'Comptes activés', value: data?.activated, hint: data ? `sur ${data.owners} : au moins un devis envoyé` : ' ' },
   ];
 
   return (
     <div className="px-4 md:px-6 pb-8">
       <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight mb-5">Vue d’ensemble</h1>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
         {figures.map((f) => (
           <div key={f.label} className={cn('rounded-2xl p-4 sm:p-5', f.dark ? 'bg-forest text-white' : 'bg-white border border-gray-200')}>
             <p className={cn('text-sm', f.dark ? 'text-white/70' : 'text-gray-600')}>{f.label}</p>
@@ -36,6 +38,28 @@ export default function AdminOverviewPage() {
           </div>
         ))}
       </div>
+
+      {data && data.atRisk.length > 0 && (
+        <section className={cn(cardCls, 'overflow-hidden mb-4')}>
+          <header className="px-5 pt-5 pb-3">
+            <h2 className="text-lg font-semibold text-gray-900">À rappeler</h2>
+            <p className="text-sm text-gray-500">Comptes qui ne sont pas venus depuis un mois, ou jamais depuis leur création.</p>
+          </header>
+          <ul className="divide-y divide-gray-100">
+            {data.atRisk.map((a) => (
+              <li key={a.id}>
+                <Link href={`/admin/comptes?compte=${a.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-medium text-gray-900 truncate">{a.name}</span>
+                    <span className="block text-sm text-gray-500 truncate">{a.email}</span>
+                  </span>
+                  <span className="text-sm text-gray-500 whitespace-nowrap">{a.last_seen_at ? `Vu le ${day(a.last_seen_at)}` : 'Jamais venu'}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         <section className={cn(cardCls, 'overflow-hidden')}>

@@ -176,6 +176,13 @@
       "when": 1792485084842,
       "tag": "0024_company_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792485181703,
+      "tag": "0025_usage_tracking",
+      "breakpoints": true
     }
   ]
 }

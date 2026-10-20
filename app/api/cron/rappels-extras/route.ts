@@ -6,6 +6,7 @@ import { isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { missionReminderEmail } from '@/lib/mail/templates';
 import { pushToExtra } from '@/lib/push';
+import { runLifecycleEmails } from '@/server/lifecycle';
 import { runReminders } from '@/server/reminders';
 
 // Rappel de la veille aux extras confirmés : email et notification. Lancé chaque jour en fin d'après-midi par
@@ -61,5 +62,10 @@ export async function GET(request: NextRequest) {
     console.error('[relances]', e instanceof Error ? e.message : e);
     return null;
   });
-  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances });
+  // Conseils aux nouveaux comptes et relance d'inactivité (server/lifecycle.ts), dans la même tâche.
+  const conseils = await runLifecycleEmails({ origin }).catch((e) => {
+    console.error('[conseils]', e instanceof Error ? e.message : e);
+    return null;
+  });
+  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances, conseils });
 }
