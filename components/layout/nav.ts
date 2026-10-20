@@ -96,7 +96,7 @@ export type Badges = Record<BadgeKey, number | 'dot' | null>;
 
 /** Compteurs affichés à côté des entrées de navigation. */
 export function useNavBadges(): Badges {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [badges, setBadges] = useState<Badges>({ pendingDevis: null, todayEvent: null, newProspects: null, stockAlert: null });
 
   useEffect(() => {
@@ -115,12 +115,20 @@ export function useNavBadges(): Badges {
       supabase.from('prospect_requests').select('*', { count: 'exact', head: true }).eq('status', 'nouveau').in('user_token', tokens)
         .then(({ count }) => set('newProspects', count || null));
     });
-    supabase.from('ingredients').select('id, stock_quantity, min_stock_alert').eq('user_id', user.id).then(({ data }) => {
-      const low = (data ?? []).filter((i: { stock_quantity: number | null; min_stock_alert: number | null }) =>
-        (i.min_stock_alert ?? 0) > 0 && (i.stock_quantity ?? 0) <= (i.min_stock_alert ?? 0)).length;
-      set('stockAlert', low || null);
-    });
   }, [user]);
+
+  // Stock bas : stock et seuils de l'entreprise (compte titulaire), catalogue commun compris.
+  // Effet à part : il se relance quand le profil (qui donne le titulaire) arrive.
+  useEffect(() => {
+    if (!user) return;
+    const set = (value: number | null) => setBadges((b) => ({ ...b, stockAlert: value }));
+    createClient().from('ingredient_stocks').select('quantity, min_alert').eq('company_id', profile?.parent_user_id ?? user.id).gt('min_alert', 0)
+      .then(({ data }) => {
+        const low = (data ?? []).filter((s: { quantity: number | string; min_alert: number | string }) =>
+          Number(s.quantity) <= Number(s.min_alert)).length;
+        set(low || null);
+      });
+  }, [user, profile]);
 
   return badges;
 }

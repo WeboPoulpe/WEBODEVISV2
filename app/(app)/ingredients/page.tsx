@@ -30,6 +30,8 @@ interface Ingredient {
   off_product_id: string | null;
   /** Allergènes cochés : null = pas encore renseignés (on suggère d'après le nom), [] = aucun, confirmé. */
   allergens?: string[] | null;
+  /** Seuil d'alerte de l'entreprise (table ingredient_stocks), ajouté au chargement : 0 = pas d'alerte. */
+  min_alert?: number;
 }
 
 interface Supplier {
@@ -176,7 +178,7 @@ function IngredientModal({
   const [imageUrl,    setImageUrl]    = useState(initial?.image_url    ?? '');
   const [offId,       setOffId]       = useState(initial?.off_product_id ?? '');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [minStockAlert, setMinStockAlert] = useState(String((initial as any)?.min_stock_alert ?? ''));
+  const [minStockAlert, setMinStockAlert] = useState(initial?.min_alert ? String(initial.min_alert) : '');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [volumeUnitPrice, setVolumeUnitPrice] = useState(String((initial as any)?.volume_unit_price ?? ''));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -237,7 +239,7 @@ function IngredientModal({
       // Une photo remplacée perd le crédit de l'ancienne.
       ...(photoChanged ? { image_credit: null } : {}),
       off_product_id: offId || null,
-      min_stock_alert: parseFloat(minStockAlert) || 0,
+      min_alert: parseFloat(minStockAlert) || 0,
       volume_unit_price: parseFloat(volumeUnitPrice) || 0,
       preferred_supplier_id: preferredSupplierId || null,
       // Enregistrer la fiche valide la liste affichée, suggestions comprises.
@@ -499,7 +501,7 @@ function IngredientRow({ ing, onEdit, onDelete, onView }: { ing: Ingredient; onE
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function IngredientsPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers,   setSuppliers]   = useState<Supplier[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -567,36 +569,60 @@ export default function IngredientsPage() {
     if (!user) return;
     setLoading(true);
     const supabase = createClient();
-    const [ings, sups, probe] = await Promise.all([
+    const [ings, sups, probe, alerts] = await Promise.all([
       supabase.from('ingredients').select('*')
         .or(`user_id.is.null,user_id.eq.${user.id}`)
         .order('category', { nullsFirst: false })
         .order('name'),
       supabase.from('suppliers').select('*').order('name'),
       supabase.from('ingredients').select('allergens').limit(1),
+      // Seuils d'alerte : propres à l'entreprise (compte titulaire), dans ingredient_stocks.
+      supabase.from('ingredient_stocks').select('ingredient_id, min_alert').eq('company_id', profile?.parent_user_id ?? user.id),
     ]);
     setAllergensReady(!probe.error);
-    if (ings.error || sups.error) setError('Vos ingrédients n’ont pas pu être chargés. Rechargez la page.');
-    setIngredients((ings.data as Ingredient[]) ?? []);
+    if (ings.error || sups.error || alerts.error) setError('Vos ingrédients n’ont pas pu être chargés. Rechargez la page.');
+    const alertOf = new Map(((alerts.data ?? []) as { ingredient_id: string; min_alert: number | string }[])
+      .map((a) => [a.ingredient_id, Number(a.min_alert) || 0]));
+    setIngredients(((ings.data as Ingredient[]) ?? []).map((i) => ({ ...i, min_alert: alertOf.get(i.id) ?? 0 })));
     setSuppliers((sups.data as Supplier[]) ?? []);
     setLoading(false);
-  }, [user]);
+  }, [user, profile]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── Ingrédients ─────────────────────────────────────────────────────────────
-  const saveIngredient = async (data: Partial<Ingredient>): Promise<string | null> => {
+  const saveIngredient = async ({ min_alert, ...data }: Partial<Ingredient>): Promise<string | null> => {
     if (!user) return 'Votre session a expiré. Reconnectez-vous.';
+    // Le seuil est enregistré au nom de l'entreprise : il faut connaître son titulaire.
+    if (!profile) return 'Votre compte est encore en cours de chargement. Réessayez dans un instant.';
     const supabase = createClient();
+    const alert = min_alert ?? 0;
+    let saved: Ingredient;
     if (modal.item?.id) {
       const { data: updated, error: err } = await supabase.from('ingredients').update(data).eq('id', modal.item.id).select().single();
       if (err || !updated) return 'L’ingrédient n’a pas pu être enregistré. Réessayez.';
-      setIngredients((prev) => prev.map((i) => i.id === updated.id ? (updated as Ingredient) : i));
+      saved = updated as Ingredient;
     } else {
       const { data: inserted, error: err } = await supabase.from('ingredients').insert([{ ...data, user_id: user.id }]).select().single();
       if (err || !inserted) return 'L’ingrédient n’a pas pu être ajouté. Réessayez.';
-      setIngredients((prev) => [...prev, inserted as Ingredient]);
+      saved = inserted as Ingredient;
     }
+    // Le seuil d'alerte vit dans le stock de l'entreprise ; la quantité n'est pas touchée (0 pour une nouvelle ligne).
+    if (alert !== (modal.item?.min_alert ?? 0)) {
+      const { error: err } = await supabase.from('ingredient_stocks').upsert(
+        { company_id: profile.parent_user_id ?? user.id, ingredient_id: saved.id, min_alert: alert },
+        { onConflict: 'company_id,ingredient_id' },
+      );
+      if (err) {
+        // La fiche est enregistrée : on la garde affichée avec l'ancien seuil.
+        const kept = { ...saved, min_alert: modal.item?.min_alert ?? 0 };
+        setIngredients((prev) => prev.some((i) => i.id === kept.id) ? prev.map((i) => i.id === kept.id ? kept : i) : [...prev, kept]);
+        setModal({ open: true, item: kept });
+        return 'L’ingrédient est enregistré, mais pas son seuil d’alerte. Réessayez.';
+      }
+    }
+    const withAlert = { ...saved, min_alert: alert };
+    setIngredients((prev) => prev.some((i) => i.id === withAlert.id) ? prev.map((i) => i.id === withAlert.id ? withAlert : i) : [...prev, withAlert]);
     setModal({ open: false, item: null });
     return null;
   };

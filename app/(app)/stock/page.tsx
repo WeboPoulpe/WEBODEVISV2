@@ -15,9 +15,11 @@ interface Ingredient {
   category: string | null;
   unit: string | null;
   image_url: string | null;
-  stock_quantity: number | null;
-  min_stock_alert: number | null;
   volume_unit_price: number | null;
+  /** Stock de l'entreprise (table ingredient_stocks) : 0 tant qu'aucun mouvement n'a été fait. */
+  stock: number;
+  /** Seuil d'alerte de l'entreprise : 0 = pas d'alerte. */
+  alert: number;
 }
 
 interface Movement {
@@ -38,7 +40,7 @@ const smallBtn =
   'inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-800 hover:border-gray-300 transition-colors';
 
 export default function StockPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,21 +53,30 @@ export default function StockPage() {
   const fetchAll = useCallback(async () => {
     if (!user) return;
     const supabase = createClient();
-    const { data, error: err } = await supabase.from('ingredients')
-      .select('*')
-      .or(`user_id.is.null,user_id.eq.${user.id}`)
-      .order('name');
-    if (err) setError('Le stock n’a pas pu être chargé. Rechargez la page.');
-    setIngredients((data as Ingredient[]) ?? []);
+    // Le stock et le seuil sont propres à l'entreprise (compte titulaire), même pour un ingrédient du catalogue commun.
+    const companyId = profile?.parent_user_id ?? user.id;
+    const [ings, stocks] = await Promise.all([
+      supabase.from('ingredients')
+        .select('*')
+        .or(`user_id.is.null,user_id.eq.${user.id}`)
+        .order('name'),
+      supabase.from('ingredient_stocks').select('ingredient_id, quantity, min_alert').eq('company_id', companyId),
+    ]);
+    if (ings.error || stocks.error) setError('Le stock n’a pas pu être chargé. Rechargez la page.');
+    const byId = new Map(((stocks.data ?? []) as { ingredient_id: string; quantity: number | string; min_alert: number | string }[])
+      .map((s) => [s.ingredient_id, s]));
+    setIngredients(((ings.data ?? []) as Omit<Ingredient, 'stock' | 'alert'>[]).map((i) => {
+      const s = byId.get(i.id);
+      return { ...i, stock: Number(s?.quantity ?? 0), alert: Number(s?.min_alert ?? 0) };
+    }));
     setLoading(false);
-  }, [user]);
+  }, [user, profile]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const filtered = ingredients.filter((i) => {
     const matchSearch = !search || i.name.toLowerCase().includes(search.toLowerCase());
-    const stock = i.stock_quantity ?? 0;
-    const alert = i.min_stock_alert ?? 0;
+    const { stock, alert } = i;
     const matchFilter =
       filter === 'all' ? true :
       filter === 'alert' ? (alert > 0 && stock <= alert) :
@@ -74,9 +85,9 @@ export default function StockPage() {
   });
 
   const totalIngredients = ingredients.length;
-  const lowStockCount = ingredients.filter((i) => (i.min_stock_alert ?? 0) > 0 && (i.stock_quantity ?? 0) <= (i.min_stock_alert ?? 0)).length;
-  const emptyCount = ingredients.filter((i) => (i.stock_quantity ?? 0) <= 0).length;
-  const totalValue = ingredients.reduce((sum, i) => sum + ((i.stock_quantity ?? 0) * (i.volume_unit_price ?? 0)), 0);
+  const lowStockCount = ingredients.filter((i) => i.alert > 0 && i.stock <= i.alert).length;
+  const emptyCount = ingredients.filter((i) => i.stock <= 0).length;
+  const totalValue = ingredients.reduce((sum, i) => sum + (i.stock * (i.volume_unit_price ?? 0)), 0);
 
   const openHistory = async (ing: Ingredient) => {
     const supabase = createClient();
@@ -144,8 +155,7 @@ export default function StockPage() {
       ) : (
         <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
           {filtered.map((ing) => {
-            const stock = ing.stock_quantity ?? 0;
-            const alert = ing.min_stock_alert ?? 0;
+            const { stock, alert } = ing;
             const isAlert = alert > 0 && stock <= alert;
             const isEmpty = stock <= 0;
             return (
@@ -242,7 +252,7 @@ function MovementModal({ ingredient, type, userId, onClose, onDone }: {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const current = ingredient.stock_quantity ?? 0;
+  const current = ingredient.stock;
   const entered = parseFloat(quantity);
 
   const save = async () => {

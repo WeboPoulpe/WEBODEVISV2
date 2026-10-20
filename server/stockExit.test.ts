@@ -26,10 +26,13 @@ beforeAll(async () => {
   await pg.exec(`
     insert into users (id, email, password_hash) values ('${ME}', 'a@t.fr', 'x'), ('${OTHER}', 'b@t.fr', 'x');
     insert into profiles (id, email) values ('${ME}', 'a@t.fr'), ('${OTHER}', 'b@t.fr');
-    insert into ingredients (id, name, user_id, unit, stock_quantity) values
-      ('${FLOUR}', 'Farine', null, 'kg', 10),
-      ('${BUTTER}', 'Beurre', '${ME}', 'kg', 1),
-      ('${FOREIGN}', 'Sel', '${OTHER}', 'kg', 5);
+    insert into ingredients (id, name, user_id, unit) values
+      ('${FLOUR}', 'Farine', null, 'kg'),
+      ('${BUTTER}', 'Beurre', '${ME}', 'kg'),
+      ('${FOREIGN}', 'Sel', '${OTHER}', 'kg');
+    -- Le stock est propre à chaque entreprise : l'autre compte a aussi de la farine, qui ne doit pas bouger.
+    insert into ingredient_stocks (company_id, ingredient_id, quantity) values
+      ('${ME}', '${FLOUR}', 10), ('${ME}', '${BUTTER}', 1), ('${OTHER}', '${FOREIGN}', 5), ('${OTHER}', '${FLOUR}', 50);
   `);
   const { rows } = await pg.query<{ id: string }>(`
     insert into quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status)
@@ -42,7 +45,8 @@ beforeAll(async () => {
 
 beforeEach(() => { current = ME; });
 
-const stock = async (id: string) => Number((await pg.query<{ s: string }>(`select stock_quantity as s from ingredients where id = $1`, [id])).rows[0].s);
+const stock = async (id: string, company = ME) => Number((await pg.query<{ s: string }>(
+  `select quantity as s from ingredient_stocks where company_id = $1 and ingredient_id = $2`, [company, id])).rows[0]?.s ?? 0);
 
 it('refuse l’événement d’un autre compte', async () => {
   current = OTHER;
@@ -65,7 +69,8 @@ it('retire les quantités de la liste de courses, une seule fois', async () => {
   expect(res.withdrawnAt).not.toBeNull();
   expect(await stock(FLOUR)).toBe(7);
   expect(await stock(BUTTER)).toBe(-1);
-  expect(await stock(FOREIGN)).toBe(5);
+  expect(await stock(FOREIGN, OTHER)).toBe(5);
+  expect(await stock(FLOUR, OTHER)).toBe(50);
 
   const { rows } = await pg.query<{ reason: string; event_id: string; user_id: string }>(
     `select reason, event_id, user_id from stock_movements where movement_type = 'out'`);

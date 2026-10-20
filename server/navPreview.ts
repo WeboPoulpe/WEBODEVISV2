@@ -1,7 +1,7 @@
 'use server';
 
 import { sql, type SQL } from 'drizzle-orm';
-import { companyIdsOf } from './companyScope';
+import { companyIdsOf, lowStockOf } from './companyScope';
 import { db } from '@/db';
 import { addDays, parisToday, relativeDay } from '@/lib/dashboard';
 import { checklistProgress, materialProgress } from '@/lib/events/prep';
@@ -183,13 +183,14 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
 
     case 'stock': {
       if (!on('stock')) return null;
-      const low = sql`i.user_id in ${team} and coalesce(i.min_stock_alert, 0) > 0 and coalesce(i.stock_quantity, 0) <= i.min_stock_alert`;
+      // Stock et seuils de l'entreprise (ingredient_stocks), catalogue commun compris.
+      const low = lowStockOf(uid);
       const [items, [count]] = await Promise.all([
-        rows<{ id: string; name: string; stock_quantity: number | null; min_stock_alert: number | null; unit: string | null }>(sql`
-          select i.id, i.name, i.stock_quantity::float as stock_quantity, i.min_stock_alert::float as min_stock_alert, i.unit
-          from public.ingredients i where ${low}
-          order by coalesce(i.stock_quantity, 0) / nullif(i.min_stock_alert, 0), i.name limit 3`),
-        rows<{ n: number }>(sql`select count(*)::int as n from public.ingredients i where ${low}`),
+        rows<{ id: string; name: string; quantity: number; min_alert: number; unit: string | null }>(sql`
+          select i.id, i.name, s.quantity::float as quantity, s.min_alert::float as min_alert, i.unit
+          from public.ingredient_stocks s join public.ingredients i on i.id = s.ingredient_id where ${low}
+          order by s.quantity / s.min_alert, i.name limit 3`),
+        rows<{ n: number }>(sql`select count(*)::int as n from public.ingredient_stocks s join public.ingredients i on i.id = s.ingredient_id where ${low}`),
       ]);
       const qty = (n: number | null, unit: string | null) => `${(n ?? 0).toLocaleString('fr-FR')}${unit ? ` ${unit}` : ''}`;
       return {
@@ -197,8 +198,8 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
         empty: 'Aucun ingrédient sous son seuil.',
         items: items.map((i) => ({
           id: i.id, label: i.name, href: '/stock?action=alertes',
-          detail: `Reste ${qty(i.stock_quantity, i.unit)}, seuil ${qty(i.min_stock_alert, i.unit)}`,
-          tag: { text: (i.stock_quantity ?? 0) <= 0 ? 'Épuisé' : 'Bas', tone: 'warn' as const },
+          detail: `Reste ${qty(i.quantity, i.unit)}, seuil ${qty(i.min_alert, i.unit)}`,
+          tag: { text: i.quantity <= 0 ? 'Épuisé' : 'Bas', tone: 'warn' as const },
         })),
         stats: [{ label: 'à commander', value: count?.n ?? 0, href: '/stock?action=alertes', tone: (count?.n ?? 0) > 0 ? 'warn' : undefined }],
       };

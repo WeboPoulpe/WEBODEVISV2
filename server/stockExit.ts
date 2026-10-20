@@ -1,14 +1,14 @@
 'use server';
 
 import { and, eq, sql } from 'drizzle-orm';
-import { companyIdsOf } from './companyScope';
+import { companyIdsOf, companyOf } from './companyScope';
 import { db } from '@/db';
-import { event_ingredients, ingredients, quotes, stock_movements } from '@/db/schema';
+import { event_ingredients, ingredient_stocks, ingredients, quotes, stock_movements } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { requireUser, requireWriter } from './session';
 
 // Sortie de stock d'un événement : les quantités de la liste de courses quittent le stock en une fois.
-// Le stock de l'ingrédient est mis à jour par le déclencheur apply_stock_movement, qui ne réagit qu'aux
+// Le stock de l'entreprise (ingredient_stocks) est mis à jour par le déclencheur apply_stock_movement, qui ne réagit qu'aux
 // insertions : une sortie s'annule donc par des entrées inverses, jamais en supprimant les mouvements.
 //
 // État d'un événement : retiré du stock si sa dernière sortie est plus récente que sa dernière entrée
@@ -89,16 +89,21 @@ export async function withdrawEventStock(quoteId: string): Promise<StockExitResu
       .select({
         ingredient_id: event_ingredients.ingredient_id,
         name: ingredients.name,
-        stock: ingredients.stock_quantity,
+        // Stock de l'entreprise (ingredient_stocks) ; pas de ligne = rien en stock.
+        stock: sql<number>`coalesce(max(${ingredient_stocks.quantity}), 0)`,
         quantity: sql<string>`sum(${event_ingredients.quantity})`,
       })
       .from(event_ingredients)
       .innerJoin(ingredients, eq(ingredients.id, event_ingredients.ingredient_id))
+      .leftJoin(ingredient_stocks, and(
+        eq(ingredient_stocks.ingredient_id, event_ingredients.ingredient_id),
+        sql`${ingredient_stocks.company_id} = ${companyOf(user.id)}`,
+      ))
       .where(and(
         eq(event_ingredients.quote_id, quoteId),
         sql`(${ingredients.user_id} is null or ${ingredients.user_id} in ${companyIdsOf(user.id)})`,
       ))
-      .groupBy(event_ingredients.ingredient_id, ingredients.name, ingredients.stock_quantity);
+      .groupBy(event_ingredients.ingredient_id, ingredients.name);
     const lines = needs.filter((n) => Number(n.quantity) > 0);
     if (lines.length === 0) return { error: 'La liste de courses ne contient aucun ingrédient suivi en stock.', ...empty };
 

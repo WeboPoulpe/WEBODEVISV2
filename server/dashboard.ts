@@ -1,7 +1,7 @@
 'use server';
 
 import { sql, type SQL } from 'drizzle-orm';
-import { companyIdsOf } from './companyScope';
+import { companyIdsOf, lowStockOf } from './companyScope';
 import { db } from '@/db';
 import {
   addDays, bucketOf, daysBetween, longDate, parisToday, relativeDay,
@@ -129,9 +129,9 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
       select (exists (select 1 from public.rental_templates where user_id in ${team})
         or exists (select 1 from public.rental_template_sets where user_id in ${team})) as used`) : none,
     on('stock') ? rows<{ name: string }>(sql`
-      select name from public.ingredients
-      where user_id in ${team} and coalesce(min_stock_alert, 0) > 0 and coalesce(stock_quantity, 0) <= min_stock_alert
-      order by name`) : none,
+      select i.name from public.ingredient_stocks s join public.ingredients i on i.id = s.ingredient_id
+      where ${lowStockOf(uid)}
+      order by i.name`) : none,
     on('stock') ? rows<{ id: string; supplier: string | null; ordered_day: string | null; event_id: string | null; event_date: string | null; client: string | null }>(sql`
       select o.id, s.name as supplier, ${paris(sql`coalesce(o.ordered_at, o.created_at)`)} as ordered_day,
         q.id as event_id, q.event_date::text as event_date, q.client_name as client
