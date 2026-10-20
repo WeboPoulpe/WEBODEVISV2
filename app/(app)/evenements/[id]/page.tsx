@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, FileText, Loader2, MapPin, Pencil, ShieldAlert, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChefHat, FileText, Loader2, MapPin, Pencil, Route, ShieldAlert, Users, Wallet } from 'lucide-react';
 import FinanceSheet from '@/components/devis/FinanceSheet';
 import { createClient } from '@/lib/supabase/client';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -15,6 +15,7 @@ import ChecklistTab from '@/components/evenements/ChecklistTab';
 import MaterielTab from '@/components/evenements/MaterielTab';
 import CoursesTab from '@/components/evenements/CoursesTab';
 import ExtrasTab from '@/components/evenements/ExtrasTab';
+import RunSheetSection from '@/components/evenements/RunSheetSection';
 import { ErrorBanner, type EventQuote } from '@/components/evenements/shared';
 
 type Tab = 'checklist' | 'materiel' | 'courses' | 'extras';
@@ -121,6 +122,8 @@ export default function EvenementPage() {
           <button onClick={() => setFinanceOpen(true)} className={btnSecondary}><Wallet className="h-4 w-4" />Marge et coûts</button>
           <Link href={`/devis/${quote.id}/modifier`} className={btnSecondary}><FileText className="h-4 w-4" />Voir le devis</Link>
           <Link href={`/devis/${quote.id}/allergenes`} className={btnSecondary}><ShieldAlert className="h-4 w-4" />Fiche allergènes</Link>
+          <Link href={`/evenements/${quote.id}/production`} className={btnSecondary}><ChefHat className="h-4 w-4" />Fiche de production</Link>
+          <Link href={`/evenements/${quote.id}/feuille-de-route`} className={btnSecondary}><Route className="h-4 w-4" />Feuille de route</Link>
         </div>
       </header>
 
@@ -140,6 +143,8 @@ export default function EvenementPage() {
         {tab === 'courses' && <CoursesTab quote={quote} />}
         {tab === 'extras' && <ExtrasTab quote={quote} />}
       </section>
+
+      <RunSheetSection quoteId={quote.id} />
 
       {edit && (
         <Modal

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { AlertTriangle, ChefHat, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { isConfirmed, isPending, REJECTED_STATUSES } from '@/lib/quoteStatus';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -221,6 +221,12 @@ export default function CalendrierPage() {
                   {selectedGuests > CAPACITY_THRESHOLD && <AlertTriangle className="h-4 w-4" />}
                   {selectedGuests} couverts{selectedGuests > CAPACITY_THRESHOLD ? `, au-delà de ${CAPACITY_THRESHOLD}` : ''}
                 </p>
+              )}
+              {/* Fiche de production consolidée des événements confirmés du jour */}
+              {selectedDay && agenda.some((q) => isConfirmed(q.status)) && (
+                <Link href={`/evenements/production/${selectedDay}`} className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-primary hover:underline">
+                  <ChefHat className="h-4 w-4" />Production du jour
+                </Link>
               )}
             </div>
             {selectedDate && (
