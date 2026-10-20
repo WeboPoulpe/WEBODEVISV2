@@ -12,6 +12,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { Check, EmptyState, ErrorBanner, useActionError, type EventQuote } from './shared';
+import StaffCostSection from '@/components/extras/StaffCostSection';
 
 interface Extra {
   id: string; name: string; phone: string | null; email: string | null; role: string | null;
@@ -407,6 +408,17 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
             );
           })}
         </ul>
+      )}
+
+      {!loading && (
+        <StaffCostSection
+          quoteId={quote.id}
+          team={assignments.filter((a) => a.extra).map((a) => ({
+            id: a.id, extraId: a.extra_id, name: a.extra!.name, role: a.extra!.role, status: a.status,
+            arrival_time: a.arrival_time, departure_time: a.departure_time,
+          }))}
+          onError={setError}
+        />
       )}
 
       <p className="text-sm text-gray-500">

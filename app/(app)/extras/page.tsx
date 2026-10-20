@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus, Trash2, Link2, Loader2, Check, ChevronLeft, ChevronRight,
-  UserPlus, CalendarDays, MapPin, Users, ArrowRight, Phone, Mail, Share2,
+  UserPlus, CalendarDays, MapPin, Users, ArrowRight, Phone, Mail, Share2, Clock,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
@@ -16,6 +16,7 @@ import { Check as CheckBox, ErrorBanner } from '@/components/evenements/shared';
 import MultiAssignModal, { StatusChoice, type NewAssignment } from '@/components/extras/MultiAssignModal';
 import { EXTRA_ROLES, MISSION_STATUSES, roleFamily, type MissionStatus } from '@/lib/extras';
 import { notifyMissionChanged } from '@/server/extras';
+import { euros, toNumber } from '@/lib/staffCost';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Extra {
@@ -27,6 +28,8 @@ interface Extra {
   access_token: string;
   /** Jours où l'extra a indiqué ne pas être disponible (depuis sa page de missions). */
   unavailable_dates: string[] | null;
+  /** Taux horaire brut habituel (colonne absente tant que la migration 0023 n'est pas appliquée). */
+  hourly_rate?: number | string | null;
 }
 
 interface QuoteOption {
@@ -222,11 +225,15 @@ function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, on
 
 // ── Fiche d'un extra ─────────────────────────────────────────────────────────
 const OTHER_ROLE = '__autre__';
-function ExtraModal({ initial, onSave, onClose, saving }: {
+interface ExtraForm { name: string; role: string; phone: string; email: string; rate: string }
+
+function ExtraModal({ initial, onSave, onClose, saving, showRate }: {
   initial?: Partial<Extra>;
-  onSave: (d: { name: string; role: string; phone: string; email: string }) => Promise<boolean>;
+  onSave: (d: ExtraForm) => Promise<boolean>;
   onClose: () => void;
   saving: boolean;
+  /** Champ « Taux horaire brut », masqué tant que la base n'a pas la colonne. */
+  showRate: boolean;
 }) {
   const [name, setName]   = useState(initial?.name  ?? '');
   // Rôle de la liste, ou « Autre » avec saisie libre (garde les rôles déjà enregistrés hors liste).
@@ -237,12 +244,15 @@ function ExtraModal({ initial, onSave, onClose, saving }: {
   const role = roleChoice === OTHER_ROLE ? otherRole.trim() : roleChoice;
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
+  const initialRate = toNumber(initial?.hourly_rate);
+  const [rate, setRate]   = useState(initialRate === null ? '' : String(initialRate).replace('.', ','));
   const [error, setError] = useState<string | null>(null);
+  const rateInvalid = rate.trim() !== '' && (toNumber(rate) === null || toNumber(rate)! < 0);
 
   const submit = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || rateInvalid) return;
     setError(null);
-    if (!(await onSave({ name, role, phone, email }))) setError('L’extra n’a pas pu être enregistré. Réessayez.');
+    if (!(await onSave({ name, role, phone, email, rate }))) setError('L’extra n’a pas pu être enregistré. Réessayez.');
   };
 
   return (
@@ -251,7 +261,7 @@ function ExtraModal({ initial, onSave, onClose, saving }: {
       onClose={onClose}
       footer={<>
         <button onClick={onClose} className={btnGhost}>Annuler</button>
-        <button onClick={submit} disabled={!name.trim() || saving} className={btnPrimary}>
+        <button onClick={submit} disabled={!name.trim() || rateInvalid || saving} className={btnPrimary}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}{initial?.id ? 'Enregistrer' : 'Ajouter'}
         </button>
       </>}
@@ -282,6 +292,19 @@ function ExtraModal({ initial, onSave, onClose, saving }: {
             <input id="extra-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" className={inputCls} />
           </div>
         </div>
+        {showRate && (
+          <div>
+            <label htmlFor="extra-rate" className={labelCls}>Taux horaire brut</label>
+            <div className="relative sm:max-w-[200px]">
+              <input id="extra-rate" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="13,50"
+                aria-describedby="extra-rate-hint" aria-invalid={rateInvalid} className={cn(inputCls, 'pr-14')} />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">€/h</span>
+            </div>
+            <p id="extra-rate-hint" className={cn('text-sm mt-1.5', rateInvalid ? 'text-danger' : 'text-gray-500')}>
+              {rateInvalid ? 'Indiquez un montant, par exemple 13,50.' : 'Repris sur chacune de ses missions, modifiable mission par mission.'}
+            </p>
+          </div>
+        )}
         {initial?.access_token && initial.name && <MissionPageLink name={initial.name} token={initial.access_token} />}
         {error && <p role="alert" className={errorCls}>{error}</p>}
       </form>
@@ -463,7 +486,8 @@ function ExtraRow({
   const past = assignments
     .filter((a) => a.quote.event_date && a.quote.event_date < today)
     .sort((a, b) => (b.quote.event_date ?? '').localeCompare(a.quote.event_date ?? ''));
-  const meta = [extra.role, extra.phone, extra.email].filter(Boolean).join(', ');
+  const rate = toNumber(extra.hourly_rate);
+  const meta = [extra.role, rate !== null ? `${euros(rate)}/h` : null, extra.phone, extra.email].filter(Boolean).join(', ');
   const daysOff = (extra.unavailable_dates ?? []).map((d) => d.slice(0, 10)).filter((d) => d >= today).sort();
 
   return (
@@ -549,11 +573,17 @@ export default function ExtrasPage() {
   const [assignFor,   setAssignFor]   = useState<string[] | null>(null);
   const [viewMode,    setViewMode]    = useState<'list' | 'agenda'>('list');
   const [openSheet,   setOpenSheet]   = useState<{ assignment: Assignment; extra: Extra } | null>(null);
+  // La colonne du taux horaire n'existe qu'après la migration 0023 : le champ est masqué sinon.
+  const [rateSupported, setRateSupported] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
     const supabase = createClient();
-    const { data: extrasData, error: extrasErr } = await supabase.from('extras').select('*').eq('user_id', user.id).order('name');
+    const [{ data: extrasData, error: extrasErr }, rateProbe] = await Promise.all([
+      supabase.from('extras').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('extras').select('id, hourly_rate').eq('user_id', user.id).limit(1),
+    ]);
+    setRateSupported(!rateProbe.error);
     const extras = (extrasData ?? []) as Extra[];
     const extraIds = extras.map((e) => e.id);
     let assigns: Assignment[] = [];
@@ -580,11 +610,14 @@ export default function ExtrasPage() {
     return map;
   }, [assignments]);
 
-  const handleSaveExtra = async (form: { name: string; role: string; phone: string; email: string }) => {
+  const handleSaveExtra = async (form: ExtraForm) => {
     if (!user) return false;
     setSaving(true);
     const supabase = createClient();
-    const fields = { name: form.name.trim(), role: form.role || null, phone: form.phone || null, email: form.email || null };
+    const fields = {
+      name: form.name.trim(), role: form.role || null, phone: form.phone || null, email: form.email || null,
+      ...(rateSupported ? { hourly_rate: toNumber(form.rate) } : {}),
+    };
     const res = editing
       ? await supabase.from('extras').update(fields).eq('id', editing.id).select().single()
       : await supabase.from('extras').insert({ user_id: user.id, ...fields }).select().single();
@@ -677,7 +710,10 @@ export default function ExtrasPage() {
             {loading ? ' ' : `${extras.length} extra${extras.length > 1 ? 's' : ''} dans votre équipe`}
           </p>
         </div>
-        <button onClick={openNew} className={cn(btnPrimary, 'w-full sm:w-auto')}><Plus className="h-4 w-4" />Ajouter un extra</button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Link href="/extras/heures" className={cn(btnSecondary, 'w-full sm:w-auto')}><Clock className="h-4 w-4" />Heures et paie</Link>
+          <button onClick={openNew} className={cn(btnPrimary, 'w-full sm:w-auto')}><Plus className="h-4 w-4" />Ajouter un extra</button>
+        </div>
       </div>
 
       {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
@@ -764,6 +800,7 @@ export default function ExtrasPage() {
           onSave={handleSaveExtra}
           onClose={() => { setShowModal(false); setEditing(null); }}
           saving={saving}
+          showRate={rateSupported}
         />
       )}
       {assignFor && (
