@@ -77,6 +77,12 @@ export const NAV_MEGA: Record<string, NavMegaEntry> = {
     ],
     preview: 'prospects',
   },
+  '/journee': {
+    summary: 'Les événements d’aujourd’hui et de demain : horaires, lieu, équipe, plats et allergènes. Une fois ouverte, la page reste consultable sans réseau.',
+    actions: [
+      { label: 'Liste des événements', hint: 'À venir et passés', href: '/evenements', icon: CalendarRange },
+    ],
+  },
   '/calendrier': {
     summary: 'Le mois en un coup d’œil : événements confirmés et devis en cours, jour par jour. Un jour libre se transforme en devis.',
     actions: [

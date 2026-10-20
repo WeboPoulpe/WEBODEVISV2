@@ -1,10 +1,23 @@
 // Service worker de WeboDevis, servi par une route : le dossier des fichiers statiques du projet
 // s'appelle « Public » (majuscule), que l'hébergement Linux ne reconnaît pas comme « public ».
 //
-// Rôle actuel : rendre l'app installable, garder ses fichiers en cache et afficher une page claire
-// hors ligne. Les données (devis, événements) ne sont pas mises en cache ici.
+// Rôle : rendre l'app installable, garder ses fichiers en cache, afficher une page claire hors ligne et
+// ouvrir « Ma journée » (/journee) sans réseau.
+//
+// Ce qui est mis en cache, et rien d'autre :
+//  - les fichiers de l'app (/_next/static : scripts, styles, polices ; /icons) — identiques pour tous les comptes ;
+//  - la page /hors-ligne ;
+//  - la page /journee, seule page de l'app gardée : son HTML ne contient aucune donnée (elle les charge après
+//    coup, puis en garde une copie sur l'appareil, rangée par compte, voir lib/offlineStore.ts).
+// Jamais mis en cache : les réponses de /api/, les actions serveur et tout ce qui n'est pas une requête GET
+// (les actions serveur sont des POST), ni les autres pages de l'app, qui contiennent des données personnelles.
+//
+// Changer CACHE (« -v2 », « -v3 »…) quand on modifie ce qui est gardé : à l'activation, le nouveau service
+// worker efface les caches portant un autre nom.
 const SCRIPT = String.raw`
-const CACHE = 'webodevis-v1';
+const CACHE = 'webodevis-v2';
+// Pages de l'app consultables sans réseau (HTML sans données personnelles uniquement).
+const OFFLINE_PAGES = ['/journee'];
 
 // Notifications push : { title, body, url, tag } envoyés par le serveur (lib/push.ts).
 self.addEventListener('push', (event) => {
@@ -49,13 +62,35 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Pages : le réseau d'abord ; sans réseau, la page « hors ligne ».
+  // Rien de ce qui passe par /api/ (session, fichiers, données) n'est gardé ni servi depuis le cache.
+  if (url.pathname.startsWith('/api/')) return;
+
+  // « Ma journée » : le réseau d'abord, et la copie gardée met à jour la page en cache ; sans réseau, la
+  // dernière copie, sinon la page « hors ligne ». Une réponse redirigée (session expirée → connexion) ou
+  // en erreur n'est pas gardée. La copie est rangée sous l'adresse sans paramètres.
+  if (request.mode === 'navigate' && OFFLINE_PAGES.includes(url.pathname)) {
+    const key = new Request(url.origin + url.pathname);
+    event.respondWith(
+      fetch(request).then((response) => {
+        if (response.ok && !response.redirected && response.type === 'basic') {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE).then((cache) => cache.put(key, copy)));
+        }
+        return response;
+      }).catch(async () => (await caches.match(key)) || caches.match(OFFLINE_URL)),
+    );
+    return;
+  }
+
+  // Autres pages : le réseau d'abord, sans rien garder ; sans réseau, la page « hors ligne ».
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
     return;
   }
 
   // Fichiers de l'app (scripts, styles, polices, icônes) : le cache d'abord, rafraîchi en arrière-plan.
+  // Ceux de /_next/static portent une empreinte dans leur nom : une version gardée reste juste. Ils sont gardés
+  // au fil des visites, dont celles de /journee : la page retrouve ainsi ses fichiers sans réseau.
   if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
     event.respondWith(
       caches.open(CACHE).then(async (cache) => {

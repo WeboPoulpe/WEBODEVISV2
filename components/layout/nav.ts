@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, Users, CalendarDays, CalendarRange, Package, Carrot, LayoutTemplate,
-  UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt,
+  UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -42,6 +42,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Production',
     items: [
+      // Consultable sans réseau (service worker et copie sur l'appareil) : en tête, pour le téléphone.
+      { href: '/journee', icon: Sun, label: 'Ma journée', exact: false, badge: 'todayEvent' },
       { href: '/calendrier', icon: CalendarDays, label: 'Calendrier', exact: false, badge: 'todayEvent' },
       { href: '/evenements', icon: CalendarRange, label: 'Événements', exact: false },
       { href: '/commandes', icon: ShoppingBasket, label: 'Commandes', exact: false },

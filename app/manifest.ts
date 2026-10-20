@@ -19,6 +19,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icons/512?maskable=1', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
     shortcuts: [
+      { name: 'Ma journée', url: '/journee' },
       { name: 'Nouveau devis', url: '/devis/nouveau' },
       { name: 'Événements', url: '/evenements' },
       { name: 'Calendrier', url: '/calendrier' },
