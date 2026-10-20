@@ -152,6 +152,8 @@ export function buildQuotePrintPage(p: {
   logoHtml?: string;
   photosHtml?: string;
   cgvHtml?: string;
+  /** Mentions légales de l'entreprise, sous le document. */
+  legalHtml?: string;
 }): string {
   const fontHref = googleFontHref(p.settings.font);
   const title = p.title.replace(/[<>&"]/g, '');
@@ -170,6 +172,7 @@ export function buildQuotePrintPage(p: {
   ${p.coverHtml ?? ''}
   ${p.coverHtml ? '' : (p.logoHtml ?? '')}
   ${wrapQuoteDoc(p.content)}
+  ${p.legalHtml ?? ''}
   ${p.photosHtml ?? ''}
   ${p.cgvHtml ?? ''}
   <script>

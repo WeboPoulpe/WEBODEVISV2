@@ -24,7 +24,7 @@ import {
   type CoverPageConfig, type PhotosPageConfig,
   DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG,
 } from './weboword/weboword.types';
-import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml } from './weboword/printHelpers';
+import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml, buildLegalFooterHtml, LEGAL_PROFILE_COLUMNS, type LegalProfile } from './weboword/printHelpers';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -227,7 +227,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [lineHeight, setLineHeight] = useState(initSettings?.lineHeight ?? DEFAULT_LINE_HEIGHT);
   const [adminModal, setAdminModal] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
-  const [companyAssets, setCompanyAssets] = useState<{ logo_url: string | null; cgv: string | null }>({ logo_url: null, cgv: null });
+  const [companyAssets, setCompanyAssets] = useState<{ logo_url: string | null; cgv: string | null; legal?: LegalProfile | null }>({ logo_url: null, cgv: null });
 
   // Load logo + CGV from profiles
   useEffect(() => {
@@ -240,7 +240,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         const { data: c } = await supabase.from('profiles').select('cgv').eq('id', user.id).maybeSingle();
         cgv = c?.cgv ?? null;
       } catch { /* colonne cgv absente */ }
-      setCompanyAssets({ logo_url: (data as { logo_url?: string | null } | null)?.logo_url ?? null, cgv });
+      // Mentions légales du pied de devis (lues à part : une colonne absente ne doit pas priver du logo).
+      const { data: legal } = await supabase.from('profiles').select(LEGAL_PROFILE_COLUMNS).eq('id', user.id).maybeSingle();
+      setCompanyAssets({ logo_url: (data as { logo_url?: string | null } | null)?.logo_url ?? null, cgv, legal: (legal as LegalProfile | null) ?? null });
     })();
   }, [user]);
 
@@ -943,6 +945,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       logoHtml: sanitizeHtml(buildLogoHeaderHtml(companyAssets.logo_url)),
       photosHtml: sanitizeHtml(buildPhotosPageHtml(photosConfig)),
       cgvHtml: alreadyHasCgv ? '' : sanitizeHtml(buildCgvHtml(companyAssets.cgv)),
+      legalHtml: sanitizeHtml(buildLegalFooterHtml(companyAssets.legal)),
     });
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
     const win = window.open(url, '_blank');

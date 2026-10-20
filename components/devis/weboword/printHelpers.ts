@@ -2,6 +2,7 @@
 
 import type { CoverPageConfig, CoverPageLayoutElement, PhotosPageConfig } from './weboword.types'
 import { COVER_TEMPLATES } from './CoverPage.templates'
+import { sellerIdentityLine } from '@/lib/invoiceMentions'
 
 function esc(s: string): string {
   return s
@@ -62,4 +63,39 @@ export function buildCgvHtml(cgv: string | null | undefined): string {
   <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:0.12em;color:#666;border-bottom:1px solid #ddd;padding-bottom:6px;margin:0 0 10px;">Conditions Générales de Vente</h2>
   <div style="font-size:8.5px;line-height:1.45;color:#444;column-count:2;column-gap:10mm;text-align:justify;">${cgv}</div>
 </div>`
+}
+
+/** Colonnes du profil qui portent l'identité légale de l'entreprise (à lire avec le reste du profil). */
+export const LEGAL_PROFILE_COLUMNS = 'company_name, company_address, siret, company_siret, legal_form, share_capital, rcs, vat_number, vat_exempt'
+
+export interface LegalProfile {
+  company_name?: string | null
+  company_address?: string | null
+  siret?: string | null
+  company_siret?: string | null
+  legal_form?: string | null
+  share_capital?: string | null
+  rcs?: string | null
+  vat_number?: string | null
+  vat_exempt?: boolean | null
+}
+
+/**
+ * Pied de document du devis : nom et adresse de l'entreprise, puis sa ligne d'identité légale (forme, capital, RCS,
+ * SIRET, n° de TVA ou mention de franchise), la même que sur les factures. Vide si rien n'est renseigné.
+ */
+export function buildLegalFooterHtml(p: LegalProfile | null | undefined): string {
+  if (!p) return ''
+  const identity = sellerIdentityLine({
+    name: p.company_name ?? '',
+    siret: p.siret || p.company_siret || null,
+    vatNumber: p.vat_exempt ? null : (p.vat_number ?? null),
+    vatExempt: !!p.vat_exempt,
+    legalForm: p.legal_form ?? null,
+    shareCapital: p.share_capital ?? null,
+    rcs: p.rcs ?? null,
+  })
+  const head = [p.company_name, p.company_address].filter((x) => x && x.trim()).join(' · ')
+  if (!identity && !head) return ''
+  return `<div data-webo-legal="1" style="margin:6mm 16mm 0;padding-top:3mm;border-top:1px solid #e5e5e5;font-family:system-ui,sans-serif;font-size:8px;line-height:1.5;color:#777;text-align:center;break-inside:avoid;">${[head, identity].filter(Boolean).map(esc).join('<br>')}</div>`
 }

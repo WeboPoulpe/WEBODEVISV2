@@ -2,7 +2,7 @@ import type { ServiceLine } from '@/context/DevisContext';
 import QuoteDocument from '@/components/devis/QuoteDocument';
 import QuoteDocumentMariage from '@/components/devis/QuoteDocumentMariage';
 import QuoteDocumentBusiness from '@/components/devis/QuoteDocumentBusiness';
-import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml } from '@/components/devis/weboword/printHelpers';
+import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml, buildLegalFooterHtml, type LegalProfile } from '@/components/devis/weboword/printHelpers';
 import { DEFAULT_COVER_CONFIG, DEFAULT_PHOTOS_CONFIG } from '@/components/devis/weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/weboword/weboword.types';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -32,7 +32,7 @@ function AcceptanceBlock({ acceptance }: { acceptance: QuoteRenderAcceptance }) 
   );
 }
 
-export interface QuoteRenderProfile {
+export interface QuoteRenderProfile extends LegalProfile {
   company_name?: string | null;
   company_address?: string | null;
   company_phone?: string | null;
@@ -57,6 +57,7 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
     const photosHtml = buildPhotosPageHtml((quote.photos_page_config as PhotosPageConfig) ?? DEFAULT_PHOTOS_CONFIG);
     const logoHtml = buildLogoHeaderHtml(profile?.logo_url);
     const cgvHtml = buildCgvHtml(profile?.cgv);
+    const legalHtml = buildLegalFooterHtml(profile);
     // Les conditions de vente ne sont ajoutées que si le document ne les contient pas déjà.
     const hasCgv = content.includes('data-webo-cgv') || (!!profile?.cgv && content.includes(profile.cgv as string));
 
@@ -72,6 +73,7 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
           {coverHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(coverHtml) }} />}
           {!coverHtml && logoHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(logoHtml) }} />}
           <div dangerouslySetInnerHTML={{ __html: wrapQuoteDoc(sanitizeHtml(content)) }} />
+          {legalHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(legalHtml) }} />}
           {photosHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(photosHtml) }} />}
           {cgvHtml && !hasCgv && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cgvHtml) }} />}
           {acceptance && <AcceptanceBlock acceptance={acceptance} />}
@@ -121,6 +123,7 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
       ) : (
         <QuoteDocument {...docProps} />
       )}
+      {buildLegalFooterHtml(profile) && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(buildLegalFooterHtml(profile)) }} />}
       {acceptance && <AcceptanceBlock acceptance={acceptance} />}
     </div>
   );

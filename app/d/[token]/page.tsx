@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { CheckCircle2, Clock } from 'lucide-react';
 import { adminSupabase } from '@/lib/supabase/admin';
 import QuoteRender from '@/components/devis/QuoteRender';
+import { LEGAL_PROFILE_COLUMNS } from '@/components/devis/weboword/printHelpers';
 import { acceptanceState, recordQuoteView } from '@/server/acceptance';
 import PrintButton from './PrintButton';
 import AcceptQuote from './AcceptQuote';
@@ -22,7 +23,7 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
   if (!quote) notFound();
 
   const [{ data: profile }, state] = await Promise.all([
-    adminSupabase.from('profiles').select('company_name, company_address, company_phone, logo_url, cgv').eq('id', quote.owner_user_id ?? quote.user_id).maybeSingle(),
+    adminSupabase.from('profiles').select(`company_phone, logo_url, cgv, ${LEGAL_PROFILE_COLUMNS}`).eq('id', quote.owner_user_id ?? quote.user_id).maybeSingle(),
     // L'acceptation en ligne ne doit jamais empêcher d'afficher le devis.
     acceptanceState(token).catch(() => null),
     // Une consultation qui ne s'enregistre pas ne doit pas empêcher d'afficher le devis.

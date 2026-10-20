@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { LEGAL_PROFILE_COLUMNS } from '@/components/devis/weboword/printHelpers';
 import { createClient } from '@/lib/supabase/server';
 import AutoPrint from '@/components/devis/AutoPrint';
 import QuoteRender from '@/components/devis/QuoteRender';
@@ -28,7 +29,7 @@ export default async function ImprimerPage({ params }: Props) {
   const { data: profile } = user
     ? await supabase
         .from('profiles')
-        .select('company_name, company_address, company_phone, logo_url, cgv')
+        .select(`company_phone, logo_url, cgv, ${LEGAL_PROFILE_COLUMNS}`)
         .eq('id', user.id)
         .single()
     : { data: null };
