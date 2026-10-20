@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { profiles, users } from '@/db/schema';
 import { DEMO_USER_ID } from '@/lib/demo';
 import { readTicket } from '@/server/tickets';
+import { clearLoginFailures, clientIp, isLoginBlocked, recordLoginFailure, TOO_MANY_ATTEMPTS } from './loginThrottle';
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -38,11 +39,18 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Mot de passe', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials.password) return null;
-        const [user] = await db.select().from(users).where(eq(users.email, normalizeEmail(credentials.email))).limit(1);
-        if (!user) return null;
-        if (!(await bcrypt.compare(credentials.password, user.password_hash))) return null;
+        const email = normalizeEmail(credentials.email);
+        const ip = clientIp(req?.headers);
+        // Trop d'échecs récents : refusé avant même de vérifier le mot de passe (le message s'affiche tel quel).
+        if (await isLoginBlocked(email, ip)) throw new Error(TOO_MANY_ATTEMPTS);
+        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        if (!user || !(await bcrypt.compare(credentials.password, user.password_hash))) {
+          await recordLoginFailure(email, ip);
+          return null;
+        }
+        await clearLoginFailures(email);
 
         // Un compte désactivé par un administrateur ne peut plus se connecter.
         const [profile] = await db.select({ is_active: profiles.is_active }).from(profiles).where(eq(profiles.id, user.id)).limit(1);

@@ -968,6 +968,18 @@ export const quote_acceptances = pgTable("quote_acceptances", {
 	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "quote_acceptances_quote_id_fkey" }).onDelete("cascade"),
 ]);
 
+// Échecs de connexion récents, pour freiner les essais de mots de passe. Email et IP sont gardés sous forme
+// d'empreinte ; les lignes de plus d'un jour sont effacées chaque nuit.
+export const login_attempts = pgTable("login_attempts", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	email_hash: text().notNull(),
+	ip_hash: text(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_login_attempts_email").using("btree", table.email_hash.asc().nullsLast().op("text_ops"), table.created_at.asc().nullsLast().op("timestamptz_ops")),
+	index("idx_login_attempts_ip").using("btree", table.ip_hash.asc().nullsLast().op("text_ops"), table.created_at.asc().nullsLast().op("timestamptz_ops")),
+]);
+
 // Compteurs des numéros de documents, par entreprise, type (quote, invoice, credit) et année (0 : sans année).
 // Lus et incrémentés par next_document_number() dans la transaction qui crée le document : jamais de trou.
 export const document_counters = pgTable("document_counters", {
