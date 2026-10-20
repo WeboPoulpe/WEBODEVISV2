@@ -38,6 +38,9 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
   const [suggestions, setSuggestions] = useState<RecipientSuggestion[]>([]);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [copyToMe, setCopyToMe] = useState(false);
+  // Copie visible (Cc) : champ affiché à la demande, adresses séparées par des virgules.
+  const [ccOpen, setCcOpen] = useState(false);
+  const [cc, setCc] = useState('');
   const [message, setMessage] = useState(() => defaultSendMessage(quote, companyName));
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +109,10 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
     if (bad.length) { setError(bad.length === 1 ? `L’adresse « ${bad[0]} » n’est pas valide. Corrigez-la ou retirez-la.` : `Ces adresses ne sont pas valides : ${bad.join(', ')}. Corrigez-les ou retirez-les.`); return; }
     if (list.length > MAX_RECIPIENTS) { setError(`Un devis part à ${MAX_RECIPIENTS} adresses au plus. Retirez-en ${list.length - MAX_RECIPIENTS}.`); return; }
     setSending(true); setError(null);
-    const res = await sendQuoteToClient({ quoteId: quote.id, to: list, message, copyToMe })
+    const ccList = splitEmails(cc);
+    const badCc = ccList.filter((e) => !isValidEmail(e));
+    if (badCc.length) { setError(badCc.length === 1 ? `L’adresse en copie « ${badCc[0]} » n’est pas valide.` : `Ces adresses en copie ne sont pas valides : ${badCc.join(', ')}.`); return; }
+    const res = await sendQuoteToClient({ quoteId: quote.id, to: list, message, copyToMe, cc: ccList })
       .catch((): SendQuoteResult => ({ error: 'L’envoi a échoué. Réessayez dans un instant.' }));
     setSending(false);
     if (res.error) { setError(res.error); return; }
@@ -150,6 +156,7 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
               L’envoi a échoué pour {failed.length === 1 ? 'cette adresse' : 'ces adresses'} : <strong>{failed.join(', ')}</strong>. Vérifiez-{failed.length === 1 ? 'la' : 'les'} puis renvoyez le devis à {failed.length === 1 ? 'cette personne' : 'ces personnes'}.
             </p>
           )}
+          {result.cc && result.cc.length > 0 && <p>En copie : <strong className="text-gray-900 break-all">{result.cc.join(', ')}</strong>.</p>}
           {result.copySent === true && <p>Une copie vous a été envoyée.</p>}
           {result.copySent === false && <p className="text-danger">La copie à votre adresse n’a pas pu partir.</p>}
           <p>{sent.length === 1 ? 'Il contient' : 'Chacun reçoit son propre email, avec'} un lien pour consulter le devis en ligne et l’enregistrer en PDF. Les réponses arriveront dans votre boîte.</p>
@@ -214,6 +221,20 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
             </div>
           )}
 
+          {ccOpen ? (
+            <div>
+              <label htmlFor="send-cc" className={labelCls}>En copie (Cc)</label>
+              <input id="send-cc" type="text" inputMode="email" autoComplete="off" autoCapitalize="off" spellCheck={false}
+                value={cc} onChange={(e) => setCc(e.target.value)} placeholder="associe@exemple.fr, assistante@exemple.fr"
+                aria-describedby="send-cc-help" className={inputCls} />
+              <p id="send-cc-help" className="mt-1.5 text-sm text-gray-500">Ces personnes voient l’email envoyé au client, et le client voit qu’elles sont en copie. 5 adresses au plus.</p>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setCcOpen(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+              <Plus className="h-4 w-4" />Mettre quelqu’un en copie
+            </button>
+          )}
+
           <div>
             <label htmlFor="send-message" className={labelCls}>Message</label>
             <textarea id="send-message" rows={7} value={message} onChange={(e) => setMessage(e.target.value)} className={cn(inputCls, 'h-auto py-3 resize-none')} />
@@ -226,7 +247,7 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
             </label>
           )}
 
-          <p className="text-sm text-gray-500">Chaque destinataire reçoit son propre email avec un lien vers le devis, pas de pièce jointe : personne ne voit les adresses des autres. À l’envoi, un devis encore à faire passe en « Devis envoyé ».</p>
+          <p className="text-sm text-gray-500">Chaque destinataire reçoit son propre email avec un lien vers le devis, pas de pièce jointe : les destinataires ne voient pas les adresses des autres (seules les personnes en copie sont visibles). À l’envoi, un devis encore à faire passe en « Devis envoyé ».</p>
         </div>
       )}
     </Modal>

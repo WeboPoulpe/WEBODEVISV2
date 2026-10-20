@@ -26,7 +26,12 @@ export interface SendQuoteResult {
   clientEmail?: string | null;
   /** La copie demandée par le traiteur est partie (absent : pas de copie demandée). */
   copySent?: boolean;
+  /** Adresses mises en copie (Cc) du premier email envoyé. */
+  cc?: string[];
 }
+
+/** Nombre d'adresses en copie au plus. */
+const MAX_CC = 5;
 
 /**
  * Envoie le devis au client par email, avec un lien pour le consulter en ligne.
@@ -36,7 +41,7 @@ export interface SendQuoteResult {
  * propre email, avec le même lien. Personne ne voit ainsi les adresses des autres, et un envoi refusé
  * pour une adresse n'empêche pas les autres de partir.
  */
-export async function sendQuoteToClient(input: { quoteId: string; to: string | string[]; message: string; copyToMe?: boolean }): Promise<SendQuoteResult> {
+export async function sendQuoteToClient(input: { quoteId: string; to: string | string[]; message: string; copyToMe?: boolean; cc?: string | string[] }): Promise<SendQuoteResult> {
   const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const recipients = uniqueEmails(Array.isArray(input.to) ? input.to.flatMap(splitEmails) : splitEmails(input.to));
@@ -45,6 +50,11 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
   if (invalid.length === 1) return { error: `L’adresse « ${invalid[0]} » n’est pas valide.` };
   if (invalid.length > 1) return { error: `Ces adresses ne sont pas valides : ${invalid.join(', ')}.` };
   if (recipients.length > MAX_RECIPIENTS) return { error: `Un devis part à ${MAX_RECIPIENTS} adresses au plus. Retirez-en ${recipients.length - MAX_RECIPIENTS}.` };
+  // Copie visible (Cc) : sans les adresses déjà destinataires.
+  const cc = uniqueEmails(Array.isArray(input.cc) ? input.cc.flatMap(splitEmails) : splitEmails(input.cc ?? '')).filter((e) => !recipients.includes(e));
+  const badCc = cc.filter((e) => !isValidEmail(e));
+  if (badCc.length) return { error: badCc.length === 1 ? `L’adresse en copie « ${badCc[0]} » n’est pas valide.` : `Ces adresses en copie ne sont pas valides : ${badCc.join(', ')}.` };
+  if (cc.length > MAX_CC) return { error: `${MAX_CC} adresses en copie au plus. Retirez-en ${cc.length - MAX_CC}.` };
   if (!input.message.trim()) return { error: 'Écrivez quelques mots pour accompagner le devis.' };
 
   const [quote] = await db
@@ -84,9 +94,12 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
   // Un email par destinataire, l'un après l'autre (Resend limite le nombre d'envois par seconde).
   const sent: string[] = [];
   const failed: string[] = [];
+  // Les adresses en copie (Cc) accompagnent le premier email qui part : elles le reçoivent une seule fois.
+  let ccPending = cc;
   for (const to of recipients) {
-    const res = await sendMail({ to, ...mail });
+    const res = await sendMail({ to, ...mail, ...(ccPending.length ? { cc: ccPending } : {}) });
     (res.error ? failed : sent).push(to);
+    if (!res.error) ccPending = [];
   }
   if (sent.length === 0) {
     return { error: recipients.length === 1 ? 'L’email n’a pas pu être envoyé. Réessayez dans un instant.' : 'Aucun email n’a pu être envoyé. Réessayez dans un instant.' };
@@ -111,7 +124,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
       })
       .where(eq(quotes.id, quote.id));
   });
-  return { error: null, status, sent, failed, clientEmail, copySent };
+  return { error: null, status, sent, failed, clientEmail, copySent, cc: cc.length && ccPending.length === 0 ? cc : undefined };
 }
 
 export interface RecipientSuggestion {
