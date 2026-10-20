@@ -3,6 +3,13 @@
     "lhr1"
   ],
   "crons": [
-    { "path": "/api/cron/rappels-extras", "schedule": "0 16 * * *" }
+    {
+      "path": "/api/cron/rappels-extras",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/purge-comptes",
+      "schedule": "30 3 * * *"
+    }
   ]
 }

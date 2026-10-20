@@ -7,6 +7,7 @@ import { fileToWebp } from '@/lib/imageToWebp';
 import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 import DocumentSettings from '@/components/parametres/DocumentSettings';
+import MyDataSection from '@/components/parametres/MyDataSection';
 import { errorCls } from '@/components/ui/kit';
 import { isDemoUser } from '@/lib/demo';
 import { changePassword } from '@/server/auth';
@@ -530,6 +531,15 @@ export default function ParametresPage() {
         locked={
           isDemoUser(user?.id) ? 'Le mot de passe ne se change pas dans la démonstration.'
             : actingAsAdmin ? 'Vous êtes dans le compte d’un client : seul son titulaire peut changer son mot de passe.'
+            : null
+        }
+      />
+
+      {/* ── Section 6: Mes données ──────────────────────────────────────────── */}
+      <MyDataSection
+        locked={
+          isDemoUser(user?.id) ? 'La démonstration ne se supprime pas.'
+            : actingAsAdmin ? 'Seul le titulaire peut supprimer son compte.'
             : null
         }
       />

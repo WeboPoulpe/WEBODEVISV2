@@ -90,12 +90,14 @@ export interface AdminAccount {
   quotes: number;
   customers: number;
   last_quote_at: string | null;
+  /** Suppression demandée par le titulaire (purge 30 jours plus tard). */
+  deletion_requested_at: string | null;
 }
 
 export async function listAccounts(): Promise<AdminAccount[]> {
   const admin = await requireAdmin();
   const { rows } = await db.execute(sql`
-    select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at,
+    select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at, p.deletion_requested_at,
            (select count(*)::int from public.quotes q where q.owner_user_id = p.id) as quotes,
            (select count(*)::int from public.customers c where c.owner_user_id = p.id) as customers,
            (select max(q.updated_at) from public.quotes q where q.owner_user_id = p.id) as last_quote_at
@@ -106,6 +108,7 @@ export async function listAccounts(): Promise<AdminAccount[]> {
     modules: enabledModules(r.modules),
     created_at: new Date(r.created_at).toISOString(),
     last_quote_at: r.last_quote_at ? new Date(r.last_quote_at).toISOString() : null,
+    deletion_requested_at: r.deletion_requested_at ? new Date(r.deletion_requested_at).toISOString() : null,
     is_demo: r.id === DEMO_USER_ID,
     is_self: r.id === admin.id,
   }));

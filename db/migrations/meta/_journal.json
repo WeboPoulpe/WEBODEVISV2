@@ -148,6 +148,13 @@
       "when": 1792480111453,
       "tag": "0020_allergens",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792480381423,
+      "tag": "0021_account_deletion",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,38 @@ const dateFr = (iso: string | null | undefined) =>
 const multiline = (text: string) => esc(text).replace(/\r?\n/g, '<br>');
 
 // ── Compte ────────────────────────────────────────────────────────────────────
+const longDate = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** Au titulaire : sa demande de suppression est enregistrée. */
+export function accountDeletionEmail({ firstName, purgeOn, contactUrl }: { firstName: string | null; purgeOn: string; contactUrl: string }): Email {
+  return {
+    subject: 'Suppression de votre compte WeboDevis',
+    html: renderEmail({
+      preheader: `Vos données seront effacées le ${longDate(purgeOn)}.`,
+      title: firstName ? `Au revoir ${esc(firstName)}` : 'Votre demande est enregistrée',
+      paragraphs: [
+        `Votre compte est désactivé. Toutes vos données (devis, clients, factures, fichiers) seront définitivement effacées le <strong>${longDate(purgeOn)}</strong>.`,
+        'Vous avez changé d’avis ? Écrivez-nous avant cette date et nous réactiverons votre compte tel quel.',
+        'Pensez à conserver vos factures : la loi vous demande de les garder dix ans.',
+      ],
+      button: { label: 'Nous écrire', url: contactUrl },
+    }),
+  };
+}
+
+/** À l'équipe : un titulaire a demandé la suppression de son compte. */
+export function accountDeletionAdminEmail({ email, purgeOn, appUrl }: { email: string; purgeOn: string; appUrl: string }): Email {
+  return {
+    subject: `Suppression de compte demandée : ${email}`,
+    html: renderEmail({
+      preheader: `${email} a demandé la suppression de son compte.`,
+      title: 'Suppression de compte demandée',
+      paragraphs: [`${esc(email)} a demandé la suppression de son compte. Il est désactivé ; la purge automatique aura lieu le ${longDate(purgeOn)}.`],
+      button: { label: 'Voir les comptes', url: `${appUrl}/admin/comptes` },
+    }),
+  };
+}
+
 export function welcomeEmail({ firstName, appUrl }: { firstName: string | null; appUrl: string }): Email {
   return {
     subject: 'Bienvenue sur WeboDevis',

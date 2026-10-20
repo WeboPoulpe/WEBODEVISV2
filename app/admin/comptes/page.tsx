@@ -6,6 +6,7 @@ import {
   createAccount, deleteEmptyAccount, listAccounts, sendAccountPasswordLink, setAccountActive, setAccountRole, updateAccount,
   type AdminAccount,
 } from '@/server/admin';
+import { cancelAccountDeletion, purgeRequestedAccount } from '@/server/account';
 import { useAuth } from '@/context/AuthContext';
 import { MODULES } from '@/lib/modules';
 import Modal from '@/components/ui/Modal';
@@ -121,7 +122,9 @@ export default function AdminAccountsPage() {
                     <span className={cn('font-semibold truncate', a.is_active ? 'text-gray-900' : 'text-gray-500')}>{accountName(a)}</span>
                     {a.role === 'admin' && <span className={cn(pill, 'bg-forest text-white')}>Administrateur</span>}
                     {a.is_demo && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Démonstration</span>}
-                    {!a.is_active && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Désactivé</span>}
+                    {a.deletion_requested_at
+                      ? <span className={cn(pill, 'bg-red-50 text-red-700')}>Suppression demandée</span>
+                      : !a.is_active && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Désactivé</span>}
                   </span>
                   <span className="block text-sm text-gray-500 truncate mt-0.5">{a.email}</span>
                 </span>
@@ -165,6 +168,12 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
   };
 
   const save = () => run('save', () => updateAccount(account.id, { firstName, lastName, companyName, modules }), 'Modifications enregistrées.');
+  const purgeOn = account.deletion_requested_at
+    ? new Date(new Date(account.deletion_requested_at).getTime() + 30 * 86400_000).toISOString() : null;
+  const purgeNow = async () => {
+    if (!confirm(`Effacer maintenant toutes les données de ${account.email} ? C’est définitif.`)) return;
+    if (await run('purge', () => purgeRequestedAccount(account.id))) onClose();
+  };
   const remove = async () => {
     if (!confirm(`Supprimer définitivement le compte ${account.email} ?`)) return;
     if (await run('delete', () => deleteEmptyAccount(account.id))) onClose();
@@ -184,6 +193,19 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
           {account.email}. Créé le {day(account.created_at)}. {account.quotes} devis, {account.customers} client{account.customers > 1 ? 's' : ''}.
         </p>
         {error && <p role="alert" className={errorCls}>{error}</p>}
+        {account.deletion_requested_at && purgeOn && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 space-y-3">
+            <p>Le titulaire a demandé la suppression de son compte le {day(account.deletion_requested_at)}. Ses données seront effacées automatiquement le {day(purgeOn)}.</p>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => run('cancel', () => cancelAccountDeletion(account.id), 'Suppression annulée, le compte est réactivé.')} disabled={busy !== null} className={btnSecondary}>
+                {busy === 'cancel' && <Loader2 className="h-4 w-4 animate-spin" />}Annuler la suppression
+              </button>
+              <button onClick={purgeNow} disabled={busy !== null} className={cn(btnGhost, 'text-danger hover:bg-red-100')}>
+                {busy === 'purge' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Effacer maintenant
+              </button>
+            </div>
+          </div>
+        )}
         {notice && <p role="status" className="text-sm text-sage bg-sage-100 rounded-xl px-4 py-3">{notice}</p>}
 
         {!account.is_self && (

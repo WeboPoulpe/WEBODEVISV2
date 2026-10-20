@@ -870,6 +870,8 @@ export const profiles = pgTable("profiles", {
 	payment_terms_days: integer().default(30).notNull(),
 	deposit_percent: numeric({ mode: 'number' }).default(30).notNull(),
 	quote_validity_days: integer().default(30).notNull(),
+	// Suppression du compte demandée par son titulaire : compte désactivé, données purgées 30 jours plus tard.
+	deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("idx_profiles_company_siret").using("btree", table.company_siret.asc().nullsLast().op("text_ops")),
 	foreignKey({
