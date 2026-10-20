@@ -1,6 +1,7 @@
 'use server';
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { event_extras, extras, profiles, quotes } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
@@ -23,7 +24,7 @@ async function ownAssignments(userId: string, ids: string[]) {
     .from(event_extras)
     .innerJoin(extras, eq(extras.id, event_extras.extra_id))
     .innerJoin(quotes, eq(quotes.id, event_extras.quote_id))
-    .where(and(inArray(event_extras.id, valid), eq(extras.user_id, userId)));
+    .where(and(inArray(event_extras.id, valid), sql`${extras.user_id} in ${companyIdsOf(userId)}`));
 }
 
 async function companyName(userId: string) {

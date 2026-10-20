@@ -237,8 +237,24 @@ async function isAdminUser(uid: string | null): Promise<boolean> {
   return admin;
 }
 
+// Rôle « consultation » d'un collaborateur (lecture seule) : relu au plus une fois par minute.
+const readOnlyCache = new Map<string, { readOnly: boolean; until: number }>();
+
+async function isReadOnlyUser(uid: string | null): Promise<boolean> {
+  if (!uid) return false;
+  const cached = readOnlyCache.get(uid);
+  if (cached && cached.until > Date.now()) return cached.readOnly;
+  const r = await pool.query(`select 1 from public.profiles where id = $1 and company_role = 'lecture'`, [uid]).catch(() => ({ rows: [] }));
+  const readOnly = r.rows.length === 1;
+  readOnlyCache.set(uid, { readOnly, until: Date.now() + 60_000 });
+  return readOnly;
+}
+
 export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promise<QueryResult> {
   try {
+    if (d.op !== 'select' && !ctx.bypass && await isReadOnlyUser(ctx.uid)) {
+      throw new QueryError('Votre accès est en consultation seule : demandez au gérant de modifier votre rôle.', '42501');
+    }
     const cat = await loadCatalog();
     const rule = RULES[d.table];
     const needsAdmin = !ctx.bypass && !!ctx.uid && !!rule && !!(rule.admin || rule.adminWrite || rule.adminOnlyColumns);

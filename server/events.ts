@@ -1,6 +1,7 @@
 'use server';
 
 import { and, eq, inArray, like, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import {
   event_ingredients, ingredients, prestations, quotes, service_ingredients, supplier_order_items, supplier_orders,
@@ -49,7 +50,7 @@ export async function recalculateCourses(quoteId: string): Promise<RecalculateRe
   if (!quote) return { error: 'Événement introuvable.', ...empty };
 
   const lines = (Array.isArray(quote.services) ? quote.services : []) as QuoteLine[];
-  const catalog = await db.select({ id: prestations.id, name: prestations.name }).from(prestations).where(eq(prestations.user_id, user.id));
+  const catalog = await db.select({ id: prestations.id, name: prestations.name }).from(prestations).where(sql`${prestations.user_id} in ${companyIdsOf(user.id)}`);
   const links = catalog.length === 0 ? [] : await db
     .select({
       service_id: service_ingredients.service_id,
@@ -144,7 +145,7 @@ export async function createSupplierOrders(quoteId: string): Promise<CreateOrder
 
   await db.transaction(async (tx) => {
     await tx.delete(supplier_orders).where(and(
-      eq(supplier_orders.user_id, user.id),
+      sql`${supplier_orders.user_id} in ${companyIdsOf(user.id)}`,
       eq(supplier_orders.event_id, quoteId),
       eq(supplier_orders.status, 'draft'),
       like(supplier_orders.notes, `${AUTO_ORDER_NOTE}%`),

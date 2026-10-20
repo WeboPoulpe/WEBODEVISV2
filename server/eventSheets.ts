@@ -1,6 +1,7 @@
 'use server';
 
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import {
   event_extras, extras, ingredients, prestations, profiles, quotes, rental_items, service_ingredients, suppliers,
@@ -98,7 +99,7 @@ function heading(q: EventRow, companyName: string): EventHeading {
 async function loadRecipes(owner: string): Promise<ProductionRecipe[]> {
   const catalog = await db
     .select({ id: prestations.id, name: prestations.name, allergens_extra: prestations.allergens_extra, allergens_checked: prestations.allergens_checked })
-    .from(prestations).where(eq(prestations.user_id, owner));
+    .from(prestations).where(sql`${prestations.user_id} in ${companyIdsOf(owner)}`);
   if (catalog.length === 0) return [];
   const links = await db
     .select({

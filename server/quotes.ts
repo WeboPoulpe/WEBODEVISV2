@@ -2,6 +2,7 @@
 
 import crypto from 'node:crypto';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { customer_contacts, customers, profiles, quotes } from '@/db/schema';
 import { appOrigin, sendMail } from '@/lib/mail';
@@ -52,7 +53,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
       client_first_name: quotes.client_first_name, event_type: quotes.event_type, event_date: quotes.event_date, guest_count: quotes.guest_count,
     })
     .from(quotes)
-    .where(and(eq(quotes.id, input.quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id})`))
+    .where(and(eq(quotes.id, input.quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id} or ${quotes.owner_user_id} in ${companyIdsOf(user.id)})`))
     .limit(1);
   if (!quote) return { error: 'Devis introuvable.' };
 
@@ -131,7 +132,7 @@ export async function quoteRecipientSuggestions(quoteId: string): Promise<{ sugg
       recipient_contact_email: quotes.recipient_contact_email, recipient_contact_role: quotes.recipient_contact_role,
     })
     .from(quotes)
-    .where(and(eq(quotes.id, quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id})`))
+    .where(and(eq(quotes.id, quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id} or ${quotes.owner_user_id} in ${companyIdsOf(user.id)})`))
     .limit(1);
   const [profile] = await db.select({ email: profiles.email }).from(profiles).where(eq(profiles.id, user.id)).limit(1);
   const accountEmail = profile?.email || user.email || null;
@@ -150,7 +151,7 @@ export async function quoteRecipientSuggestions(quoteId: string): Promise<{ sugg
     const [customer] = await db
       .select({ id: customers.id, email: customers.email, contact_person_name: customers.contact_person_name, contact_person_email: customers.contact_person_email })
       .from(customers)
-      .where(and(eq(customers.id, quote.customer_id), sql`(${customers.owner_user_id} = ${user.id} or ${customers.user_id} = ${user.id})`))
+      .where(and(eq(customers.id, quote.customer_id), sql`(${customers.owner_user_id} in ${companyIdsOf(user.id)} or ${customers.user_id} = ${user.id})`))
       .limit(1);
     if (customer) {
       add(customer.email, 'Client');

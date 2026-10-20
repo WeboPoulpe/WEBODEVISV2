@@ -1,6 +1,7 @@
 'use server';
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { ingredients, prestations, profiles, quotes, service_ingredients } from '@/db/schema';
 import { allergenSheet, type AllergenSheetRow } from '@/lib/allergens';
@@ -28,7 +29,7 @@ export async function getQuoteAllergenSheet(quoteId: string): Promise<QuoteAller
   const owner = q.owner_user_id ?? q.user_id ?? user.id;
 
   const catalog = await db.select({ id: prestations.id, name: prestations.name, allergens_extra: prestations.allergens_extra, allergens_checked: prestations.allergens_checked })
-    .from(prestations).where(eq(prestations.user_id, owner));
+    .from(prestations).where(sql`${prestations.user_id} in ${companyIdsOf(owner)}`);
   const recipe = catalog.length === 0 ? [] : await db
     .select({ service_id: service_ingredients.service_id, name: ingredients.name, allergens: ingredients.allergens })
     .from(service_ingredients)

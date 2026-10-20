@@ -1,6 +1,7 @@
 'use server';
 
 import { sql, type SQL } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { addDays, parisToday, relativeDay } from '@/lib/dashboard';
 import { checklistProgress, materialProgress } from '@/lib/events/prep';
@@ -47,6 +48,8 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
   const on = (m: string) => modules.includes(m);
 
   // Devis de l'entreprise (mêmes droits que la règle « quotes » de server/compat/rules.ts).
+  // Comptes de l'entreprise : catalogue, stock, extras et commandes sont partagés entre collaborateurs.
+  const team = companyIdsOf(uid);
   const access = sql`(q.user_id = ${uid} or q.owner_user_id = ${uid} or q.owner_user_id in (select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${uid}::uuid)))`;
   const upcomingConfirmed = sql`${access} and q.status in (${list(CONFIRMED_STATUSES)}) and q.event_date >= ${today}::date`;
   const when = (iso: string) => relativeDay(iso, today);
@@ -135,7 +138,7 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
 
     case 'prospects': {
       if (!on('prospects')) return null;
-      const mine = sql`(p.owner_user_id = ${uid} or p.user_token in (select k.token from public.user_prospect_tokens k where k.user_id = ${uid}))`;
+      const mine = sql`(p.owner_user_id in ${team} or p.user_token in (select k.token from public.user_prospect_tokens k where k.user_id in ${team}))`;
       const fresh = sql`${mine} and p.status = 'nouveau' and not exists (select 1 from public.quotes pq where pq.prospect_id = p.id::text)`;
       const [latest, [count]] = await Promise.all([
         rows<{ id: string; who: string; event_type: string | null; event_date: string | null; guest_count: number | null; created_day: string }>(sql`
@@ -163,9 +166,9 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
           select c.id, c.email, c.customer_type::text as customer_type,
             case when c.customer_type = 'entreprise' then coalesce(nullif(trim(c.company_name), ''), c.email)
               else coalesce(nullif(trim(coalesce(c.first_name, '') || ' ' || coalesce(c.last_name, '')), ''), c.email) end as name
-          from public.customers c where c.owner_user_id = ${uid}
+          from public.customers c where c.owner_user_id in ${team}
           order by c.created_at desc limit 3`),
-        rows<{ n: number }>(sql`select count(*)::int as n from public.customers c where c.owner_user_id = ${uid}`),
+        rows<{ n: number }>(sql`select count(*)::int as n from public.customers c where c.owner_user_id in ${team}`),
       ]);
       return {
         title: 'Clients récents',
@@ -180,7 +183,7 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
 
     case 'stock': {
       if (!on('stock')) return null;
-      const low = sql`i.user_id = ${uid} and coalesce(i.min_stock_alert, 0) > 0 and coalesce(i.stock_quantity, 0) <= i.min_stock_alert`;
+      const low = sql`i.user_id in ${team} and coalesce(i.min_stock_alert, 0) > 0 and coalesce(i.stock_quantity, 0) <= i.min_stock_alert`;
       const [items, [count]] = await Promise.all([
         rows<{ id: string; name: string; stock_quantity: number | null; min_stock_alert: number | null; unit: string | null }>(sql`
           select i.id, i.name, i.stock_quantity::float as stock_quantity, i.min_stock_alert::float as min_stock_alert, i.unit
@@ -203,7 +206,7 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
 
     case 'extras': {
       if (!on('extras')) return null;
-      const waiting = sql`e.user_id = ${uid} and ee.status = 'a_solliciter' and ${upcomingConfirmed}`;
+      const waiting = sql`e.user_id in ${team} and ee.status = 'a_solliciter' and ${upcomingConfirmed}`;
       const [items, [count]] = await Promise.all([
         rows<{ id: string; quote_id: string; extra: string; role: string | null; client_name: string; event_date: string }>(sql`
           select ee.id, ee.quote_id, e.name as extra, e.role, q.client_name, q.event_date::text as event_date
@@ -235,9 +238,9 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
         rows<{ id: string; supplier: string | null; ordered_day: string | null }>(sql`
           select o.id, s.name as supplier, (coalesce(o.ordered_at, o.created_at) at time zone 'Europe/Paris')::date::text as ordered_day
           from public.supplier_orders o left join public.suppliers s on s.id = o.supplier_id
-          where o.user_id = ${uid} and o.status = 'sent'
+          where o.user_id in ${team} and o.status = 'sent'
           order by o.ordered_at limit 3`),
-        rows<{ n: number }>(sql`select count(*)::int as n from public.supplier_orders o where o.user_id = ${uid} and o.status = 'sent'`),
+        rows<{ n: number }>(sql`select count(*)::int as n from public.supplier_orders o where o.user_id in ${team} and o.status = 'sent'`),
       ]);
       return {
         title: 'Envoyées, pas encore reçues',

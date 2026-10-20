@@ -33,10 +33,14 @@ const company: Predicate = (t, u) => `${t}.owner_user_id in ${companyMembers(u)}
 const quoteAccess: Predicate = (t, u) => `(${t}.user_id = ${u} or ${t}.owner_user_id = ${u} or ${company(t, u)})`;
 const viaQuote: Predicate = (t, u) =>
   `exists (select 1 from public.quotes pq where pq.id = ${t}.quote_id and ${quoteAccess('pq', u)})`;
-const globalOrOwn: Predicate = (t, u) => `(${t}.user_id is null or ${t}.user_id = ${u})`;
+// Ligne d'un des comptes de l'entreprise : le catalogue, le stock, les extras… sont partagés entre collaborateurs
+// (décision du 2026-10-20 : un collaborateur travaille sur le même catalogue que le titulaire).
+const team = (column: string): Predicate => (t, u) => `${t}.${column} in ${companyMembers(u)}`;
+const globalOrTeam: Predicate = (t, u) => `(${t}.user_id is null or ${team('user_id')(t, u)})`;
 // Une ligne écrite ne peut pointer que vers des lignes que l'utilisateur a le droit de voir.
 const readableIngredient = (col: string): Predicate => (t, u) =>
-  `exists (select 1 from public.ingredients pi where pi.id = ${t}.${col} and (pi.user_id is null or pi.user_id = ${u}))`;
+  `exists (select 1 from public.ingredients pi where pi.id = ${t}.${col} and (pi.user_id is null or pi.user_id in ${companyMembers(u)}))`;
+const teamOrder = (t: string, u: string) => `exists (select 1 from public.supplier_orders po where po.id = ${t} and po.user_id in ${companyMembers(u)})`;
 const both = (p: Predicate): Pick<TableRule, 'read' | 'write'> => ({ read: p, write: p });
 
 const ALL: Op[] = ['select', 'insert', 'update', 'delete'];
@@ -59,17 +63,17 @@ export const RULES: Record<string, TableRule> = {
     admin: ['select', 'update'],
     adminOnlyColumns: ['modules', 'role', 'is_active', 'deletion_requested_at', 'company_role', 'ical_token', 'subscription_type', 'subscription_plan', 'max_linked_users', 'parent_user_id', 'can_view_all_company_data'],
   },
-  prestations: both(own('user_id')),
-  prestation_categories: { read: globalOrOwn, write: own('user_id'), adminWrite: (t) => `${t}.user_id is null` },
-  prestation_subcategories: { read: globalOrOwn, write: own('user_id'), adminWrite: (t) => `${t}.user_id is null` },
+  prestations: both(team('user_id')),
+  prestation_categories: { read: globalOrTeam, write: team('user_id'), adminWrite: (t) => `${t}.user_id is null` },
+  prestation_subcategories: { read: globalOrTeam, write: team('user_id'), adminWrite: (t) => `${t}.user_id is null` },
   services: both(company),
   quote_services: both(viaQuote),
-  quote_folders: { ...both(own('owner_user_id')), admin: ALL },
+  quote_folders: { ...both(team('owner_user_id')), admin: ALL },
   quote_templates: both((t, u) => `(${t}.owner_user_id = ${u} or ${t}.user_id = ${u})`),
-  devis_templates: both(own('user_id')),
+  devis_templates: both(team('user_id')),
   prospect_requests: {
     ...both((t, u) =>
-      `(${t}.owner_user_id = ${u} or ${t}.user_token in (select k.token from public.user_prospect_tokens k where k.user_id = ${u}))`),
+      `(${t}.owner_user_id in ${companyMembers(u)} or ${t}.user_token in (select k.token from public.user_prospect_tokens k where k.user_id in ${companyMembers(u)}))`),
     admin: ALL,
     anonInsert: (t) =>
       `exists (select 1 from public.user_prospect_tokens k where k.token = ${t}.user_token and k.is_active and (${t}.owner_user_id is null or ${t}.owner_user_id = k.user_id))`,
@@ -80,39 +84,38 @@ export const RULES: Record<string, TableRule> = {
   },
   notifications: both(own('user_id')),
   suppliers: both((t, u) => `(${t}.user_id = ${u} or ${company(t, u)})`),
-  ingredients: { read: globalOrOwn, write: own('user_id') },
+  ingredients: { read: globalOrTeam, write: team('user_id') },
   service_ingredients: {
-    read: own('user_id'),
+    read: team('user_id'),
     write: (t, u) =>
-      `(${t}.user_id = ${u} and exists (select 1 from public.prestations pp where pp.id = ${t}.service_id and pp.user_id = ${u}) and ${readableIngredient('ingredient_id')(t, u)})`,
+      `(${team('user_id')(t, u)} and exists (select 1 from public.prestations pp where pp.id = ${t}.service_id and pp.user_id in ${companyMembers(u)}) and ${readableIngredient('ingredient_id')(t, u)})`,
   },
-  service_materials: both(own('user_id')),
+  service_materials: both(team('user_id')),
   stock_movements: {
-    read: own('user_id'),
+    read: team('user_id'),
     write: (t, u) =>
-      `(${t}.user_id = ${u} and ${readableIngredient('ingredient_id')(t, u)}`
+      `(${team('user_id')(t, u)} and ${readableIngredient('ingredient_id')(t, u)}`
       + ` and (${t}.event_id is null or exists (select 1 from public.quotes pq where pq.id = ${t}.event_id and ${quoteAccess('pq', u)}))`
-      + ` and (${t}.order_id is null or exists (select 1 from public.supplier_orders po where po.id = ${t}.order_id and po.user_id = ${u})))`,
+      + ` and (${t}.order_id is null or ${teamOrder(`${t}.order_id`, u)}))`,
   },
-  supplier_orders: both(own('user_id')),
-  supplier_order_items: both((t, u) =>
-    `exists (select 1 from public.supplier_orders po where po.id = ${t}.order_id and po.user_id = ${u})`),
-  extras: both(own('user_id')),
-  // L'extra ET le devis doivent appartenir à l'utilisateur : sinon la page mission de l'extra
+  supplier_orders: both(team('user_id')),
+  supplier_order_items: both((t, u) => teamOrder(`${t}.order_id`, u)),
+  extras: both(team('user_id')),
+  // L'extra ET le devis doivent appartenir à l'entreprise : sinon la page mission de l'extra
   // exposerait le devis (et la liste de courses) d'un autre compte.
   event_extras: both((t, u) =>
-    `(exists (select 1 from public.extras pe where pe.id = ${t}.extra_id and pe.user_id = ${u}) and ${viaQuote(t, u)})`),
+    `(exists (select 1 from public.extras pe where pe.id = ${t}.extra_id and pe.user_id in ${companyMembers(u)}) and ${viaQuote(t, u)})`),
   event_ingredients: both(viaQuote),
   // Accords signés en ligne : lisibles par le traiteur, écrits seulement par le serveur (page publique).
   quote_acceptances: { read: viaQuote, write: () => 'false' },
   rental_items: both(viaQuote),
-  rental_templates: both(own('user_id')),
-  rental_template_sets: both(own('user_id')),
-  material_presets: both(own('user_id')),
-  material_template_sets: both(own('user_id')),
-  // Un article ne peut entrer que dans un de ses propres modèles.
+  rental_templates: both(team('user_id')),
+  rental_template_sets: both(team('user_id')),
+  material_presets: both(team('user_id')),
+  material_template_sets: both(team('user_id')),
+  // Un article ne peut entrer que dans un modèle de l'entreprise.
   material_templates: {
-    read: own('user_id'),
-    write: (t, u) => `(${t}.user_id = ${u} and exists (select 1 from public.material_template_sets ms where ms.id = ${t}.set_id and ms.user_id = ${u}))`,
+    read: team('user_id'),
+    write: (t, u) => `(${team('user_id')(t, u)} and exists (select 1 from public.material_template_sets ms where ms.id = ${t}.set_id and ms.user_id in ${companyMembers(u)}))`,
   },
 };

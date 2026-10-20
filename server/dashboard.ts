@@ -1,6 +1,7 @@
 'use server';
 
 import { sql, type SQL } from 'drizzle-orm';
+import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import {
   addDays, bucketOf, daysBetween, longDate, parisToday, relativeDay,
@@ -63,6 +64,8 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
   const on = (key: string) => modules.includes(key);
 
   // Devis de l'entreprise (mêmes droits que la règle « quotes » de server/compat/rules.ts).
+  // Comptes de l'entreprise : catalogue, stock, extras et commandes sont partagés entre collaborateurs.
+  const team = companyIdsOf(uid);
   const access = sql`(q.user_id = ${uid} or q.owner_user_id = ${uid} or q.owner_user_id in (select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${uid}::uuid)))`;
   const confirmedIn = list(CONFIRMED_STATUSES);
   const upcomingConfirmed = sql`${access} and q.status in (${confirmedIn}) and q.event_date >= ${today}::date`;
@@ -77,7 +80,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
     from public.event_extras ee
     join public.extras e on e.id = ee.extra_id
     join public.quotes q on q.id = ee.quote_id
-    where e.user_id = ${uid} and ${access} and q.status in (${confirmedIn})
+    where e.user_id in ${team} and ${access} and q.status in (${confirmedIn})
       and q.event_date >= ${yearStart}::date and q.event_date < ${`${+today.slice(0, 4) + 1}-01-01`}::date`)
     .catch(() => null);
 
@@ -102,7 +105,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
         ${paris(sql`p.created_at`)} as created_day,
         exists (select 1 from public.quotes pq where pq.prospect_id = p.id::text) as linked
       from public.prospect_requests p
-      where (p.owner_user_id = ${uid} or p.user_token in (select k.token from public.user_prospect_tokens k where k.user_id = ${uid}))
+      where (p.owner_user_id in ${team} or p.user_token in (select k.token from public.user_prospect_tokens k where k.user_id in ${team}))
         and (p.created_at >= ${monthStart}::date or p.status = 'nouveau')
       order by p.created_at
       limit 300`) : none,
@@ -111,8 +114,8 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
       from public.event_extras ee
       join public.extras e on e.id = ee.extra_id
       join public.quotes q on q.id = ee.quote_id
-      where e.user_id = ${uid} and ${upcomingConfirmed}`) : none,
-    on('evenements') && on('extras') ? rows<{ n: number }>(sql`select count(*)::int as n from public.extras where user_id = ${uid}`) : none,
+      where e.user_id in ${team} and ${upcomingConfirmed}`) : none,
+    on('evenements') && on('extras') ? rows<{ n: number }>(sql`select count(*)::int as n from public.extras where user_id in ${team}`) : none,
     on('evenements') ? rows<{ quote_id: string; total: number; todo: number }>(sql`
       select ei.quote_id, count(*)::int as total, count(*) filter (where not ei.checked)::int as todo
       from public.event_ingredients ei join public.quotes q on q.id = ei.quote_id
@@ -123,11 +126,11 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
       from public.rental_items ri join public.quotes q on q.id = ri.quote_id
       where ${upcomingConfirmed} group by ri.quote_id`) : none,
     on('evenements') ? rows<{ used: boolean }>(sql`
-      select (exists (select 1 from public.rental_templates where user_id = ${uid})
-        or exists (select 1 from public.rental_template_sets where user_id = ${uid})) as used`) : none,
+      select (exists (select 1 from public.rental_templates where user_id in ${team})
+        or exists (select 1 from public.rental_template_sets where user_id in ${team})) as used`) : none,
     on('stock') ? rows<{ name: string }>(sql`
       select name from public.ingredients
-      where user_id = ${uid} and coalesce(min_stock_alert, 0) > 0 and coalesce(stock_quantity, 0) <= min_stock_alert
+      where user_id in ${team} and coalesce(min_stock_alert, 0) > 0 and coalesce(stock_quantity, 0) <= min_stock_alert
       order by name`) : none,
     on('stock') ? rows<{ id: string; supplier: string | null; ordered_day: string | null; event_id: string | null; event_date: string | null; client: string | null }>(sql`
       select o.id, s.name as supplier, ${paris(sql`coalesce(o.ordered_at, o.created_at)`)} as ordered_day,
@@ -135,7 +138,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
       from public.supplier_orders o
       left join public.suppliers s on s.id = o.supplier_id
       left join public.quotes q on q.id = o.event_id
-      where o.user_id = ${uid} and o.status = 'sent'
+      where o.user_id in ${team} and o.status = 'sent'
       order by o.ordered_at`) : none,
     rows<{ id: string; title: string; message: string; type: string; action_url: string | null; created_day: string }>(sql`
       select n.id, n.title, n.message, n.type, n.action_url, ${paris(sql`n.created_at`)} as created_day
@@ -147,7 +150,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
       order by n.created_at desc limit 10`),
     // Prix de revient du catalogue, pour la marge estimée (rapprochement des lignes par leur nom).
     rows<{ name: string; cost: string | null }>(sql`
-      select name, cost_price::text as cost from public.prestations where user_id = ${uid} and coalesce(cost_price, 0) > 0`),
+      select name, cost_price::text as cost from public.prestations where user_id in ${team} and coalesce(cost_price, 0) > 0`),
     staffQuery,
   ]);
 
