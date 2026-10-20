@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Carrot, Plus, Pencil, Trash2, Search, Loader2, Check,
-  ChevronDown, ChevronRight, X, UploadCloud, ImagePlus,
+  ChevronDown, ChevronRight, X, UploadCloud, ImagePlus, Info,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { ErrorBanner } from '@/components/evenements/shared';
+import AllergenPicker from '@/components/allergens/AllergenPicker';
+import AllergenBadges from '@/components/allergens/AllergenBadges';
+import { ingredientAllergens, sortAllergens, suggestAllergens, type AllergenKey } from '@/lib/allergens';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Ingredient {
@@ -25,6 +28,8 @@ interface Ingredient {
   /** Auteur et licence de la photo, quand elle vient d'une banque d'images libres. */
   image_credit?: string | null;
   off_product_id: string | null;
+  /** Allergènes cochés : null = pas encore renseignés (on suggère d'après le nom), [] = aucun, confirmé. */
+  allergens?: string[] | null;
 }
 
 interface Supplier {
@@ -155,9 +160,11 @@ async function searchOFF(query: string): Promise<OFFResult[]> {
 
 // ── Fiche d'un ingrédient ─────────────────────────────────────────────────────
 function IngredientModal({
-  initial, onSave, onClose,
+  initial, onSave, onClose, allergensReady,
 }: {
   initial: Partial<Ingredient> | null;
+  /** La colonne des allergènes existe en base (migration 0020 appliquée). */
+  allergensReady: boolean;
   /** Renvoie un message d'erreur, ou null si l'enregistrement a réussi. */
   onSave: (data: Partial<Ingredient>) => Promise<string | null>;
   onClose: () => void;
@@ -182,6 +189,12 @@ function IngredientModal({
   }, []);
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState<string | null>(null);
+
+  // Allergènes : ceux déjà renseignés, sinon des suggestions tirées du nom (suivent le nom tant qu'on n'y touche pas).
+  const [pickedAllergens, setPickedAllergens] = useState<AllergenKey[] | null>(
+    Array.isArray(initial?.allergens) ? sortAllergens(initial.allergens) : null,
+  );
+  const allergenKeys = pickedAllergens ?? suggestAllergens(name);
 
   // Suggestions Open Food Facts pendant la saisie du nom
   const [offResults, setOffResults] = useState<OFFResult[]>([]);
@@ -227,6 +240,8 @@ function IngredientModal({
       min_stock_alert: parseFloat(minStockAlert) || 0,
       volume_unit_price: parseFloat(volumeUnitPrice) || 0,
       preferred_supplier_id: preferredSupplierId || null,
+      // Enregistrer la fiche valide la liste affichée, suggestions comprises.
+      ...(allergensReady ? { allergens: sortAllergens(allergenKeys) } : {}),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
     setSaving(false);
@@ -311,6 +326,29 @@ function IngredientModal({
             placeholder="Volaille, Fromage, Champignons" className={inputCls} />
         </div>
 
+        {allergensReady && (
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className={cn(labelCls, 'mb-0')} id="ing-allergens">Allergènes</p>
+              {allergenKeys.length > 0 && (
+                <button type="button" onClick={() => setPickedAllergens([])}
+                  className="-mr-2 h-10 px-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                  Aucun allergène
+                </button>
+              )}
+            </div>
+            <AllergenPicker
+              label="Allergènes de l’ingrédient"
+              value={allergenKeys}
+              suggested={pickedAllergens ? [] : allergenKeys}
+              onChange={setPickedAllergens}
+            />
+            {pickedAllergens?.length === 0 && (
+              <p className="text-sm text-gray-500 mt-2">Aucun allergène pour cet ingrédient.</p>
+            )}
+          </div>
+        )}
+
         <div>
           <label htmlFor="ing-supplier" className={labelCls}>Fournisseur préféré</label>
           <select id="ing-supplier" value={preferredSupplierId} onChange={(e) => setPreferredSupplierId(e.target.value)} className={inputCls}>
@@ -336,6 +374,25 @@ function IngredientModal({
         </div>
 
         {error && <p role="alert" className={errorCls}>{error}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+// ── Allergènes d'un ingrédient commun (lecture seule) ───────────────────────
+function LibraryAllergensModal({ ing, onClose }: { ing: Ingredient; onClose: () => void }) {
+  const { keys, suggested } = ingredientAllergens({ name: ing.name, allergens: ing.allergens });
+  return (
+    <Modal title={ing.name} onClose={onClose} footer={<button onClick={onClose} className={btnPrimary}>Fermer</button>}>
+      <div className="space-y-3 pb-3">
+        <p className="text-[15px] text-gray-700">
+          {suggested
+            ? 'Ingrédient commun : allergènes suggérés d’après le nom. Vérifiez-les dans vos prestations.'
+            : 'Ingrédient commun : vérifiez ses allergènes dans vos prestations.'}
+        </p>
+        {keys.length > 0
+          ? <AllergenPicker readOnly label="Allergènes suggérés" value={keys} suggested={suggested ? keys : []} />
+          : <p className="text-sm text-gray-500">Aucun allergène repéré d’après le nom.</p>}
       </div>
     </Modal>
   );
@@ -398,9 +455,10 @@ function SupplierRow({
 }
 
 // ── Ligne d'un ingrédient ─────────────────────────────────────────────────────
-function IngredientRow({ ing, onEdit, onDelete }: { ing: Ingredient; onEdit: () => void; onDelete: () => void }) {
+function IngredientRow({ ing, onEdit, onDelete, onView }: { ing: Ingredient; onEdit: () => void; onDelete: () => void; onView: () => void }) {
   const mine = ing.user_id !== null;
   const meta = [ing.sub_category, ing.unit].filter(Boolean).join(', ');
+  const allergens = ingredientAllergens({ name: ing.name, allergens: ing.allergens });
   const content = (
     <>
       <span className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -418,6 +476,7 @@ function IngredientRow({ ing, onEdit, onDelete }: { ing: Ingredient; onEdit: () 
           {!mine && <span className={cn(pill, 'bg-gray-100 text-gray-600')}>Bibliothèque</span>}
         </span>
         {meta && <span className="block text-sm text-gray-500 truncate">{meta}</span>}
+        <AllergenBadges keys={allergens.keys} suggested={allergens.suggested} max={3} className="mt-1" />
       </span>
       {ing.category && <span className="hidden lg:block w-40 text-sm text-gray-500 truncate">{ing.category}</span>}
     </>
@@ -425,6 +484,9 @@ function IngredientRow({ ing, onEdit, onDelete }: { ing: Ingredient; onEdit: () 
   return (
     <li className="flex items-center gap-1 pr-2">
       <div className="flex-1 min-w-0 flex items-center gap-3 sm:gap-4 pl-4 sm:pl-5 py-2.5">{content}</div>
+      {!mine && (
+        <button onClick={onView} className={iconBtn} aria-label={`Allergènes de ${ing.name}`} title="Allergènes"><Info className="h-4 w-4" /></button>
+      )}
       {mine && (
         <>
           <button onClick={onEdit} className={iconBtn} aria-label={`Modifier ${ing.name}`} title="Modifier"><Pencil className="h-4 w-4" /></button>
@@ -446,6 +508,9 @@ export default function IngredientsPage() {
   const [search,      setSearch]      = useState('');
   const [catFilter,   setCatFilter]   = useState('Tous');
   const [modal,       setModal]       = useState<{ open: boolean; item: Partial<Ingredient> | null }>({ open: false, item: null });
+  const [viewing,     setViewing]     = useState<Ingredient | null>(null);
+  // Tant que la migration des allergènes n'est pas appliquée, la colonne manque : on n'affiche pas leur saisie.
+  const [allergensReady, setAllergensReady] = useState(false);
   // Actions rapides du menu (lib/navMega.ts). Le sélecteur de fichier s'ouvre grâce au clic fait dans le menu.
   useUrlAction({
     nouveau: () => setModal({ open: true, item: null }),
@@ -502,13 +567,15 @@ export default function IngredientsPage() {
     if (!user) return;
     setLoading(true);
     const supabase = createClient();
-    const [ings, sups] = await Promise.all([
+    const [ings, sups, probe] = await Promise.all([
       supabase.from('ingredients').select('*')
         .or(`user_id.is.null,user_id.eq.${user.id}`)
         .order('category', { nullsFirst: false })
         .order('name'),
       supabase.from('suppliers').select('*').order('name'),
+      supabase.from('ingredients').select('allergens').limit(1),
     ]);
+    setAllergensReady(!probe.error);
     if (ings.error || sups.error) setError('Vos ingrédients n’ont pas pu être chargés. Rechargez la page.');
     setIngredients((ings.data as Ingredient[]) ?? []);
     setSuppliers((sups.data as Supplier[]) ?? []);
@@ -711,7 +778,7 @@ export default function IngredientsPage() {
               )}
               <ul className={cn(cardCls, 'divide-y divide-gray-100 overflow-hidden')}>
                 {g.items.map((ing) => (
-                  <IngredientRow key={ing.id} ing={ing} onEdit={() => setModal({ open: true, item: ing })} onDelete={() => deleteIngredient(ing)} />
+                  <IngredientRow key={ing.id} ing={ing} onEdit={() => setModal({ open: true, item: ing })} onDelete={() => deleteIngredient(ing)} onView={() => setViewing(ing)} />
                 ))}
               </ul>
             </section>
@@ -774,8 +841,11 @@ export default function IngredientsPage() {
           initial={modal.item}
           onSave={saveIngredient}
           onClose={() => setModal({ open: false, item: null })}
+          allergensReady={allergensReady}
         />
       )}
+
+      {viewing && <LibraryAllergensModal ing={viewing} onClose={() => setViewing(null)} />}
 
       {showCsvModal && (
         <CsvImportModal

@@ -13,6 +13,8 @@ import { PENDING_STATUSES } from '@/lib/quoteStatus';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { usePrestationCategories } from '@/hooks/usePrestationCategories';
+import AllergenPicker from '@/components/allergens/AllergenPicker';
+import { ALLERGEN_LABELS, ingredientAllergens, prestationAllergens, sortAllergens, type AllergenKey } from '@/lib/allergens';
 
 // Page d'une prestation du catalogue : création (/prestations/nouvelle) et modification (/prestations/[id]).
 // Grand écran : le formulaire à gauche, l'aperçu dans un devis à droite (colonne collante).
@@ -33,6 +35,9 @@ export interface PrestationRecord {
   description: string | null;
   is_option: boolean;
   gastro_card_html?: string | null;
+  /** Absents tant que la migration 0020 n'est pas appliquée. */
+  allergens_extra?: string[] | null;
+  allergens_checked?: boolean | null;
 }
 
 interface IngredientLink {
@@ -40,8 +45,15 @@ interface IngredientLink {
   ingredient_id: string;
   qty_per_person: number;
   unit: string | null;
-  ingredient: { id: string; name: string; unit: string | null };
+  ingredient: { id: string; name: string; unit: string | null; allergens?: string[] | null };
 }
+
+/** Ingrédient de la recette, tel que le calcul des allergènes le lit. */
+type RecipeItem = { name: string; allergens: string[] | null | undefined };
+
+// Sélection des liens de la recette. Sans la colonne des allergènes (migration pas encore appliquée), on s'en passe.
+const LINK_SELECT = 'id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit, allergens)';
+const LINK_SELECT_OLD = 'id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)';
 
 interface IngredientOption {
   id: string;
@@ -98,8 +110,13 @@ function Section({ title, hint, children, id }: { title: string; hint?: React.Re
 }
 
 // ── Ingrédients liés (modification seulement) ────────────────────────────────
-function IngredientsSection({ prestationId, userId }: { prestationId: string; userId: string }) {
+function IngredientsSection({ prestationId, userId, onRecipe }: {
+  prestationId: string; userId: string;
+  /** Recette à jour, pour le calcul des allergènes. */
+  onRecipe: (items: RecipeItem[]) => void;
+}) {
   const [links, setLinks] = useState<IngredientLink[]>([]);
+  const [linkSelect, setLinkSelect] = useState(LINK_SELECT);
   const [loadingLinks, setLoadingLinks] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
@@ -110,15 +127,22 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
   const [error, setError] = useState<string | null>(null);
 
   const loadLinks = useCallback(async () => {
-    const { data } = await createClient()
-      .from('service_ingredients')
-      .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
-      .eq('service_id', prestationId);
-    setLinks((data ?? []) as unknown as IngredientLink[]);
+    const supabase = createClient();
+    let res = await supabase.from('service_ingredients').select(LINK_SELECT).eq('service_id', prestationId);
+    if (res.error) {
+      res = await supabase.from('service_ingredients').select(LINK_SELECT_OLD).eq('service_id', prestationId);
+      if (!res.error) setLinkSelect(LINK_SELECT_OLD);
+    }
+    setLinks((res.data ?? []) as unknown as IngredientLink[]);
     setLoadingLinks(false);
   }, [prestationId]);
 
   useEffect(() => { loadLinks(); }, [loadLinks]);
+
+  // La recette change (chargement, ajout, retrait) : le calcul des allergènes suit.
+  useEffect(() => {
+    if (!loadingLinks) onRecipe(links.map((l) => ({ name: l.ingredient.name, allergens: l.ingredient.allergens })));
+  }, [links, loadingLinks, onRecipe]);
 
   useEffect(() => {
     if (!showAdd || search.trim().length < 2) { setOptions([]); return; }
@@ -141,7 +165,7 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
     const { data, error } = await createClient()
       .from('service_ingredients')
       .insert({ service_id: prestationId, ingredient_id: selected.id, qty_per_person: amount && amount > 0 ? amount : 1, unit: selected.unit || null, user_id: userId })
-      .select('id, ingredient_id, qty_per_person, unit, ingredient:ingredients(id, name, unit)')
+      .select(linkSelect)
       .single();
     setSaving(false);
     if (error) { setError('L’ingrédient n’a pas pu être lié. Réessayez.'); return; }
@@ -233,6 +257,87 @@ function IngredientsSection({ prestationId, userId }: { prestationId: string; us
   );
 }
 
+// ── Allergènes ───────────────────────────────────────────────────────────────
+function AllergensSection({ recipe, extra, onExtra, checked, onChecked, isNew }: {
+  /** null tant que la recette se charge. */
+  recipe: RecipeItem[] | null;
+  extra: AllergenKey[];
+  onExtra: (keys: AllergenKey[]) => void;
+  checked: boolean;
+  onChecked: (v: boolean) => void;
+  isNew: boolean;
+}) {
+  const items = recipe ?? [];
+  const all = prestationAllergens({ name: '', allergens_extra: extra, ingredients: items });
+  const fromRecipe = prestationAllergens({ name: '', ingredients: items });
+  // Allergènes qui ne viennent que de suggestions par le nom (ni confirmés sur un ingrédient, ni ajoutés à la main).
+  const confirmed = new Set<string>(extra);
+  for (const ing of items) {
+    const r = ingredientAllergens(ing);
+    if (!r.suggested) r.keys.forEach((k) => confirmed.add(k));
+  }
+  const hint = Object.fromEntries(Object.entries(fromRecipe.sources).map(([k, v]) => [k, (v ?? []).join(', ')]));
+
+  return (
+    <Section id="presta-allergens" title="Allergènes" hint="Ceux des ingrédients de la recette, et ceux que vous ajoutez à la main.">
+      {recipe === null ? (
+        <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-gray-400" /></div>
+      ) : (
+        <>
+          {all.keys.length === 0 ? (
+            <p className="text-[15px] text-gray-600">Aucun allergène pour le moment.</p>
+          ) : (
+            <ul className="space-y-1.5" aria-label="Allergènes de la prestation">
+              {all.keys.map((k) => {
+                const sugg = !confirmed.has(k);
+                return (
+                  <li key={k} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className={cn(pill, 'border', sugg ? 'border-dashed border-primary-400 bg-white text-primary-800' : 'border-primary-100 bg-primary-50 text-primary-800')}>
+                      {ALLERGEN_LABELS[k]}
+                    </span>
+                    <span className="text-sm text-gray-500 min-w-0">
+                      {(all.sources[k] ?? []).join(', ')}{sugg && ' (suggéré d’après le nom)'}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {all.hasSuggestions && (
+            <p className="rounded-xl bg-primary-50 border border-primary-100 px-4 py-3 text-[15px] text-gray-800">
+              Certains allergènes sont suggérés d’après le nom des ingrédients : vérifiez-les.
+            </p>
+          )}
+
+          <div>
+            <p className={labelCls}>Ajouter à la main</p>
+            <AllergenPicker
+              label="Allergènes ajoutés à la main"
+              value={extra}
+              onChange={onExtra}
+              locked={fromRecipe.keys}
+              lockedHint={hint}
+            />
+            <p className="text-sm text-gray-500 mt-2">
+              {isNew
+                ? 'Une fois la prestation ajoutée, liez ses ingrédients : leurs allergènes viendront s’ajouter ici.'
+                : 'Un allergène apporté par un ingrédient reste coché : retirez l’ingrédient ou corrigez-le dans Ingrédients.'}
+            </p>
+          </div>
+
+          <label className="flex items-center gap-3 min-h-10 cursor-pointer select-none">
+            <input
+              type="checkbox" checked={checked} onChange={(e) => onChecked(e.target.checked)}
+              className="h-5 w-5 rounded border-gray-300 accent-primary flex-shrink-0"
+            />
+            <span className="text-[15px] text-gray-700">J’ai vérifié les allergènes de cette prestation</span>
+          </label>
+        </>
+      )}
+    </Section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 /** Charge la prestation (ou rien, pour une création), puis affiche le formulaire. */
 export default function PrestationEditor({ id }: { id?: string }) {
@@ -294,6 +399,8 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     subCategoryId: initial?.sub_category_id ?? '',
     description: initial?.description ?? '',
     isOption: initial?.is_option ?? false,
+    extra: sortAllergens(initial?.allergens_extra ?? []).join(','),
+    checked: !!initial?.allergens_checked,
   }));
   const [name, setName] = useState(startValues.name);
   const [price, setPrice] = useState(startValues.price);
@@ -312,6 +419,36 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
   const [description, setDescription] = useState(startValues.description);
   const [isOption, setIsOption] = useState(startValues.isOption);
   const gastroHtml = initial?.gastro_card_html?.trim() ? initial.gastro_card_html : null;
+
+  // ── Allergènes ─────────────────────────────────────────────────────────────
+  // Colonnes présentes en base ? (migration 0020) Une fiche chargée le dit ; une création demande à la base.
+  const [allergensReady, setAllergensReady] = useState(initial ? 'allergens_checked' in initial : false);
+  useEffect(() => {
+    if (initial) return;
+    createClient().from('prestations').select('allergens_checked').limit(1).then(({ error }) => setAllergensReady(!error));
+  }, [initial]);
+  const [extra, setExtra] = useState<AllergenKey[]>(() => sortAllergens(initial?.allergens_extra ?? []));
+  /** Recette (null tant qu'elle se charge ; vide pour une création). */
+  const [recipe, setRecipe] = useState<RecipeItem[] | null>(initial ? null : []);
+  const onRecipe = useCallback((items: RecipeItem[]) => setRecipe(items), []);
+  const allergenKeys = prestationAllergens({ name, allergens_extra: extra, ingredients: recipe ?? [] }).keys.join(',');
+  const recipeKeys = recipe ? prestationAllergens({ name, ingredients: recipe }).keys.join(',') : null;
+  // « Vérifié » vaut pour une liste précise : si la liste change, la case se décoche d'elle-même.
+  const [checkedFor, setCheckedFor] = useState<string | null | undefined>(initial ? undefined : null);
+  useEffect(() => {
+    if (recipe && checkedFor === undefined) setCheckedFor(initial?.allergens_checked ? allergenKeys : null);
+  }, [recipe, checkedFor, initial, allergenKeys]);
+  const allergensChecked = checkedFor === undefined ? !!initial?.allergens_checked : checkedFor === allergenKeys;
+  // La recette s'enregistre à chaque lien : si elle change les allergènes d'une prestation vérifiée, la base le sait tout de suite.
+  const recipeStart = useRef<string | null>(null);
+  const dbChecked = useRef(!!initial?.allergens_checked);
+  useEffect(() => {
+    if (recipeKeys === null) return;
+    if (recipeStart.current === null) { recipeStart.current = recipeKeys; return; }
+    if (recipeKeys === recipeStart.current || !dbChecked.current || !initial || !allergensReady) return;
+    dbChecked.current = false;
+    createClient().from('prestations').update({ allergens_checked: false }).eq('id', initial.id).then(() => {});
+  }, [recipeKeys, initial, allergensReady]);
   const [saving, setSaving] = useState<null | 'list' | 'fiche'>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -421,6 +558,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     name !== startValues.name || price !== startValues.price || childPrice !== startValues.childPrice ||
     costPrice !== startValues.costPrice || categoryId !== startValues.categoryId || subCategoryId !== startValues.subCategoryId ||
     description !== startValues.description || isOption !== startValues.isOption ||
+    (allergensReady && (extra.join(',') !== startValues.extra || allergensChecked !== startValues.checked)) ||
     (creatingCat && !!newCatName.trim()) || (creatingSubCat && !!newSubCatName.trim());
 
   // Quitter la page avec une saisie non enregistrée : fermeture de l'onglet, rechargement, ou lien de l'application.
@@ -493,12 +631,15 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
       description: description.trim() || null,
       is_option: isOption,
       user_id: user.id,
+      // La case « vérifié » ne tient que pour la liste cochée : une liste modifiée est à revérifier.
+      ...(allergensReady ? { allergens_extra: extra, allergens_checked: allergensChecked } : {}),
     };
     setSaving(then);
     const supabase = createClient();
     const { data, error } = initial
       ? await supabase.from('prestations').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
       : await supabase.from('prestations').insert([payload]).select().single();
+    if (!error) dbChecked.current = allergensReady && allergensChecked;
     if (error || !data) {
       setSaving(null);
       setSaveError('La prestation n’a pas pu être enregistrée. Vérifiez votre connexion, puis réessayez.');
@@ -506,7 +647,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     }
     if (initial && syncDrafts) await syncDraftQuotes(payload.name, payload.description ?? '');
     // Ce qui est enregistré devient la référence : plus rien à confirmer en quittant.
-    setStartValues({ name, price, childPrice, costPrice, categoryId, subCategoryId, description, isOption });
+    setStartValues({ name, price, childPrice, costPrice, categoryId, subCategoryId, description, isOption, extra: extra.join(','), checked: allergensChecked });
     go(then === 'fiche' ? `/prestations/${data.id}/edit-webo` : listAfterSave(data.id));
   };
 
@@ -709,7 +850,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
                   <RichTextEditor
                     initialValue={description}
                     onChange={setDescription}
-                    placeholder="Détails, inclusions, allergènes…"
+                    placeholder="Détails, inclusions…"
                     ariaLabel="Description"
                     minHeight="18rem"
                     maxHeight="min(36rem, 65dvh)"
@@ -749,7 +890,14 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
               )}
             </form>
 
-            {initial && user && <IngredientsSection prestationId={initial.id} userId={user.id} />}
+            {initial && user && <IngredientsSection prestationId={initial.id} userId={user.id} onRecipe={onRecipe} />}
+
+            {allergensReady && (
+              <AllergensSection
+                recipe={recipe} extra={extra} onExtra={setExtra} isNew={!initial}
+                checked={allergensChecked} onChecked={(v) => setCheckedFor(v ? allergenKeys : null)}
+              />
+            )}
           </div>
 
           {/* ── Aperçu ── */}

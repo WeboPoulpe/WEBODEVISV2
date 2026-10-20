@@ -221,10 +221,12 @@ function SelectBox({ checked, onChange, label, indeterminate }: { checked: boole
 }
 
 function PrestationRow({
-  p, onOpen, onDelete, onDuplicate, onPrice, selected, onToggle, highlighted,
+  p, onOpen, onDelete, onDuplicate, onPrice, selected, onToggle, highlighted, allergensToCheck,
 }: {
   p: Prestation; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; onPrice: (price: number) => Promise<boolean>;
   selected: boolean; onToggle: () => void; highlighted: boolean;
+  /** Allergènes pas encore confirmés par le traiteur. */
+  allergensToCheck: boolean;
 }) {
   const excerpt = plainText(p.description);
   return (
@@ -232,9 +234,14 @@ function PrestationRow({
       <label className="pl-1 sm:pl-2 cursor-pointer"><SelectBox checked={selected} onChange={onToggle} label={`Sélectionner ${p.name}`} /></label>
       <Link href={`/prestations/${p.id}`} onClick={onOpen} className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1 text-left pl-1 py-3.5">
         <span className="sm:flex-1 min-w-0 w-full">
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-semibold text-gray-900 line-clamp-2">{p.name}</span>
             {p.is_option && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Option</span>}
+            {allergensToCheck && (
+              <span className={cn(pill, 'border border-dashed border-primary-300 text-primary-800')} title="Ouvrez la prestation pour vérifier ses allergènes">
+                Allergènes à vérifier
+              </span>
+            )}
           </span>
           {(excerpt || p.sub_category) && (
             <span className="block text-sm text-gray-500 truncate mt-0.5">
@@ -259,6 +266,8 @@ const LIST_STATE = 'prestations:liste';
 export default function PrestationsPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Prestation[]>([]);
+  // Prestations dont les allergènes restent à vérifier (vide tant que la migration 0020 n'est pas appliquée).
+  const [toCheck, setToCheck] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -308,6 +317,9 @@ export default function PrestationsPage() {
       .order('name');
     setItems(data ?? []);
     setLoading(false);
+    // Requête à part : si la colonne n'existe pas encore, la liste s'affiche quand même, sans la pastille.
+    const { data: checks, error } = await supabase.from('prestations').select('id, allergens_checked').eq('allergens_checked', false);
+    setToCheck(error ? new Set() : new Set((checks ?? []).map((c: { id: string }) => c.id)));
   };
 
   useEffect(() => { load(); }, []);
@@ -692,6 +704,7 @@ export default function PrestationsPage() {
                     onPrice={(price) => handlePrice(p.id, price)}
                     selected={selectedIds.has(p.id)}
                     onToggle={() => toggleOne(p.id)}
+                    allergensToCheck={toCheck.has(p.id)}
                   />
                 ))}
               </ul>
