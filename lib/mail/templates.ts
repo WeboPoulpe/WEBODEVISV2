@@ -381,3 +381,86 @@ export function missionReminderEmail({ mission, link }: { mission: MissionDetail
     }),
   };
 }
+
+// ── Relances automatiques ─────────────────────────────────────────────────────
+// Envoyées au client au nom du traiteur (nom d'expéditeur = entreprise, réponses vers le traiteur).
+
+export interface QuoteReminderDetails {
+  companyName: string;
+  clientName: string | null;
+  quoteNumber: string | null;
+  eventType: string | null;
+  eventDate: string | null;
+  guestCount: number | null;
+  /** Date limite d'acceptation du devis. */
+  validUntil: string | null;
+}
+
+/** Au client : un devis envoyé reste sans réponse. */
+export function quoteReminderEmail({ quote, link }: { quote: QuoteReminderDetails; link: string }): Email {
+  const what = quote.eventType ? `votre ${quote.eventType.toLowerCase()}` : 'votre événement';
+  return {
+    subject: `Votre devis ${quote.companyName}${quote.quoteNumber ? ` n° ${quote.quoteNumber}` : ''} vous attend`,
+    html: renderEmail({
+      brand: quote.companyName,
+      preheader: `${quote.companyName} revient vers vous au sujet de son devis.`,
+      title: quote.clientName ? `Bonjour ${quote.clientName}` : 'Bonjour',
+      paragraphs: [
+        `Nous vous avons adressé notre proposition pour ${esc(what)}. Avez-vous pu la consulter ?`,
+        'Si elle vous convient, vous pouvez l’accepter en ligne depuis le lien ci-dessous. Une question, un changement à prévoir ? Répondez simplement à cet email.',
+      ],
+      facts: [
+        ['Devis n°', quote.quoteNumber ?? ''],
+        ['Événement', quote.eventType ?? ''],
+        ['Date', dateFr(quote.eventDate)],
+        ['Couverts', quote.guestCount ? String(quote.guestCount) : ''],
+        ['Valable jusqu’au', quote.validUntil ? longDate(quote.validUntil) : ''],
+      ],
+      button: { label: 'Consulter le devis', url: link },
+      note: 'Vous avez déjà répondu ou ne souhaitez pas donner suite ? Ne tenez pas compte de ce message.',
+      footer: `Envoyé par ${quote.companyName} avec WeboDevis.`,
+    }),
+  };
+}
+
+export interface InvoiceReminderDetails {
+  companyName: string;
+  buyerName: string | null;
+  number: string;
+  /** Montant restant dû, en euros. */
+  remaining: number;
+  dueDate: string;
+  iban: string | null;
+  bic: string | null;
+  /** Nombre de relances déjà envoyées pour cette facture (0 pour la première). */
+  previous: number;
+}
+
+/** Au client : une facture est échue et reste à régler (en tout ou partie). */
+export function invoiceReminderEmail({ invoice }: { invoice: InvoiceReminderDetails }): Email {
+  const amount = euroFr(invoice.remaining);
+  return {
+    subject: `${invoice.previous ? 'Nouveau rappel' : 'Rappel'} : facture ${invoice.number} de ${invoice.companyName}`,
+    html: renderEmail({
+      brand: invoice.companyName,
+      preheader: `Facture ${invoice.number} : ${amount} restent à régler.`,
+      title: invoice.buyerName ? `Bonjour ${invoice.buyerName}` : 'Bonjour',
+      paragraphs: [
+        `Sauf erreur de notre part, la facture <strong>${esc(invoice.number)}</strong>, arrivée à échéance le ${esc(longDate(invoice.dueDate))}, n’est pas encore entièrement réglée. Il reste <strong>${esc(amount)}</strong> à payer.`,
+        invoice.iban
+          ? 'Vous pouvez régler par virement avec les coordonnées ci-dessous, en indiquant le numéro de la facture.'
+          : 'Merci de nous indiquer quand le règlement sera fait.',
+        'Si le paiement vient d’être fait, ne tenez pas compte de ce message. Une question ? Répondez simplement à cet email.',
+      ],
+      facts: [
+        ['Facture n°', invoice.number],
+        ['Échéance', longDate(invoice.dueDate)],
+        ['Reste à payer', amount],
+        ['Bénéficiaire', invoice.iban ? invoice.companyName : ''],
+        ['IBAN', invoice.iban ?? ''],
+        ['BIC', invoice.bic ?? ''],
+      ],
+      footer: `Envoyé par ${invoice.companyName} avec WeboDevis.`,
+    }),
+  };
+}

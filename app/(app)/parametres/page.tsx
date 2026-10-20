@@ -8,6 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 import DocumentSettings from '@/components/parametres/DocumentSettings';
 import MyDataSection from '@/components/parametres/MyDataSection';
+import RemindersSection from '@/components/parametres/RemindersSection';
+import CalendarFeedSection from '@/components/parametres/CalendarFeedSection';
 import { errorCls } from '@/components/ui/kit';
 import { isDemoUser } from '@/lib/demo';
 import { changePassword } from '@/server/auth';
@@ -522,6 +524,10 @@ export default function ParametresPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Relances automatiques et abonnement agenda ─────────────────────── */}
+      <RemindersSection />
+      <CalendarFeedSection locked={isDemoUser(user?.id) ? 'L’abonnement agenda n’est pas disponible dans la démonstration.' : null} />
 
       {/* ── Section 4: Notifications ─────────────────────────────────────────── */}
       <NotificationsSection />

@@ -6,6 +6,7 @@ import { isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { missionReminderEmail } from '@/lib/mail/templates';
 import { pushToExtra } from '@/lib/push';
+import { runReminders } from '@/server/reminders';
 
 // Rappel de la veille aux extras confirmés : email et notification. Lancé chaque jour en fin d'après-midi par
 // Vercel (vercel.json), qui envoie « Authorization: Bearer CRON_SECRET ». Un rappel n'est envoyé qu'une fois.
@@ -55,5 +56,10 @@ export async function GET(request: NextRequest) {
       sent++;
     }
   }
-  return NextResponse.json({ day, missions: rows.length, reminded: sent });
+  // Relances automatiques des devis et factures (server/reminders.ts), lancées ici : l'offre Vercel limite le nombre de tâches planifiées.
+  const relances = await runReminders({ origin }).catch((e) => {
+    console.error('[relances]', e instanceof Error ? e.message : e);
+    return null;
+  });
+  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances });
 }
