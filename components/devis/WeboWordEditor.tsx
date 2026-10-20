@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -26,6 +26,10 @@ import {
 } from './weboword/weboword.types';
 import { buildCoverPageHtml, buildPhotosPageHtml, buildLogoHeaderHtml, buildCgvHtml, buildLegalFooterHtml, LEGAL_PROFILE_COLUMNS, type LegalProfile } from './weboword/printHelpers';
 import { useFeedback } from '@/components/ui/Feedback';
+import { documentHasCgv } from '@/lib/cgvDetect';
+import { usePrintPreview } from './weboword/usePrintPreview';
+import { PageEndMarkers } from './weboword/PageEndMarkers';
+import { CgvDuplicateBanner } from './weboword/CgvDuplicateBanner';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -184,6 +188,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const { profile, user } = useAuth();
   const { confirm, notify } = useFeedback();
   const editorRef  = useRef<HTMLDivElement>(null);
+  const sheetRef   = useRef<HTMLDivElement>(null);
   const colorInput = useRef<HTMLInputElement>(null);
   const initDone   = useRef(false);
 
@@ -889,7 +894,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const el = editorRef.current;
     if (!el) return;
     if (!companyAssets.cgv) { setToast('Aucune condition de vente enregistrée. Ajoutez-les dans Paramètres, Mon entreprise.'); return; }
-    if (el.innerHTML.includes('data-webo-cgv') || (companyAssets.cgv && el.innerHTML.includes(companyAssets.cgv))) {
+    if (documentHasCgv(el.innerHTML, companyAssets.cgv)) {
       setToast('Les CGV sont déjà présentes dans le document.');
       return;
     }
@@ -897,6 +902,44 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     el.insertAdjacentHTML('beforeend', block);
     setToast('Conditions de vente ajoutées en fin de document. Pensez à enregistrer.');
   }, [companyAssets.cgv]);
+
+  // Retire le bloc CGV ajouté automatiquement quand le texte contient déjà les conditions. Passe par l'édition du
+  // navigateur : la suppression s'annule avec Ctrl+Z, comme une modification tapée.
+  const removeAddedCgv = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const blocks = Array.from(el.querySelectorAll<HTMLElement>('[data-webo-cgv]'));
+    if (blocks.length === 0) return;
+    el.focus();
+    const sel = window.getSelection();
+    for (const block of blocks) {
+      if (sel) {
+        const range = document.createRange();
+        range.selectNode(block);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('delete');
+      }
+      if (block.isConnected) block.remove();
+    }
+    setToast('Bloc des conditions générales retiré (Ctrl+Z pour annuler). Pensez à enregistrer.');
+  }, []);
+
+  // ── Aperçu de l'impression : fins de page, nombre de pages, CGV en double ──────
+  const previewLogoHtml = useMemo(() => sanitizeHtml(buildLogoHeaderHtml(companyAssets.logo_url)), [companyAssets.logo_url]);
+  const previewLegalHtml = useMemo(() => sanitizeHtml(buildLegalFooterHtml(companyAssets.legal)), [companyAssets.legal]);
+  const previewCgvHtml = useMemo(() => sanitizeHtml(buildCgvHtml(companyAssets.cgv)), [companyAssets.cgv]);
+  const printPreview = usePrintPreview({
+    editorRef,
+    sheetRef,
+    settings: { font, fontSize, lineHeight, showDesc },
+    coverEnabled: coverConfig.enabled,
+    photoPages: photosConfig.enabled ? photosConfig.pages.length : 0,
+    logoHtml: previewLogoHtml,
+    legalHtml: previewLegalHtml,
+    cgvHtml: previewCgvHtml,
+    cgvText: companyAssets.cgv,
+  });
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async (): Promise<boolean> => {
@@ -946,7 +989,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const content = sanitizeHtml(editorRef.current?.innerHTML ?? '');
     if (!content) return;
     const safeName = (clientName ?? 'client').replace(/[^a-zA-ZÀ-ÿ0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 40);
-    const alreadyHasCgv = content.includes('data-webo-cgv') || (!!companyAssets.cgv && content.includes(companyAssets.cgv));
+    // Conditions déjà dans le document (bloc ajouté, texte collé ou titre « Conditions Générales de Vente ») : pas de doublon.
+    const alreadyHasCgv = documentHasCgv(content, companyAssets.cgv);
     const html = buildQuotePrintPage({
       title: `Devis-${safeName}-${new Date().toISOString().slice(0, 10)}`,
       content,
@@ -1116,6 +1160,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             <button onClick={() => setNotice(null)} className="font-medium text-primary hover:underline">Compris</button>
           </div>
         )}
+        {printPreview.cgvDuplicate && <CgvDuplicateBanner onRemove={removeAddedCgv} />}
         {/* Error display (only when there's an error) */}
         {error && (
           <div className="px-4 py-1.5 bg-red-50 border-b border-red-100 text-xs text-red-700">
@@ -1376,6 +1421,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             <RefreshCw className="h-3.5 w-3.5" />
           </TB>
 
+          {printPreview.totalPages !== null && (
+            <span className="ml-auto pl-2 text-xs text-gray-500 whitespace-nowrap" title="Estimation : les fins de page sont marquées en pointillés sur la feuille">
+              ≈ {printPreview.totalPages} page{printPreview.totalPages > 1 ? 's' : ''} à l’impression
+            </span>
+          )}
         </div>
       </div>
 
@@ -1426,8 +1476,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
         {/* Devis editor (A4) */}
         <div
+          ref={sheetRef}
           style={{ width: '210mm' }}
-          className="mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full"
+          className="relative mx-auto bg-white shadow-xl rounded-lg print:shadow-none print:rounded-none print:w-full"
         >
           <style>{`
             #weboword-sheet,
@@ -1483,6 +1534,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               else if (e.clipboardData.files.length > 0) setToast('Les photos se placent avec la page photos ou la page de garde.');
             }}
           />
+          {/* Fins de page de l'impression : repères posés par-dessus la feuille, hors du texte du devis. */}
+          <PageEndMarkers markers={printPreview.markers} />
         </div>
 
         {/* Page photos */}

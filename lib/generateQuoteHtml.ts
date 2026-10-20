@@ -492,7 +492,7 @@ ${d.remarks ? `
 </div>
 ` : ''}
 
-<div style="display:flex;gap:14px;margin-top:16px;">
+<div data-webo-sign="1" style="display:flex;gap:14px;margin-top:16px;">
   <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
     <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.bonAccord}</p>
     <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">${t.dateSignature}</p>

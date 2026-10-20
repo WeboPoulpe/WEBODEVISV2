@@ -8,6 +8,7 @@ import type { CoverPageConfig, PhotosPageConfig } from '@/components/devis/webow
 import { sanitizeHtml } from '@/lib/sanitize';
 import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import PrintBreaks from '@/components/devis/PrintBreaks';
+import { documentHasCgv } from '@/lib/cgvDetect';
 import { googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 
 /** Accord signé en ligne par le client, imprimé à la fin du document. */
@@ -58,8 +59,9 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
     const logoHtml = buildLogoHeaderHtml(profile?.logo_url);
     const cgvHtml = buildCgvHtml(profile?.cgv);
     const legalHtml = buildLegalFooterHtml(profile);
-    // Les conditions de vente ne sont ajoutées que si le document ne les contient pas déjà.
-    const hasCgv = content.includes('data-webo-cgv') || (!!profile?.cgv && content.includes(profile.cgv as string));
+    // Les conditions de vente ne sont ajoutées que si le document ne les contient pas déjà (bloc ajouté, texte
+    // collé ou titre « Conditions Générales de Vente » tapé à la main).
+    const hasCgv = documentHasCgv(content, profile?.cgv);
 
     return (
       <>

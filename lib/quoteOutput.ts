@@ -49,6 +49,17 @@ export function googleFontHref(font: string): string | null {
 
 const cssFont = (font: string) => font.replace(/[^\w\s-]/g, '');
 
+/** Marge haute et basse de chaque page imprimée (hauteur de .quote-gap à l'impression), en millimètres. */
+export const PRINT_GAP_MM = 14;
+
+const MM_TO_PX = 96 / 25.4;
+
+/** Hauteur d'une feuille A4 entière, en pixels CSS. */
+export const A4_PAGE_PX = 297 * MM_TO_PX;
+
+/** Hauteur utile d'une page du document imprimé (A4 moins les marges haute et basse), en pixels CSS. */
+export const PAGE_CONTENT_PX = (297 - 2 * PRINT_GAP_MM) * MM_TO_PX;
+
 /**
  * Règles communes à toutes les sorties. Le document est dans `.quote-doc` ; à l'impression, il est placé dans un
  * tableau `.quote-pages` dont l'en-tête et le pied, répétés par le navigateur sur chaque page, servent de marges
@@ -93,13 +104,17 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     .quote-doc .gastro-menu h1, .quote-doc .gastro-menu h2, .quote-doc .gastro-menu h3,
     .quote-doc .gastro-menu .webo-keep-next { page-break-after: avoid; break-after: avoid; }
     .quote-doc thead { display: table-header-group; }
+    /* Le cadre « Bon pour accord » n'est pas coupé, et ne commence pas seul en haut d'une page quand le texte
+       qui le précède peut l'accompagner (repère posé par generateQuoteHtml ou par markSignature). */
+    .quote-doc [data-webo-sign], .quote-doc .webo-sign { page-break-inside: avoid; break-inside: avoid; }
+    .quote-doc :has(+ [data-webo-sign]), .quote-doc :has(+ .webo-sign) { page-break-after: avoid; break-after: avoid; }
     .quote-doc p, .quote-doc li { orphans: 2; widows: 2; }
     ${s.showDesc ? '' : '.quote-doc .svc-desc { display: none !important; }'}
     @media print {
-      .quote-gap { height: 14mm; }
+      .quote-gap { height: ${PRINT_GAP_MM}mm; }
       .quote-doc { padding-top: 0; padding-bottom: 0; }
       /* Le bandeau d'en-tête remonte jusqu'au bord de la feuille, par-dessus la marge haute de la première page. */
-      .quote-doc [style*="-20mm -20mm 0"] { margin-top: -14mm !important; }
+      .quote-doc [style*="-20mm -20mm 0"] { margin-top: -${PRINT_GAP_MM}mm !important; }
     }
   `;
 }
@@ -109,7 +124,7 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
  * utile d'une page A4 (297 mm moins les deux marges de 14 mm de .quote-gap, à 96 px par pouce). Un plat plus court
  * n'est jamais coupé ; au pire, il laisse une demi-page blanche en passant à la page suivante.
  */
-export const LONG_DISH_PX = Math.round(((297 - 2 * 14) * 96) / 25.4 / 2);
+export const LONG_DISH_PX = Math.round(PAGE_CONTENT_PX / 2);
 
 /**
  * Marque les plats trop hauts pour être gardés d'un seul tenant (classe webo-long, voir quoteOutputCss), et le
@@ -134,6 +149,30 @@ export function markLongDishes(doc: Document, limit: number): void {
     let box: Element = el;
     while (box.children.length === 1 && /^(DIV|SECTION|ARTICLE)$/.test(box.children[0].tagName)) box = box.children[0];
     if (box.children.length > 1) box.children[0].classList.add('webo-keep-next');
+  });
+}
+
+/**
+ * Repère le cadre « Bon pour accord » d'un devis qui n'a pas la balise data-webo-sign (devis rédigés avant elle) :
+ * le plus petit bloc qui l'entoure reçoit la classe webo-sign (voir quoteOutputCss). Comme markLongDishes, à
+ * lancer avant chaque impression, sans dépendance ; la classe ne vit que dans la page imprimée.
+ */
+export function markSignature(doc: Document): void {
+  doc.querySelectorAll('.webo-sign').forEach((el) => el.classList.remove('webo-sign'));
+  doc.querySelectorAll<HTMLElement>('.quote-doc').forEach((root) => {
+    if (root.querySelector('[data-webo-sign]')) return;
+    const label = /bon pour accord|agreement\s*[—–-]\s*client/i;
+    // Le plus profond des blocs qui portent la mention, et le dernier du document.
+    let box: HTMLElement | null = null;
+    const candidates = Array.from(root.querySelectorAll<HTMLElement>('p, span, strong, b, div, td, h1, h2, h3, h4, h5, h6'));
+    for (const el of candidates) {
+      if (el.closest('[data-webo-cgv]') || !label.test(el.textContent || '')) continue;
+      if (!Array.from(el.children).some((c) => label.test(c.textContent || ''))) box = el;
+    }
+    if (!box) return;
+    // On remonte jusqu'au cadre complet (les deux cases de signature), sans englober le reste du document.
+    while (box.parentElement && box.parentElement !== root && (box.parentElement.textContent || '').length <= 400) box = box.parentElement;
+    box.classList.add('webo-sign');
   });
 }
 
@@ -179,8 +218,9 @@ export function buildQuotePrintPage(p: {
   ${p.cgvHtml ?? ''}
   <script>
     var markLongDishes = ${markLongDishes.toString()};
+    var markSignature = ${markSignature.toString()};
     var lightenImagesForPrint = ${lightenImagesForPrint.toString()};
-    function pageBreaks() { markLongDishes(document, ${LONG_DISH_PX}); }
+    function pageBreaks() { markLongDishes(document, ${LONG_DISH_PX}); markSignature(document); }
     window.addEventListener('beforeprint', pageBreaks);
     // L'impression part quand les polices et les images sont là : sinon la mise en page bouge pendant l'aperçu.
     window.onload = function () {
