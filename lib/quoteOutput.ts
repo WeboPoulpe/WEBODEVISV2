@@ -84,11 +84,11 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     .quote-doc li { display: list-item; }
     .quote-doc img { max-width: 100%; }
     .quote-doc table { max-width: 100%; }
-    .quote-doc .screen-sep {
-      visibility: hidden !important; height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important;
-      font-size: 0 !important; line-height: 0 !important; overflow: hidden !important;
-      page-break-after: always !important; break-after: page !important;
-    }
+    /* Repère « Saut de page » : absent du papier, c'est l'élément qui le suit qui commence la nouvelle page.
+       (Quand le repère, même sans hauteur, tombait juste après une fin de page, il y était posé seul puis faisait
+       changer de page : une page blanche.) */
+    .quote-doc .screen-sep { display: none !important; }
+    .quote-doc .screen-sep + * { page-break-before: always !important; break-before: page !important; }
     .quote-doc .gastro-page { page-break-before: always !important; break-before: page !important; }
     /* Une ligne du tableau ou le bloc des totaux ne sont jamais coupés entre deux pages. */
     .quote-doc tr, .quote-doc [data-webo-financials] > div { page-break-inside: avoid; break-inside: avoid; }
