@@ -1,6 +1,8 @@
 // Mise en page de sortie d'un devis : une seule feuille de style pour l'impression depuis l'éditeur,
 // la page d'impression et le lien envoyé au client. Ce qu'on voit dans l'éditeur est ce qui sort.
 
+import { lightenImagesForPrint } from './printImages';
+
 /** Polices présentes sur les appareils ; toutes les autres viennent de Google Fonts. */
 const SYSTEM_FONTS = ['Georgia', 'Times New Roman', 'Arial', 'Helvetica', 'Verdana', 'Courier New', 'Trebuchet MS', 'Garamond'];
 
@@ -177,12 +179,15 @@ export function buildQuotePrintPage(p: {
   ${p.cgvHtml ?? ''}
   <script>
     var markLongDishes = ${markLongDishes.toString()};
+    var lightenImagesForPrint = ${lightenImagesForPrint.toString()};
     function pageBreaks() { markLongDishes(document, ${LONG_DISH_PX}); }
     window.addEventListener('beforeprint', pageBreaks);
     // L'impression part quand les polices et les images sont là : sinon la mise en page bouge pendant l'aperçu.
     window.onload = function () {
       var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-      ready.then(function () { pageBreaks(); setTimeout(function () { window.print(); }, 250); });
+      // Photos recompressées en JPEG avant l'impression : le PDF reste léger (voir lib/printImages.ts).
+      ready.then(function () { return lightenImagesForPrint(document).catch(function () {}); })
+        .then(function () { pageBreaks(); setTimeout(function () { window.print(); }, 250); });
     };
   </script>
 </body>

@@ -8,11 +8,13 @@
 export async function fileToWebp(file: File, opts: { quality?: number; maxDim?: number } = {}): Promise<File> {
   const { quality = 0.85, maxDim = 2000 } = opts;
   if (typeof window === 'undefined' || typeof document === 'undefined') return file;
-  if (!file.type.startsWith('image/') || file.type === 'image/webp') return file;
+  if (!file.type.startsWith('image/')) return file;
 
   try {
     const bitmap = await createImageBitmap(file);
     let { width, height } = bitmap;
+    // Une image déjà en WebP et à la bonne taille reste telle quelle ; trop grande, elle est réduite comme les autres.
+    if (file.type === 'image/webp' && Math.max(width, height) <= maxDim) return file;
     if (Math.max(width, height) > maxDim) {
       const ratio = maxDim / Math.max(width, height);
       width = Math.round(width * ratio);

@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
+import { printLight } from '@/lib/printImages';
 
-/** Triggers window.print() once the page has mounted. */
+/** Ouvre la fenêtre d'impression une fois la page affichée, photos allégées (PDF léger). */
 export default function AutoPrint() {
   useEffect(() => {
-    // Small delay to let fonts / images render before the print dialog
-    const t = setTimeout(() => window.print(), 300);
+    // Petit délai : polices et images se mettent en place avant la fenêtre d'impression.
+    const t = setTimeout(() => { printLight(); }, 300);
     return () => clearTimeout(t);
   }, []);
 
