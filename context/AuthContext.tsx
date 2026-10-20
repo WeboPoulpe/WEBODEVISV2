@@ -21,6 +21,8 @@ export interface Profile {
   cgv: string | null;
   subscription_type: string | null;
   parent_user_id: string | null;
+  /** Comptes de l'entreprise (titulaire et collaborateurs), lui compris. */
+  company_ids?: string[];
   can_view_all_company_data: boolean;
   has_completed_onboarding: boolean | null;
   default_vat_rate: number | null;

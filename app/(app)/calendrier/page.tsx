@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ChefHat, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { companyIds, companyQuotesFilter } from '@/lib/companyFilter';
+import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { isConfirmed, isPending, REJECTED_STATUSES } from '@/lib/quoteStatus';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -77,11 +79,14 @@ export default function CalendrierPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const { user, profile } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
     createClient()
       .from('quotes')
       .select('id, client_name, event_type, event_date, event_location, guest_count, total_amount, status')
+      .or(companyQuotesFilter(user.id, companyIds(user.id, profile)))
       .not('event_date', 'is', null)
       .not('status', 'in', `(${REJECTED_STATUSES.join(',')})`)
       .order('event_date', { ascending: true })
@@ -90,7 +95,7 @@ export default function CalendrierPage() {
         setQuotes((data ?? []) as Quote[]);
         setLoading(false);
       });
-  }, []);
+  }, [user, profile]);
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const visible = useMemo(() => (confirmedOnly ? quotes.filter((q) => isConfirmed(q.status)) : quotes), [quotes, confirmedOnly]);

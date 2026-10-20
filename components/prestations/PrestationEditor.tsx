@@ -152,7 +152,6 @@ function IngredientsSection({ prestationId, userId, onRecipe }: {
       const { data } = await createClient()
         .from('ingredients')
         .select('id, name, unit')
-        .eq('user_id', userId)
         .ilike('name', `%${search}%`)
         .limit(10);
       setOptions((data ?? []) as IngredientOption[]);
@@ -351,7 +350,7 @@ export default function PrestationEditor({ id }: { id?: string }) {
   useEffect(() => {
     if (!id || !user) return;
     let alive = true;
-    createClient().from('prestations').select('*').eq('id', id).eq('user_id', user.id).maybeSingle()
+    createClient().from('prestations').select('*').eq('id', id).maybeSingle()
       .then(({ data }) => { if (alive) setState({ status: data ? 'ready' : 'missing', record: (data as PrestationRecord | null) ?? null }); });
     return () => { alive = false; };
   }, [id, user]);
@@ -641,7 +640,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     setSaving(then);
     const supabase = createClient();
     const { data, error } = initial
-      ? await supabase.from('prestations').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
+      ? await supabase.from('prestations').update(payload).eq('id', initial.id).select().single()
       : await supabase.from('prestations').insert([payload]).select().single();
     if (!error) dbChecked.current = allergensReady && allergensChecked;
     if (error || !data) {

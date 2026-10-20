@@ -580,8 +580,8 @@ export default function ExtrasPage() {
     if (!user) return;
     const supabase = createClient();
     const [{ data: extrasData, error: extrasErr }, rateProbe] = await Promise.all([
-      supabase.from('extras').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('extras').select('id, hourly_rate').eq('user_id', user.id).limit(1),
+      supabase.from('extras').select('*').order('name'),
+      supabase.from('extras').select('id, hourly_rate').limit(1),
     ]);
     setRateSupported(!rateProbe.error);
     const extras = (extrasData ?? []) as Extra[];

@@ -90,7 +90,7 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
 
   useEffect(() => {
     if (!user) return;
-    createClient().from('extras').select(EXTRA_COLS).eq('user_id', user.id).order('name')
+    createClient().from('extras').select(EXTRA_COLS).order('name')
       .then(({ data }) => setExtras((data ?? []) as Extra[]));
   }, [user]);
 

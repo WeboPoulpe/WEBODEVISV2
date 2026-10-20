@@ -9,6 +9,7 @@ import {
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
   BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal, Send, Receipt,
 } from 'lucide-react';
+import { companyIds, companyQuotesFilter } from '@/lib/companyFilter';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatDate, formatCurrency } from '@/lib/utils';
@@ -91,8 +92,9 @@ const QUOTE_COLUMNS_LEGACY = 'id, quote_number, client_name, internal_name, even
  * (migration lot E non appliquée), on retombe sur l'ancienne sélection au lieu de
  * casser toute la page.
  */
-async function loadQuotes(supabase: ReturnType<typeof createClient>, userId: string): Promise<Quote[]> {
-  const filter = `user_id.eq.${userId},owner_user_id.eq.${userId}`;
+async function loadQuotes(supabase: ReturnType<typeof createClient>, userId: string, ids: string[]): Promise<Quote[]> {
+  // Devis de toute l'entreprise (titulaire et collaborateurs) ; le filtre reste utile pour un compte administrateur.
+  const filter = companyQuotesFilter(userId, ids);
   const res = await supabase.from('quotes').select(QUOTE_COLUMNS).or(filter).order('created_at', { ascending: false });
   if (!res.error) return (res.data ?? []) as unknown as Quote[];
   console.warn('[devis] Dossiers indisponibles (migration lot E à appliquer ?) :', res.error.message);
@@ -760,6 +762,8 @@ function PipelineView({
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DevisPage() {
   const { user, profile } = useAuth();
+  // Comptes de l'entreprise : devis, dossiers et demandes de toute l'équipe.
+  const ids = useMemo(() => (user ? companyIds(user.id, profile) : []), [user, profile]);
   const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [prospects, setProspects] = useState<ProspectLite[]>([]);
@@ -841,14 +845,13 @@ export default function DevisPage() {
     if (!user) return;
     const supabase = createClient();
     Promise.all([
-      loadQuotes(supabase, user.id),
+      loadQuotes(supabase, user.id, ids),
       supabase.from('devis_templates')
         .select('id, name, template, created_at, services, remarks, vat_rate, hide_price')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
       supabase.from('quote_folders')
         .select('id, name, parent_id, color, icon, created_at')
-        .eq('owner_user_id', user.id)
+        .in('owner_user_id', ids)
         .order('name', { ascending: true }),
     ]).then(async ([quoteRows, tplRes, foldersRes]) => {
       try {
@@ -869,15 +872,15 @@ export default function DevisPage() {
           .select('id, first_name, last_name, email, event_type, event_date, guest_count, status')
           .order('created_at', { ascending: false });
         pq = myTokens.length > 0
-          ? pq.or(`owner_user_id.eq.${user.id},user_token.in.(${myTokens.join(',')})`)
-          : pq.eq('owner_user_id', user.id);
+          ? pq.or(`owner_user_id.in.(${ids.join(',')}),user_token.in.(${myTokens.join(',')})`)
+          : pq.in('owner_user_id', ids);
         const { data: prospectRows } = await pq;
         setProspects(((prospectRows ?? []) as ProspectLite[]).filter((p) => !linkedProspectIds.has(p.id)));
       } finally {
         setLoading(false);
       }
     });
-  }, [user]);
+  }, [user, ids]);
 
   // Create a devis from a template
   // Un modèle passe par le parcours de création : événement et client d'abord, puis le document part du modèle,
@@ -896,7 +899,7 @@ export default function DevisPage() {
   // Vignettes des modèles : leurs documents sont chargés en une fois, à la première ouverture de la fenêtre.
   useEffect(() => {
     if (!showTemplates || tplDocs !== null || !user) return;
-    createClient().from('devis_templates').select('id, content_html').eq('user_id', user.id)
+    createClient().from('devis_templates').select('id, content_html')
       .then(({ data }) => setTplDocs(Object.fromEntries(((data ?? []) as { id: string; content_html: string | null }[]).map((t) => [t.id, t.content_html]))));
   }, [showTemplates, tplDocs, user]);
 
@@ -1467,7 +1470,7 @@ export default function DevisPage() {
         onCreated={() => {
           // Reload quotes
           if (!user) return;
-          loadQuotes(createClient(), user.id).then(setQuotes);
+          loadQuotes(createClient(), user.id, ids).then(setQuotes);
         }}
       />
 

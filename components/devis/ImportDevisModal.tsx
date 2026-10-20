@@ -106,7 +106,6 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
     const { data } = await supabase
       .from('customers')
       .select('id, first_name, last_name, email, phone, address')
-      .eq('owner_user_id', user.id)
       .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`)
       .limit(6);
     setCustomerResults(data ?? []);
@@ -153,7 +152,7 @@ export default function ImportDevisModal({ open, onClose, onCreated, editQuoteId
     if (!isEdit && !customerId && email.trim()) {
       const supabase2 = createClient();
       const { data: existing } = await supabase2.from('customers')
-        .select('id').eq('owner_user_id', user.id).eq('email', email.trim().toLowerCase()).maybeSingle();
+        .select('id').eq('email', email.trim().toLowerCase()).maybeSingle();
       if (existing?.id) {
         customerId = existing.id;
       } else {

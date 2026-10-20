@@ -28,7 +28,7 @@ const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLow
 /** Ajoute à la liste un matériel saisi à la main dans un événement, s'il n'y est pas déjà. */
 export async function rememberMaterial(userId: string, name: string, qty: number, unit: string) {
   const supabase = createClient();
-  const { data } = await supabase.from('material_presets').select('id').eq('user_id', userId).ilike('name', name.trim()).limit(1);
+  const { data } = await supabase.from('material_presets').select('id').ilike('name', name.trim()).limit(1);
   if (data && data.length > 0) return;
   await supabase.from('material_presets').insert({ user_id: userId, name: name.trim(), unit: unit || null, default_qty: qty });
 }
@@ -56,7 +56,7 @@ export default function MaterialPicker({ userId, guests, already, onClose, onAdd
   const suggested = (p: Preset) => (p.qty_per_guest && guests > 0 ? Math.ceil(Number(p.qty_per_guest) * guests) : Number(p.default_qty));
 
   useEffect(() => {
-    createClient().from('material_presets').select('id, name, unit, default_qty, qty_per_guest').eq('user_id', userId).order('name')
+    createClient().from('material_presets').select('id, name, unit, default_qty, qty_per_guest').order('name')
       .then(({ data, error: err }) => {
         if (err) setError('Votre liste de matériel n’a pas pu être chargée. Fermez et rouvrez cette fenêtre.');
         setPresets((data ?? []) as Preset[]);

@@ -56,12 +56,19 @@ export async function registerUser(input: {
   return { error: null };
 }
 
-/** Profil de l'utilisateur connecté (null si non connecté ou profil absent). */
-export async function getMyProfile(): Promise<ProfileRow | null> {
+/**
+ * Profil de l'utilisateur connecté (null si non connecté ou profil absent), avec les comptes de son entreprise
+ * (titulaire et collaborateurs) : les pages s'en servent pour filtrer devis et demandes sur toute l'entreprise.
+ */
+export async function getMyProfile(): Promise<(ProfileRow & { company_ids: string[] }) | null> {
   const user = await getSessionUser();
   if (!user) return null;
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id)).limit(1);
-  return profile ?? null;
+  if (!profile) return null;
+  const company = profile.parent_user_id ?? profile.id;
+  const team = await db.select({ id: profiles.id }).from(profiles)
+    .where(sql`${profiles.id} = ${company}::uuid or ${profiles.parent_user_id} = ${company}::uuid`);
+  return { ...profile, company_ids: team.map((t) => t.id) };
 }
 
 /** Répond toujours sans erreur, que le compte existe ou non, pour ne pas révéler les emails inscrits. */

@@ -29,12 +29,11 @@ export default async function ModifierPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Support both V2 (user_id) and V1 (owner_user_id)
+  // Les règles d'accès limitent la lecture aux devis de l'entreprise (titulaire et collaborateurs).
   const { data: quote } = await supabase
     .from('quotes')
     .select('*')
     .eq('id', id)
-    .or(`user_id.eq.${user.id},owner_user_id.eq.${user.id}`)
     .single();
 
   if (!quote) notFound();

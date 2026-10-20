@@ -19,7 +19,6 @@ export default async function PrestationEditWebo({
     .from('prestations')
     .select('*')
     .eq('id', id)
-    .eq('user_id', user.id)
     .single();
 
   if (!prestation) notFound();

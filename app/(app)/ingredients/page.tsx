@@ -571,7 +571,6 @@ export default function IngredientsPage() {
     const supabase = createClient();
     const [ings, sups, probe, alerts] = await Promise.all([
       supabase.from('ingredients').select('*')
-        .or(`user_id.is.null,user_id.eq.${user.id}`)
         .order('category', { nullsFirst: false })
         .order('name'),
       supabase.from('suppliers').select('*').order('name'),

@@ -106,9 +106,9 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
-    supabase.from('material_template_sets').select('id, name').eq('user_id', user.id).order('created_at')
+    supabase.from('material_template_sets').select('id, name').order('created_at')
       .then(({ data }) => setMaterialSets((data ?? []) as MaterialTemplateSet[]));
-    supabase.from('material_templates').select('id, set_id, name, unit, default_qty, qty_per_guest').eq('user_id', user.id).order('sort_order')
+    supabase.from('material_templates').select('id, set_id, name, unit, default_qty, qty_per_guest').order('sort_order')
       .then(({ data }) => setMaterialTemplates((data ?? []) as MaterialTemplate[]));
   }, [user]);
 
@@ -163,9 +163,9 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   useEffect(() => {
     if (!user) return;
     const supabase = createClient();
-    supabase.from('rental_templates').select('*').eq('user_id', user.id).order('sort_order')
+    supabase.from('rental_templates').select('*').order('sort_order')
       .then(({ data }) => setTemplates((data ?? []) as RentalTemplate[]));
-    supabase.from('rental_template_sets').select('id, name').eq('user_id', user.id).order('created_at')
+    supabase.from('rental_template_sets').select('id, name').order('created_at')
       .then(({ data }) => setTemplateSets((data ?? []) as RentalTemplateSet[]));
   }, [user]);
 

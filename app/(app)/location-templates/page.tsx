@@ -55,8 +55,8 @@ export default function LocationTemplatesPage() {
     if (!user) return;
     const supabase = createClient();
     const [s, i, sup] = await Promise.all([
-      supabase.from('rental_template_sets').select('id, name').eq('user_id', user.id).order('created_at'),
-      supabase.from('rental_templates').select('*').eq('user_id', user.id).order('sort_order'),
+      supabase.from('rental_template_sets').select('id, name').order('created_at'),
+      supabase.from('rental_templates').select('*').order('sort_order'),
       supabase.from('suppliers').select('id, name').order('name'),
     ]);
     if (s.error || i.error) setError('Vos modèles n’ont pas pu être chargés. Rechargez la page.');

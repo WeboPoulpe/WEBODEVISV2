@@ -58,7 +58,6 @@ export default function StockPage() {
     const [ings, stocks] = await Promise.all([
       supabase.from('ingredients')
         .select('*')
-        .or(`user_id.is.null,user_id.eq.${user.id}`)
         .order('name'),
       supabase.from('ingredient_stocks').select('ingredient_id, quantity, min_alert').eq('company_id', companyId),
     ]);

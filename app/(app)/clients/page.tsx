@@ -6,6 +6,7 @@ import {
   Plus, Search, Users, Building2, User, Mail, Phone, FileText, Star,
   TrendingUp, StickyNote, Save, Loader2, CalendarDays, ChevronRight,
 } from 'lucide-react';
+import { companyIds, companyQuotesFilter } from '@/lib/companyFilter';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { isConfirmed, QUOTE_STATUS_LABELS } from '@/lib/quoteStatus';
@@ -369,6 +370,8 @@ export default function ClientsPage() {
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState<number | null>(null);
 
+  // Comptes de l'entreprise : le nombre de devis par client se compte sur les devis de toute l'équipe.
+  const { user, profile } = useAuth();
   const loadCustomers = useCallback(async () => {
     const supabase = createClient();
     const { data: cust } = await supabase
@@ -376,7 +379,9 @@ export default function ClientsPage() {
       .select('id, customer_type, first_name, last_name, company_name, email, phone, address, siret_number, contact_person_name, notes')
       .order('created_at', { ascending: false });
     if (!cust) { setLoading(false); return; }
-    const { data: counts } = await supabase.from('quotes').select('client_email');
+    const { data: counts } = user
+      ? await supabase.from('quotes').select('client_email').or(companyQuotesFilter(user.id, companyIds(user.id, profile)))
+      : { data: [] as { client_email: string | null }[] };
     const countMap: Record<string, number> = {};
     counts?.forEach(({ client_email }) => {
       if (client_email) countMap[client_email] = (countMap[client_email] ?? 0) + 1;
@@ -388,7 +393,7 @@ export default function ClientsPage() {
     const wanted = new URLSearchParams(window.location.search).get('fiche');
     const target = wanted ? list.find((c) => c.id === wanted) : undefined;
     if (target) setSheetCustomer(target);
-  }, []);
+  }, [user, profile]);
 
   useEffect(() => { loadCustomers(); }, [loadCustomers]);
 

@@ -49,7 +49,7 @@ export default function ExtrasHoursPage() {
   const load = useCallback(async () => {
     if (!user) return;
     const supabase = createClient();
-    const { data: extrasData, error: extrasErr } = await supabase.from('extras').select('*').eq('user_id', user.id).order('name');
+    const { data: extrasData, error: extrasErr } = await supabase.from('extras').select('*').order('name');
     if (extrasErr) { setError('Vos extras n’ont pas pu être chargés. Rechargez la page.'); setLoading(false); return; }
     const list = (extrasData ?? []) as { id: string; name: string; role: string | null; hourly_rate?: unknown }[];
     const ids = list.map((e) => e.id);

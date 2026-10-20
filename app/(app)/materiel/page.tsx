@@ -39,7 +39,7 @@ export default function MaterielPage() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const { data, error: err } = await createClient().from('material_presets').select('id, name, unit, default_qty, qty_per_guest').eq('user_id', user.id).order('name');
+    const { data, error: err } = await createClient().from('material_presets').select('id, name, unit, default_qty, qty_per_guest').order('name');
     if (err) setError('Votre liste n’a pas pu être chargée. Rechargez la page.');
     setItems(((data ?? []) as Preset[]).map((p) => ({ ...p, default_qty: Number(p.default_qty), qty_per_guest: p.qty_per_guest == null ? null : Number(p.qty_per_guest) })));
   }, [user]);

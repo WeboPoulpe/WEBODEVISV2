@@ -71,7 +71,7 @@ export default function NouveauDevisOnboarding() {
   const [startFrom, setStartFrom] = useState<string>('');
   useEffect(() => {
     if (!user) return;
-    createClient().from('devis_templates').select('id, name, template').eq('user_id', user.id).order('name')
+    createClient().from('devis_templates').select('id, name, template').order('name')
       .then(({ data }) => {
         const list = (data ?? []) as { id: string; name: string; template: string | null }[];
         setSavedTemplates(list);

@@ -62,7 +62,6 @@ export default function CommandesPage() {
     const [ordersRes, suppliersRes] = await Promise.all([
       supabase.from('supplier_orders')
         .select('*, supplier:suppliers(id, name, email, phone), items:supplier_order_items(*, ingredient:ingredients(id, name, unit, volume_unit_price, preferred_supplier_id))')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
       supabase.from('suppliers').select('*').order('name'),
     ]);
@@ -422,7 +421,7 @@ function CreateOrderModal({ userId, suppliers, onClose, onCreated }: {
 
   useEffect(() => {
     const sb = createClient();
-    sb.from('ingredients').select('id, name, unit, volume_unit_price, preferred_supplier_id').or(`user_id.is.null,user_id.eq.${userId}`).order('name')
+    sb.from('ingredients').select('id, name, unit, volume_unit_price, preferred_supplier_id').order('name')
       .then(({ data }) => setIngredients((data as Ingredient[]) ?? []));
   }, [userId]);
 

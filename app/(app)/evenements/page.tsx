@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, MapPin } from 'lucide-react';
+import { companyIds, companyQuotesFilter } from '@/lib/companyFilter';
+import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -57,11 +59,14 @@ export default function EvenementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>('upcoming');
   useUrlAction({ passes: () => setScope('past') });
+  const { user, profile } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
     createClient()
       .from('quotes')
       .select('id, client_name, event_type, event_date, event_location, guest_count, total_amount, status')
+      .or(companyQuotesFilter(user.id, companyIds(user.id, profile)))
       .in('status', CONFIRMED_STATUSES)
       .not('event_date', 'is', null)
       .order('event_date', { ascending: true })
@@ -70,7 +75,7 @@ export default function EvenementsPage() {
         setEvents((data ?? []) as Event[]);
         setLoading(false);
       });
-  }, []);
+  }, [user, profile]);
 
   const today = new Date().toLocaleDateString('sv-SE'); // AAAA-MM-JJ, heure locale
   const { upcoming, past } = useMemo(() => ({

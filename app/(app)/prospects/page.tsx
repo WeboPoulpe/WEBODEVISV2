@@ -8,6 +8,7 @@ import {
   MessageSquare, ChevronDown, FileText, Copy, Check, Link2,
   Loader2, Trash2, RefreshCw, Eye, AlertCircle,
 } from 'lucide-react';
+import { companyIds } from '@/lib/companyFilter';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
@@ -309,7 +310,6 @@ function CreateDevisModal({
         .from('customers')
         .select('id')
         .eq('email', email.trim().toLowerCase())
-        .eq('owner_user_id', user.id)
         .limit(1)
         .maybeSingle();
 
@@ -540,7 +540,6 @@ function SaveAsCustomerButton({ prospect }: { prospect: Prospect }) {
       supabase.from('customers')
         .select('id')
         .eq('email', prospect.email.toLowerCase())
-        .eq('owner_user_id', user.id)
         .maybeSingle()
         .then(({ data }) => { if (data) setAlreadyExists(true); });
     });
@@ -870,7 +869,7 @@ function ProspectCard({
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 function ProspectsPageInner() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [prospectQuoteMap, setProspectQuoteMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -904,12 +903,14 @@ function ProspectsPageInner() {
       .select('*')
       .order('created_at', { ascending: false });
 
+    // Demandes de toute l'entreprise (le filtre reste utile pour un compte administrateur).
+    const ids = companyIds(user.id, profile);
     if (myTokens.length > 0) {
       query = query.or(
-        `owner_user_id.eq.${user.id},user_token.in.(${myTokens.join(',')})`
+        `owner_user_id.in.(${ids.join(',')}),user_token.in.(${myTokens.join(',')})`
       );
     } else {
-      query = query.eq('owner_user_id', user.id);
+      query = query.in('owner_user_id', ids);
     }
 
     const { data } = await query;

@@ -53,8 +53,8 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
   const load = useCallback(async () => {
     const supabase = createClient();
     const [s, i] = await Promise.all([
-      supabase.from('material_template_sets').select('id, name').eq('user_id', userId).order('created_at'),
-      supabase.from('material_templates').select(ITEM_SELECT).eq('user_id', userId).order('sort_order'),
+      supabase.from('material_template_sets').select('id, name').order('created_at'),
+      supabase.from('material_templates').select(ITEM_SELECT).order('sort_order'),
     ]);
     if (s.error || i.error) setError('Vos modèles n’ont pas pu être chargés. Rechargez la page.');
     const loaded = (s.data ?? []) as TemplateSet[];
