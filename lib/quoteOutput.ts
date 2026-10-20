@@ -132,6 +132,32 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
 }
 
 /**
+ * Annule, dans `paper`, les styles de l'application qui changent la mise en page des balises (remise à zéro de
+ * Tailwind : marges des paragraphes et titres, taille des titres, puces, images en bloc, bordures… ; police et
+ * espacement des titres de l'application) : on revient aux valeurs par défaut du navigateur, celles de la fenêtre
+ * d'impression de l'éditeur. À placer avant quoteOutputCss, dont les règles gardent le dessus.
+ */
+export function appResetCss(paper: string): string {
+  const reset = (tags: string, props: string[]) => `${paper} :is(${tags}) { ${props.map((p) => `${p}: revert;`).join(' ')} }`;
+  return [
+    // Texte hors du document (logo, mentions, conditions) : police par défaut du navigateur, comme à l'impression.
+    `${paper} { font: initial; letter-spacing: normal; }`,
+    `${paper} *, ${paper} *::before, ${paper} *::after { border-width: revert; border-style: revert; border-color: revert; }`,
+    reset('h1, h2, h3, h4, h5, h6', ['font-size', 'font-weight', 'font-family', 'margin', 'letter-spacing']),
+    reset('blockquote, dl, dd, figure, p, pre, hr', ['margin']),
+    reset('hr', ['height', 'color', 'border-top-width']),
+    reset('ol, ul, menu', ['list-style', 'margin', 'padding']),
+    reset('a', ['color', 'text-decoration']),
+    reset('b, strong', ['font-weight']),
+    reset('code, kbd, samp, pre, small', ['font-size']),
+    reset('sub, sup', ['font-size', 'line-height', 'position', 'vertical-align', 'top', 'bottom']),
+    reset('table', ['text-indent', 'border-color', 'border-collapse']),
+    reset('img, svg, video, canvas, audio, iframe, embed, object', ['display', 'vertical-align']),
+    reset('img, video', ['max-width', 'height']),
+  ].join('\n');
+}
+
+/**
  * Feuille de style de l'éditeur : la feuille à l'écran a exactement la mise en page du papier.
  *  • Les styles de l'application qui changent la mise en page des balises (remise à zéro de Tailwind : marges
  *    des paragraphes et titres, taille des titres, puces, images en bloc, bordures…, et l'espacement des titres
@@ -149,22 +175,8 @@ export function quoteEditorCss(s: QuoteOutputSettings, paper: string, root: stri
     .replace(/@page\s*\{[^}]*\}/, '')
     .replace('@media print', '@media all')
     .replace(/\.quote-doc/g, doc);
-  const reset = (tags: string, props: string[]) => `${paper} :is(${tags}) { ${props.map((p) => `${p}: revert;`).join(' ')} }`;
   return [
-    // Texte hors du document (logo, mentions) : police par défaut du navigateur, comme dans la page imprimée.
-    `${paper} { font: initial; letter-spacing: normal; }`,
-    `${paper} *, ${paper} *::before, ${paper} *::after { border-width: revert; border-style: revert; border-color: revert; }`,
-    reset('h1, h2, h3, h4, h5, h6', ['font-size', 'font-weight', 'margin', 'letter-spacing']),
-    reset('blockquote, dl, dd, figure, p, pre, hr', ['margin']),
-    reset('hr', ['height', 'color', 'border-top-width']),
-    reset('ol, ul, menu', ['list-style', 'margin', 'padding']),
-    reset('a', ['color', 'text-decoration']),
-    reset('b, strong', ['font-weight']),
-    reset('code, kbd, samp, pre, small', ['font-size']),
-    reset('sub, sup', ['font-size', 'line-height', 'position', 'vertical-align', 'top', 'bottom']),
-    reset('table', ['text-indent', 'border-color', 'border-collapse']),
-    reset('img, svg, video, canvas, audio, iframe, embed, object', ['display', 'vertical-align']),
-    reset('img, video', ['max-width', 'height']),
+    appResetCss(paper),
     output,
     `${doc} { padding-top: ${PRINT_GAP_MM}mm !important; padding-bottom: ${PRINT_GAP_MM}mm !important; }`,
     `${doc} .screen-sep { display: block !important; position: relative !important; height: 0 !important; margin: 0 !important;`

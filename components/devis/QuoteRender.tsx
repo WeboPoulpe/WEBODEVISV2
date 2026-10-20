@@ -9,7 +9,7 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import PrintBreaks from '@/components/devis/PrintBreaks';
 import { documentHasCgv } from '@/lib/cgvDetect';
-import { googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
+import { appResetCss, googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 
 /** Accord signé en ligne par le client, imprimé à la fin du document. */
 export interface QuoteRenderAcceptance {
@@ -22,7 +22,7 @@ export interface QuoteRenderAcceptance {
 function AcceptanceBlock({ acceptance }: { acceptance: QuoteRenderAcceptance }) {
   const when = new Date(acceptance.acceptedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' });
   return (
-    <div className="mx-[20mm] my-6 p-4 border border-gray-300 rounded-lg break-inside-avoid" style={{ fontFamily: 'system-ui, sans-serif' }}>
+    <div className="webo-ui mx-[20mm] my-6 p-4 border border-gray-300 rounded-lg break-inside-avoid" style={{ fontFamily: 'system-ui, sans-serif' }}>
       <p className="text-[12px] font-semibold text-gray-900">Bon pour accord, signé en ligne</p>
       <p className="text-[11px] text-gray-600 mt-1">
         Accepté le {when} par {acceptance.signerName}{acceptance.signerRole ? `, ${acceptance.signerRole}` : ''}.
@@ -69,7 +69,9 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
           // eslint-disable-next-line @next/next/no-page-custom-font
           <link rel="stylesheet" href={fontHref} />
         )}
-        <style>{quoteOutputCss(settings)}</style>
+        {/* Styles de l'application annulés dans le document (sauf le cadre d'accord en ligne, .webo-ui) : la page
+            s'imprime exactement comme la fenêtre d'impression de l'éditeur. */}
+        <style>{`${appResetCss('.quote-render > :where(:not(.webo-ui))')}\n${quoteOutputCss(settings)}`}</style>
         <PrintBreaks />
         <div className="quote-render quote-out">
           {coverHtml && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(coverHtml) }} />}
