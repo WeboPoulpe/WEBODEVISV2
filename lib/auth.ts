@@ -44,13 +44,14 @@ export const authOptions: NextAuthOptions = {
         const email = normalizeEmail(credentials.email);
         const ip = clientIp(req?.headers);
         // Trop d'échecs récents : refusé avant même de vérifier le mot de passe (le message s'affiche tel quel).
-        if (await isLoginBlocked(email, ip)) throw new Error(TOO_MANY_ATTEMPTS);
+        // Si le compteur est illisible (base en cours de mise à jour), la connexion reste possible.
+        if (await isLoginBlocked(email, ip).catch(() => false)) throw new Error(TOO_MANY_ATTEMPTS);
         const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
         if (!user || !(await bcrypt.compare(credentials.password, user.password_hash))) {
-          await recordLoginFailure(email, ip);
+          await recordLoginFailure(email, ip).catch((e) => console.error('[connexion] compteur', e));
           return null;
         }
-        await clearLoginFailures(email);
+        await clearLoginFailures(email).catch(() => {});
 
         // Un compte désactivé par un administrateur ne peut plus se connecter.
         const [profile] = await db.select({ is_active: profiles.is_active }).from(profiles).where(eq(profiles.id, user.id)).limit(1);

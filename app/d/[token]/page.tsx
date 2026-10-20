@@ -23,7 +23,8 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
 
   const [{ data: profile }, state] = await Promise.all([
     adminSupabase.from('profiles').select('company_name, company_address, company_phone, logo_url, cgv').eq('id', quote.owner_user_id ?? quote.user_id).maybeSingle(),
-    acceptanceState(token),
+    // L'acceptation en ligne ne doit jamais empêcher d'afficher le devis.
+    acceptanceState(token).catch(() => null),
     // Une consultation qui ne s'enregistre pas ne doit pas empêcher d'afficher le devis.
     recordQuoteView(token).catch(() => {}),
   ]);
