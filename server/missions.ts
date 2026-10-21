@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { event_extras, event_ingredients, extras, ingredients, notifications, profiles, quotes, suppliers } from '@/db/schema';
 import { isDemoUser } from '@/lib/demo';
 import { forgetSubscription, pushEnabled, pushToUser, saveSubscription, type BrowserSubscription } from '@/lib/push';
+import { contractsOfExtra } from './extraHrCore';
 
 // Liste de courses d'une mission, pour un extra qui n'a pas de compte : le lien personnel de l'extra
 // (son jeton) est la seule clé, et il n'ouvre que les événements où les courses lui ont été confiées.
@@ -73,6 +74,8 @@ export interface MissionPage {
     id: string; quoteId: string; status: string; arrival: string | null; departure: string | null; notes: string | null;
     courses: boolean; respondedAt: string | null;
     eventType: string; clientName: string; eventDate: string; location: string | null; guestCount: number;
+    /** Contrat envoyé pour cette mission (à signer, ou signé). */
+    contract: { id: string; status: 'envoye' | 'signe' } | null;
   }[];
 }
 
@@ -101,6 +104,7 @@ export async function getMissionPage(token: string): Promise<MissionPage | null>
     .from(event_extras).innerJoin(quotes, eq(quotes.id, event_extras.quote_id))
     .where(and(eq(event_extras.extra_id, extra.id), gte(quotes.event_date, since)))
     .orderBy(asc(quotes.event_date), asc(event_extras.arrival_time));
+  const contracts = await contractsOfExtra(extra.id);
   return {
     extra: { id: extra.id, name: extra.name, role: extra.role, unavailableDates: (extra.unavailable ?? []).filter((d) => d >= since).sort() },
     company: {
@@ -108,7 +112,7 @@ export async function getMissionPage(token: string): Promise<MissionPage | null>
       phone: owner?.phone ?? null,
       email: owner?.email ?? null,
     },
-    missions: rows,
+    missions: rows.map((r) => ({ ...r, contract: contracts[r.id] ?? null })),
   };
 }
 

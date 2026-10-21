@@ -211,6 +211,13 @@
       "when": 1792565851887,
       "tag": "0029_accounting_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792566064829,
+      "tag": "0030_extra_contracts",
+      "breakpoints": true
     }
   ]
 }

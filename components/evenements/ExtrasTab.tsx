@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Clock, Link2, Loader2, MessageCircle, MessageSquare, Pencil, Plus, Printer, Send, Trash2 } from 'lucide-react';
+import { AlertTriangle, Clock, FileSignature, Link2, Loader2, MessageCircle, MessageSquare, Pencil, Plus, Printer, Send, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { generateStaffHtml, type StaffMission } from '@/lib/generateStaffHtml';
@@ -14,6 +14,9 @@ import { cn } from '@/lib/utils';
 import { Check, EmptyState, ErrorBanner, useActionError, type EventQuote } from './shared';
 import StaffCostSection from '@/components/extras/StaffCostSection';
 import { useFeedback } from '@/components/ui/Feedback';
+import ContractModal, { DPAE_TONES } from '@/components/extras/ContractModal';
+import type { MissionHrStatus } from '@/lib/extraContract';
+import { getHrStatuses } from '@/server/extraHr';
 
 interface Extra {
   id: string; name: string; phone: string | null; email: string | null; role: string | null;
@@ -71,6 +74,9 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
   const [sendFor, setSendFor] = useState<Assignment | null>(null);
   const [sending, setSending] = useState<'one' | 'team' | null>(null);
   const [notice, setNotice] = useState<{ text: string; unreachable: Assignment[] } | null>(null);
+  // Contrat et DPAE de chaque mission, et fenêtre ouverte.
+  const [hr, setHr] = useState<Record<string, MissionHrStatus>>({});
+  const [contractFor, setContractFor] = useState<Assignment | null>(null);
 
   const day = quote.event_date?.slice(0, 10) ?? null;
 
@@ -82,6 +88,13 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
   }, [quote.id, check]);
 
   useEffect(() => { loadAssignments(); }, [loadAssignments]);
+
+  const assignmentKey = assignments.map((a) => `${a.id}:${a.status}:${a.arrival_time ?? ''}`).join(',');
+  const refreshHr = useCallback(() => {
+    const ids = assignmentKey ? assignmentKey.split(',').map((k) => k.split(':')[0]) : [];
+    if (ids.length) getHrStatuses(ids).then(setHr).catch(() => undefined);
+  }, [assignmentKey]);
+  useEffect(() => { refreshHr(); }, [refreshHr]);
 
   // Les extras répondent depuis leur page : au retour sur l'onglet, l'équipe se met à jour.
   useEffect(() => {
@@ -402,9 +415,22 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
                 )}
 
                 {a.extra && a.status !== 'refuse' && (
-                  <button onClick={() => setSendFor(a)} className={cn(btnSecondary, 'h-10 mt-3 w-full sm:w-auto')}>
-                    <Send className="h-4 w-4" />{a.invited_at ? 'Renvoyer la mission' : 'Envoyer la mission'}
-                  </button>
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 mt-3">
+                    <button onClick={() => setSendFor(a)} className={cn(btnSecondary, 'h-10 w-full sm:w-auto')}>
+                      <Send className="h-4 w-4" />{a.invited_at ? 'Renvoyer la mission' : 'Envoyer la mission'}
+                    </button>
+                    <button onClick={() => setContractFor(a)} className={cn(btnSecondary, 'h-10 w-full sm:w-auto')}>
+                      <FileSignature className="h-4 w-4" />Contrat et DPAE
+                    </button>
+                    {hr[a.id] && hr[a.id].dpae.level !== 'none' && (
+                      <span className={cn('inline-flex items-center self-start sm:self-auto px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap', DPAE_TONES[hr[a.id].dpae.level])}>
+                        {hr[a.id].dpae.label}
+                      </span>
+                    )}
+                    {hr[a.id]?.contract === 'signe' && (
+                      <span className="inline-flex items-center self-start sm:self-auto px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-sage-100 text-sage">Contrat signé</span>
+                    )}
+                  </div>
                 )}
               </li>
             );
@@ -426,6 +452,15 @@ export default function ExtrasTab({ quote }: { quote: EventQuote }) {
       <p className="text-sm text-gray-500">
         Votre carnet d’extras se gère dans <Link href="/extras" className="font-medium text-primary hover:underline">la page Extras</Link>.
       </p>
+
+      {contractFor?.extra && (
+        <ContractModal
+          assignmentId={contractFor.id}
+          extraName={contractFor.extra.name}
+          onClose={() => setContractFor(null)}
+          onChanged={refreshHr}
+        />
+      )}
 
       {team && (
         <Modal

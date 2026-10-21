@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus, Trash2, Link2, Loader2, Check, ChevronLeft, ChevronRight,
-  UserPlus, CalendarDays, MapPin, Users, ArrowRight, Phone, Mail, Share2, Clock,
+  UserPlus, CalendarDays, MapPin, Users, ArrowRight, Phone, Mail, Share2, Clock, FileSignature, AlertTriangle, ChevronDown,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
@@ -18,6 +18,10 @@ import { EXTRA_ROLES, MISSION_STATUSES, roleFamily, type MissionStatus } from '@
 import { notifyMissionChanged } from '@/server/extras';
 import { euros, toNumber } from '@/lib/staffCost';
 import { useFeedback } from '@/components/ui/Feedback';
+import ContractModal, { DPAE_TONES } from '@/components/extras/ContractModal';
+import ExtraHrForm from '@/components/extras/ExtraHrForm';
+import { dpaeNeedsAction, type MissionHrStatus } from '@/lib/extraContract';
+import { getHrStatuses } from '@/server/extraHr';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Extra {
@@ -111,9 +115,26 @@ interface SheetProps {
   onStatusChange: (id: string, s: Status) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
   onSave: (id: string, arrivalTime: string, departureTime: string, notes: string) => Promise<boolean>;
+  /** Contrat et DPAE de la mission (absent tant que le statut n'est pas chargé). */
+  hr?: MissionHrStatus;
+  onContract: () => void;
 }
 
-function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, onSave }: SheetProps) {
+const CONTRACT_LABELS = { brouillon: 'Contrat à envoyer', envoye: 'Contrat envoyé', signe: 'Contrat signé' } as const;
+
+/** Pastilles « contrat » et « DPAE » d'une mission. */
+function HrPills({ hr }: { hr?: MissionHrStatus }) {
+  if (!hr) return null;
+  const dpae = hr.dpae.level !== 'none' ? hr.dpae : null;
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {hr.contract && <span className={cn(pill, hr.contract === 'signe' ? 'bg-sage-100 text-sage' : 'bg-gray-100 text-gray-700')}>{CONTRACT_LABELS[hr.contract]}</span>}
+      {dpae && <span className={cn(pill, DPAE_TONES[dpae.level])}>{dpae.label}</span>}
+    </span>
+  );
+}
+
+function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, onSave, hr, onContract }: SheetProps) {
   const { confirm } = useFeedback();
   const [detail, setDetail]   = useState<QuoteDetail | null>(null);
   const [arrTime, setArrTime] = useState(assignment.arrival_time ?? '');
@@ -191,6 +212,16 @@ function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, on
               ? `${assignment.status === 'confirme' ? 'A accepté' : 'A décliné'} lui-même depuis sa page, le ${dateTimeFr(assignment.responded_at)}.`
               : assignment.invited_at ? `Mission envoyée le ${dateTimeFr(assignment.invited_at)}.` : 'Mission pas encore envoyée : envoyez-la depuis l’onglet Extras de l’événement.'}
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 p-4 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium text-gray-900">Contrat et déclaration d’embauche</p>
+            <HrPills hr={hr} />
+          </div>
+          <button type="button" onClick={onContract} className={cn(btnSecondary, 'h-10 w-full sm:w-auto')}>
+            <FileSignature className="h-4 w-4" />Contrat et DPAE
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -310,7 +341,26 @@ function ExtraModal({ initial, onSave, onClose, saving, showRate }: {
         {initial?.access_token && initial.name && <MissionPageLink name={initial.name} token={initial.access_token} />}
         {error && <p role="alert" className={errorCls}>{error}</p>}
       </form>
+      {initial?.id && <HrSection extraId={initial.id} />}
     </Modal>
+  );
+}
+
+/** Fiche administrative de l'extra (contrat, DPAE), repliée par défaut. */
+function HrSection({ extraId }: { extraId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="rounded-2xl border border-gray-200 mb-3">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 px-4 min-h-12 text-left">
+        <span>
+          <span className="block font-medium text-gray-900">Contrat et DPAE</span>
+          <span className="block text-sm text-gray-500">État civil, n° de sécurité sociale, adresse</span>
+        </span>
+        <ChevronDown className={cn('h-4 w-4 text-gray-500 transition-transform flex-shrink-0', open && 'rotate-180')} />
+      </button>
+      {open && <div className="px-4 pb-4"><ExtraHrForm extraId={extraId} /></div>}
+    </section>
   );
 }
 
@@ -468,9 +518,10 @@ function AgendaView({ extras, assignments, onTagClick }: {
 
 // ── Ligne d'un extra ──────────────────────────────────────────────────────────
 function ExtraRow({
-  extra, assignments, checked, onCheck, onEdit, onDelete, onAssign, onCopyLink, copied, onTagClick,
+  extra, assignments, checked, onCheck, onEdit, onDelete, onAssign, onCopyLink, copied, onTagClick, hr,
 }: {
   extra: Extra;
+  hr: Record<string, MissionHrStatus>;
   checked: boolean;
   onCheck: (on: boolean) => void;
   assignments: Assignment[];
@@ -517,10 +568,13 @@ function ExtraRow({
         <div className="flex flex-wrap gap-2 pl-[56px] sm:pl-[128px] pr-4 pb-2.5">
           {upcoming.map((a) => {
             const s = st(a.status);
+            const dpae = hr[a.id]?.dpae;
+            const warn = !!dpae && dpaeNeedsAction(dpae.level);
             return (
-              <button key={a.id} onClick={() => onTagClick(a)} title={s.label}
+              <button key={a.id} onClick={() => onTagClick(a)} title={warn ? `${s.label}, ${dpae.label}` : s.label}
                 className={cn('inline-flex items-center gap-2 max-w-full min-h-10 px-3 rounded-xl text-sm font-medium hover:opacity-80 transition-opacity', s.cls)}>
-                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', s.dot)} />
+                {warn ? <AlertTriangle className={cn('h-3.5 w-3.5 flex-shrink-0', dpae.level === 'open' ? 'text-amber-700' : 'text-danger')} aria-label={dpae.label} />
+                  : <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', s.dot)} />}
                 <span className="font-semibold whitespace-nowrap">{dateFr(a.quote.event_date, { day: 'numeric', month: 'short' })}</span>
                 <span className="truncate">{a.quote.event_type || a.quote.client_name}</span>
               </button>
@@ -576,6 +630,9 @@ export default function ExtrasPage() {
   const [assignFor,   setAssignFor]   = useState<string[] | null>(null);
   const [viewMode,    setViewMode]    = useState<'list' | 'agenda'>('list');
   const [openSheet,   setOpenSheet]   = useState<{ assignment: Assignment; extra: Extra } | null>(null);
+  // Contrat et DPAE : statut par mission, et fenêtre ouverte.
+  const [hr,          setHr]          = useState<Record<string, MissionHrStatus>>({});
+  const [contractFor, setContractFor] = useState<{ id: string; name: string; tab: 'contrat' | 'dpae' } | null>(null);
   // La colonne du taux horaire n'existe qu'après la migration 0023 : le champ est masqué sinon.
   const [rateSupported, setRateSupported] = useState(false);
 
@@ -603,7 +660,16 @@ export default function ExtrasPage() {
     setExtras(extras);
     setAssignments(assigns);
     setLoading(false);
+    if (assigns.length) getHrStatuses(assigns.map((a) => a.id)).then(setHr).catch(() => undefined);
   }, [user]);
+
+  const refreshHr = () => { if (assignments.length) getHrStatuses(assignments.map((a) => a.id)).then(setHr).catch(() => undefined); };
+
+  // DPAE à faire : missions confirmées dans les 8 jours (ou déjà commencées) sans DPAE notée.
+  const dpaeTodo = useMemo(() => assignments
+    .filter((a) => { const l = hr[a.id]?.dpae.level; return !!l && dpaeNeedsAction(l); })
+    .sort((a, b) => (a.quote.event_date ?? '').localeCompare(b.quote.event_date ?? '')), [assignments, hr]);
+  const extraName = (id: string) => extras.find((e) => e.id === id)?.name ?? 'Extra';
 
   useEffect(() => { load(); }, [load]);
 
@@ -721,6 +787,27 @@ export default function ExtrasPage() {
 
       {error && <div className="mb-4"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
 
+      {dpaeTodo.length > 0 && (
+        <section aria-labelledby="dpae-todo" className="mb-4 rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3">
+          <h2 id="dpae-todo" className="flex items-center gap-2 font-semibold text-amber-900">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            {dpaeTodo.length > 1 ? `${dpaeTodo.length} déclarations d’embauche (DPAE) à faire` : 'Une déclaration d’embauche (DPAE) à faire'}
+          </h2>
+          <ul className="flex flex-wrap gap-2 mt-2">
+            {dpaeTodo.map((a) => (
+              <li key={a.id}>
+                <button onClick={() => setContractFor({ id: a.id, name: extraName(a.extra_id), tab: 'dpae' })}
+                  className="inline-flex items-center gap-2 min-h-10 px-3 rounded-xl text-sm font-medium bg-white border border-amber-200 hover:border-amber-300">
+                  <span className="font-semibold">{extraName(a.extra_id)}</span>
+                  <span className="text-gray-600">{dateFr(a.quote.event_date, { day: 'numeric', month: 'short' })}</span>
+                  <span className={cn(pill, DPAE_TONES[hr[a.id].dpae.level])}>{hr[a.id].dpae.level === 'open' ? 'à faire' : hr[a.id].dpae.level === 'urgent' ? 'urgent' : 'en retard'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {!loading && extras.length > 0 && (
         <div className="flex p-1 mb-4 rounded-xl bg-gray-200/70 w-fit" role="tablist" aria-label="Affichage">
           {([['list', 'Liste'], ['agenda', 'Agenda']] as const).map(([mode, label]) => (
@@ -791,6 +878,7 @@ export default function ExtrasPage() {
               onCopyLink={() => copyLink(extra.access_token, extra.id)}
               copied={copied === extra.id}
               onTagClick={(a) => setOpenSheet({ assignment: a, extra })}
+              hr={hr}
             />
           ))}
           </ul>
@@ -824,6 +912,17 @@ export default function ExtrasPage() {
           onStatusChange={handleStatusChange}
           onRemove={handleRemoveAssignment}
           onSave={handleSaveSheet}
+          hr={hr[openSheet.assignment.id]}
+          onContract={() => setContractFor({ id: openSheet.assignment.id, name: openSheet.extra.name, tab: 'contrat' })}
+        />
+      )}
+      {contractFor && (
+        <ContractModal
+          assignmentId={contractFor.id}
+          extraName={contractFor.name}
+          initialTab={contractFor.tab}
+          onClose={() => setContractFor(null)}
+          onChanged={refreshHr}
         />
       )}
     </div>

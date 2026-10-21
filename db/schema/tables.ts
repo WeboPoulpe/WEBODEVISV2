@@ -1893,3 +1893,85 @@ export const push_subscriptions = pgTable("push_subscriptions", {
 	foreignKey({ columns: [table.extra_id], foreignColumns: [extras.id], name: "push_subscriptions_extra_id_fkey" }).onDelete("cascade"),
 	check("push_subscriptions_owner_check", sql`(user_id IS NOT NULL) <> (extra_id IS NOT NULL)`),
 ]);
+
+// Fiche administrative d'un extra, pour son contrat et sa déclaration préalable à l'embauche (DPAE) : état civil,
+// n° de sécurité sociale, adresse. Données personnelles sensibles : jamais lues par /api/db (pas de règle dans
+// server/compat/rules.ts), seulement par les actions de server/extraHr.ts, et jamais par un compte en consultation seule.
+export const extra_hr_details = pgTable("extra_hr_details", {
+	extra_id: uuid().primaryKey().notNull(),
+	owner_user_id: uuid().notNull(),
+	birth_name: text(),
+	usage_name: text(),
+	first_names: text(),
+	sex: text(),
+	birth_date: date({ mode: 'string' }),
+	birth_city: text(),
+	birth_department: text(),
+	birth_country: text(),
+	nationality: text(),
+	social_security_number: text(),
+	address: text(),
+	postal_code: text(),
+	city: text(),
+	iban: text(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_extra_hr_details_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.extra_id], foreignColumns: [extras.id], name: "extra_hr_details_extra_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.owner_user_id], foreignColumns: [users.id], name: "extra_hr_details_owner_user_id_fkey" }).onDelete("cascade"),
+	check("extra_hr_details_sex_check", sql`sex IS NULL OR sex = ANY (ARRAY['F'::text, 'M'::text])`),
+]);
+
+// Réglages d'employeur de l'entreprise (compte titulaire), repris sur les contrats d'extra et la fiche DPAE :
+// code APE, URSSAF, convention collective, caisses, service de santé au travail, clauses propres au traiteur.
+export const employer_settings = pgTable("employer_settings", {
+	user_id: uuid().primaryKey().notNull(),
+	naf_code: text(),
+	urssaf: text(),
+	convention: text(),
+	retirement_fund: text(),
+	provident_fund: text(),
+	health_service: text(),
+	meal_terms: text(),
+	trial_terms: text(),
+	signatory_name: text(),
+	signatory_title: text(),
+	signature_city: text(),
+	extra_clauses: text(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({ columns: [table.user_id], foreignColumns: [users.id], name: "employer_settings_user_id_fkey" }).onDelete("cascade"),
+]);
+
+// Contrat d'extra (CDD d'usage) et DPAE d'une mission (une affectation event_extras). Le contrat envoyé est figé
+// (snapshot, content_hash) : l'extra signe en ligne exactement ce qu'il a reçu (nom, signature tracée, horodatage,
+// IP), ou le traiteur le note signé sur papier. La DPAE se fait sur due.urssaf.fr : on note qu'elle est faite,
+// avec le n° d'accusé de réception. dpae_reminded_at : rappel envoyé au traiteur (tâche de 16 h, une seule fois).
+export const extra_contracts = pgTable("extra_contracts", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	event_extra_id: uuid().notNull(),
+	owner_user_id: uuid().notNull(),
+	terms: jsonb(),
+	status: text().default('brouillon').notNull(),
+	snapshot: jsonb(),
+	content_hash: text(),
+	sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+	signed_on_paper: boolean().default(false).notNull(),
+	signer_name: text(),
+	signature: text(),
+	signed_at: timestamp({ withTimezone: true, mode: 'string' }),
+	signer_ip: text(),
+	signer_user_agent: text(),
+	dpae_done: boolean().default(false).notNull(),
+	dpae_date: date({ mode: 'string' }),
+	dpae_ack_number: text(),
+	dpae_reminded_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("extra_contracts_event_extra_id_key").using("btree", table.event_extra_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_extra_contracts_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.event_extra_id], foreignColumns: [event_extras.id], name: "extra_contracts_event_extra_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.owner_user_id], foreignColumns: [users.id], name: "extra_contracts_owner_user_id_fkey" }).onDelete("cascade"),
+	check("extra_contracts_status_check", sql`status = ANY (ARRAY['brouillon'::text, 'envoye'::text, 'signe'::text])`),
+]);

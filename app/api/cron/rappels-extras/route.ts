@@ -9,6 +9,7 @@ import { pushToExtra } from '@/lib/push';
 import { runLifecycleEmails } from '@/server/lifecycle';
 import { runReminders } from '@/server/reminders';
 import { runTastingReminders } from '@/server/tastingReminders';
+import { runDpaeReminders } from '@/server/extraHrCore';
 
 // Rappel de la veille aux extras confirmés : email et notification. Lancé chaque jour en fin d'après-midi par
 // Vercel (vercel.json), qui envoie « Authorization: Bearer CRON_SECRET ». Un rappel n'est envoyé qu'une fois.
@@ -73,5 +74,10 @@ export async function GET(request: NextRequest) {
     console.error('[dégustations]', e instanceof Error ? e.message : e);
     return null;
   });
-  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances, conseils, degustations });
+  // Rappel au traiteur des DPAE à faire pour ses extras confirmés des 8 prochains jours (server/extraHrCore.ts), une fois par mission.
+  const dpae = await runDpaeReminders({ origin }).catch((e) => {
+    console.error('[dpae]', e instanceof Error ? e.message : e);
+    return null;
+  });
+  return NextResponse.json({ day, missions: rows.length, reminded: sent, relances, conseils, degustations, dpae });
 }

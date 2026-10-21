@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bell, BellOff, CalendarDays, CalendarPlus, Check, Clock, Download, Loader2, Mail, MapPin, Phone, ShoppingBasket, Users, X } from 'lucide-react';
+import { Bell, BellOff, CalendarDays, CalendarPlus, Check, Clock, Download, FileSignature, Loader2, Mail, MapPin, Phone, ShoppingBasket, Users, X } from 'lucide-react';
 import { respondToMission, setUnavailableDates, subscribeExtraDevice, unsubscribeDevice as forgetDevice, type MissionPage } from '@/server/missions';
 import { currentSubscription, isStandalone, pushSupport, subscribeDevice, unsubscribeDevice, type PushSupport } from '@/lib/pushClient';
 import { missionStatus } from '@/lib/extras';
@@ -163,6 +163,12 @@ function MissionCard({ m, token, busy, onAnswer, conflict }: { m: Mission; token
           <button onClick={() => onAnswer('confirme')} disabled={busy} className={cn(btn, 'w-full bg-gray-100 text-gray-800 hover:bg-gray-200')}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}Finalement, je suis disponible
           </button>
+        )}
+        {m.contract && (
+          <Link href={`/e/${token}/contrat/${m.contract.id}`}
+            className={cn(btn, 'w-full', m.contract.status === 'envoye' ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white border border-gray-200 text-gray-800 hover:bg-gray-50')}>
+            <FileSignature className="h-4 w-4" />{m.contract.status === 'envoye' ? 'Lire et signer mon contrat' : 'Mon contrat signé'}
+          </Link>
         )}
         {m.courses && (
           <Link href={`/e/${token}/courses/${m.quoteId}`} className={cn(btn, 'w-full bg-forest text-white hover:bg-forest/90')}>

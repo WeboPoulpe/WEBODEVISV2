@@ -3,6 +3,7 @@ import { executeQuery } from '@/server/compat/execute';
 import { RULES } from '@/server/compat/rules';
 import { getSessionUser } from '@/server/session';
 import { listInvoices } from '@/server/invoices';
+import { exportHrData } from '@/server/extraHrCore';
 
 // Export des données du compte (droit à la portabilité, art. 20 du RGPD) : un fichier JSON avec tout ce que
 // le compte peut lire, table par table. Les règles d'accès de /api/db s'appliquent : rien d'un autre compte.
@@ -26,6 +27,8 @@ export async function GET() {
   }
   const invoices = await listInvoices().catch(() => []);
   if (invoices.length) tables.factures = invoices;
+  // Fiches administratives des extras, contrats et réglages d'employeur : hors de /api/db, exportés à part.
+  Object.assign(tables, await exportHrData(user.id).catch(() => ({})));
 
   const body = JSON.stringify({
     format: 'WeboDevis, export des données du compte',

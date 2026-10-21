@@ -35,8 +35,15 @@ const config: NextConfig = {
   // (NEXT_DIST_DIR=.next-build npx next build) sans toucher au serveur de développement en cours.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   devIndicators: false,
-  // Polices du PDF des factures, lues sur le disque par la route : à embarquer dans la fonction Vercel.
-  outputFileTracingIncludes: { '/api/factures/[id]/pdf': ['./lib/facturx/fonts/*.ttf'] },
+  // Polices des PDF (factures, contrats d'extra), lues sur le disque par les routes : à embarquer dans la fonction
+  // Vercel. Les pages Extras et Événement envoient le contrat en PDF depuis une action serveur.
+  outputFileTracingIncludes: {
+    '/api/factures/[id]/pdf': ['./lib/facturx/fonts/*.ttf'],
+    '/api/extras/contrat/[id]': ['./lib/facturx/fonts/*.ttf'],
+    '/e/[token]/contrat/[id]/pdf': ['./lib/facturx/fonts/*.ttf'],
+    '/extras': ['./lib/facturx/fonts/*.ttf'],
+    '/evenements/[id]': ['./lib/facturx/fonts/*.ttf'],
+  },
   // Test sur téléphone en développement : adresses du réseau local autorisées à charger l'app.
   allowedDevOrigins: ['192.168.1.*'],
   images: {
