@@ -50,11 +50,15 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
             <CheckCircle2 className="h-5 w-5 mt-0.5 flex-shrink-0" />
             <p className="text-sm">
               <span className="font-semibold">Devis accepté le {frDateTime(state.acceptance.acceptedAt)}</span> par {state.acceptance.signerName}
-              {state.acceptance.signerRole ? ` (${state.acceptance.signerRole})` : ''}. Merci, {companyName} a bien reçu votre accord.
+              {state.acceptance.signerRole ? ` (${state.acceptance.signerRole})` : ''}
+              {state.acceptance.formulaName ? `, formule « ${state.acceptance.formulaName} »` : ''}. Merci, {companyName} a bien reçu votre accord.
             </p>
           </div>
         )}
-        {state?.canAccept && <AcceptQuote token={token} companyName={companyName} validUntil={state.validUntil} isCompany={state.isCompany} />}
+        {state?.canAccept && (
+          <AcceptQuote token={token} companyName={companyName} validUntil={state.validUntil} isCompany={state.isCompany}
+            formulas={state.formulas} chosenFormulaId={state.chosenFormulaId} hidePrice={state.hidePrice} />
+        )}
         {state?.expired && (
           <div className="mx-4 sm:mx-auto sm:max-w-[210mm] my-4 sm:mt-0 sm:mb-6 flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 print:hidden" role="status">
             <Clock className="h-5 w-5 mt-0.5 flex-shrink-0" />

@@ -10,6 +10,7 @@ import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import PrintBreaks from '@/components/devis/PrintBreaks';
 import { documentHasCgv } from '@/lib/cgvDetect';
 import { appResetCss, googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
+import { documentForFormula, parseFormulas, quoteLines } from '@/lib/quoteFormulas';
 
 /** Accord signé en ligne par le client, imprimé à la fin du document. */
 export interface QuoteRenderAcceptance {
@@ -17,6 +18,8 @@ export interface QuoteRenderAcceptance {
   signerRole: string | null;
   signature: string;
   acceptedAt: string;
+  /** Formule signée (devis à plusieurs formules). */
+  formulaName?: string | null;
 }
 
 function AcceptanceBlock({ acceptance }: { acceptance: QuoteRenderAcceptance }) {
@@ -25,7 +28,8 @@ function AcceptanceBlock({ acceptance }: { acceptance: QuoteRenderAcceptance }) 
     <div className="webo-ui mx-[20mm] my-6 p-4 border border-gray-300 rounded-lg break-inside-avoid" style={{ fontFamily: 'system-ui, sans-serif' }}>
       <p className="text-[12px] font-semibold text-gray-900">Bon pour accord, signé en ligne</p>
       <p className="text-[11px] text-gray-600 mt-1">
-        Accepté le {when} par {acceptance.signerName}{acceptance.signerRole ? `, ${acceptance.signerRole}` : ''}.
+        Accepté le {when} par {acceptance.signerName}{acceptance.signerRole ? `, ${acceptance.signerRole}` : ''}
+        {acceptance.formulaName ? `, formule « ${acceptance.formulaName} »` : ''}.
       </p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={acceptance.signature} alt={`Signature de ${acceptance.signerName}`} className="mt-2 h-20 w-auto" />
@@ -51,8 +55,12 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
   if (quote.content_html) {
     const settings = outputSettings(quote);
     const fontHref = googleFontHref(settings.font);
-    // Le numéro attribué par la base est posé sous la date de l'en-tête.
-    const content = withQuoteNumber(quote.content_html as string, quote.quote_number, quote.language === 'en' ? 'en' : 'fr');
+    // Le numéro attribué par la base est posé sous la date de l'en-tête. Devis à formules : une fois la formule
+    // retenue, le document ne présente plus qu'elle.
+    const content = documentForFormula(
+      withQuoteNumber(quote.content_html as string, quote.quote_number, quote.language === 'en' ? 'en' : 'fr'),
+      parseFormulas(quote.formulas), quote.chosen_formula_id,
+    );
 
     const coverHtml = buildCoverPageHtml((quote.cover_page_config as CoverPageConfig) ?? DEFAULT_COVER_CONFIG);
     const photosHtml = buildPhotosPageHtml((quote.photos_page_config as PhotosPageConfig) ?? DEFAULT_PHOTOS_CONFIG);
@@ -93,7 +101,7 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
       : `${quote.client_first_name ?? ''} ${quote.client_last_name ?? ''}`.trim() ||
         (quote.client_name ?? '');
 
-  const services: ServiceLine[] = Array.isArray(quote.services) ? quote.services : [];
+  const services: ServiceLine[] = quoteLines<ServiceLine>(quote);
   const images: string[] = Array.isArray(quote.images) ? quote.images : [];
 
   const docProps = {

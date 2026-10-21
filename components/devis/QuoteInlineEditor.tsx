@@ -16,6 +16,7 @@ import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { syncWeboDocument } from '@/lib/weboFinancials';
+import { effectiveLines, parseFormulas } from '@/lib/quoteFormulas';
 import { quoteVatBreakdown, vatRowsForDisplay, resolveGuestSplit } from '@/lib/quoteTotals';
 import VatRateSelect from '@/components/devis/VatRateSelect';
 import CompanySearch from '@/components/clients/CompanySearch';
@@ -406,7 +407,11 @@ export default function QuoteInlineEditor({
       .select('content_html, selected_font, guest_count_adults, guest_count_children, language').eq('id', quoteId).maybeSingle();
     const split = resolveGuestSplit(event.guestCount, current?.guest_count_adults as number | null, current?.guest_count_children as number | null);
     const lines = services.filter((l) => !l.isPageBreak);
-    const ttcExact = quoteVatBreakdown(lines, options.vatRate, split.adults, split.children).ttc;
+    // Formules au choix (migration 0031, lues à part : sans elles, aucune) : gardées dans le document, et le
+    // total est celui de la formule retenue (à défaut, de la première).
+    const f = await supabase.from('quotes').select('formulas, chosen_formula_id').eq('id', quoteId).maybeSingle();
+    const formulas = f.error ? [] : parseFormulas(f.data?.formulas);
+    const ttcExact = quoteVatBreakdown(effectiveLines(lines, formulas, f.error ? null : f.data?.chosen_formula_id as string | null), options.vatRate, split.adults, split.children).ttc;
     const clientName = client.type === 'particulier' ? `${client.firstName} ${client.lastName}`.trim() : client.companyName;
     const synced = current?.content_html
       ? syncWeboDocument(current.content_html as string, {
@@ -419,7 +424,7 @@ export default function QuoteInlineEditor({
             eventType: event.eventType || null, eventDate: event.eventDate || null, eventLocation: event.eventLocation || null,
             guestCount: event.guestCount, guestCountAdults: (current.guest_count_adults as number | null) ?? null,
             guestCountChildren: (current.guest_count_children as number | null) ?? null,
-            services: lines, vatRate: options.vatRate, hidePrice: options.hidePrice,
+            services: lines, formulas, vatRate: options.vatRate, hidePrice: options.hidePrice,
             language: current.language === 'en' ? 'en' : 'fr',
           },
           financials: true,

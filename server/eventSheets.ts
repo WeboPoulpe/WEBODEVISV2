@@ -8,6 +8,8 @@ import {
 } from '@/db/schema';
 import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
 import { cleanRunSheet, productionPlan, type ProductionPlan, type ProductionRecipe, type RunSheetStep } from '@/lib/production';
+import { quoteLines } from '@/lib/quoteFormulas';
+import { formulaFields } from './formulaColumns';
 import { requireUser } from './session';
 
 // Documents imprimables de la fiche événement : fiche de production cuisine, production du jour
@@ -49,7 +51,10 @@ const EVENT_COLUMNS = {
   internal_notes: quotes.internal_notes,
 };
 
-type EventRow = { [K in keyof typeof EVENT_COLUMNS]: (typeof EVENT_COLUMNS)[K]['_']['data'] | null };
+// Formules du devis (migration 0031, lues sans erreur avant) : la production ne compte que la formule retenue.
+const eventSelect = async () => ({ ...EVENT_COLUMNS, ...(await formulaFields()) });
+
+type EventRow = { [K in keyof typeof EVENT_COLUMNS]: (typeof EVENT_COLUMNS)[K]['_']['data'] | null } & { formulas?: unknown; chosen_formula_id?: string | null };
 
 export interface EventHeading {
   id: string;
@@ -127,10 +132,10 @@ async function loadRecipes(owner: string): Promise<ProductionRecipe[]> {
 }
 
 const ownerOf = (q: EventRow, uid: string) => q.owner_user_id ?? q.user_id ?? uid;
-const linesOf = (q: EventRow) => (Array.isArray(q.services) ? q.services : []) as { name?: string; quantity?: number; removed?: boolean; isPageBreak?: boolean }[];
+const linesOf = (q: EventRow) => quoteLines<{ name?: string; quantity?: number; removed?: boolean; isPageBreak?: boolean }>(q);
 
 async function loadEvent(uid: string, quoteId: string): Promise<EventRow | null> {
-  const [q] = await db.select(EVENT_COLUMNS).from(quotes).where(and(eq(quotes.id, quoteId), companyAccess(uid))).limit(1);
+  const [q] = await db.select(await eventSelect()).from(quotes).where(and(eq(quotes.id, quoteId), companyAccess(uid))).limit(1);
   return (q as EventRow | undefined) ?? null;
 }
 
@@ -154,7 +159,7 @@ export interface DayProduction {
 export async function getDayProduction(date: string): Promise<DayProduction | null> {
   const user = await requireUser();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) return null;
-  const rows = (await db.select(EVENT_COLUMNS).from(quotes)
+  const rows = (await db.select(await eventSelect()).from(quotes)
     .where(and(eq(quotes.event_date, date), inArray(quotes.status, CONFIRMED_STATUSES), companyAccess(user.id)))
     .orderBy(asc(quotes.team_arrival_time), asc(quotes.created_at))) as EventRow[];
 

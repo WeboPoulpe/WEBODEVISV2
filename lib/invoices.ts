@@ -6,6 +6,7 @@
 // arrondie au centime.
 
 import { lineTotalHT, lineVatRate, resolveGuestSplit, type VatLine } from './quoteTotals';
+import { quoteLines } from './quoteFormulas';
 
 export type InvoiceKind = 'acompte' | 'solde' | 'facture' | 'avoir';
 export type InvoiceStatus = 'brouillon' | 'emise' | 'payee_partiellement' | 'payee' | 'annulee';
@@ -63,6 +64,9 @@ interface QuoteForInvoice {
   guest_count?: number | null;
   guest_count_adults?: number | null;
   guest_count_children?: number | null;
+  /** Formules du devis : seules la formule retenue et les lignes communes sont facturées. */
+  formulas?: unknown;
+  chosen_formula_id?: string | null;
 }
 
 type QuoteServiceLine = VatLine & { name?: string; description?: string | null };
@@ -72,11 +76,11 @@ const defaultRate = (v: number | string | null) => {
   return Number.isFinite(n) ? n : 20;
 };
 
-/** Lignes facturables d'un devis : sans les lignes retirées, offertes, en option ni les sauts de page. */
+/** Lignes facturables d'un devis : sans les lignes retirées, offertes, en option ni les sauts de page, ni celles des formules non retenues. */
 export function linesFromQuote(quote: QuoteForInvoice): InvoiceLine[] {
   const rate = defaultRate(quote.vat_rate);
   const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
-  const services = (Array.isArray(quote.services) ? quote.services : []) as QuoteServiceLine[];
+  const services = quoteLines<QuoteServiceLine>(quote);
   const out: InvoiceLine[] = [];
   for (const s of services) {
     if (!s || s.removed || s.isFree || s.isOption || s.isPageBreak) continue;

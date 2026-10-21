@@ -187,6 +187,8 @@ export interface AcceptanceDetails {
   eventDate: string | null;
   totalTTC: number | null;
   acceptedAt: string;
+  /** Formule choisie par le client (devis à plusieurs formules). */
+  formulaName?: string | null;
 }
 
 const euroFr = (n: number | null) => (n == null ? '' : `${n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
@@ -196,6 +198,7 @@ const acceptanceFacts = (a: AcceptanceDetails): [string, string][] => [
   ['Le', new Date(a.acceptedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' })],
   ['Événement', a.eventType ?? ''],
   ['Date', dateFr(a.eventDate)],
+  ...(a.formulaName ? [['Formule retenue', a.formulaName] as [string, string]] : []),
   ['Montant TTC', euroFr(a.totalTTC)],
 ];
 

@@ -128,6 +128,12 @@ export function syncWeboDocument(
         }
         const holder = doc.createElement('div');
         holder.innerHTML = addedItems;
+        // Devis à formules : le titre d'une formule déjà présente dans la carte n'est pas répété.
+        holder.querySelectorAll('.webo-formula-title').forEach((title) => {
+          const id = title.getAttribute('data-webo-formula');
+          // (Identifiants de formule : lettres, chiffres, - et _ seulement, voir parseFormulas.)
+          if (id && /^[\w-]+$/.test(id) && menu.querySelector(`.webo-formula-title[data-webo-formula="${id}"]`)) title.remove();
+        });
         while (holder.firstChild) menu.appendChild(holder.firstChild);
         changed = true;
       }

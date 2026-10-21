@@ -10,6 +10,7 @@
  */
 
 import { lineTotalHT, quoteVatBreakdown, vatRowsForDisplay, resolveGuestSplit } from './quoteTotals';
+import { chosenFormula, effectiveLines, lineFormulaId, parseFormulas, type QuoteFormula } from './quoteFormulas';
 import { sanitizeHtml } from './sanitize';
 
 export interface QuoteHtmlData {
@@ -36,7 +37,13 @@ export interface QuoteHtmlData {
     vatRate?: number | null;
     gastroCardHtml?: string | null;
     gastroCardHtmlEn?: string | null;
+    /** Formule de la ligne (identifiant dans `formulas`) ; absente : ligne commune à toutes les formules. */
+    formula?: string | null;
   }>;
+  /** Formules au choix du client (voir lib/quoteFormulas.ts). Absentes : devis classique. */
+  formulas?: QuoteFormula[] | null;
+  /** Formule retenue : le document ne présente plus qu'elle. */
+  chosenFormulaId?: string | null;
   /** Taux par défaut du devis (lignes sans taux propre). */
   vatRate: number;
   remarks?: string | null;
@@ -142,6 +149,9 @@ const T = {
     menuCompleter: 'Menu à compléter',
     remarques: 'REMARQUES',
     cgv: 'Conditions Générales de Vente',
+    aChoisir: 'à choisir',
+    formulesNote: 'Formules au choix : le total dépend de la formule retenue.',
+    formuleRetenue: 'Formule retenue',
   },
   en: {
     devis: 'QUOTE',
@@ -177,6 +187,9 @@ const T = {
     menuCompleter: 'Menu to be defined',
     remarques: 'REMARKS',
     cgv: 'Terms & Conditions',
+    aChoisir: 'to be chosen',
+    formulesNote: 'Choice of packages: the total depends on the package selected.',
+    formuleRetenue: 'Selected package',
   },
 };
 
@@ -219,6 +232,7 @@ function safeData(d: QuoteHtmlData): QuoteHtmlData {
       gastroCardHtml: s.gastroCardHtml ? sanitizeHtml(s.gastroCardHtml) : s.gastroCardHtml,
       gastroCardHtmlEn: s.gastroCardHtmlEn ? sanitizeHtml(s.gastroCardHtmlEn) : s.gastroCardHtmlEn,
     })),
+    formulas: parseFormulas(d.formulas).map((f) => ({ ...f, name: esc(f.name) ?? '', description: esc(f.description) })),
   };
 }
 
@@ -228,22 +242,27 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   const t = T[lang];
   const m = (n: number) => money(n, lang);
   const dateFr = (s?: string | null) => dateFmt(s, lang);
-  const activeServices = d.services.filter((s) => !s.removed);
+  // Formules au choix : toutes présentées tant qu'aucune n'est retenue, puis seulement la retenue.
+  const formulas = d.formulas ?? [];
+  const chosen = chosenFormula(formulas, d.chosenFormulaId);
+  const shownFormulas = chosen ? [chosen] : formulas;
+  const notRemoved = d.services.filter((s) => !s.removed);
+  const activeServices = chosen ? effectiveLines(notRemoved, formulas, chosen.id) : notRemoved;
+  const formulaOf = (s: QuoteHtmlData['services'][number]) => lineFormulaId(s, formulas);
   // Répartition adultes/enfants pour le tarif « au couvert » (prix enfant distinct).
   const { adults, children } = resolveGuestSplit(d.guestCount, d.guestCountAdults, d.guestCountChildren);
-  // Total de référence = HORS options (les options sont facultatives, présentées à part),
-  // TVA ventilée par taux (chaque ligne peut avoir le sien).
-  const totals = quoteVatBreakdown(activeServices, d.vatRate, adults, children);
-  const htSansOption = totals.ht;
-  const ttc = totals.ttc;
-  // Total alternatif = AVEC options (jamais additionné au précédent : ce sont deux montants distincts).
-  const avecOptions = quoteVatBreakdown(activeServices, d.vatRate, adults, children, { includeOptions: true });
-  const optionHt = activeServices.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + lineTotalHT(s, adults, children), 0);
-  const ttcAvecOptions = avecOptions.ttc;
+  // Totaux d'un ensemble de lignes (le devis entier, ou les lignes communes + celles d'une formule).
+  const totalsOf = (lines: QuoteHtmlData['services']) => {
+    // Total de référence = HORS options (les options sont facultatives, présentées à part),
+    // TVA ventilée par taux (chaque ligne peut avoir le sien).
+    const totals = quoteVatBreakdown(lines, d.vatRate, adults, children);
+    // Total alternatif = AVEC options (jamais additionné au précédent : ce sont deux montants distincts).
+    const avecOptions = quoteVatBreakdown(lines, d.vatRate, adults, children, { includeOptions: true });
+    const optionHt = lines.filter((s) => s.isOption && !s.isFree).reduce((sum, s) => sum + lineTotalHT(s, adults, children), 0);
+    return { totals, htSansOption: totals.ht, ttc: totals.ttc, optionHt, ttcAvecOptions: avecOptions.ttc };
+  };
   // Taux affiché : « 10 % » en français, « 10% » en anglais.
   const rateLabel = (r: number) => lang === 'en' ? `${r}%` : `${r.toLocaleString('fr-FR')} %`;
-  // Une ligne de TVA par taux présent (au moins une, au taux du devis, si le devis est vide).
-  const vatRows = vatRowsForDisplay(totals, d.vatRate);
   const today = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'fr-FR');
   // Translate event type if devis is in English
   const eventTypeT = translateEventType(d.eventType || '', lang);
@@ -303,7 +322,13 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   };
 
   // ── Table rows Page 1 (titre uniquement, descriptions en page 2) ───────────
-  const tableRows = activeServices.map((s) => {
+  // Les lignes d'une formule portent data-webo-formula : une fois la formule retenue, la page du client et
+  // l'impression ne gardent que les siennes (voir documentForFormula).
+  const formulaAttr = (s: QuoteHtmlData['services'][number]) => {
+    const f = formulaOf(s);
+    return f ? ` data-webo-formula="${f}"` : '';
+  };
+  const tableRow = (s: QuoteHtmlData['services'][number]) => {
     // For EN devis, prefer English title from gastroCardHtmlEn if available
     const displayName = lang === 'en'
       ? (extractEnTitle(s.gastroCardHtmlEn) || s.name || '—')
@@ -318,7 +343,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     const nameColor = isOpt ? 'color:#92400e;' : 'color:#1a1a1a;';
     const priceStyle = s.isFree ? 'text-decoration:line-through;color:#9ca3af;' : isOpt ? 'color:#d97706;' : '';
     return `
-    <tr style="${rowBg}">
+    <tr${formulaAttr(s)} style="${rowBg}">
       <td style="padding:9px 12px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
         <strong style="font-size:12px;${nameColor}">${displayName}</strong>${badge}
       </td>
@@ -328,29 +353,94 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(lineTotalHT(s, adults, children))}</td>
       ` : ''}
     </tr>`;
-  }).join('');
+  };
+  const colCount = d.hidePrice ? 2 : 4;
+  // Mention « à choisir » : retirée de la page du client et de l'impression une fois la formule retenue.
+  const pending = (text: string) => chosen ? '' : ` <span data-webo-formula-pending="1" style="font-weight:normal;font-style:italic;color:#888;">— ${text}</span>`;
+  const formulaHeaderRow = (f: QuoteFormula) => `
+    <tr data-webo-formula="${f.id}" style="background-color:${lightBg};">
+      <td colspan="${colCount}" style="padding:10px 12px 8px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
+        <strong style="font-size:12px;color:${accentColor};text-transform:uppercase;letter-spacing:0.6px;">${f.name}</strong>${pending(t.aChoisir)}
+        ${f.description ? `<br><span style="font-size:11px;color:#777;font-style:italic;">${f.description}</span>` : ''}
+      </td>
+    </tr>`;
+  // Devis classique : les lignes dans l'ordre. Devis à formules : les lignes communes, puis chaque formule.
+  const tableRows = shownFormulas.length === 0
+    ? activeServices.map(tableRow).join('')
+    : activeServices.filter((s) => !formulaOf(s)).map(tableRow).join('')
+      + shownFormulas.map((f) => formulaHeaderRow(f) + activeServices.filter((s) => formulaOf(s) === f.id).map(tableRow).join('')).join('');
 
   // ── Menu items Page 2 — use gastroCardHtml if available, otherwise fallback ──
-  const menuItems = activeServices
-    .filter((s) => s.name)
-    .map((s) => {
-      // If prestation has a custom gastro_card_html, use it as-is (wrapped in container)
-      // Use English version if language is 'en' AND English version exists, otherwise French
-      const cardHtml = d.language === 'en' ? (s.gastroCardHtmlEn || s.gastroCardHtml) : s.gastroCardHtml;
-      if (cardHtml) {
-        return `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
-      }
-      const optBadge = s.isOption
-        ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
-        : '';
-      return `
-      <div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
+  const menuItem = (s: QuoteHtmlData['services'][number]) => {
+    // If prestation has a custom gastro_card_html, use it as-is (wrapped in container)
+    // Use English version if language is 'en' AND English version exists, otherwise French
+    const cardHtml = d.language === 'en' ? (s.gastroCardHtmlEn || s.gastroCardHtml) : s.gastroCardHtml;
+    if (cardHtml) {
+      return `<div${formulaAttr(s)} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
+    }
+    const optBadge = s.isOption
+      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
+      : '';
+    return `
+      <div${formulaAttr(s)} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
         <p style="font-size:15px;font-weight:normal;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
         ${s.description
           ? `<div class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</div>`
           : ''}
       </div>`;
-    }).join('');
+  };
+  // Titre d'une formule dans la carte : un paragraphe, frère des plats (la mise en page des plats ne change pas).
+  const menuFormulaTitle = (f: QuoteFormula) =>
+    `<p class="webo-formula-title" data-webo-formula="${f.id}" style="text-align:center;font-size:11px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:2px;margin:6px 0 16px;page-break-after:avoid;break-after:avoid;">${f.name}${pending(t.aChoisir)}</p>`;
+  const named = activeServices.filter((s) => s.name);
+  const menuItems = shownFormulas.length === 0
+    ? named.map(menuItem).join('')
+    : named.filter((s) => !formulaOf(s)).map(menuItem).join('')
+      + shownFormulas.map((f) => {
+        const dishes = named.filter((s) => formulaOf(s) === f.id);
+        return dishes.length ? menuFormulaTitle(f) + dishes.map(menuItem).join('') : '';
+      }).join('');
+
+  // ── Totaux : un bloc pour le devis, ou un bloc par formule (lignes communes + lignes de la formule) ──
+  const totalsBox = (lines: QuoteHtmlData['services'], f?: QuoteFormula) => {
+    const { totals, htSansOption, ttc, optionHt, ttcAvecOptions } = totalsOf(lines);
+    // Une ligne de TVA par taux présent (au moins une, au taux du devis, si le devis est vide).
+    const vatRows = vatRowsForDisplay(totals, d.vatRate);
+    return `
+  <div${f ? ` data-webo-formula="${f.id}"` : ''} style="display:flex;justify-content:flex-end;margin-bottom:${f && !chosen ? '12px' : '20px'};">
+    <div style="min-width:220px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
+      ${f ? `<div style="font-size:11px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">${chosen ? `${t.formuleRetenue} : ` : ''}${f.name}${pending(t.aChoisir)}</div>` : ''}
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
+        <span>${t.sousTotalHt}</span><span>${m(htSansOption)}</span>
+      </div>
+      ${vatRows.map((r, i) => i < vatRows.length - 1 ? `
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
+        <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
+      </div>` : `
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
+        <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
+      </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;gap:14px;font-size:15px;font-weight:bold;color:${accentColor};">
+        <span>${t.totalTtc}</span><span>${m(ttc)}</span>
+      </div>
+      ${optionHt > 0 ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${lightBorder};">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;">
+          <span>${t.siOptionsHt}</span><span>+ ${m(optionHt)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:bold;color:#d97706;">
+          <span>${t.totalTtcOptions}</span><span style="white-space:nowrap;">${m(ttcAvecOptions)}</span>
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  </div>`;
+  };
+  const totalsHtml = shownFormulas.length === 0
+    ? totalsBox(activeServices)
+    : (chosen ? '' : `
+  <p data-webo-formula-pending="1" style="margin:0 0 10px;text-align:right;font-size:11px;color:#888;font-style:italic;">${t.formulesNote}</p>`)
+      + shownFormulas.map((f) => totalsBox(effectiveLines(activeServices, formulas, f.id), f)).join('');
 
   return `${googleFontImport}
 <!-- ═══════════════════════ PAGE 1 — DEVIS FINANCIER ═══════════════════════ -->
@@ -421,34 +511,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   </table>
 
   ${!d.hidePrice ? `
-  <!-- ── Totaux ── -->
-  <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
-    <div style="min-width:220px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
-        <span>${t.sousTotalHt}</span><span>${m(htSansOption)}</span>
-      </div>
-      ${vatRows.map((r, i) => i < vatRows.length - 1 ? `
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
-        <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
-      </div>` : `
-      <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
-        <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
-      </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;gap:14px;font-size:15px;font-weight:bold;color:${accentColor};">
-        <span>${t.totalTtc}</span><span>${m(ttc)}</span>
-      </div>
-      ${optionHt > 0 ? `
-      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${lightBorder};">
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;">
-          <span>${t.siOptionsHt}</span><span>+ ${m(optionHt)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:bold;color:#d97706;">
-          <span>${t.totalTtcOptions}</span><span style="white-space:nowrap;">${m(ttcAvecOptions)}</span>
-        </div>
-      </div>
-      ` : ''}
-    </div>
-  </div>
+  <!-- ── Totaux ── -->${totalsHtml}
   ` : ''}
   </div>
   <!-- fin bloc financier -->

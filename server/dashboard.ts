@@ -12,6 +12,8 @@ import { FAMILY_LABELS, roleFamily, suggestedStaff } from '@/lib/extras';
 import { enabledModules } from '@/lib/modules';
 import { CONFIRMED_STATUSES, PENDING_STATUSES } from '@/lib/quoteStatus';
 import { quoteDefaultRate, quoteTotalTTC, quoteVatBreakdown, resolveGuestSplit, type VatLine } from '@/lib/quoteTotals';
+import { quoteLines } from '@/lib/quoteFormulas';
+import { formulaSql } from './formulaColumns';
 import { catalogKey, quoteCost, staffCost, sumMargins, type MarginSummary, type StaffRow } from '@/lib/costing';
 import { requireUser } from './session';
 
@@ -33,6 +35,8 @@ interface QuoteRow {
   status: string; total_amount: string | null; vat_rate: string | null; services: unknown;
   created_day: string; sent_day: string | null;
   checklist: unknown; event_materials: unknown; event_material_checks: unknown; extra_costs: unknown;
+  /** Formules du devis : seule la formule retenue compte (voir lib/quoteFormulas.ts). */
+  formulas: unknown; chosen_formula_id: string | null;
 }
 
 const list = (values: readonly string[]) => sql.join(values.map((v) => sql`${v}`), sql`, `);
@@ -89,7 +93,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
       select q.id, q.client_name, q.internal_name, q.event_type, q.event_date::text as event_date, q.guest_count,
         q.guest_count_adults, q.guest_count_children, q.status, q.total_amount::text, q.vat_rate::text, q.services,
         ${paris(sql`q.created_at`)} as created_day, ${paris(sql`q.sent_at`)} as sent_day,
-        q.checklist, q.event_materials, q.event_material_checks, q.extra_costs
+        q.checklist, q.event_materials, q.event_material_checks, q.extra_costs, ${await formulaSql('q')}
       from public.quotes q
       where ${access} and (
         (q.status in (${list(PENDING_STATUSES)}) and q.event_date >= ${today}::date)
@@ -221,7 +225,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
     const links: TodoLink[] = [];
     const check = checklistProgress(q.checklist);
     if (check.total > check.done) links.push({ label: `Checklist ${check.done} sur ${check.total}`, href: tab('checklist') });
-    const mat = materialProgress(q.event_materials, q.services, q.event_material_checks);
+    const mat = materialProgress(q.event_materials, quoteLines(q), q.event_material_checks);
     if (mat.total > mat.done) links.push({ label: `Matériel : ${plural(mat.total - mat.done, 'article', 'articles')} à préparer`, href: tab('materiel') });
     const c = coursesOf.get(q.id);
     if (c && c.todo > 0) links.push({ label: `Courses : ${plural(c.todo, 'article', 'articles')} à acheter`, href: tab('courses') });
@@ -341,7 +345,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
   const htOf = (q: QuoteRow) => {
     const { adults, children } = resolveGuestSplit(q.guest_count, q.guest_count_adults, q.guest_count_children);
     const rate = quoteDefaultRate(q.vat_rate);
-    const { ht } = quoteVatBreakdown(Array.isArray(q.services) ? q.services as VatLine[] : [], rate, adults, children);
+    const { ht } = quoteVatBreakdown(quoteLines<VatLine>(q), rate, adults, children);
     if (ht > 0) return ht;
     // Devis sans lignes (importé) : le montant enregistré est TTC.
     return q.total_amount == null ? 0 : Math.round((Number(q.total_amount) / (1 + rate / 100)) * 100) / 100;
@@ -349,7 +353,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
   const costedOf = (q: QuoteRow) => {
     const { adults, children } = resolveGuestSplit(q.guest_count, q.guest_count_adults, q.guest_count_children);
     const c = quoteCost({
-      services: q.services, catalog, extraCosts: q.extra_costs,
+      services: quoteLines(q), catalog, extraCosts: q.extra_costs,
       staffCost: staffCost(staffOf.get(q.id) ?? []), adults, children,
     });
     return { revenueHT: htOf(q), totalCost: c.totalCost, hasCost: c.hasCost };

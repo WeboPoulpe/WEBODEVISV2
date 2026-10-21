@@ -9,6 +9,8 @@ import {
 import { toPurchaseUnit } from '@/lib/costing';
 import { computeIngredientNeeds, groupNeedsBySupplier, type PrestationRecipe, type QuoteLine } from '@/lib/events/needs';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
+import { quoteLines } from '@/lib/quoteFormulas';
+import { formulaFields } from './formulaColumns';
 import { requireUser, requireWriter } from './session';
 
 // Opérations en plusieurs étapes de la fiche événement. Chacune vérifie que le devis
@@ -18,7 +20,7 @@ const AUTO_ORDER_NOTE = 'Commande générée depuis la liste de courses';
 
 async function loadOwnedQuote(uid: string, quoteId: string) {
   const [quote] = await db
-    .select({ id: quotes.id, services: quotes.services, guest_count: quotes.guest_count })
+    .select({ id: quotes.id, services: quotes.services, guest_count: quotes.guest_count, ...(await formulaFields()) })
     .from(quotes)
     .where(and(
       eq(quotes.id, quoteId),
@@ -50,7 +52,8 @@ export async function recalculateCourses(quoteId: string): Promise<RecalculateRe
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, ...empty };
   if (!quote) return { error: 'Événement introuvable.', ...empty };
 
-  const lines = (Array.isArray(quote.services) ? quote.services : []) as QuoteLine[];
+  // Devis à formules : les courses de la formule retenue seulement (avec les lignes communes).
+  const lines = quoteLines<QuoteLine>(quote);
   const catalog = await db.select({ id: prestations.id, name: prestations.name }).from(prestations).where(sql`${prestations.user_id} in ${companyIdsOf(user.id)}`);
   const links = catalog.length === 0 ? [] : await db
     .select({

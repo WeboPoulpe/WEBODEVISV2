@@ -8,6 +8,8 @@
 // Centralisé ici pour que l'éditeur, le PDF (generateQuoteHtml), la sauvegarde
 // WeboWord et la liste des devis calculent tous la MÊME chose.
 
+import { effectiveLines, quoteLines, type QuoteFormula } from './quoteFormulas';
+
 export interface PricedLine {
   quantity?: number;
   unitPrice?: number;
@@ -101,10 +103,24 @@ export function quoteDefaultRate(vatRate: number | string | null | undefined): n
   return Number.isFinite(n) ? n : 20;
 }
 
+/** Totaux de chaque formule : lignes communes + lignes de la formule (hors options, comme le total du devis). */
+export function formulaTotals(
+  lines: readonly (VatLine | null | undefined)[],
+  formulas: readonly QuoteFormula[],
+  defaultRate: number,
+  adults = 0,
+  children = 0,
+): { formula: QuoteFormula; totals: VatBreakdown }[] {
+  return formulas.map((formula) => ({
+    formula,
+    totals: quoteVatBreakdown(effectiveLines(lines, formulas, formula.id), defaultRate, adults, children),
+  }));
+}
+
 /**
  * Total TTC d'un devis, hors options : calculé depuis ses lignes (sans les lignes offertes, en option
  * ou retirées) au taux de chaque ligne (sinon celui du devis), sinon le montant enregistré.
- * Le même que la liste des devis.
+ * Devis à formules : celui de la formule retenue (à défaut, de la première). Le même que la liste des devis.
  */
 export function quoteTotalTTC(quote: {
   total_amount: number | string | null;
@@ -113,10 +129,12 @@ export function quoteTotalTTC(quote: {
   guest_count_adults?: number | null;
   guest_count_children?: number | null;
   services: unknown;
+  formulas?: unknown;
+  chosen_formula_id?: string | null;
 }): number | null {
   if (Array.isArray(quote.services) && quote.services.length > 0) {
     const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
-    const { ht, ttc } = quoteVatBreakdown(quote.services as VatLine[], quoteDefaultRate(quote.vat_rate), adults, children);
+    const { ht, ttc } = quoteVatBreakdown(quoteLines<VatLine>(quote), quoteDefaultRate(quote.vat_rate), adults, children);
     if (ht > 0) return ttc;
   }
   return quote.total_amount == null ? null : Number(quote.total_amount);

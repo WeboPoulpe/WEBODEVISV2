@@ -6,6 +6,7 @@ import { quotes } from '@/db/schema';
 import { INVOICE_KIND_LABELS, type InvoiceKind } from '@/lib/invoices';
 import { QUOTE_STATUS_LABELS, type QuoteStatus } from '@/lib/quoteStatus';
 import { companyIdsOf } from './companyScope';
+import { formulaColumnsReady } from './formulaColumns';
 import { requireUser } from './session';
 
 // Historique d'un devis : tout ce qui lui est arrivé, du plus récent au plus ancien — création, changements de
@@ -44,6 +45,8 @@ export async function getQuoteHistory(quoteId: string): Promise<HistoryEntry[] |
   if (!q) return null;
   const id = q.id;
 
+  // Formule signée avec l'accord (colonne de la migration 0031, absente avant).
+  const formulaName = (await formulaColumnsReady()) ? sql`a.formula_name` : sql`null::text`;
   const [creator, statuses, events, acceptances, reminders, invoices, payments, tastings] = await Promise.all([
     rows<{ email: string }>(sql`select email from public.profiles where id = ${q.user_id}`),
     rows<{ at: string; old_status: string | null; new_status: string; by: string | null }>(sql`
@@ -52,8 +55,9 @@ export async function getQuoteHistory(quoteId: string): Promise<HistoryEntry[] |
     rows<{ at: string; kind: 'envoi_email' | 'envoi_whatsapp' | 'consultation'; details: { to?: string[]; cc?: string[]; phone?: string | null } | null; by: string | null }>(sql`
       select e.created_at as at, e.kind, e.details, p.email as by
       from public.quote_events e left join public.profiles p on p.id = e.actor_id where e.quote_id = ${id}`),
-    rows<{ at: string; signer_name: string; signer_role: string | null; invalidated_at: string | null }>(sql`
-      select accepted_at as at, signer_name, signer_role, invalidated_at from public.quote_acceptances where quote_id = ${id}`),
+    rows<{ at: string; signer_name: string; signer_role: string | null; invalidated_at: string | null; formula_name: string | null }>(sql`
+      select a.accepted_at as at, a.signer_name, a.signer_role, a.invalidated_at, ${formulaName} as formula_name
+      from public.quote_acceptances a where a.quote_id = ${id}`),
     rows<{ at: string; sent_to: string }>(sql`
       select sent_at as at, sent_to from public.document_reminders where quote_id = ${id} and kind = 'devis'`),
     rows<{ at: string; kind: string; number: string | null; total_ttc: string; by: string | null }>(sql`
@@ -85,7 +89,8 @@ export async function getQuoteHistory(quoteId: string): Promise<HistoryEntry[] |
   for (const a of acceptances) {
     out.push({
       at: iso(a.at), kind: 'acceptation', title: `Accepté et signé en ligne par ${a.signer_name}${a.signer_role ? ` (${a.signer_role})` : ''}`,
-      detail: a.invalidated_at ? 'Le devis a été modifié depuis : cet accord porte sur une version précédente.' : undefined,
+      detail: [a.formula_name && `Formule retenue : ${a.formula_name}.`, a.invalidated_at && 'Le devis a été modifié depuis : cet accord porte sur une version précédente.']
+        .filter(Boolean).join(' ') || undefined,
     });
   }
   for (const r of reminders) out.push({ at: iso(r.at), kind: 'relance', title: 'Relance automatique envoyée', detail: r.sent_to });

@@ -188,6 +188,10 @@ export const quotes = pgTable("quotes", {
 	// Feuille de route : déroulé horaire [{ time, label, note }] et contact sur place.
 	run_sheet: jsonb().default([]).notNull(),
 	onsite_contact: text(),
+	// Formules proposées au choix du client [{ id, name, description }] (voir lib/quoteFormulas.ts) et celle
+	// qu'il a retenue en signant (ou que le traiteur a retenue pour lui). Les lignes portent l'id de leur formule.
+	formulas: jsonb(),
+	chosen_formula_id: text(),
 }, (table) => [
 	index("idx_quotes_customer_id").using("btree", table.customer_id.asc().nullsLast().op("uuid_ops")),
 	index("idx_quotes_folder").using("btree", table.folder_id.asc().nullsLast().op("uuid_ops")),
@@ -984,6 +988,9 @@ export const quote_acceptances = pgTable("quote_acceptances", {
 	user_agent: text(),
 	accepted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	invalidated_at: timestamp({ withTimezone: true, mode: 'string' }),
+	// Formule choisie par le client en signant (devis à plusieurs formules), avec son nom à ce moment-là.
+	formula_id: text(),
+	formula_name: text(),
 }, (table) => [
 	index("idx_quote_acceptances_quote").using("btree", table.quote_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({ columns: [table.quote_id], foreignColumns: [quotes.id], name: "quote_acceptances_quote_id_fkey" }).onDelete("cascade"),

@@ -5,6 +5,8 @@ import { companyIdsOf } from './companyScope';
 import { db } from '@/db';
 import { ingredients, prestations, profiles, quotes, service_ingredients } from '@/db/schema';
 import { allergenSheet, type AllergenSheetRow } from '@/lib/allergens';
+import { quoteLines } from '@/lib/quoteFormulas';
+import { quoteColumns } from './formulaColumns';
 import { requireUser } from './session';
 
 export interface QuoteAllergenSheet {
@@ -21,7 +23,7 @@ export interface QuoteAllergenSheet {
 /** Fiche allergènes d'un devis : ses plats rapprochés du catalogue et de leurs recettes. */
 export async function getQuoteAllergenSheet(quoteId: string): Promise<QuoteAllergenSheet | null> {
   const user = await requireUser();
-  const [q] = await db.select().from(quotes).where(and(
+  const [q] = await db.select(await quoteColumns()).from(quotes).where(and(
     eq(quotes.id, quoteId),
     sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id} or ${quotes.owner_user_id} in (select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${user.id}::uuid)))`,
   )).limit(1);
@@ -36,7 +38,8 @@ export async function getQuoteAllergenSheet(quoteId: string): Promise<QuoteAller
     .innerJoin(ingredients, eq(ingredients.id, service_ingredients.ingredient_id))
     .where(inArray(service_ingredients.service_id, catalog.map((p) => p.id)));
 
-  const lines = (Array.isArray(q.services) ? q.services : []) as { name?: string; removed?: boolean; isPageBreak?: boolean }[];
+  // Devis à formules : les plats de la formule retenue (avec les lignes communes).
+  const lines = quoteLines<{ name?: string; removed?: boolean; isPageBreak?: boolean }>(q);
   const sheet = allergenSheet(lines, catalog.map((p) => ({
     name: p.name, allergens_extra: p.allergens_extra, allergens_checked: p.allergens_checked,
     ingredients: recipe.filter((r) => r.service_id === p.id).map((r) => ({ name: r.name, allergens: r.allergens })),

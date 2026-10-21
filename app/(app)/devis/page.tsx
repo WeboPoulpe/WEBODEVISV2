@@ -39,6 +39,7 @@ import { listInvoices, type Invoice } from '@/server/invoices';
 import { INVOICE_KIND_LABELS } from '@/lib/invoices';
 import { isConfirmed } from '@/lib/quoteStatus';
 import { useFeedback } from '@/components/ui/Feedback';
+import { chosenFormula, lineFormulaId, parseFormulas } from '@/lib/quoteFormulas';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface QuoteService {
@@ -79,6 +80,9 @@ interface Quote {
   client_email?: string | null;
   /** Dossier de rangement (null = racine) */
   folder_id?: string | null;
+  /** Formules au choix et formule retenue (migration 0031) : le total suit la formule retenue. */
+  formulas?: unknown;
+  chosen_formula_id?: string | null;
 }
 type ViewMode = 'list' | 'pipeline';
 type Scope = 'encours' | 'confirmes' | 'refuses' | 'prospects';
@@ -87,6 +91,8 @@ type Scope = 'encours' | 'confirmes' | 'refuses' | 'prospects';
 // ⚠️ Doit rester UN littéral d'une seule pièce : supabase-js infère le type des lignes
 // depuis la chaîne elle-même (une concaténation casse l'inférence).
 const QUOTE_COLUMNS = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id';
+/** Mêmes colonnes avec les formules du devis (migration 0031). */
+const QUOTE_COLUMNS_FORMULAS = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id, formulas, chosen_formula_id';
 /** Mêmes colonnes sans folder_id — utilisé tant que la migration lot E n'est pas appliquée. */
 const QUOTE_COLUMNS_LEGACY = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email';
 
@@ -98,6 +104,9 @@ const QUOTE_COLUMNS_LEGACY = 'id, quote_number, client_name, internal_name, even
 async function loadQuotes(supabase: ReturnType<typeof createClient>, userId: string, ids: string[]): Promise<Quote[]> {
   // Devis de toute l'entreprise (titulaire et collaborateurs) ; le filtre reste utile pour un compte administrateur.
   const filter = companyQuotesFilter(userId, ids);
+  // Formules (migration 0031) : sans elles, la sélection habituelle.
+  const withFormulas = await supabase.from('quotes').select(QUOTE_COLUMNS_FORMULAS).or(filter).order('created_at', { ascending: false });
+  if (!withFormulas.error) return (withFormulas.data ?? []) as unknown as Quote[];
   const res = await supabase.from('quotes').select(QUOTE_COLUMNS).or(filter).order('created_at', { ascending: false });
   if (!res.error) return (res.data ?? []) as unknown as Quote[];
   console.warn('[devis] Dossiers indisponibles (migration lot E à appliquer ?) :', res.error.message);
@@ -261,6 +270,9 @@ function DevisSheet({
   const [prospectId, setProspectId] = useState(quote.prospect_id ?? null);
 
   const Icon = getEventIcon(quote.event_type || '');
+  // Formules au choix du devis et formule retenue (voir lib/quoteFormulas.ts).
+  const sheetFormulas = parseFormulas(quote.formulas);
+  const sheetChosen = chosenFormula(sheetFormulas, quote.chosen_formula_id)?.id ?? null;
 
   const handleStatusChange = async (s: string) => {
     setSavingStatus(true);
@@ -436,10 +448,15 @@ function DevisSheet({
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prestations</p>
               <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-                {(quote.services as QuoteService[]).filter((s) => !s.isPageBreak && s.name).map((s, i) => (
-                  <div key={i} className={`flex items-center justify-between gap-2 px-3 py-2 ${s.isOption ? 'bg-amber-50/60' : ''}`}>
+                {(quote.services as QuoteService[]).filter((s) => !s.isPageBreak && s.name).map((s, i) => {
+                  // Devis à formules : la formule de la ligne, et les lignes des formules non retenues estompées.
+                  const formula = sheetFormulas.find((f) => f.id === lineFormulaId(s, sheetFormulas));
+                  const dropped = !!formula && !!sheetChosen && formula.id !== sheetChosen;
+                  return (
+                  <div key={i} className={`flex items-center justify-between gap-2 px-3 py-2 ${s.isOption ? 'bg-amber-50/60' : ''} ${dropped ? 'opacity-50' : ''}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-sm ${s.isOption ? 'text-amber-800' : 'text-gray-900'}`}>{s.name}</span>
+                      {formula && <span className="ml-1.5 text-[9px] font-bold text-primary bg-primary-50 px-1.5 py-0.5 rounded">{formula.name.toUpperCase()}</span>}
                       {s.isOption && <span className="ml-1.5 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">OPTION</span>}
                       {s.isFree && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">INCLUS</span>}
                     </div>
@@ -450,8 +467,16 @@ function DevisSheet({
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
+              {sheetFormulas.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  {sheetChosen
+                    ? `Formule retenue : ${sheetFormulas.find((f) => f.id === sheetChosen)?.name ?? ''}.`
+                    : 'Plusieurs formules au choix : le client choisira la sienne en signant.'}
+                </p>
+              )}
             </div>
           )}
 

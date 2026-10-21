@@ -8,6 +8,8 @@ import {
   addDays, balanceLines, cents, creditLines, depositLines, invoiceTotals, linesFromQuote, paymentStatus,
   PAYMENT_METHODS, type InvoiceKind, type InvoiceLine, type InvoiceStatus, type PaymentMethod, type RateTotal,
 } from '@/lib/invoices';
+import { formulaPending } from '@/lib/quoteFormulas';
+import { quoteColumns } from './formulaColumns';
 import { requireUser, requireWriter } from './session';
 
 // Factures clients. Tout passe par ces actions serveur (les tables ne sont pas exposées à /api/db) :
@@ -70,7 +72,7 @@ async function companyOf(uid: string): Promise<string> {
 }
 
 async function loadQuote(uid: string, quoteId: string) {
-  const [quote] = await db.select().from(quotes).where(and(
+  const [quote] = await db.select(await quoteColumns()).from(quotes).where(and(
     eq(quotes.id, quoteId),
     sql`(${quotes.user_id} = ${uid} or ${quotes.owner_user_id} = ${uid} or ${quotes.owner_user_id} in (select cp.id from public.profiles cp where coalesce(cp.parent_user_id, cp.id) = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${uid}::uuid)))`,
   )).limit(1);
@@ -212,6 +214,8 @@ export async function createInvoiceDraft(input: { quoteId: string; kind: Exclude
   const company = await companyOf(user.id);
   const { seller, depositPercent } = await sellerSnapshot(company);
 
+  // Devis à formules : on ne facture que la formule retenue, il faut donc la connaître.
+  if (formulaPending(quote)) return { error: 'Ce devis propose plusieurs formules : indiquez d’abord celle que le client a retenue (panneau Prestations de l’éditeur).' };
   const quoteLines = linesFromQuote(quote);
   if (quoteLines.length === 0) return { error: 'Ce devis n’a aucune ligne à facturer.' };
 

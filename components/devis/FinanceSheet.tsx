@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { quoteVatBreakdown, resolveGuestSplit } from '@/lib/quoteTotals';
 import { catalogKey, quoteCost, staffCost, type StaffRow } from '@/lib/costing';
+import { quoteLines } from '@/lib/quoteFormulas';
 
 // Marge d'un devis : chiffre d'affaires HT, coûts par poste (prestations, frais annexes, personnel), marge brute.
 // Coût d'une ligne : prix de revient de la prestation du catalogue de même nom, sinon celui porté par la ligne.
@@ -53,7 +54,14 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
     sb.from('quotes').select('services, vat_rate, extra_costs, guest_count, guest_count_adults, guest_count_children').eq('id', quoteId).single()
       .then(async ({ data }) => {
         if (!data) { setLoading(false); return; }
-        const svcs = Array.isArray(data.services) ? data.services as Service[] : [];
+        // Devis à formules : la marge de la formule retenue (à défaut, de la première). Colonnes lues à part :
+        // absentes tant que la migration 0031 n'est pas appliquée, le devis compte alors toutes ses lignes.
+        const f = await sb.from('quotes').select('formulas, chosen_formula_id').eq('id', quoteId).maybeSingle();
+        const svcs = quoteLines<Service>({
+          services: data.services,
+          formulas: f.error ? null : f.data?.formulas,
+          chosen_formula_id: f.error ? null : (f.data?.chosen_formula_id as string | null | undefined),
+        });
         setServices(svcs.filter((s) => !s.isPageBreak && s.name));
         setVatRate(data.vat_rate ?? 20);
         setGuests(resolveGuestSplit(data.guest_count, data.guest_count_adults, data.guest_count_children));

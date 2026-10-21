@@ -14,6 +14,7 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { buildQuotePrintPage, googleFontHref, quoteEditorCss, DEFAULT_LINE_HEIGHT, type QuoteEditorSettings } from '@/lib/quoteOutput';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
+import { documentForFormula, lineFormulaId, type QuoteFormula } from '@/lib/quoteFormulas';
 import { useAuth } from '@/context/AuthContext';
 import WeboWordSidePanels from './WeboWordSidePanels';
 import { CoverPage } from './weboword/CoverPage';
@@ -49,6 +50,9 @@ interface Props {
   editorSettings?: QuoteEditorSettings | null;
   /** Date du dernier enregistrement, pour repérer une version enregistrée ailleurs entre-temps. */
   updatedAt?: string | null;
+  /** Formules au choix du client (voir lib/quoteFormulas.ts) et celle retenue : l'impression ne montre qu'elle. */
+  formulas?: QuoteFormula[];
+  chosenFormulaId?: string | null;
 }
 
 // ── Gastronomic menu width options ────────────────────────────────────────────
@@ -183,7 +187,9 @@ const LINE_HEIGHTS = [
   { label: '2.0', value: '2' },
 ];
 
-export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt }: Props) {
+export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt, formulas = [], chosenFormulaId: initChosen = null }: Props) {
+  // Formule retenue (elle peut changer depuis le panneau Prestations sans recharger la page).
+  const [chosenFormulaId, setChosenFormulaId] = useState<string | null>(initChosen);
   const router = useRouter();
   const { profile, user } = useAuth();
   const { confirm, notify } = useFeedback();
@@ -577,7 +583,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             vatRate: s.vatRate ?? null,
             gastroCardHtml: s.gastroCardHtml,
             gastroCardHtmlEn: s.gastroCardHtmlEn,
+            formula: lineFormulaId(s, formulas),
           })),
+        // Toutes les formules restent dans le document : la page du client et l'impression ne montrent que la retenue.
+        formulas,
         vatRate: q.vat_rate ?? 20,
         remarks: q.remarks ?? null,
         hidePrice: q.hide_price ?? false,
@@ -593,7 +602,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setLocalDraft(null);
     setSaving(false);
     setToast('Document régénéré. Pensez à enregistrer.');
-  }, [quoteId, user, companyAssets.cgv, font, confirm]);
+  }, [quoteId, user, companyAssets.cgv, font, confirm, formulas]);
 
   // ── Admin fields: load from database ────────────────────────────────────────
   const openAdminModal = useCallback(async () => {
@@ -991,7 +1000,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   // La fenêtre d'impression du navigateur propose les deux ; le document y est le même que sur le lien envoyé au client.
   const openPrintWindow = () => {
     // La fenêtre est de la même origine que l'app : le contenu y entre nettoyé.
-    const content = sanitizeHtml(editorRef.current?.innerHTML ?? '');
+    // Devis à formules : une fois la formule retenue, seule elle est imprimée.
+    const content = documentForFormula(sanitizeHtml(editorRef.current?.innerHTML ?? ''), formulas, chosenFormulaId);
     if (!content) return;
     const safeName = (clientName ?? 'client').replace(/[^a-zA-ZÀ-ÿ0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 40);
     // Conditions déjà dans le document (bloc ajouté, texte collé ou titre « Conditions Générales de Vente ») : pas de doublon.
@@ -1574,6 +1584,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           window.history.replaceState(null, '', url.toString());
         }}
         getSheetHtml={() => editorRef.current?.innerHTML ?? null}
+        onFormulaChosen={setChosenFormulaId}
         onApplied={(message) => {
           setActivePanel(null);
           try { if (message) sessionStorage.setItem(`weboword_notice_${quoteId}`, message); } catch { /* rien */ }

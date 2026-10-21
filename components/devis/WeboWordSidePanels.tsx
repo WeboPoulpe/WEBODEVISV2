@@ -11,7 +11,9 @@ import { DEFAULT_TRANSFORM } from './weboword/weboword.types';
 import type { CoverPageConfig, PhotosPageConfig } from './weboword/weboword.types';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
-import { quoteVatBreakdown, resolveGuestSplit } from '@/lib/quoteTotals';
+import { formulaTotals, quoteVatBreakdown, resolveGuestSplit } from '@/lib/quoteTotals';
+import FormulasEditor from './FormulasEditor';
+import { effectiveLines, lineFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import RecipientPicker from '@/components/devis/RecipientPicker';
 import CompanySearch from '@/components/clients/CompanySearch';
@@ -41,6 +43,8 @@ interface Props {
   onCoverChange?: (c: CoverPageConfig) => void;
   photosConfig?: PhotosPageConfig;
   onPhotosChange?: (c: PhotosPageConfig) => void;
+  /** La formule retenue a changé (impression depuis l'éditeur). */
+  onFormulaChosen?: (id: string | null) => void;
 }
 
 const MENU_WIDTHS = [
@@ -55,7 +59,7 @@ interface Client { id: string; first_name: string | null; last_name: string | nu
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; vatRate?: number | null; description?: string | null; photo_url?: string; [key: string]: any; }
 
-export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange }: Props) {
+export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange, onFormulaChosen }: Props) {
   // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
   const supabase = useMemo(() => createClient(), []);
   const { notify } = useFeedback();
@@ -89,6 +93,11 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
+  // Formules au choix du client (colonnes de la migration 0031 : sans elles, la section n'est pas proposée).
+  const [formulas, setFormulas] = useState<QuoteFormula[]>([]);
+  const [formulasSupported, setFormulasSupported] = useState(false);
+  const [chosenFormulaId, setChosenFormulaId] = useState<string | null>(null);
+  const savedFormulas = useRef<string>('[]');
   // Couverts au chargement : les lignes qui en avaient la quantité suivent un changement de couverts.
   const initialGuestTotal = useRef(0);
   const [syncQuantities, setSyncQuantities] = useState(true);
@@ -193,10 +202,19 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   useEffect(() => {
     if (!activePanel) return;
     setLoading(true);
-    supabase.from('quotes')
-      .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language, customer_id, client_type, client_siret, contact_person_name, recipient_contact_id, recipient_contact_role, recipient_contact_email, recipient_contact_phone')
-      .eq('id', quoteId).single()
-      .then(({ data }) => {
+    Promise.all([
+      supabase.from('quotes')
+        .select('client_name, client_email, client_phone, client_address, event_type, event_date, event_location, guest_count, guest_count_adults, guest_count_children, services, remarks, vat_rate, hide_price, template, language, customer_id, client_type, client_siret, contact_person_name, recipient_contact_id, recipient_contact_role, recipient_contact_email, recipient_contact_phone')
+        .eq('id', quoteId).single(),
+      // Lues à part : une erreur ici veut dire que la migration 0031 n'est pas appliquée (pas de formules).
+      supabase.from('quotes').select('formulas, chosen_formula_id').eq('id', quoteId).maybeSingle(),
+    ])
+      .then(([{ data }, f]) => {
+        const loadedFormulas = f.error ? [] : parseFormulas(f.data?.formulas);
+        setFormulasSupported(!f.error);
+        setFormulas(loadedFormulas);
+        setChosenFormulaId(f.error ? null : (f.data?.chosen_formula_id as string | null) ?? null);
+        savedFormulas.current = JSON.stringify(loadedFormulas);
         if (data) {
           const loadedClientName = data.client_name || '';
           const loadedClientEmail = data.client_email || '';
@@ -253,7 +271,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           initialFinancials.current = JSON.stringify({
             services: loadedServices, guestCount: loadedGuestCount, guestAdults: loadedGuestAdults,
             guestChildren: loadedGuestChildren, vatRate: loadedVatRate, hidePrice: loadedHidePrice,
-            template: loadedTemplate, language: loadedLanguage,
+            template: loadedTemplate, language: loadedLanguage, formulas: loadedFormulas,
           });
           initialServiceIds.current = new Set(
             loadedServices.map((s: Service) => s.id as string | undefined).filter(Boolean) as string[],
@@ -392,7 +410,10 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       parseInt(guestChildren) || null,
     );
     // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
-    const totalTtc = quoteVatBreakdown(services, vatRate, adults, children).ttc;
+    // Devis à formules : le total de la formule retenue (à défaut, de la première).
+    const formulaIds = new Set(formulas.map((f) => f.id));
+    const keptChoice = chosenFormulaId && formulaIds.has(chosenFormulaId) ? chosenFormulaId : null;
+    const totalTtc = quoteVatBreakdown(effectiveLines(services, formulas, keptChoice), vatRate, adults, children).ttc;
 
     // ⚠️ On NE régénère JAMAIS tout le document WeboWord : le texte mis en forme
     // (page de garde, carte gastronomique, prose manuelle) est préservé.
@@ -425,6 +446,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       template,
       language,
       services,
+      // Formules : seulement quand la base les connaît (migration 0031). Une formule retenue puis supprimée ne l'est plus.
+      ...(formulasSupported ? { formulas: formulas.length ? parseFormulas(formulas) : null, ...(keptChoice !== chosenFormulaId ? { chosen_formula_id: keptChoice } : {}) } : {}),
     };
 
     // Si les données financières ont changé (ajout/suppr/qté/prix, couverts, TVA…),
@@ -433,7 +456,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     //  • le bloc TEXTE des prestations ajoutées est ajouté en fin de carte gastro.
     // Tout le reste (page de garde, textes existants, prose manuelle) est préservé.
     const currentFin = JSON.stringify({
-      services, guestCount, guestAdults, guestChildren, vatRate, hidePrice, template, language,
+      services, guestCount, guestAdults, guestChildren, vatRate, hidePrice, template, language, formulas,
     });
     // Idem pour les cartes Client / Événement (même ordre de clés qu'au chargement).
     const currentParties = JSON.stringify({
@@ -468,6 +491,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           vatRate: s.vatRate ?? null,
           gastroCardHtml: (s.gastroCardHtml as string | null | undefined) ?? null,
           gastroCardHtmlEn: (s.gastroCardHtmlEn as string | null | undefined) ?? null,
+          formula: lineFormulaId(s, formulas),
         });
         // Prestations réellement ajoutées depuis le chargement (nouvel id).
         const addedServices = services
@@ -497,6 +521,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
               guestCountAdults: parseInt(guestAdults) || null,
               guestCountChildren: parseInt(guestChildren) || null,
               services: services.map(mapSvc),
+              // Le document garde toutes les formules : la page du client et l'impression ne montrent que la retenue.
+              formulas,
               vatRate,
               hidePrice,
               language,
@@ -523,6 +549,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   };
 
   if (!activePanel) return null;
+
+  // Couverts saisis, pour le total de chaque formule (tarif adultes / enfants).
+  const guestSplit = resolveGuestSplit(parseInt(guestCount) || null, parseInt(guestAdults) || null, parseInt(guestChildren) || null);
 
   const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary';
   const labelCls = 'block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1';
@@ -661,6 +690,29 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                     Ligne personnalisée
                   </button>
 
+                  {formulasSupported && (
+                    <FormulasEditor
+                      quoteId={quoteId}
+                      formulas={formulas}
+                      onFormulasChange={(next) => {
+                        setFormulas(next);
+                        // Lignes d'une formule supprimée : elles redeviennent communes.
+                        const ids = new Set(next.map((f) => f.id));
+                        setServices((prev) => prev.map((s) => {
+                          if (!s.formula || ids.has(s.formula as string)) return s;
+                          const rest: Service = { ...s };
+                          delete rest.formula;
+                          return rest;
+                        }));
+                      }}
+                      totals={formulaTotals(services, formulas, vatRate, guestSplit.adults, guestSplit.children)}
+                      hidePrice={hidePrice}
+                      chosenFormulaId={chosenFormulaId}
+                      dirty={JSON.stringify(formulas) !== savedFormulas.current}
+                      onChosen={(id) => { setChosenFormulaId(id); onFormulaChosen?.(id); }}
+                    />
+                  )}
+
                   {/* Services list — drag & drop reorder */}
                   <div className="space-y-2 border-t border-gray-100 pt-3">
                     {services.length === 0 ? (
@@ -731,6 +783,27 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                               </select>
                             </div>
                           </div>
+                          {formulas.length > 0 && (
+                            <div>
+                              <label className="text-[10px] text-gray-500">Formule</label>
+                              <select
+                                value={lineFormulaId(svc, formulas) ?? ''}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setServices((prev) => prev.map((s, i) => {
+                                    if (i !== idx) return s;
+                                    const next: Service = { ...s, formula: v };
+                                    if (!v) delete next.formula;
+                                    return next;
+                                  }));
+                                }}
+                                className={`${inputCls} text-xs py-1`}
+                              >
+                                <option value="">Commune à toutes les formules</option>
+                                {formulas.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                              </select>
+                            </div>
+                          )}
                           {/* Photo per prestation + taux de TVA de la ligne */}
                           <div className="mt-2 flex items-center gap-2">
                             <VatRateSelect

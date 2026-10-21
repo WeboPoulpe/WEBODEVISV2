@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, errorCls, inputCls, labelCls } from '@/components/ui/kit';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
+import { parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { cn } from '@/lib/utils';
 
 // Dupliquer un devis pour un autre événement : on choisit le client, la date et les couverts ; les quantités
@@ -41,8 +42,13 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
   const [guests, setGuests] = useState('');
   const [asTemplate, setAsTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
+  // Formules au choix du devis copié (migration 0031 ; null sans elles) : la copie les reprend, sans formule retenue.
+  const [formulas, setFormulas] = useState<QuoteFormula[] | null>(null);
 
   useEffect(() => {
+    createClient().from('quotes').select('formulas').eq('id', quoteId).maybeSingle().then(({ data, error: err }) => {
+      if (!err) setFormulas(parseFormulas(data?.formulas));
+    });
     createClient().from('quotes').select(SOURCE_COLUMNS).eq('id', quoteId).single().then(({ data, error: err }) => {
       if (err || !data) { setError('Ce devis n’a pas pu être lu. Fermez et réessayez.'); return; }
       const q = data as Source;
@@ -114,6 +120,7 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
           guestCount: newGuests, guestCountAdults: adults, guestCountChildren: children,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           services: services.filter((s) => !s.isPageBreak) as any,
+          formulas,
           vatRate: Number(source.vat_rate ?? 20), hidePrice: !!source.hide_price,
           language: source.language === 'en' ? 'en' : 'fr',
         },
@@ -141,6 +148,7 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
       guest_count: newGuests, guest_count_adults: adults, guest_count_children: children,
       remarks: source.remarks ?? null, vat_rate: source.vat_rate ?? 20, hide_price: source.hide_price ?? false,
       images: source.images ?? [], folder_id: source.folder_id ?? null,
+      ...(formulas && formulas.length ? { formulas } : {}),
     }).select('id').single();
     if (res.error || !res.data) {
       console.error(res.error);

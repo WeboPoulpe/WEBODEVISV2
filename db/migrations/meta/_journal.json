@@ -218,6 +218,13 @@
       "when": 1792566064829,
       "tag": "0030_extra_contracts",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792566124829,
+      "tag": "0031_quote_formulas",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import QuoteInlineEditor from '@/components/devis/QuoteInlineEditor';
 import WeboWordEditor from '@/components/devis/WeboWordEditor';
+import { lineFormulaId, parseFormulas } from '@/lib/quoteFormulas';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,9 @@ export default async function ModifierPage({
 
   // ── WeboWord editor ───────────────────────────────────────────────────────
   if (showWeboWord) {
+    // Formules au choix (colonnes de la migration 0031 : absentes avant, le devis n'en a alors pas).
+    const formulas = parseFormulas((quote as { formulas?: unknown }).formulas);
+    const chosenFormulaId = ((quote as { chosen_formula_id?: string | null }).chosen_formula_id) ?? null;
     // Nom et CGV de l'entreprise : ceux du titulaire, aussi pour un collaborateur.
     const { data: me } = await supabase.from('profiles').select('parent_user_id').eq('id', user.id).maybeSingle();
     const { data: profileData } = await supabase
@@ -119,7 +123,9 @@ export default async function ModifierPage({
             vatRate:      (s as ServiceLine & { vatRate?: number | null }).vatRate ?? null,
             gastroCardHtml: (s as ServiceLine & { gastroCardHtml?: string | null }).gastroCardHtml,
             gastroCardHtmlEn: (s as ServiceLine & { gastroCardHtmlEn?: string | null }).gastroCardHtmlEn,
+            formula:      lineFormulaId(s, formulas),
           })),
+        formulas,
         vatRate:    quote.vat_rate   ?? 20,
         remarks:    quote.remarks    ?? null,
         hidePrice:  quote.hide_price ?? false,
@@ -149,6 +155,8 @@ export default async function ModifierPage({
         selectedFontSize={(quote.selected_font_size as number | null) ?? 12}
         editorSettings={(quote.editor_settings as Record<string, unknown> | null) ?? null}
         updatedAt={(quote.updated_at as string | null) ?? null}
+        formulas={formulas}
+        chosenFormulaId={chosenFormulaId}
       />
     );
   }
