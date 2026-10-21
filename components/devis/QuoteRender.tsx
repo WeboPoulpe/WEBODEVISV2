@@ -9,7 +9,7 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { withQuoteNumber } from '@/lib/quoteNumberHtml';
 import PrintBreaks from '@/components/devis/PrintBreaks';
 import { documentHasCgv } from '@/lib/cgvDetect';
-import { appResetCss, googleFontHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
+import { appResetCss, documentFonts, googleFontsHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 import { documentForFormula, parseFormulas, quoteLines } from '@/lib/quoteFormulas';
 
 /** Accord signé en ligne par le client, imprimé à la fin du document. */
@@ -54,7 +54,6 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
   // ── Devis rédigé dans l'éditeur : son contenu est rendu tel quel ─────────────
   if (quote.content_html) {
     const settings = outputSettings(quote);
-    const fontHref = googleFontHref(settings.font);
     // Le numéro attribué par la base est posé sous la date de l'en-tête. Devis à formules : une fois la formule
     // retenue, le document ne présente plus qu'elle.
     const content = documentForFormula(
@@ -70,6 +69,8 @@ export default function QuoteRender({ quote, profile, acceptance = null }: { quo
     // Les conditions de vente ne sont ajoutées que si le document ne les contient pas déjà (bloc ajouté, texte
     // collé ou titre « Conditions Générales de Vente » tapé à la main).
     const hasCgv = documentHasCgv(content, profile?.cgv);
+    // Police du devis et polices choisies pour des paragraphes.
+    const fontHref = googleFontsHref(documentFonts(settings.font, content));
 
     return (
       <>

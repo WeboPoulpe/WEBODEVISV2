@@ -10,7 +10,8 @@ const SYSTEM_FONTS = ['Georgia', 'Times New Roman', 'Arial', 'Helvetica', 'Verda
 export const QUOTE_FONTS = [
   'Georgia', 'Times New Roman', 'Garamond', 'Playfair Display', 'Merriweather', 'Lora', 'Cormorant Garamond', 'EB Garamond',
   'Crimson Text', 'Libre Baskerville', 'Spectral', 'Arial', 'Helvetica', 'Montserrat', 'Roboto', 'Open Sans', 'Lato', 'Poppins',
-  'Inter', 'Raleway', 'Nunito', 'Source Sans 3', 'Work Sans',
+  'Inter', 'Raleway', 'Nunito', 'Source Sans 3', 'Work Sans', 'Dancing Script', 'Great Vibes', 'Pinyon Script', 'Cinzel',
+  'Abril Fatface', 'Bebas Neue', 'Oswald',
 ];
 
 export interface QuoteOutputSettings {
@@ -57,8 +58,25 @@ export function outputSettings(quote: { selected_font?: string | null; selected_
 
 /** Feuille de style de la police choisie, ou null pour une police déjà présente sur l'appareil. */
 export function googleFontHref(font: string): string | null {
-  if (!font || SYSTEM_FONTS.includes(font)) return null;
-  return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:ital,wght@0,400;0,600;0,700;1,400&display=swap`;
+  return googleFontsHref([font]);
+}
+
+/** Une seule feuille de style Google Fonts pour plusieurs polices, ou null si toutes sont sur l'appareil. */
+export function googleFontsHref(fonts: string[]): string | null {
+  const families = fonts.filter((f) => f && !SYSTEM_FONTS.includes(f))
+    .map((f) => `family=${encodeURIComponent(f)}:ital,wght@0,400;0,600;0,700;1,400`);
+  return families.length ? `https://fonts.googleapis.com/css2?${families.join('&')}&display=swap` : null;
+}
+
+/** Polices d'un document : celle du devis, puis celles choisies pour des paragraphes (repère data-webo-font). */
+export function documentFonts(font: string, html?: string | null): string[] {
+  const marked = Array.from((html ?? '').matchAll(/data-webo-font="([^"]+)"/g), (m) => m[1]).filter((f) => QUOTE_FONTS.includes(f));
+  return Array.from(new Set([font, ...marked]));
+}
+
+/** Police propre à un paragraphe : la variable passe au bloc et à son contenu, le bloc repéré le plus proche gagne. */
+function paragraphFontCss(): string {
+  return QUOTE_FONTS.map((f) => `.quote-doc [data-webo-font="${f}"] { --webo-font: '${cssFont(f)}'; }`).join('\n    ');
 }
 
 const cssFont = (font: string) => font.replace(/[^\w\s-]/g, '');
@@ -89,7 +107,8 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     .quote-pages > thead > tr > td, .quote-pages > tfoot > tr > td, .quote-pages > tbody > tr > td { padding: 0; border: 0; }
     .quote-gap { height: 0; }
     .quote-doc { padding: 20mm; font-size: ${s.fontSize}px; line-height: ${s.lineHeight}; }
-    .quote-doc, .quote-doc * { font-family: '${font}', Georgia, serif !important; }
+    .quote-doc, .quote-doc * { font-family: var(--webo-font, '${font}'), Georgia, serif !important; }
+    ${paragraphFontCss()}
     .quote-doc, .quote-doc p, .quote-doc li, .quote-doc div, .quote-doc span, .quote-doc td, .quote-doc th { line-height: ${s.lineHeight} !important; }
     .quote-doc h1, .quote-doc h2, .quote-doc h3 { line-height: 1.25 !important; }
     /* Un paragraphe sans marge écrite n'en a pas, comme dans les éditeurs où il est saisi (description, CGV, carte) :
@@ -283,7 +302,7 @@ export function buildQuotePrintPage(p: {
   /** Mentions légales de l'entreprise, sous le document. */
   legalHtml?: string;
 }): string {
-  const fontHref = googleFontHref(p.settings.font);
+  const fontHref = googleFontsHref(documentFonts(p.settings.font, p.content));
   const title = p.title.replace(/[<>&"]/g, '');
   return `<!DOCTYPE html>
 <html lang="fr">

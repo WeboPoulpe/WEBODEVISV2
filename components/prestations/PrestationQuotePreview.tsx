@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { generateQuoteHtml, type QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import { useHydrated } from '@/lib/useHydrated';
-import { appResetCss, googleFontHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
+import { appResetCss, documentFonts, googleFontsHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
 import { sanitizeHtml } from '@/lib/sanitize';
 
 // Aperçu d'une prestation telle qu'elle sortira dans un devis : la ligne du tableau et son bloc dans la carte du menu.
@@ -72,7 +72,7 @@ export default function PrestationQuotePreview({ data, style, font }: {
   // Feuille de sortie des devis, sans la règle @page (elle changerait l'impression de la page Prestations), après
   // l'annulation des styles de l'application (marges des paragraphes, puces…) : le rendu de la fenêtre d'impression.
   const css = useMemo(() => `${appResetCss(`.${PAPER}`)}\n${quoteOutputCss(outputSettings({ selected_font: fontName })).replace(/@page\s*\{[^}]*\}/, '')}`, [fontName]);
-  const fontHref = googleFontHref(fontName);
+  const fontHref = googleFontsHref(documentFonts(fontName, data.gastroCardHtml));
 
   return (
     <div className="space-y-5">

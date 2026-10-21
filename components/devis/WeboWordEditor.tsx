@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { buildQuotePrintPage, googleFontHref, quoteEditorCss, DEFAULT_LINE_HEIGHT, PARAGRAPH_LINE_HEIGHTS, type QuoteEditorSettings } from '@/lib/quoteOutput';
+import { buildQuotePrintPage, documentFonts, googleFontHref, quoteEditorCss, DEFAULT_LINE_HEIGHT, PARAGRAPH_LINE_HEIGHTS, type QuoteEditorSettings } from '@/lib/quoteOutput';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { documentForFormula, lineFormulaId, type QuoteFormula } from '@/lib/quoteFormulas';
@@ -231,7 +231,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, [sessionLost]);
   const [toast,     setToast]     = useState<string | null>(null);
   const [showDesc,  setShowDesc]  = useState(initSettings?.showDesc !== false);
-  const [font,      setFont]      = useState(initFont ?? 'Georgia');
+  // Police par défaut du devis ; la barre d'outils règle celle des paragraphes.
+  const [font]                    = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
   // Interligne par défaut du devis (gardé avec le devis) ; la barre d'outils règle celui des paragraphes.
   const [lineHeight] = useState(initSettings?.lineHeight ?? DEFAULT_LINE_HEIGHT);
@@ -334,19 +335,27 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const handleSavePdfRef = useRef<() => void>(() => {});
   const handleSaveRef = useRef<() => Promise<boolean>>(async () => false);
 
-  // ── Load Google Font when font changes ────────────────────────────────────
+  // ── Polices Google : celle du devis et celles choisies pour des paragraphes ─
   useEffect(() => {
-    const f = FONTS.find((x) => x.value === font);
-    if (!f?.google) return;
-    const id = `gfont-${font.replace(/\s+/g, '-')}`;
-    if (!document.getElementById(id)) {
+    const loadFont = (name: string) => {
+      if (!FONTS.find((x) => x.value === name)?.google) return;
+      const id = `gfont-${name.replace(/\s+/g, '-')}`;
+      if (document.getElementById(id)) return;
       const link = document.createElement('link');
       link.id   = id;
       link.rel  = 'stylesheet';
       // Même feuille de police que l'impression (italique comprise) : mêmes largeurs de texte, mêmes pages.
-      link.href = googleFontHref(font) ?? '';
+      link.href = googleFontHref(name) ?? '';
       document.head.appendChild(link);
-    }
+    };
+    const el = editorRef.current;
+    const load = () => documentFonts(font, el?.innerHTML).forEach(loadFont);
+    load();
+    if (!el) return;
+    // Le document peut être remplacé (chargement, brouillon, régénération) ou recevoir une police de paragraphe.
+    const observer = new MutationObserver(load);
+    observer.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-webo-font'] });
+    return () => observer.disconnect();
   }, [font]);
 
   // ── Close font menu on outside click ─────────────────────────────────────
@@ -843,9 +852,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, [adminFields, adminServices, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
-  // Interligne du paragraphe où se trouve le curseur (celui du devis s'il n'en a pas), et dernière sélection
-  // dans la feuille : la liste déroulante prend le focus, la sélection doit lui survivre.
+  // Interligne et police du paragraphe où se trouve le curseur (ceux du devis s'il n'en a pas), et dernière
+  // sélection dans la feuille : la liste déroulante prend le focus, la sélection doit lui survivre.
   const [paraLineHeight, setParaLineHeight] = useState<string | null>(null);
+  const [paraFont, setParaFont] = useState<string | null>(null);
   const sheetRange = useRef<Range | null>(null);
   useEffect(() => {
     const onSelect = () => {
@@ -854,21 +864,26 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       if (!el || !sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) return;
       sheetRange.current = sel.getRangeAt(0).cloneRange();
       const start = sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement;
-      const marked = start?.closest('[data-webo-lh]');
-      setParaLineHeight(marked && el.contains(marked) ? marked.getAttribute('data-webo-lh') : null);
+      const marked = (attr: string) => {
+        const m = start?.closest(`[${attr}]`);
+        return m && el.contains(m) ? m.getAttribute(attr) : null;
+      };
+      setParaLineHeight(marked('data-webo-lh'));
+      setParaFont(marked('data-webo-font'));
     };
     document.addEventListener('selectionchange', onSelect);
     return () => document.removeEventListener('selectionchange', onSelect);
   }, []);
 
-  // Interligne des seuls paragraphes sélectionnés : les blocs sans bloc enfant touchés par la sélection, ou,
-  // pour un simple curseur, le bloc qui le contient.
-  const applyParagraphLineHeight = useCallback((value: string) => {
+  // Réglage des seuls paragraphes sélectionnés (repère `attr`) : les blocs sans bloc enfant touchés par la
+  // sélection, ou, pour un simple curseur, le bloc qui le contient.
+  const markParagraphs = useCallback((attr: 'data-webo-lh' | 'data-webo-font', value: string): boolean => {
     const el = editorRef.current;
     const range = sheetRange.current;
+    const what = attr === 'data-webo-lh' ? 'l’interligne' : 'la police';
     if (!el || !range || !el.contains(range.commonAncestorContainer)) {
-      setToast('Cliquez d’abord dans le paragraphe dont vous voulez changer l’interligne.');
-      return;
+      setToast(`Cliquez d’abord dans le paragraphe dont vous voulez changer ${what}.`);
+      return false;
     }
     const isLeaf = (b: Element) => !b.querySelector(LH_BLOCKS);
     let blocks = Array.from(el.querySelectorAll(LH_BLOCKS)).filter((b) => isLeaf(b) && range.intersectsNode(b) && !b.closest('[contenteditable="false"]'));
@@ -878,19 +893,25 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       blocks = block && block !== el && el.contains(block) ? [block] : [];
     }
     if (blocks.length === 0) {
-      setToast('Cliquez d’abord dans le paragraphe dont vous voulez changer l’interligne.');
-      return;
+      setToast(`Cliquez d’abord dans le paragraphe dont vous voulez changer ${what}.`);
+      return false;
     }
     blocks.forEach((b) => {
-      b.querySelectorAll('[data-webo-lh]').forEach((c) => c.removeAttribute('data-webo-lh'));
-      b.setAttribute('data-webo-lh', value);
+      b.querySelectorAll(`[${attr}]`).forEach((c) => c.removeAttribute(attr));
+      b.setAttribute(attr, value);
     });
-    setParaLineHeight(value);
     const sel = window.getSelection();
     el.focus();
     sel?.removeAllRanges();
     sel?.addRange(range);
+    return true;
   }, []);
+  const applyParagraphLineHeight = useCallback((value: string) => {
+    if (markParagraphs('data-webo-lh', value)) setParaLineHeight(value);
+  }, [markParagraphs]);
+  const applyParagraphFont = useCallback((value: string) => {
+    if (markParagraphs('data-webo-font', value)) setParaFont(value);
+  }, [markParagraphs]);
 
   const exec = useCallback((cmd: string, value?: string) => {
     editorRef.current?.focus();
@@ -1382,11 +1403,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           <div className="relative">
             <button
               onMouseDown={(e) => { e.preventDefault(); setShowFontMenu((v) => !v); }}
-              title="Changer la police"
+              title="Police des paragraphes sélectionnés"
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-              style={{ fontFamily: font }}
+              style={{ fontFamily: paraFont ?? font }}
             >
-              <span className="max-w-[90px] truncate">{font}</span>
+              <span className="max-w-[90px] truncate">{paraFont ?? font}</span>
               <span className="text-gray-400">▾</span>
             </button>
             {showFontMenu && (
@@ -1394,10 +1415,10 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
                 {FONTS.map((f) => (
                   <button
                     key={f.value}
-                    onMouseDown={(e) => { e.preventDefault(); setFont(f.value); setShowFontMenu(false); }}
+                    onMouseDown={(e) => { e.preventDefault(); applyParagraphFont(f.value); setShowFontMenu(false); }}
                     className={cn(
                       'w-full text-left px-3 py-1.5 text-sm hover:bg-primary/5 transition-colors',
-                      font === f.value && 'text-primary font-semibold',
+                      (paraFont ?? font) === f.value && 'text-primary font-semibold',
                     )}
                     style={{ fontFamily: f.value }}
                   >

@@ -5,7 +5,7 @@ import {
   AlignCenter, AlignLeft, AlignRight, Bold, Italic, List, ListOrdered, Palette, RemoveFormatting, Underline, Wand2,
 } from 'lucide-react';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
-import { appResetCss, googleFontHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
+import { appResetCss, documentFonts, googleFontsHref, outputSettings, quoteOutputCss } from '@/lib/quoteOutput';
 import { carteShell, EDIT_ATTR, type CardKind } from '@/lib/prestationCard';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { useHydrated } from '@/lib/useHydrated';
@@ -101,7 +101,8 @@ export default function CarteBlockEditor({ name, isOption, kind, lang, template,
       .${PAPER} [${EDIT_ATTR}]:empty::before { content: attr(data-placeholder); color: #a8a29e; pointer-events: none; }`,
     [font],
   );
-  const fontHref = googleFontHref(font);
+  // Police des devis, et celles de paragraphes repris d'un devis (bouton « + » de l'éditeur).
+  const fontHref = googleFontsHref(documentFonts(font, value));
 
   const emit = useCallback(() => {
     const el = editRef.current;

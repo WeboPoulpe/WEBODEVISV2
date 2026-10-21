@@ -22,11 +22,14 @@ function dishName(el: HTMLElement): string | null {
   return first?.tagName === 'P' ? (first.textContent || '').trim() || null : null;
 }
 
+/** Repères propres au devis : ils ne passent pas dans la fiche (l'interligne et la police d'un paragraphe, oui). */
+const QUOTE_ONLY = /^data-webo-(?!lh$|font$)/;
+
 /** Fiche de la carte tirée d'un plat : son contenu, sans les repères du devis, centré s'il l'était. */
 export function dishCardHtml(el: HTMLElement): string {
   const copy = el.cloneNode(true) as HTMLElement;
   copy.querySelectorAll('*').forEach((n) => {
-    Array.from(n.attributes).forEach((a) => { if (a.name.startsWith('data-webo-')) n.removeAttribute(a.name); });
+    Array.from(n.attributes).forEach((a) => { if (QUOTE_ONLY.test(a.name)) n.removeAttribute(a.name); });
   });
   const inner = copy.innerHTML.trim();
   // Le plat sans fiche est centré par son enveloppe, que la fiche n'a pas : le centrage passe dans la fiche.

@@ -4,7 +4,7 @@
 
 import { computePageBreaks, type PageBlock, type PageBreakResult } from '@/lib/pageBreaks';
 import {
-  A4_PAGE_PX, LONG_DISH_PX, PAGE_CONTENT_PX, googleFontHref, markLongDishes, markSignature, quoteOutputCss, wrapQuoteDoc,
+  A4_PAGE_PX, LONG_DISH_PX, PAGE_CONTENT_PX, documentFonts, googleFontsHref, markLongDishes, markSignature, quoteOutputCss, wrapQuoteDoc,
   type QuoteOutputSettings,
 } from '@/lib/quoteOutput';
 import { documentHasCgv } from '@/lib/cgvDetect';
@@ -134,7 +134,7 @@ export function measurePrintPages(idoc: Document, iwin: Window, input: MeasureIn
     const css = quoteOutputCss(settings).replace('@media print', '@media all');
     if (style && style.textContent !== css) style.textContent = css;
     const link = idoc.getElementById('font') as HTMLLinkElement | null;
-    const href = googleFontHref(settings.font) ?? '';
+    const href = googleFontsHref(documentFonts(settings.font, html)) ?? '';
     if (link && link.getAttribute('href') !== (href || null)) {
       if (href) link.setAttribute('href', href); else link.removeAttribute('href');
     }
