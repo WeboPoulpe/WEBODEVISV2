@@ -32,6 +32,8 @@ interface Props {
   onApplied: (notice?: string) => void;
   /** La feuille telle qu'elle est à l'écran, avec ce qui a été tapé depuis le dernier enregistrement. */
   getSheetHtml?: () => string | null;
+  /** Réglages de l'éditeur (interligne, largeur de la carte…), enregistrés avec la feuille. */
+  getEditorSettings?: () => Record<string, unknown>;
   // Editor actions (top bar moved here)
   onSave?: () => void;
   onPrint?: () => void;
@@ -50,7 +52,8 @@ interface Props {
 const MENU_WIDTHS = [
   { label: 'Étroit', value: '280px' },
   { label: 'Normal', value: '400px' },
-  { label: 'Large', value: '560px' },
+  // Assez en retrait de « Plein » (toute la largeur entre les marges, environ 640 px) pour que l'écart se voie.
+  { label: 'Large', value: '500px' },
   { label: 'Plein', value: '100%' },
 ];
 
@@ -59,7 +62,7 @@ interface Client { id: string; first_name: string | null; last_name: string | nu
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Service { name: string; quantity: number; unitPrice: number; isFree?: boolean; isOption?: boolean; removed?: boolean; vatRate?: number | null; description?: string | null; photo_url?: string; [key: string]: any; }
 
-export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange, onFormulaChosen }: Props) {
+export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, getEditorSettings, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange, onFormulaChosen }: Props) {
   // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
   const supabase = useMemo(() => createClient(), []);
   const { notify } = useFeedback();
@@ -473,6 +476,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // Appliquer enregistre aussi ce qui a été tapé dans la feuille : rien n'est perdu au rechargement.
     const sheetHtml = getSheetHtml?.() || null;
     if (sheetHtml) updatePayload.content_html = sheetHtml;
+    // Avec la feuille, ses réglages : le rechargement qui suit ne doit pas remettre les anciens (largeur de la carte…).
+    const editorSettings = getEditorSettings?.();
+    if (editorSettings) updatePayload.editor_settings = editorSettings;
     const kept: ('intro' | 'menuTitle')[] = [];
     if (finChanged || partiesChanged) {
       const { data: cur } = await supabase.from('quotes')

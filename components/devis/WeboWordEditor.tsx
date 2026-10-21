@@ -397,7 +397,14 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       editorRef.current.innerHTML = sanitizeHtml(initialHtml);
       initDone.current = true;
       const menu = editorRef.current.querySelector('.gastro-menu') as HTMLElement | null;
-      if (menu) menu.style.maxWidth = initSettings?.menuWidth ?? '100%';
+      // La largeur écrite dans le document fait foi (« Appliquer » l'enregistre sans les réglages) ; les réglages
+      // ne servent qu'au document qui n'en a pas.
+      // Exception : un devis jamais réglé garde la pleine largeur par défaut, pas les 400 px de la génération.
+      if (menu) {
+        const written = menu.style.maxWidth;
+        if (written && (initSettings?.menuWidth || written !== '400px')) setMenuWidth(written);
+        else menu.style.maxWidth = initSettings?.menuWidth ?? '100%';
+      }
       lockFinancials(editorRef.current);
       // Référence de « rien à enregistrer » : la feuille telle qu'elle vient d'être chargée.
       savedHtml.current = editorRef.current.innerHTML;
@@ -1726,6 +1733,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           window.history.replaceState(null, '', url.toString());
         }}
         getSheetHtml={() => editorRef.current?.innerHTML ?? null}
+        getEditorSettings={() => ({ lineHeight, showDesc, menuWidth, splitDishes })}
         onFormulaChosen={setChosenFormulaId}
         onApplied={(message) => {
           setActivePanel(null);
