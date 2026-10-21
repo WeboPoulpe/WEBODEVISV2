@@ -30,6 +30,7 @@ import { useFeedback } from '@/components/ui/Feedback';
 import { documentHasCgv } from '@/lib/cgvDetect';
 import { usePrintPreview } from './weboword/usePrintPreview';
 import { PageSheets } from './weboword/PageSheets';
+import { DishLayoutButtons } from './weboword/DishLayoutButtons';
 import { CgvDuplicateBanner } from './weboword/CgvDuplicateBanner';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
@@ -1532,6 +1533,9 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
           {/* Vue en pages : bandes entre les feuilles, posées par-dessus, hors du texte du devis. */}
           <PageSheets bands={printPreview.bands} />
+
+          {/* « + » en face de chaque plat : sa mise en page devient celle de la prestation. */}
+          <DishLayoutButtons editorRef={editorRef} sheetRef={sheetRef} quoteId={quoteId} />
         </div>
 
         {/* Page photos */}

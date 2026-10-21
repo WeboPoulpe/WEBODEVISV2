@@ -78,6 +78,9 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     .quote-doc, .quote-doc * { font-family: '${font}', Georgia, serif !important; }
     .quote-doc, .quote-doc p, .quote-doc li, .quote-doc div, .quote-doc span, .quote-doc td, .quote-doc th { line-height: ${s.lineHeight} !important; }
     .quote-doc h1, .quote-doc h2, .quote-doc h3 { line-height: 1.25 !important; }
+    /* Un paragraphe sans marge écrite n'en a pas, comme dans les éditeurs où il est saisi (description, CGV, carte) :
+       sans cela, chaque ligne d'une description (un <p> par ligne) était séparée d'une ligne vide. */
+    .quote-doc p { margin: 0; }
     .quote-doc * { min-height: 0 !important; }
     .quote-doc ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
     .quote-doc ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }

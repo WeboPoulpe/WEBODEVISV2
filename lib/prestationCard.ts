@@ -17,10 +17,10 @@ const MARK = 'PRESTA-EDIT-MARK';
 /** Attribut de la zone modifiable dans le bloc. */
 export const EDIT_ATTR = 'data-presta-edit';
 
-/** Le bloc .gastro-menu du document généré (colonne des plats de la carte). */
+/** Le bloc .gastro-menu du document généré (colonne des plats de la carte), sans le repère des plats du devis. */
 function menuBlock(html: string): string {
   const m = html.match(/<div class="gastro-menu"[\s\S]*?<\/div>\s*(?=<!-- ── Pied de carte)/);
-  return m ? m[0].trim() : '';
+  return m ? m[0].trim().replace(/ data-webo-dish="[^"]*"/g, '') : '';
 }
 
 /**
