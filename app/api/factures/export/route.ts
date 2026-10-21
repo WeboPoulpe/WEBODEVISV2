@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   let count: number;
 
   if (format === 'fec') {
-    const entries = fecEntries(data.documents, data.payments);
+    const entries = fecEntries(data.documents, data.payments, data.accounts);
     if (!entries.every(isBalanced)) return NextResponse.json({ error: 'Une écriture n’est pas équilibrée : export interrompu.' }, { status: 500 });
     const siren = sirenOf(data.siret);
     body = fecText(entries);

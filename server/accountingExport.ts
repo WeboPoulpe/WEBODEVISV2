@@ -3,7 +3,7 @@ import { and, asc, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/db';
 import { customer_invoice_payments, customer_invoices, profiles, quotes } from '@/db/schema';
-import type { ExportDocument, ExportPayment } from '@/lib/accountingExport';
+import { accountsFrom, type AccountingAccounts, type ExportDocument, type ExportPayment } from '@/lib/accountingExport';
 import { invoiceTotals, type InvoiceKind, type InvoiceLine, type InvoiceStatus, type PaymentMethod, type RateTotal } from '@/lib/invoices';
 import { companyOf } from './companyScope';
 import { requireUser } from './session';
@@ -15,11 +15,26 @@ import { requireUser } from './session';
 const num = (v: unknown) => Number(v ?? 0);
 const credited = alias(customer_invoices, 'credited');
 
+/**
+ * Comptes FEC de l'entreprise (Paramètres > Comptabilité), complétés par les comptes standards. Sans contrôle de
+ * droits : l'appelant a déjà vérifié la session et passe l'entreprise de l'utilisateur.
+ */
+export async function companyAccounts(company: string): Promise<AccountingAccounts> {
+  try {
+    const [p] = await db.select({ s: profiles.accounting_settings }).from(profiles).where(eq(profiles.id, company)).limit(1);
+    return accountsFrom(p?.s);
+  } catch {
+    // Colonne absente (migration 0029 pas encore appliquée) : comptes standards.
+    return accountsFrom(null);
+  }
+}
+
 export interface AccountingExportData {
   documents: ExportDocument[];
   payments: ExportPayment[];
   /** SIRET de l'entreprise (Paramètres), pour nommer le fichier FEC. */
   siret: string | null;
+  accounts: AccountingAccounts;
 }
 
 export async function accountingExportData(from: string, to: string): Promise<AccountingExportData> {
@@ -38,7 +53,7 @@ export async function accountingExportData(from: string, to: string): Promise<Ac
       .innerJoin(customer_invoices, eq(customer_invoices.id, customer_invoice_payments.invoice_id))
       .where(and(mine, ne(customer_invoices.status, 'brouillon'), gte(customer_invoice_payments.paid_on, from), lte(customer_invoice_payments.paid_on, to)))
       .orderBy(asc(customer_invoice_payments.paid_on), asc(customer_invoices.number)),
-    db.select({ siret: profiles.siret, companySiret: profiles.company_siret }).from(profiles)
+    db.select({ id: profiles.id, siret: profiles.siret, companySiret: profiles.company_siret }).from(profiles)
       .where(sql`${profiles.id} = ${companyOf(user.id)}`).limit(1),
   ]);
 
@@ -79,5 +94,6 @@ export async function accountingExportData(from: string, to: string): Promise<Ac
     buyer_name: (buyer as { name?: string } | null)?.name || 'Client',
   }));
 
-  return { documents, payments, siret: company?.siret || company?.companySiret || null };
+  const accounts = company ? await companyAccounts(company.id) : accountsFrom(null);
+  return { documents, payments, siret: company?.siret || company?.companySiret || null, accounts };
 }

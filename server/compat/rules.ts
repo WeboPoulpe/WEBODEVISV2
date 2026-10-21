@@ -63,7 +63,7 @@ export const RULES: Record<string, TableRule> = {
     read: (t, u) => `(${t}.id = ${u} or ${t}.id = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${u}))`,
     write: own('id'),
     admin: ['select', 'update'],
-    adminOnlyColumns: ['modules', 'role', 'is_active', 'deletion_requested_at', 'company_role', 'ical_token', 'last_seen_at', 'subscription_type', 'subscription_plan', 'max_linked_users', 'parent_user_id', 'can_view_all_company_data'],
+    adminOnlyColumns: ['modules', 'role', 'is_active', 'deletion_requested_at', 'company_role', 'ical_token', 'last_seen_at', 'subscription_type', 'subscription_plan', 'max_linked_users', 'parent_user_id', 'can_view_all_company_data', 'accounting_settings'],
   },
   prestations: both(team('user_id')),
   prestation_categories: { read: globalOrTeam, write: team('user_id'), adminWrite: (t) => `${t}.user_id is null` },

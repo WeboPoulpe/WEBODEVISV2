@@ -204,6 +204,13 @@
       "when": 1792505400605,
       "tag": "0028_tastings",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792565851887,
+      "tag": "0029_accounting_settings",
+      "breakpoints": true
     }
   ]
 }

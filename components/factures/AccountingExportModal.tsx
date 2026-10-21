@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Download, Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, errorCls, inputCls, labelCls } from '@/components/ui/kit';
-import { ACCOUNTING_ACCOUNTS, PERIOD_LABELS, periodDates, type PeriodPreset } from '@/lib/accountingExport';
+import { PERIOD_LABELS, periodDates, type PeriodPreset } from '@/lib/accountingExport';
 import { frDate } from '@/lib/invoiceMentions';
 import { cn } from '@/lib/utils';
 
@@ -83,7 +84,6 @@ export default function AccountingExportModal({ onClose }: { onClose: () => void
     }
   };
 
-  const a = ACCOUNTING_ACCOUNTS;
   return (
     <Modal title="Export comptable" onClose={onClose} wide
       footer={<>
@@ -133,15 +133,13 @@ export default function AccountingExportModal({ onClose }: { onClose: () => void
           <div className="text-sm text-gray-600 space-y-2">
             <p>
               Le fichier des écritures comptables, au format officiel, que votre comptable importe dans son logiciel.
-              Il contient les factures et avoirs émis sur la période (journal des ventes {a.salesJournal.code}) et les paiements reçus (journal de banque {a.bankJournal.code}).
+              Il contient les factures et avoirs émis sur la période (journal des ventes) et les paiements reçus (journal de banque, ou de caisse pour les espèces).
             </p>
-            <p>Comptes utilisés, à ajuster par votre comptable à l’import si les siens sont différents :</p>
-            <ul className="list-disc pl-5 space-y-0.5">
-              <li>Clients : {a.customers.num}, avec un compte par client (C + nom)</li>
-              <li>Prestations : {a.sales[20]} (TVA 20 %), {a.sales[10]} (10 %), {a.sales[5.5]} (5,5 %), {a.sales[0]} (sans TVA)</li>
-              <li>TVA collectée : {a.vat[20]} (20 %), {a.vat[10]} (10 %), {a.vat[5.5]} (5,5 %)</li>
-              <li>Banque : {a.bank.num}</li>
-            </ul>
+            <p>
+              Numéros de comptes et journaux : ceux du plan comptable standard (clients 411000, prestations 706…, TVA collectée 44571…, banque 512000).
+              Si votre comptable en utilise d’autres, réglez-les une fois pour toutes dans{' '}
+              <Link href="/parametres#comptabilite" onClick={onClose} className="font-medium text-primary underline underline-offset-2">Paramètres, Comptabilité</Link>.
+            </p>
           </div>
         )}
       </div>

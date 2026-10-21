@@ -883,6 +883,8 @@ export const profiles = pgTable("profiles", {
 	// Relances automatiques par email : devis sans réponse et factures échues (désactivées par défaut).
 	auto_reminders: boolean().default(false).notNull(),
 	reminder_delay_days: integer().default(7).notNull(),
+	// Comptes de l'export comptable FEC (voir lib/accountingExport.ts) ; null : comptes standards.
+	accounting_settings: jsonb(),
 	// Abonnement agenda (iCal) des événements : jeton secret de l'adresse, null tant qu'il n'est pas créé.
 	ical_token: text().unique(),
 	// Rôle dans l'entreprise pour un compte rattaché : gerant, collaborateur, lecture (voir lib/team.ts).

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ACCOUNTING_ACCOUNTS, customerAuxAccount, documentsCsv, fecEntries, fecFileName, fecText, isBalanced, paymentsCsv,
-  periodDates, sirenOf, type ExportDocument, type ExportPayment,
+  ACCOUNTING_ACCOUNTS, accountsError, accountsFrom, customerAuxAccount, isDefaultAccounts, documentsCsv, fecEntries, fecFileName, fecText, isBalanced, paymentsCsv,
+  periodDates, sirenOf, type AccountingAccounts, type ExportDocument, type ExportPayment,
 } from './accountingExport';
 import { invoiceTotals } from './invoices';
 
@@ -123,5 +123,61 @@ describe('FEC', () => {
   it('compte client tiré du nom, sans accents ni espaces', () => {
     expect(customerAuxAccount('Mairie de Saint-Lyé')).toBe('CMAIRIEDESAINTLYE');
     expect(customerAuxAccount('  ')).toBe('CCLIENT');
+  });
+});
+
+describe('comptes réglables', () => {
+  const custom: AccountingAccounts = {
+    ...ACCOUNTING_ACCOUNTS,
+    customers: '41100000', bank: '51210000', cash: '53100000',
+    sales: { ...ACCOUNTING_ACCOUNTS.sales, '20': '70610000', '10': '70620000', autre: '70690000' },
+    vat: { ...ACCOUNTING_ACCOUNTS.vat, '20': '44571200', '10': '44571100' },
+    salesJournal: { code: 'VT', label: 'Ventes' }, bankJournal: { code: 'BNP', label: 'Banque BNP' }, cashJournal: { code: 'CAI', label: 'Caisse' },
+    auxPerCustomer: false,
+  };
+
+  it('l’export utilise les comptes et journaux de l’entreprise, toujours équilibré', () => {
+    const odd = doc({ number: 'F-9', vat_breakdown: [{ rate: 8.5, base: 99.99, vat: 8.5 }] });
+    const all = fecEntries([multi, credit, odd], [payment, { ...payment, method: 'especes', paid_on: '2026-10-12' }], custom);
+    expect(all.every(isBalanced)).toBe(true);
+    const sale = all.find((e) => e.pieceRef === 'F-2026-0001' && e.journal === 'VT')!;
+    expect(sale.num).toBe('VT000001');
+    expect(sale.lines.map((l) => l.account)).toEqual(['41100000', '70610000', '70620000', '44571200', '44571100']);
+    // Sans compte auxiliaire : rien dans CompAuxNum / CompAuxLib.
+    expect(sale.lines[0].auxNum).toBeUndefined();
+    expect(all.find((e) => e.pieceRef === 'F-9')!.lines.map((l) => l.account)).toEqual(['41100000', '70690000', ACCOUNTING_ACCOUNTS.vat.autre]);
+    const [bank, cash] = all.filter((e) => e.label.startsWith('Règlement'));
+    expect(bank).toMatchObject({ journal: 'BNP', journalLabel: 'Banque BNP', num: 'BNP000001' });
+    expect(bank.lines[0].account).toBe('51210000');
+    expect(cash).toMatchObject({ journal: 'CAI', num: 'CAI000001' });
+    expect(cash.lines[0]).toMatchObject({ account: '53100000', accountLabel: 'Caisse', debit: 500 });
+    const row = fecText(all).split('\r\n')[1].split('\t');
+    expect(row.slice(0, 8)).toEqual(['VT', 'Ventes', 'VT000001', '20261005', '41100000', 'Clients', '', '']);
+  });
+
+  it('paiement en espèces avec les comptes standards : caisse 530000, journal CA', () => {
+    const [e] = fecEntries([], [{ ...payment, method: 'especes' }]);
+    expect(e).toMatchObject({ journal: 'CA', num: 'CA000001' });
+    expect(e.lines.map((l) => l.account)).toEqual(['530000', '411000']);
+  });
+
+  it('valeurs enregistrées illisibles ou absentes : comptes standards, champ par champ', () => {
+    expect(accountsFrom(null)).toEqual(ACCOUNTING_ACCOUNTS);
+    expect(accountsFrom({ customers: '411ABC', bank: '401000', sales: { '20': '706 1' }, salesJournal: { code: 'v t', label: '' }, auxPerCustomer: false }))
+      .toEqual({ ...ACCOUNTING_ACCOUNTS, sales: { ...ACCOUNTING_ACCOUNTS.sales, '20': '7061' }, auxPerCustomer: false });
+    expect(isDefaultAccounts(accountsFrom({}))).toBe(true);
+    expect(isDefaultAccounts(custom)).toBe(false);
+  });
+
+  it('vérification de la saisie : chiffres, longueur, classe, journaux', () => {
+    expect(accountsError(ACCOUNTING_ACCOUNTS)).toBeNull();
+    expect(accountsError(custom)).toBeNull();
+    expect(accountsError({ ...custom, customers: '41A' })).toMatch(/Compte clients : un numéro de 3 à 12 chiffres/);
+    expect(accountsError({ ...custom, bank: '1234567890123' })).toMatch(/banque/);
+    expect(accountsError({ ...custom, sales: { ...custom.sales, '10': '606000' } })).toMatch(/Prestations \(TVA 10 %\).*commence par 7/);
+    expect(accountsError({ ...custom, bankJournal: { code: 'VT', label: 'x' } })).toMatch(/propre code/);
+    expect(accountsError({ ...custom, cashJournal: { code: 'BNP', label: 'Autre' } })).toMatch(/même libellé/);
+    expect(accountsError({ ...custom, cashJournal: { code: 'BNP', label: 'Banque BNP' } })).toBeNull();
+    expect(accountsError({ ...custom, salesJournal: { code: 'VT', label: ' ' } })).toMatch(/libellé/);
   });
 });

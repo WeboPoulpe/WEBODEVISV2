@@ -9,7 +9,7 @@
 // FEC (fichier des écritures comptables, art. A47 A-1 du livre des procédures fiscales) : texte tabulé,
 // 18 colonnes, dates AAAAMMJJ, montants à virgule. Une écriture par facture ou avoir dans le journal des ventes,
 // une écriture par paiement dans le journal de banque. Les comptes sont ceux de ACCOUNTING_ACCOUNTS : des
-// valeurs courantes du plan comptable général, que le comptable peut renommer à l'import.
+// valeurs courantes du plan comptable général, que l'entreprise remplace par les siens dans Paramètres > Comptabilité.
 
 import { cents, INVOICE_KIND_LABELS, INVOICE_STATUS_LABELS, PAYMENT_METHODS, type InvoiceKind, type InvoiceStatus, type PaymentMethod, type RateTotal } from './invoices';
 import { frDate } from './invoiceMentions';
@@ -149,25 +149,133 @@ export function paymentsCsv(payments: readonly ExportPayment[]): string {
 
 // ── FEC ──────────────────────────────────────────────────────────────────────
 
+/** Taux de TVA proposés, avec un compte chacun ; « autre » pour tout autre taux. */
+export const ACCOUNT_RATES = ['20', '10', '5.5', '2.1', '0', 'autre'] as const;
+export type AccountRate = typeof ACCOUNT_RATES[number];
+/** Taux qui ont un compte de TVA collectée (à 0 %, il n'y a pas de TVA). */
+export const VAT_ACCOUNT_RATES = ['20', '10', '5.5', '2.1', 'autre'] as const;
+export type VatAccountRate = typeof VAT_ACCOUNT_RATES[number];
+
+export interface Journal { code: string; label: string }
+
+/** Comptes et journaux du FEC, réglables dans Paramètres > Comptabilité (profiles.accounting_settings). */
+export interface AccountingAccounts {
+  salesJournal: Journal;
+  bankJournal: Journal;
+  /** Paiements en espèces : journal et compte de caisse. */
+  cashJournal: Journal;
+  customers: string;
+  bank: string;
+  cash: string;
+  /** Prestations de services, par taux de TVA. */
+  sales: Record<AccountRate, string>;
+  /** TVA collectée, par taux. */
+  vat: Record<VatAccountRate, string>;
+  /** Un compte auxiliaire par client (C + nom) sur les lignes du compte clients. */
+  auxPerCustomer: boolean;
+}
+
 /**
- * Comptes utilisés dans le FEC. Valeurs par défaut du plan comptable général : le comptable peut les faire
- * correspondre aux siens à l'import (ils deviendront réglables dans Paramètres plus tard).
+ * Comptes standards du plan comptable général, utilisés tant que l'entreprise n'a rien réglé.
  * Ventes et TVA collectée : un compte par taux, pour préparer la déclaration de TVA.
  */
-export const ACCOUNTING_ACCOUNTS = {
+export const ACCOUNTING_ACCOUNTS: AccountingAccounts = {
   salesJournal: { code: 'VE', label: 'Journal des ventes' },
   bankJournal: { code: 'BQ', label: 'Journal de banque' },
-  customers: { num: '411000', label: 'Clients' },
-  bank: { num: '512000', label: 'Banque' },
-  /** Prestations de services, par taux de TVA. */
-  sales: { 20: '706200', 10: '706100', 5.5: '706055', 2.1: '706021', 0: '706000' } as Record<number, string>,
-  salesOther: '706900',
-  /** TVA collectée, par taux. */
-  vat: { 20: '4457120', 10: '4457110', 5.5: '4457105', 2.1: '4457102' } as Record<number, string>,
-  vatOther: '4457100',
-} as const;
+  cashJournal: { code: 'CA', label: 'Journal de caisse' },
+  customers: '411000',
+  bank: '512000',
+  cash: '530000',
+  sales: { '20': '706200', '10': '706100', '5.5': '706055', '2.1': '706021', '0': '706000', autre: '706900' },
+  vat: { '20': '4457120', '10': '4457110', '5.5': '4457105', '2.1': '4457102', autre: '4457100' },
+  auxPerCustomer: true,
+};
 
-export type AccountingAccounts = typeof ACCOUNTING_ACCOUNTS;
+/** Clé du taux dans les tableaux de comptes : 5.5 → « 5.5 », un taux non prévu → « autre ». */
+export function accountRate(rate: number): AccountRate {
+  const key = String(cents(rate));
+  return (ACCOUNT_RATES as readonly string[]).includes(key) ? key as AccountRate : 'autre';
+}
+
+/** Compte de TVA collectée d'un taux (un taux à 0 % n'en a pas : il tombe sur « autre »). */
+const vatRate = (rate: number): VatAccountRate => {
+  const key = accountRate(rate);
+  return key === '0' ? 'autre' : key;
+};
+
+/** Numéro de compte : chiffres seulement, de 3 à 12. */
+const ACCOUNT_RE = /^\d{3,12}$/;
+const JOURNAL_RE = /^[A-Z0-9]{1,6}$/;
+/** Classe attendue du plan comptable, par compte (premier chiffre). */
+const CLASS = { customers: '4', bank: '5', cash: '5', sales: '7', vat: '4' } as const;
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '').replace(/\s+/g, ' ').trim();
+const accountOk = (s: string, cls: string) => ACCOUNT_RE.test(s) && s.startsWith(cls);
+const account = (v: unknown, fallback: string, cls: string) => {
+  const s = str(v).replace(/\s/g, '');
+  return accountOk(s, cls) ? s : fallback;
+};
+const journal = (v: unknown, fallback: Journal): Journal => {
+  const j = (v && typeof v === 'object' ? v : {}) as Partial<Journal>;
+  const code = str(j.code).toUpperCase();
+  const label = str(j.label).slice(0, 60);
+  return { code: JOURNAL_RE.test(code) ? code : fallback.code, label: label || fallback.label };
+};
+
+/** Comptes enregistrés, complétés champ par champ par les comptes standards (valeur absente ou illisible). */
+export function accountsFrom(stored: unknown): AccountingAccounts {
+  const d = ACCOUNTING_ACCOUNTS;
+  if (!stored || typeof stored !== 'object') return d;
+  const s = stored as Record<string, unknown>;
+  const sales = (s.sales && typeof s.sales === 'object' ? s.sales : {}) as Record<string, unknown>;
+  const vat = (s.vat && typeof s.vat === 'object' ? s.vat : {}) as Record<string, unknown>;
+  return {
+    salesJournal: journal(s.salesJournal, d.salesJournal),
+    bankJournal: journal(s.bankJournal, d.bankJournal),
+    cashJournal: journal(s.cashJournal, d.cashJournal),
+    customers: account(s.customers, d.customers, CLASS.customers),
+    bank: account(s.bank, d.bank, CLASS.bank),
+    cash: account(s.cash, d.cash, CLASS.cash),
+    sales: Object.fromEntries(ACCOUNT_RATES.map((r) => [r, account(sales[r], d.sales[r], CLASS.sales)])) as Record<AccountRate, string>,
+    vat: Object.fromEntries(VAT_ACCOUNT_RATES.map((r) => [r, account(vat[r], d.vat[r], CLASS.vat)])) as Record<VatAccountRate, string>,
+    auxPerCustomer: typeof s.auxPerCustomer === 'boolean' ? s.auxPerCustomer : d.auxPerCustomer,
+  };
+}
+
+/** « 5.5 » → « TVA 5,5 % », « autre » → « autre taux ». */
+export const accountRateLabel = (r: AccountRate) => (r === 'autre' ? 'autre taux' : `TVA ${r.replace('.', ',')} %`);
+
+/** Vérifie des comptes saisis : le premier problème à afficher, ou null s'ils sont bons. */
+export function accountsError(a: AccountingAccounts): string | null {
+  const check = (v: string, cls: string, what: string) => {
+    const s = (v ?? '').replace(/\s/g, '');
+    if (!ACCOUNT_RE.test(s)) return `${what} : un numéro de 3 à 12 chiffres, sans lettre.`;
+    if (!s.startsWith(cls)) return `${what} : dans le plan comptable, ce numéro commence par ${cls}.`;
+    return null;
+  };
+  const code = (j: Journal) => (j.code ?? '').trim().toUpperCase();
+  const errors: (string | null)[] = [
+    check(a.customers, CLASS.customers, 'Compte clients'),
+    ...ACCOUNT_RATES.map((r) => check(a.sales[r], CLASS.sales, `Prestations (${accountRateLabel(r)})`)),
+    ...VAT_ACCOUNT_RATES.map((r) => check(a.vat[r], CLASS.vat, `TVA collectée (${accountRateLabel(r)})`)),
+    check(a.bank, CLASS.bank, 'Compte de banque'),
+    check(a.cash, CLASS.cash, 'Compte de caisse'),
+  ];
+  for (const j of [a.salesJournal, a.bankJournal, a.cashJournal]) {
+    if (!JOURNAL_RE.test(code(j))) errors.push('Code de journal : 1 à 6 lettres ou chiffres, sans espace.');
+    if (!str(j.label)) errors.push('Donnez un libellé à chaque journal.');
+  }
+  if (code(a.salesJournal) === code(a.bankJournal) || code(a.salesJournal) === code(a.cashJournal)) {
+    errors.push('Le journal des ventes doit avoir son propre code.');
+  }
+  if (code(a.bankJournal) === code(a.cashJournal) && str(a.bankJournal.label) !== str(a.cashJournal.label)) {
+    errors.push('Banque et caisse partagent le même code de journal : donnez-leur le même libellé.');
+  }
+  return errors.find((e) => e) ?? null;
+}
+
+/** Les comptes sont-ils les comptes standards ? */
+export const isDefaultAccounts = (a: AccountingAccounts) => JSON.stringify(accountsFrom(a)) === JSON.stringify(ACCOUNTING_ACCOUNTS);
 
 export const FEC_COLUMNS = [
   'JournalCode', 'JournalLib', 'EcritureNum', 'EcritureDate', 'CompteNum', 'CompteLib', 'CompAuxNum', 'CompAuxLib',
@@ -184,7 +292,7 @@ export interface FecLine {
 }
 
 export interface FecEntry {
-  /** Code du journal : ventes (VE) ou banque (BQ) par défaut. */
+  /** Code du journal : ventes (VE), banque (BQ) ou caisse (CA) par défaut. */
   journal: string;
   journalLabel: string;
   /** Numéro d'écriture, continu dans chaque journal (VE000001, VE000002…). */
@@ -213,17 +321,19 @@ const pct = (rate: number) => `${rateLabel(rate)} %`;
 
 /**
  * Écritures du FEC. Vente : client au débit (TTC), prestations au crédit (HT par taux), TVA collectée au crédit
- * (par taux). Un avoir a des montants négatifs : les sens s'inversent d'eux-mêmes. Paiement : banque au débit,
- * client au crédit. Écritures dans l'ordre des dates, numérotées sans trou dans chaque journal.
+ * (par taux). Un avoir a des montants négatifs : les sens s'inversent d'eux-mêmes. Paiement : banque (ou caisse
+ * pour les espèces) au débit, client au crédit. Écritures dans l'ordre des dates, numérotées sans trou dans chaque journal.
  */
 export function fecEntries(docs: readonly ExportDocument[], payments: readonly ExportPayment[], accounts: AccountingAccounts = ACCOUNTING_ACCOUNTS): FecEntry[] {
-  const customer = (name: string) => ({ account: accounts.customers.num, accountLabel: accounts.customers.label, auxNum: customerAuxAccount(name), auxLabel: name });
+  const customer = (name: string): Omit<FecLine, 'debit' | 'credit'> => (accounts.auxPerCustomer
+    ? { account: accounts.customers, accountLabel: 'Clients', auxNum: customerAuxAccount(name), auxLabel: name }
+    : { account: accounts.customers, accountLabel: 'Clients' });
   // rank : à date égale, les ventes passent avant les règlements.
   const draft: (Omit<FecEntry, 'num'> & { rank: number })[] = [];
 
   for (const d of docs) {
-    const sales = d.vat_breakdown.map((r) => line({ account: accounts.sales[r.rate] ?? accounts.salesOther, accountLabel: `Prestations de services TVA ${pct(r.rate)}` }, r.base, 'credit'));
-    const vat = d.vat_breakdown.map((r) => line({ account: accounts.vat[r.rate] ?? accounts.vatOther, accountLabel: `TVA collectée ${pct(r.rate)}` }, r.vat, 'credit'));
+    const sales = d.vat_breakdown.map((r) => line({ account: accounts.sales[accountRate(r.rate)], accountLabel: `Prestations de services TVA ${pct(r.rate)}` }, r.base, 'credit'));
+    const vat = d.vat_breakdown.map((r) => line({ account: accounts.vat[vatRate(r.rate)], accountLabel: `TVA collectée ${pct(r.rate)}` }, r.vat, 'credit'));
     // Le TTC du client est la somme exacte des lignes de vente et de TVA : l'écriture est équilibrée au centime.
     const ttc = cents(d.vat_breakdown.reduce((s, r) => s + cents(r.base) + cents(r.vat), 0));
     const lines = [line(customer(d.buyer_name), ttc, 'debit'), ...sales, ...vat].filter((l): l is FecLine => !!l);
@@ -235,13 +345,16 @@ export function fecEntries(docs: readonly ExportDocument[], payments: readonly E
   }
 
   for (const p of payments) {
+    // Espèces : journal et compte de caisse ; les autres moyens passent par la banque.
+    const cash = p.method === 'especes';
+    const j = cash ? accounts.cashJournal : accounts.bankJournal;
     const lines = [
-      line({ account: accounts.bank.num, accountLabel: accounts.bank.label }, p.amount, 'debit'),
+      line(cash ? { account: accounts.cash, accountLabel: 'Caisse' } : { account: accounts.bank, accountLabel: 'Banque' }, p.amount, 'debit'),
       line(customer(p.buyer_name), p.amount, 'credit'),
     ].filter((l): l is FecLine => !!l);
     if (lines.length === 0) continue;
     draft.push({
-      journal: accounts.bankJournal.code, journalLabel: accounts.bankJournal.label, rank: 1, date: p.paid_on, pieceRef: p.invoice_number,
+      journal: j.code, journalLabel: j.label, rank: 1, date: p.paid_on, pieceRef: p.invoice_number,
       label: `Règlement ${p.invoice_number} ${p.buyer_name} (${PAYMENT_METHODS[p.method] ?? p.method})`, lines,
     });
   }
