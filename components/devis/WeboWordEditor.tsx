@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { buildQuotePrintPage, googleFontHref, quoteEditorCss, DEFAULT_LINE_HEIGHT, type QuoteEditorSettings } from '@/lib/quoteOutput';
+import { buildQuotePrintPage, googleFontHref, quoteEditorCss, DEFAULT_LINE_HEIGHT, PARAGRAPH_LINE_HEIGHTS, type QuoteEditorSettings } from '@/lib/quoteOutput';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { documentForFormula, lineFormulaId, type QuoteFormula } from '@/lib/quoteFormulas';
@@ -179,14 +179,9 @@ function cleanPastedHtml(html: string): string {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 const FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
-const LINE_HEIGHTS = [
-  { label: '1.0', value: '1' },
-  { label: '1.2', value: '1.2' },
-  { label: '1.4', value: '1.4' },
-  { label: '1.6', value: '1.6' },
-  { label: '1.8', value: '1.8' },
-  { label: '2.0', value: '2' },
-];
+const LINE_HEIGHTS = PARAGRAPH_LINE_HEIGHTS.map((value) => ({ label: value.includes('.') ? value : `${value}.0`, value }));
+/** Blocs qui reçoivent un interligne propre (repère data-webo-lh, voir quoteOutputCss). */
+const LH_BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, div';
 
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt, formulas = [], chosenFormulaId: initChosen = null }: Props) {
   // Formule retenue (elle peut changer depuis le panneau Prestations sans recharger la page).
@@ -238,7 +233,8 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const [showDesc,  setShowDesc]  = useState(initSettings?.showDesc !== false);
   const [font,      setFont]      = useState(initFont ?? 'Georgia');
   const [fontSize,  setFontSize]  = useState(initSize ?? 12);
-  const [lineHeight, setLineHeight] = useState(initSettings?.lineHeight ?? DEFAULT_LINE_HEIGHT);
+  // Interligne par défaut du devis (gardé avec le devis) ; la barre d'outils règle celui des paragraphes.
+  const [lineHeight] = useState(initSettings?.lineHeight ?? DEFAULT_LINE_HEIGHT);
   const [adminModal, setAdminModal] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(null);
   const [companyAssets, setCompanyAssets] = useState<{ logo_url: string | null; cgv: string | null; legal?: LegalProfile | null }>({ logo_url: null, cgv: null });
@@ -847,6 +843,55 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, [adminFields, adminServices, quoteId]);
 
   // ── Toolbar commands ─────────────────────────────────────────────────────────
+  // Interligne du paragraphe où se trouve le curseur (celui du devis s'il n'en a pas), et dernière sélection
+  // dans la feuille : la liste déroulante prend le focus, la sélection doit lui survivre.
+  const [paraLineHeight, setParaLineHeight] = useState<string | null>(null);
+  const sheetRange = useRef<Range | null>(null);
+  useEffect(() => {
+    const onSelect = () => {
+      const el = editorRef.current;
+      const sel = window.getSelection();
+      if (!el || !sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) return;
+      sheetRange.current = sel.getRangeAt(0).cloneRange();
+      const start = sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement;
+      const marked = start?.closest('[data-webo-lh]');
+      setParaLineHeight(marked && el.contains(marked) ? marked.getAttribute('data-webo-lh') : null);
+    };
+    document.addEventListener('selectionchange', onSelect);
+    return () => document.removeEventListener('selectionchange', onSelect);
+  }, []);
+
+  // Interligne des seuls paragraphes sélectionnés : les blocs sans bloc enfant touchés par la sélection, ou,
+  // pour un simple curseur, le bloc qui le contient.
+  const applyParagraphLineHeight = useCallback((value: string) => {
+    const el = editorRef.current;
+    const range = sheetRange.current;
+    if (!el || !range || !el.contains(range.commonAncestorContainer)) {
+      setToast('Cliquez d’abord dans le paragraphe dont vous voulez changer l’interligne.');
+      return;
+    }
+    const isLeaf = (b: Element) => !b.querySelector(LH_BLOCKS);
+    let blocks = Array.from(el.querySelectorAll(LH_BLOCKS)).filter((b) => isLeaf(b) && range.intersectsNode(b) && !b.closest('[contenteditable="false"]'));
+    if (blocks.length === 0) {
+      const start = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+      const block = start?.closest(LH_BLOCKS);
+      blocks = block && block !== el && el.contains(block) ? [block] : [];
+    }
+    if (blocks.length === 0) {
+      setToast('Cliquez d’abord dans le paragraphe dont vous voulez changer l’interligne.');
+      return;
+    }
+    blocks.forEach((b) => {
+      b.querySelectorAll('[data-webo-lh]').forEach((c) => c.removeAttribute('data-webo-lh'));
+      b.setAttribute('data-webo-lh', value);
+    });
+    setParaLineHeight(value);
+    const sel = window.getSelection();
+    el.focus();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }, []);
+
   const exec = useCallback((cmd: string, value?: string) => {
     editorRef.current?.focus();
     document.execCommand(cmd, false, value ?? undefined);
@@ -1381,12 +1426,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </div>
 
           {/* Line height selector */}
-          <div className="flex items-center gap-0.5" title="Interligne">
+          <div className="flex items-center gap-0.5" title="Interligne des paragraphes sélectionnés">
             <span className="text-[10px] text-gray-400 mr-0.5 hidden sm:inline">Interligne :</span>
             <select
-              value={lineHeight}
+              value={paraLineHeight ?? lineHeight}
               onMouseDown={(e) => e.stopPropagation()}
-              onChange={(e) => setLineHeight(e.target.value)}
+              onChange={(e) => applyParagraphLineHeight(e.target.value)}
               className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
             >
               {LINE_HEIGHTS.map((lh) => (

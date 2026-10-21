@@ -31,6 +31,20 @@ export interface QuoteEditorSettings {
 
 export const DEFAULT_LINE_HEIGHT = '1.4';
 
+/** Interlignes proposés pour un paragraphe (repère data-webo-lh posé par l'éditeur). */
+export const PARAGRAPH_LINE_HEIGHTS = ['1', '1.2', '1.4', '1.6', '1.8', '2'];
+
+/**
+ * Interligne propre à un paragraphe : il passe devant celui du devis, pour le bloc et tout ce qu'il contient.
+ * Les règles « contenu » viennent d'abord : un bloc qui a son propre repère garde le sien dans un bloc repéré.
+ */
+function paragraphLineHeightCss(): string {
+  const inner = PARAGRAPH_LINE_HEIGHTS.map((v) =>
+    `.quote-doc [data-webo-lh="${v}"] :where(p, li, div, span, td, th, h1, h2, h3, h4, h5, h6):not([data-webo-lh]) { line-height: ${v} !important; }`);
+  const own = PARAGRAPH_LINE_HEIGHTS.map((v) => `.quote-doc [data-webo-lh="${v}"][data-webo-lh] { line-height: ${v} !important; }`);
+  return [...inner, ...own].join('\n    ');
+}
+
 export function outputSettings(quote: { selected_font?: string | null; selected_font_size?: number | null; editor_settings?: unknown }): QuoteOutputSettings {
   const saved = (quote.editor_settings && typeof quote.editor_settings === 'object' ? quote.editor_settings : {}) as QuoteEditorSettings;
   return {
@@ -81,6 +95,7 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     /* Un paragraphe sans marge écrite n'en a pas, comme dans les éditeurs où il est saisi (description, CGV, carte) :
        sans cela, chaque ligne d'une description (un <p> par ligne) était séparée d'une ligne vide. */
     .quote-doc p { margin: 0; }
+    ${paragraphLineHeightCss()}
     .quote-doc * { min-height: 0 !important; }
     .quote-doc ul { list-style: disc outside; padding-left: 1.6em; margin: 6px 0; }
     .quote-doc ol { list-style: decimal outside; padding-left: 1.6em; margin: 6px 0; }
