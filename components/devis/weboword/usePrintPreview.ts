@@ -167,11 +167,11 @@ export function usePrintPreview(o: Options): PrintPreview {
   }, []);
 
   // Réglages qui changent la mise en page : nouvelle mesure.
-  const { font, fontSize, lineHeight, showDesc } = o.settings;
+  const { font, fontSize, lineHeight, showDesc, splitDishes } = o.settings;
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => { try { measureRef.current(); } catch { /* rien */ } }, DEBOUNCE_MS);
-  }, [font, fontSize, lineHeight, showDesc, o.coverEnabled, o.photoPages, o.logoHtml, o.legalHtml, o.cgvHtml, o.cgvText]);
+  }, [font, fontSize, lineHeight, showDesc, splitDishes, o.coverEnabled, o.photoPages, o.logoHtml, o.legalHtml, o.cgvHtml, o.cgvText]);
 
   return preview;
 }

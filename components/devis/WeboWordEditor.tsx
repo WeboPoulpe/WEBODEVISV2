@@ -7,7 +7,7 @@ import {
   Bold, Italic, Underline, List, ListOrdered,
   Save, Printer, Loader2, Check, Palette, ArrowLeft,
   LayoutTemplate, Bell, Eye, EyeOff, Download, Wand2,
-  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw, ScrollText, SeparatorHorizontal, Info,
+  PenLine, History, X, Search, Image as ImageIcon, ImagePlus, RefreshCw, ScrollText, SeparatorHorizontal, Info, Scissors,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -178,10 +178,21 @@ function cleanPastedHtml(html: string): string {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-const FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
+const FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 28, 32];
 const LINE_HEIGHTS = PARAGRAPH_LINE_HEIGHTS.map((value) => ({ label: value.includes('.') ? value : `${value}.0`, value }));
 /** Blocs qui reçoivent un interligne propre (repère data-webo-lh, voir quoteOutputCss). */
 const LH_BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, div';
+
+/** Paragraphes d'une sélection : les blocs sans bloc enfant qu'elle touche, ou, pour un curseur, le bloc qui le contient. */
+function blocksInRange(el: HTMLElement, range: Range): HTMLElement[] {
+  const isLeaf = (b: Element) => !b.querySelector(LH_BLOCKS);
+  const blocks = Array.from(el.querySelectorAll<HTMLElement>(LH_BLOCKS))
+    .filter((b) => isLeaf(b) && range.intersectsNode(b) && !b.closest('[contenteditable="false"]'));
+  if (blocks.length) return blocks;
+  const start = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+  const block = start?.closest<HTMLElement>(LH_BLOCKS);
+  return block && block !== el && el.contains(block) ? [block] : [];
+}
 
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt, formulas = [], chosenFormulaId: initChosen = null }: Props) {
   // Formule retenue (elle peut changer depuis le panneau Prestations sans recharger la page).
@@ -231,9 +242,12 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   }, [sessionLost]);
   const [toast,     setToast]     = useState<string | null>(null);
   const [showDesc,  setShowDesc]  = useState(initSettings?.showDesc !== false);
+  // Plats de la carte coupés d'une page à l'autre (sinon chacun part entier à la page suivante).
+  const [splitDishes, setSplitDishes] = useState(initSettings?.splitDishes === true);
   // Police par défaut du devis ; la barre d'outils règle celle des paragraphes.
   const [font]                    = useState(initFont ?? 'Georgia');
-  const [fontSize,  setFontSize]  = useState(initSize ?? 12);
+  // Taille de base du devis (gardée avec le devis) ; la barre d'outils règle celle de la sélection.
+  const [fontSize]                = useState(initSize ?? 12);
   // Interligne par défaut du devis (gardé avec le devis) ; la barre d'outils règle celui des paragraphes.
   const [lineHeight] = useState(initSettings?.lineHeight ?? DEFAULT_LINE_HEIGHT);
   const [adminModal, setAdminModal] = useState(false);
@@ -856,6 +870,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   // sélection dans la feuille : la liste déroulante prend le focus, la sélection doit lui survivre.
   const [paraLineHeight, setParaLineHeight] = useState<string | null>(null);
   const [paraFont, setParaFont] = useState<string | null>(null);
+  const [selSize, setSelSize] = useState<number | null>(null);
   const sheetRange = useRef<Range | null>(null);
   useEffect(() => {
     const onSelect = () => {
@@ -870,6 +885,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       };
       setParaLineHeight(marked('data-webo-lh'));
       setParaFont(marked('data-webo-font'));
+      if (start) setSelSize(Math.round(parseFloat(getComputedStyle(start).fontSize) * 2) / 2 || null);
     };
     document.addEventListener('selectionchange', onSelect);
     return () => document.removeEventListener('selectionchange', onSelect);
@@ -885,13 +901,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
       setToast(`Cliquez d’abord dans le paragraphe dont vous voulez changer ${what}.`);
       return false;
     }
-    const isLeaf = (b: Element) => !b.querySelector(LH_BLOCKS);
-    let blocks = Array.from(el.querySelectorAll(LH_BLOCKS)).filter((b) => isLeaf(b) && range.intersectsNode(b) && !b.closest('[contenteditable="false"]'));
-    if (blocks.length === 0) {
-      const start = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
-      const block = start?.closest(LH_BLOCKS);
-      blocks = block && block !== el && el.contains(block) ? [block] : [];
-    }
+    const blocks = blocksInRange(el, range);
     if (blocks.length === 0) {
       setToast(`Cliquez d’abord dans le paragraphe dont vous voulez changer ${what}.`);
       return false;
@@ -909,6 +919,52 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const applyParagraphLineHeight = useCallback((value: string) => {
     if (markParagraphs('data-webo-lh', value)) setParaLineHeight(value);
   }, [markParagraphs]);
+  // Taille en pixels : le texte sélectionné, ou, pour un simple curseur, le paragraphe entier. Les tailles écrites
+  // à l'intérieur sont retirées, sinon elles garderaient le dessus.
+  const applySize = useCallback((px: number) => {
+    const el = editorRef.current;
+    const range = sheetRange.current;
+    if (!el || !range || !el.contains(range.commonAncestorContainer)) {
+      setToast('Sélectionnez d’abord le texte dont vous voulez changer la taille.');
+      return;
+    }
+    const clearInner = (n: HTMLElement) => n.querySelectorAll<HTMLElement>('[style*="font-size"]').forEach((c) => { c.style.fontSize = ''; });
+    const sel = window.getSelection();
+    el.focus();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    if (range.collapsed) {
+      const blocks = blocksInRange(el, range);
+      if (blocks.length === 0) { setToast('Sélectionnez d’abord le texte dont vous voulez changer la taille.'); return; }
+      blocks.forEach((b) => { clearInner(b); b.style.fontSize = `${px}px`; });
+      setSelSize(px);
+      return;
+    }
+    // execCommand ne connaît que 7 tailles : on pose la plus grande, puis on la remplace par la taille voulue.
+    document.execCommand('styleWithCSS', false, 'false');
+    document.execCommand('fontSize', false, '7');
+    const spans: HTMLElement[] = [];
+    el.querySelectorAll<HTMLElement>('font[size="7"], span[style*="xxx-large"]').forEach((f) => {
+      const span = document.createElement('span');
+      span.style.fontSize = `${px}px`;
+      if (f.tagName === 'FONT' && f.getAttribute('color')) span.style.color = f.getAttribute('color')!;
+      while (f.firstChild) span.appendChild(f.firstChild);
+      clearInner(span);
+      f.replaceWith(span);
+      spans.push(span);
+    });
+    // Le texte reste sélectionné, pour enchaîner gras, couleur, autre taille…
+    if (spans.length && sel) {
+      const next = document.createRange();
+      next.setStartBefore(spans[0]);
+      next.setEndAfter(spans[spans.length - 1]);
+      sel.removeAllRanges();
+      sel.addRange(next);
+      sheetRange.current = next.cloneRange();
+    }
+    setSelSize(px);
+  }, []);
+
   const applyParagraphFont = useCallback((value: string) => {
     if (markParagraphs('data-webo-font', value)) setParaFont(value);
   }, [markParagraphs]);
@@ -1007,13 +1063,13 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
   const previewLegalHtml = useMemo(() => sanitizeHtml(buildLegalFooterHtml(companyAssets.legal)), [companyAssets.legal]);
   const previewCgvHtml = useMemo(() => sanitizeHtml(buildCgvHtml(companyAssets.cgv)), [companyAssets.cgv]);
   const editorSheetCss = useMemo(
-    () => quoteEditorCss({ font, fontSize, lineHeight, showDesc }, '.webo-paper', '#weboword-sheet'),
-    [font, fontSize, lineHeight, showDesc],
+    () => quoteEditorCss({ font, fontSize, lineHeight, showDesc, splitDishes }, '.webo-paper', '#weboword-sheet'),
+    [font, fontSize, lineHeight, showDesc, splitDishes],
   );
   const printPreview = usePrintPreview({
     editorRef,
     sheetRef,
-    settings: { font, fontSize, lineHeight, showDesc },
+    settings: { font, fontSize, lineHeight, showDesc, splitDishes },
     coverEnabled: coverConfig.enabled,
     photoPages: photosConfig.enabled ? photosConfig.pages.length : 0,
     logoHtml: previewLogoHtml,
@@ -1029,7 +1085,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     setSaving(true); setError(null);
     const supabase = createClient();
     const stamp = new Date().toISOString();
-    const payload = { content_html: html, selected_font: font, selected_font_size: fontSize, cover_page_config: coverConfig, photos_page_config: photosConfig, editor_settings: { lineHeight, showDesc, menuWidth }, updated_at: stamp };
+    const payload = { content_html: html, selected_font: font, selected_font_size: fontSize, cover_page_config: coverConfig, photos_page_config: photosConfig, editor_settings: { lineHeight, showDesc, menuWidth, splitDishes }, updated_at: stamp };
     const write = (guarded: boolean) => {
       let q = supabase.from('quotes').update(payload).eq('id', quoteId);
       if (guarded && loadedStamp.current) q = q.eq('updated_at', loadedStamp.current);
@@ -1076,7 +1132,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
     const html = buildQuotePrintPage({
       title: `Devis-${safeName}-${new Date().toISOString().slice(0, 10)}`,
       content,
-      settings: { font, fontSize, lineHeight, showDesc },
+      settings: { font, fontSize, lineHeight, showDesc, splitDishes },
       coverHtml: sanitizeHtml(buildCoverPageHtml(coverConfig)),
       logoHtml: sanitizeHtml(buildLogoHeaderHtml(companyAssets.logo_url)),
       photosHtml: sanitizeHtml(buildPhotosPageHtml(photosConfig)),
@@ -1386,6 +1442,21 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
               : <><EyeOff className="h-3.5 w-3.5" /><span className="hidden sm:inline">Descriptions masquées</span></>}
           </button>
 
+          {/* Plats coupés d'une page à l'autre */}
+          <button
+            onMouseDown={(e) => { e.preventDefault(); setSplitDishes((v) => !v); }}
+            title={splitDishes
+              ? 'Les plats de la carte continuent page suivante. Cliquez pour qu’ils partent entiers à la page suivante.'
+              : 'Laisser un plat de la carte continuer page suivante (plusieurs prestations par page). La coupure se voit dans l’éditeur ; un « Saut de page » la déplace.'}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors border',
+              splitDishes ? 'border-primary text-primary bg-primary-50' : 'border-gray-200 text-gray-600 hover:bg-gray-100',
+            )}
+          >
+            <Scissors className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{splitDishes ? 'Plats coupés entre pages' : 'Plats entiers'}</span>
+          </button>
+
           {/* Auto-structure descriptions */}
           <button
             type="button"
@@ -1432,15 +1503,16 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           <Sep />
 
           {/* Font size selector */}
-          <div className="flex items-center gap-0.5" title="Taille de police">
+          <div className="flex items-center gap-0.5" title="Taille du texte sélectionné (ou du paragraphe du curseur)">
             <span className="text-[10px] text-gray-400 mr-0.5 hidden sm:inline">Taille :</span>
             <select
-              value={fontSize}
+              value={selSize ?? fontSize}
               onMouseDown={(e) => e.stopPropagation()}
-              onChange={(e) => setFontSize(Number(e.target.value))}
+              onChange={(e) => applySize(Number(e.target.value))}
               className="px-1.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
             >
-              {FONT_SIZES.map((s) => (
+              {/* La taille sous le curseur, même hors de la liste (ex. 12,5 px), pour que la liste ne paraisse pas vide. */}
+              {(selSize !== null && !FONT_SIZES.includes(selSize) ? [...FONT_SIZES, selSize].sort((a, b) => a - b) : FONT_SIZES).map((s) => (
                 <option key={s} value={s}>{s}px</option>
               ))}
             </select>

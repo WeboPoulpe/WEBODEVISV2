@@ -21,6 +21,8 @@ export interface QuoteOutputSettings {
   lineHeight: string;
   /** Afficher les descriptions des prestations. */
   showDesc: boolean;
+  /** Un plat de la carte peut continuer page suivante (entre deux paragraphes) au lieu de partir entier. */
+  splitDishes?: boolean;
 }
 
 /** Réglages de l'éditeur gardés avec le devis (colonne `editor_settings`). */
@@ -28,6 +30,7 @@ export interface QuoteEditorSettings {
   lineHeight?: string;
   showDesc?: boolean;
   menuWidth?: string;
+  splitDishes?: boolean;
 }
 
 export const DEFAULT_LINE_HEIGHT = '1.4';
@@ -53,6 +56,7 @@ export function outputSettings(quote: { selected_font?: string | null; selected_
     fontSize: quote.selected_font_size || 12,
     lineHeight: /^\d(\.\d)?$/.test(saved.lineHeight ?? '') ? saved.lineHeight! : DEFAULT_LINE_HEIGHT,
     showDesc: saved.showDesc !== false,
+    splitDishes: saved.splitDishes === true,
   };
 }
 
@@ -159,6 +163,8 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     .quote-doc :has(+ [data-webo-sign]), .quote-doc :has(+ .webo-sign) { page-break-after: avoid; break-after: avoid; }
     .quote-doc p, .quote-doc li { orphans: 2; widows: 2; }
     ${s.showDesc ? '' : '.quote-doc .svc-desc { display: none !important; }'}
+    ${s.splitDishes ? `/* Plats coupés d'une page à l'autre : la coupure tombe entre deux paragraphes, que l'éditeur montre. */
+    .quote-doc .gastro-menu > div { page-break-inside: auto; break-inside: auto; }` : ''}
     @media print {
       .quote-gap { height: ${PRINT_GAP_MM}mm; }
       .quote-doc { padding-top: 0; padding-bottom: 0; }
