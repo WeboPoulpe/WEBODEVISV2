@@ -131,7 +131,29 @@ export function prospectNotificationEmail({ prospect, appUrl, brochureName }: { 
 }
 
 /** À la personne qui a rempli le formulaire : accusé de réception, au nom du traiteur. */
-export function prospectAckEmail({ companyName, prospect }: { companyName: string; prospect: ProspectDetails }): Email {
+export function prospectAckEmail({ companyName, prospect, language = 'fr' }: { companyName: string; prospect: ProspectDetails; /** Langue de la page d'où vient la demande (brochure en anglais). */ language?: 'fr' | 'en' }): Email {
+  if (language === 'en') {
+    return {
+      subject: `${companyName} has received your request`,
+      html: renderEmail({
+        brand: companyName,
+        preheader: 'Your request has arrived. We will get back to you shortly.',
+        title: `Thank you ${prospect.firstName}`,
+        paragraphs: [
+          'Your quote request has arrived. We are looking into it and will get back to you shortly.',
+          'Here is what you sent us:',
+        ],
+        facts: [
+          ['Event', prospect.eventType ?? ''],
+          ['Date', prospect.eventDate ?? ''],
+          ['Guests', prospect.guestCount ? `${prospect.guestCount}${prospect.guestCountChildren ? `, including ${prospect.guestCountChildren} children` : ''}` : ''],
+          ['Venue', prospect.location ?? ''],
+        ],
+        note: 'To complete or correct your request, simply reply to this email.',
+        footer: `Sent by ${companyName} with WeboDevis.`,
+      }),
+    };
+  }
   return {
     subject: `${companyName} a bien reçu votre demande`,
     html: renderEmail({
@@ -149,7 +171,6 @@ export function prospectAckEmail({ companyName, prospect }: { companyName: strin
   };
 }
 
-// ── Devis envoyé au client ────────────────────────────────────────────────────
 /** Une brochure envoyée par le traiteur : son message et le lien pour la feuilleter. */
 export function brochureEmail({ companyName, brochureName, message, link, language }: {
   companyName: string;
@@ -175,6 +196,7 @@ export function brochureEmail({ companyName, brochureName, message, link, langua
   };
 }
 
+// ── Devis envoyé au client ────────────────────────────────────────────────────
 export function quoteProposalEmail({ companyName, quoteNumber, clientName, eventType, eventDate, guestCount, message, link }: {
   companyName: string;
   quoteNumber?: string | null;

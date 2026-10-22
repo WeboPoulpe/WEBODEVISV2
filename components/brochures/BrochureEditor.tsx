@@ -92,6 +92,20 @@ export default function BrochureEditor({ brochure, catalog, company }: { brochur
     return () => window.clearTimeout(timer);
   }, [draft, brochure.id]);
 
+  // En quittant l'éditeur (« Retour », lien du menu) avant la fin du délai : le dernier changement part tout de suite.
+  // En fermant l'onglet pendant un enregistrement : le navigateur demande confirmation.
+  const latest = useRef(draft);
+  latest.current = draft;
+  useEffect(() => {
+    const pending = () => JSON.stringify(latest.current) !== saved.current;
+    const onLeave = (e: BeforeUnloadEvent) => { if (pending()) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', onLeave);
+    return () => {
+      window.removeEventListener('beforeunload', onLeave);
+      if (pending()) saveBrochure(brochure.id, { ...latest.current, vat_rate: String(latest.current.vat_rate) }).catch(() => {});
+    };
+  }, [brochure.id]);
+
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const setContent = (fn: (c: BrochureContent) => BrochureContent) => setDraft((d) => ({ ...d, content: fn(d.content) }));
   const byId = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);

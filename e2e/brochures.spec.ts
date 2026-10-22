@@ -1,5 +1,5 @@
 import { test, expect, type Browser } from '@playwright/test';
-import { createAccount, deleteAccount, horizontalOverflow, sql, withAccount } from './helpers';
+import { createAccount, deleteAccount, horizontalOverflow, openSession, sql, withAccount } from './helpers';
 
 // Brochures : le lien public se feuillette, sans compte. Chaque test travaille sur un compte d'essai créé pour lui,
 // puis supprimé : aucun compte réel n'est touché.
@@ -107,9 +107,16 @@ test.describe('brochures', () => {
       expect((await sql<{ description: string }>(`select description from public.prestations where id = $1`, [menu.id]))[0].description).toBe('<p>Entrée, plat, dessert</p>');
 
       await page.screenshot({ path: 'e2e/screenshots/brochure-editeur-desktop.png' });
+
+      // Un changement fait juste avant de quitter l'éditeur est quand même enregistré.
+      await page.getByLabel('Nom de la brochure').fill('Mariages 2028');
+      await page.getByRole('link', { name: 'Retour aux brochures' }).click();
+      await expect.poll(async () => (await sql<{ name: string }>(`select name from public.brochures where id = $1`, [b.id]))[0].name, { timeout: 10_000 })
+        .toBe('Mariages 2028');
+      await page.goto(`/brochures/${b.id}`);
       await page.setViewportSize({ width: 360, height: 780 });
       await page.reload();
-      await expect(page.getByLabel('Nom de la brochure')).toHaveValue('Mariages 2027', { timeout: 20_000 });
+      await expect(page.getByLabel('Nom de la brochure')).toHaveValue('Mariages 2028', { timeout: 20_000 });
       expect(await horizontalOverflow(page)).toBe(0);
       await page.screenshot({ path: 'e2e/screenshots/brochure-editeur-mobile.png', fullPage: true });
     });
@@ -124,6 +131,12 @@ test.describe('brochures', () => {
       const next = page.getByRole('button', { name: 'Page suivante' });
       while (await next.isEnabled()) { await next.click(); await page.waitForTimeout(750); }
       await page.getByLabel('Prénom').fill('Camille');
+      // Revenir en arrière puis revenir au formulaire : la saisie est toujours là.
+      await page.getByRole('button', { name: 'Page précédente' }).click();
+      await page.waitForTimeout(750);
+      await page.getByRole('button', { name: 'Page suivante' }).click();
+      await page.waitForTimeout(750);
+      await expect(page.getByLabel('Prénom')).toHaveValue('Camille');
       await page.getByLabel('Nom', { exact: true }).fill('Martin');
       await page.getByLabel('Email').fill(`camille-${Date.now()}@test.webodevis.local`);
       await page.getByLabel('Invités').fill('80');
@@ -132,6 +145,16 @@ test.describe('brochures', () => {
       await page.screenshot({ path: 'e2e/screenshots/brochure-formulaire-mobile.png' });
       const rows = await sql<{ brochure_id: string; guest_count: number }>(`select brochure_id, guest_count from public.prospect_requests where owner_user_id = $1`, [t.user.id]);
       expect(rows).toEqual([{ brochure_id: t.brochureId, guest_count: 80 }]);
+
+      // Le traiteur voit, dans ses Prospects, de quelle brochure vient la demande.
+      const owner = await openSession(browser, t.user);
+      try {
+        const op = await owner.newPage();
+        await op.goto('/prospects');
+        await expect(op.getByText('Brochure « Mariages 2027 »').first()).toBeVisible({ timeout: 20_000 });
+      } finally {
+        await owner.close();
+      }
     } finally {
       await context.close();
       await sql(`delete from public.prospect_requests where owner_user_id = $1`, [t.user.id]);

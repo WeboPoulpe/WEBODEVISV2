@@ -15,6 +15,8 @@ export interface BrochureItem {
   prestationId: string;
   /** Texte propre à la brochure (sinon celui du catalogue). */
   html?: string | null;
+  /** Ce texte part d'une fiche, qui porte déjà son titre : le nom de la prestation n'est pas répété. */
+  titled?: boolean;
   /** Photo propre à la brochure (sinon celle de la prestation). */
   photoUrl?: string | null;
   hidePrice?: boolean;
@@ -86,6 +88,7 @@ export function parseBrochureContent(raw: unknown): BrochureContent {
       return [{
         prestationId: id,
         ...(str(it.html) ? { html: str(it.html) } : {}),
+        ...(it.titled === true ? { titled: true } : {}),
         ...(str(it.photoUrl) ? { photoUrl: str(it.photoUrl) } : {}),
         ...(it.hidePrice === true ? { hidePrice: true } : {}),
       }];
@@ -148,7 +151,8 @@ export function resolveItems(
     const html = item.html || card || p.description || '';
     const prices = item.hidePrice ? { price: null, childPrice: null } : formatPrice(p, o);
     return [{
-      key, name: p.name, html: sanitizeHtml(html), titled: !!(item.html || card),
+      // Retouche : titrée si elle part d'une fiche ; sinon (texte du catalogue) titrée s'il y a une fiche.
+      key, name: p.name, html: sanitizeHtml(html), titled: item.html ? item.titled === true : !!card,
       photoUrl: item.photoUrl ?? p.photo_url ?? null, ...prices, missing: false,
     }];
   });

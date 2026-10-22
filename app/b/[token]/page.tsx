@@ -4,7 +4,6 @@
 import type { Metadata } from 'next';
 import { brochureUnavailableCompany, getPublicBrochure, recordBrochureView } from '@/server/brochures';
 import BrochureBook from './BrochureBook';
-import BrochureRequestForm from '@/components/brochures/BrochureRequestForm';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Brochure', robots: { index: false, follow: false } };
@@ -31,7 +30,7 @@ export default async function BrochurePublicPage({ params }: { params: Promise<{
   await recordBrochureView(token).catch(() => {});
   return (
     <main className="min-h-screen bg-[#EDE6DA] flex flex-col items-center justify-center px-4 py-6">
-      <BrochureBook brochure={brochure} formSlot={<BrochureRequestForm token={token} language={brochure.language} />} />
+      <BrochureBook brochure={brochure} token={token} />
     </main>
   );
 }

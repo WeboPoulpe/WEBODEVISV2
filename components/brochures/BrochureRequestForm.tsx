@@ -1,7 +1,8 @@
 'use client';
 
 // Formulaire de la dernière page de la brochure : mêmes champs que le formulaire de prospection, en français ou en
-// anglais selon la brochure. Après l'envoi, un remerciement le remplace.
+// anglais selon la brochure. Après l'envoi, un remerciement le remplace. Son état (useBrochureForm) vit au-dessus
+// du livre : la page du formulaire se démonte quand on tourne les pages, la saisie reste.
 
 import { useState } from 'react';
 import { submitBrochureRequest, type BrochureRequestFields } from '@/server/brochureRequests';
@@ -24,11 +25,18 @@ const TEXT = {
 const field = 'w-full rounded-lg border border-black/15 bg-white/80 px-2.5 py-1.5 text-[13px] text-[#1C2621] outline-none focus:border-[#B4502D]';
 const lab = 'block text-[11px] uppercase tracking-wider text-[#5b5b55] mb-0.5';
 
-export default function BrochureRequestForm({ token, language }: { token: string; language: 'fr' | 'en' }) {
-  const t = TEXT[language];
+/** État du formulaire, à tenir au-dessus du livre. */
+export function useBrochureForm() {
   const [f, setF] = useState<BrochureRequestFields>({ first_name: '', last_name: '', email: '' });
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [error, setError] = useState<string | null>(null);
+  return { f, setF, state, setState, error, setError };
+}
+export type BrochureFormState = ReturnType<typeof useBrochureForm>;
+
+export default function BrochureRequestForm({ token, language, form }: { token: string; language: 'fr' | 'en'; form: BrochureFormState }) {
+  const t = TEXT[language];
+  const { f, setF, state, setState, error, setError } = form;
   const set = (k: keyof BrochureRequestFields, v: string) => setF((x) => ({ ...x, [k]: v }));
 
   if (state === 'sent') {

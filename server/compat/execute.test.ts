@@ -45,6 +45,7 @@ beforeAll(async () => {
     create table event_extras (id uuid primary key default gen_random_uuid(), quote_id uuid not null, extra_id uuid not null);
     create table supplier_orders (id uuid primary key default gen_random_uuid(), user_id uuid not null);
     create table stock_movements (id uuid primary key default gen_random_uuid(), user_id uuid not null, ingredient_id uuid not null, quantity numeric, event_id uuid, order_id uuid);
+    create table brochures (id uuid primary key default gen_random_uuid(), owner_user_id uuid not null, name text, content jsonb);
 
     insert into profiles (id) values ('${ME}'), ('${VICTIM}');
     insert into profiles (id, parent_user_id, company_role) values ('${MEMBER}', '${ME}', 'collaborateur'), ('${READER}', '${ME}', 'lecture');
@@ -159,5 +160,18 @@ describe('collaborateurs d’une même entreprise', () => {
     expect((r.data as { id: string }[]).map((p) => p.id)).toContain(MY_PRESTATION);
     const w = await run({ table: 'prestations', op: 'insert', values: { user_id: READER, name: 'x' } }, READER);
     expect(w.error?.message).toMatch(/consultation/);
+  });
+});
+
+describe('brochures : écriture seulement par les actions serveur', () => {
+  it('la lecture par l’équipe passe, l’écriture directe est refusée (le contenu doit être nettoyé côté serveur)', async () => {
+    await pg.exec(`insert into brochures (id, owner_user_id, name) values ('00000000-0000-4000-8000-0000000000e1', '${ME}', 'Mariages')`);
+    const read = await run({ table: 'brochures', op: 'select', filters: [{ kind: 'cmp', column: 'id', op: 'eq', value: '00000000-0000-4000-8000-0000000000e1' }] } as never, MEMBER);
+    expect(read.error).toBeNull();
+    expect((read.data as unknown[]).length).toBe(1);
+    await run({ table: 'brochures', op: 'update', values: { content: { about: { html: '<img src=x onerror=alert(1)>' } } }, filters: [{ kind: 'cmp', column: 'id', op: 'eq', value: '00000000-0000-4000-8000-0000000000e1' }] } as never, MEMBER);
+    expect(await owner('brochures', 'content', '00000000-0000-4000-8000-0000000000e1')).toBeNull();
+    const ins = await run({ table: 'brochures', op: 'insert', values: { owner_user_id: ME, name: 'Glissée' } }, MEMBER);
+    expect(ins.error).not.toBeNull();
   });
 });

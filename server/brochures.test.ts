@@ -201,6 +201,19 @@ describe('brochures : formulaire de fin', () => {
     expect((await req.submitBrochureRequest(token, { ...fields, email: 'r6@exemple.fr' })).error).toMatch(/Trop de demandes/);
   });
 
+  it('brochure en anglais : erreurs et accusé de réception en anglais', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'English' });
+    await br.saveBrochure(id!, { language: 'en' });
+    const token = await tokenOf(id!);
+    expect((await req.submitBrochureRequest(token, { ...fields, email: 'nope' })).error).toBe('The email address is not valid.');
+    sent.length = 0;
+    expect((await req.submitBrochureRequest(token, { ...fields, email: 'eng@exemple.fr' })).error).toBeNull();
+    const ack = sent.find((m) => m.to === 'eng@exemple.fr')!;
+    expect(ack.subject).toMatch(/received your request/);
+    expect(ack.html).toContain('Thank you');
+  });
+
   it('notifyProspect : la notification au traiteur et l’accusé à la personne', async () => {
     sent.length = 0;
     await mail.notifyProspect({ ownerId: OWNER, prospect: { firstName: 'Lou', lastName: 'Bé', email: 'lou@exemple.fr' } });

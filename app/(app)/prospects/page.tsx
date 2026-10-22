@@ -50,6 +50,8 @@ interface Prospect {
   status: ProspectStatus;
   owner_user_id: string | null;
   user_token: string | null;
+  /** Brochure d'où vient la demande (formulaire en fin de brochure). */
+  brochure_id?: string | null;
   created_at: string;
 }
 
@@ -625,9 +627,12 @@ function ProspectDrawer({
   onStatusChange,
   onDelete,
   onCreateDevis,
+  brochureName,
 }: {
   prospect: Prospect;
   linkedQuoteId?: string | null;
+  /** Nom de la brochure d'où vient la demande. */
+  brochureName?: string | null;
   onClose: () => void;
   onStatusChange: (id: string, status: ProspectStatus) => void;
   onDelete: (id: string) => void;
@@ -709,6 +714,12 @@ function ProspectDrawer({
               )}
             </div>
           </div>
+
+          {brochureName && (
+            <p className="flex items-center gap-2 text-sm text-gray-700">
+              <BookOpen className="h-4 w-4 text-gray-400" /> Demande envoyée depuis la brochure « {brochureName} »
+            </p>
+          )}
 
           {/* Contact */}
           <div>
@@ -846,10 +857,12 @@ function ProspectCard({
   prospect,
   selected,
   onClick,
+  brochureName,
 }: {
   prospect: Prospect;
   selected: boolean;
   onClick: () => void;
+  brochureName?: string | null;
 }) {
   const isUrgent =
     prospect.event_date &&
@@ -877,6 +890,11 @@ function ProspectCard({
       </div>
 
       <div className="flex items-center gap-3 text-xs text-gray-400 mt-3 flex-wrap">
+        {brochureName && (
+          <span className="flex items-center gap-1 text-gray-600">
+            <BookOpen className="h-3 w-3" /> Brochure « {brochureName} »
+          </span>
+        )}
         {prospect.event_type && (
           <span className="bg-primary-50 text-primary px-2 py-0.5 rounded-full font-medium">
             {prospect.event_type}
@@ -906,6 +924,9 @@ function ProspectsPageInner() {
   const { confirm } = useFeedback();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [prospectQuoteMap, setProspectQuoteMap] = useState<Record<string, string>>({});
+  // Noms des brochures, pour dire d'où vient une demande.
+  const [brochureNames, setBrochureNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => { listBrochures().then((all) => setBrochureNames(new Map(all.map((b) => [b.id, b.name])))).catch(() => {}); }, []);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProspectStatus | 'all'>('all');
   const [eventFilter, setEventFilter] = useState<string>('all');
@@ -1179,6 +1200,7 @@ function ProspectsPageInner() {
                   prospect={p}
                   selected={selected?.id === p.id}
                   onClick={() => setSelected((cur) => cur?.id === p.id ? null : p)}
+                  brochureName={p.brochure_id ? brochureNames.get(p.brochure_id) : null}
                 />
               ))}
             </div>
@@ -1192,6 +1214,7 @@ function ProspectsPageInner() {
           )}>
             <ProspectDrawer
               prospect={selected}
+              brochureName={selected.brochure_id ? brochureNames.get(selected.brochure_id) : null}
               linkedQuoteId={prospectQuoteMap[selected.id] ?? null}
               onClose={() => setSelected(null)}
               onStatusChange={handleStatusChange}

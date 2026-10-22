@@ -28,20 +28,33 @@ export interface BrochureRequestFields {
   message?: string;
 }
 
+const MESSAGES = {
+  fr: {
+    gone: 'Cette brochure n’est plus disponible.', names: 'Indiquez votre prénom et votre nom.', email: 'L’adresse email n’est pas valide.',
+    tooMany: 'Trop de demandes envoyées depuis cette connexion. Réessayez dans une heure.',
+  },
+  en: {
+    gone: 'This brochure is no longer available.', names: 'Please enter your first and last name.', email: 'The email address is not valid.',
+    tooMany: 'Too many requests sent from this connection. Please try again in an hour.',
+  },
+};
+
 const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const count = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 && n < 100000 ? n : null; };
 
 export async function submitBrochureRequest(token: string, fields: BrochureRequestFields): Promise<{ error: string | null }> {
   if (!TOKEN.test(token ?? '')) return { error: 'Ce lien n’est plus valable.' };
-  const [b] = await db.select({ id: brochures.id, owner: brochures.owner_user_id, name: brochures.name }).from(brochures)
+  const [b] = await db.select({ id: brochures.id, owner: brochures.owner_user_id, name: brochures.name, language: brochures.language }).from(brochures)
     .where(and(eq(brochures.share_token, token), eq(brochures.is_active, true))).limit(1);
-  if (!b) return { error: 'Cette brochure n’est plus disponible.' };
+  if (!b) return { error: MESSAGES.fr.gone };
+  const language = b.language === 'en' ? 'en' : 'fr';
+  const t = MESSAGES[language];
 
   const first = clean(fields.first_name, 80);
   const last = clean(fields.last_name, 80);
   const email = clean(fields.email, 200).toLowerCase();
-  if (!first || !last) return { error: 'Indiquez votre prénom et votre nom.' };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'L’adresse email n’est pas valide.' };
+  if (!first || !last) return { error: t.names };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: t.email };
   const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(fields.event_date ?? '') ? fields.event_date! : null;
 
   // Compte de démonstration : la page répond normalement, mais rien n'est enregistré ni envoyé.
@@ -54,7 +67,7 @@ export async function submitBrochureRequest(token: string, fields: BrochureReque
     eq(prospect_requests.brochure_id, b.id), eq(prospect_requests.ip_hash, ipHash),
     gt(prospect_requests.created_at, new Date(Date.now() - 3600_000).toISOString()),
   ));
-  if (n >= MAX_REQUESTS_PER_HOUR) return { error: 'Trop de demandes envoyées depuis cette connexion. Réessayez dans une heure.' };
+  if (n >= MAX_REQUESTS_PER_HOUR) return { error: t.tooMany };
 
   const prospect = {
     firstName: first, lastName: last, email,
@@ -72,6 +85,6 @@ export async function submitBrochureRequest(token: string, fields: BrochureReque
     guest_count_children: prospect.guestCountChildren, message: prospect.message,
     owner_user_id: b.owner, brochure_id: b.id, ip_hash: ipHash, status: 'nouveau',
   });
-  await notifyProspect({ ownerId: b.owner, prospect, brochureName: b.name }).catch(() => {});
+  await notifyProspect({ ownerId: b.owner, prospect, brochureName: b.name, language }).catch(() => {});
   return { error: null };
 }

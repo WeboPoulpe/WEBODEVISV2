@@ -17,7 +17,8 @@ export default function ItemRetouch({ item, prestation, language, onSave, onClos
   onSave: (item: BrochureItem) => void;
   onClose: () => void;
 }) {
-  const catalogText = (language === 'en' && prestation.gastro_card_html_en) || prestation.gastro_card_html || prestation.description || '';
+  const card = (language === 'en' && prestation.gastro_card_html_en) || prestation.gastro_card_html;
+  const catalogText = card || prestation.description || '';
   const [html, setHtml] = useState(item.html ?? catalogText);
   const [photoUrl, setPhotoUrl] = useState<string | null>(item.photoUrl ?? null);
   const [hidePrice, setHidePrice] = useState(!!item.hidePrice);
@@ -26,7 +27,7 @@ export default function ItemRetouch({ item, prestation, language, onSave, onClos
   const save = () => {
     // Texte inchangé par rapport au catalogue : pas de retouche, la brochure suit le catalogue.
     const own = html.trim() && html !== catalogText ? html : null;
-    onSave({ prestationId: item.prestationId, ...(own ? { html: own } : {}), ...(photoUrl ? { photoUrl } : {}), ...(hidePrice ? { hidePrice: true } : {}) });
+    onSave({ prestationId: item.prestationId, ...(own ? { html: own, ...(card ? { titled: true } : {}) } : {}), ...(photoUrl ? { photoUrl } : {}), ...(hidePrice ? { hidePrice: true } : {}) });
   };
 
   return (

@@ -55,6 +55,18 @@ describe('brochure : pages', () => {
     expect(items(ed).map((i) => i.missing)).toEqual([false, true]);
   });
 
+  it('prestation sans fiche retouchée : son nom reste affiché ; fiche retouchée : le titre est dans le texte', () => {
+    const noCard = new Map([['p1', prestation()]]);
+    const withCard = new Map([['p1', prestation({ gastro_card_html: '<h3>Menu</h3><p>…</p>' })]]);
+    const one = (items: BrochureContent['sections'][number]['items'], cat: Map<string, CatalogPrestation>) =>
+      paginateBrochure({ ...parseBrochureContent(null), sections: [{ id: 's', title: '', items }] }, cat, 'editorial', { ...TTC10, forEditor: false })
+        .flatMap((p) => (p.kind === 'items' ? p.items : []))[0];
+    expect(one([{ prestationId: 'p1', html: '<p>Retouché</p>' }], noCard).titled).toBe(false);
+    expect(one([{ prestationId: 'p1', html: '<h3>Menu</h3><p>Retouché</p>', titled: true }], withCard).titled).toBe(true);
+    expect(one([{ prestationId: 'p1' }], withCard).titled).toBe(true);
+    expect(parseBrochureContent({ sections: [{ id: 's', title: '', items: [{ prestationId: 'p1', titled: true }] }] }).sections[0].items[0].titled).toBe(true);
+  });
+
   it('contenu illisible : valeurs par défaut, éléments invalides ignorés', () => {
     expect(parseBrochureContent(null)).toEqual({ about: { enabled: true, html: '' }, contact: { enabled: true }, sections: [] });
     const c = parseBrochureContent({ sections: [{ id: 's', title: 'T', items: [{ prestationId: 'p1' }, { html: 'sans id' }] }] });

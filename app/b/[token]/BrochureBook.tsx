@@ -2,13 +2,16 @@
 
 // Le livre du lien public : les pages de la brochure dans le feuilletage.
 
-import type { ReactNode } from 'react';
 import { Flipbook } from '@/components/brochures/Flipbook';
+import BrochureRequestForm, { useBrochureForm } from '@/components/brochures/BrochureRequestForm';
 import { BrochurePageView } from '@/components/brochures/BrochurePages';
 import type { PublicBrochure } from '@/server/brochures';
 
-export default function BrochureBook({ brochure, formSlot }: { brochure: PublicBrochure; formSlot?: ReactNode }) {
+export default function BrochureBook({ brochure, token }: { brochure: PublicBrochure; token: string }) {
   const en = brochure.language === 'en';
+  // Saisie du formulaire gardée ici : elle survit aux pages qui tournent.
+  const form = useBrochureForm();
+  const formSlot = <BrochureRequestForm token={token} language={brochure.language} form={form} />;
   return (
     <Flipbook
       ariaLabel={brochure.name}
