@@ -190,6 +190,29 @@ async function catalogFor(row: BrochureRow): Promise<Map<string, CatalogPrestati
   return new Map(rows.map((p) => [p.id, p]));
 }
 
+/** Tout ce que l'éditeur affiche : la brochure, le catalogue de l'entreprise (à piocher) et ses coordonnées (aperçu). */
+export async function getBrochureEditorData(id: string): Promise<{ brochure: BrochureRow; catalog: CatalogPrestation[]; company: PublicBrochure['company'] } | null> {
+  const user = await requireUser();
+  const brochure = await getBrochure(id);
+  if (!brochure) return null;
+  const [company, catalog] = await Promise.all([
+    companyProfile(brochure.owner_user_id),
+    db.select({
+      id: prestations.id, name: prestations.name, description: prestations.description,
+      gastro_card_html: prestations.gastro_card_html, gastro_card_html_en: prestations.gastro_card_html_en,
+      unit_price: prestations.unit_price, child_unit_price: prestations.child_unit_price,
+      category: prestations.category, photo_url: prestations.photo_url,
+    }).from(prestations).where(sql`${prestations.user_id} in ${companyIdsOf(user.id)}`).orderBy(prestations.category, prestations.name),
+  ]);
+  return {
+    brochure, catalog,
+    company: {
+      name: company?.name ?? '', logoUrl: company?.logoUrl ?? null, address: company?.address ?? null,
+      phone: company?.phone ?? null, email: company?.email ?? null, website: company?.website ?? null,
+    },
+  };
+}
+
 /** La brochure telle que le lecteur la feuillette, ou null (jeton invalide, inconnu, lien désactivé). */
 export async function getPublicBrochure(token: string): Promise<PublicBrochure | null> {
   const row = await byToken(token, true);

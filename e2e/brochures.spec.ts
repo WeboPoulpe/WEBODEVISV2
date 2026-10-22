@@ -68,4 +68,50 @@ test.describe('brochures', () => {
       await page.screenshot({ path: 'e2e/screenshots/brochures-liste-mobile.png' });
     });
   });
+  test('composer une brochure : prestations, style, prix, retouche', async ({ browser }: { browser: Browser }) => {
+    await withAccount(browser, 'brochure-editeur', async (page, userId) => {
+      const [menu] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Menu Tentation', 76, 'dîner', '<p>Entrée, plat, dessert</p>') returning id`, [userId]);
+      await sql(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Cocktail vin d''honneur', 14, 'cocktail', '<p>Huit pièces</p>')`, [userId]);
+      const [b] = await sql<{ id: string }>(`insert into public.brochures (owner_user_id, user_id, name, share_token, cover) values ($1, $1, 'Mariages 2027', $2, '{"title":"Mariages 2027"}'::jsonb) returning id`,
+        [userId, `jeton-e2e-editeur-${Date.now()}`]);
+      await page.goto(`/brochures/${b.id}`);
+      await expect(page.getByLabel('Nom de la brochure')).toHaveValue('Mariages 2027', { timeout: 20_000 });
+
+      await page.getByRole('button', { name: 'Ajouter des prestations' }).click();
+      await page.getByRole('checkbox', { name: /Menu Tentation/ }).check();
+      await page.getByRole('checkbox', { name: /Cocktail vin d'honneur/ }).check();
+      await page.getByRole('button', { name: 'Ajouter (2)' }).click();
+      const composition = page.getByRole('region', { name: 'Composition' });
+      await expect(composition).toContainText('Menu Tentation');
+      await expect(composition).toContainText("Cocktail vin d'honneur");
+
+      await page.getByRole('button', { name: 'Carte', exact: true }).click();
+      await page.getByRole('checkbox', { name: 'Afficher la page « qui sommes-nous »' }).uncheck();
+      const preview = page.getByRole('region', { name: 'Aperçu de la brochure' });
+      await preview.getByRole('button', { name: 'Page suivante' }).click();
+      await expect(preview).toContainText('Menu Tentation');
+      await expect(preview).toContainText('€');
+      await page.getByRole('checkbox', { name: 'Afficher les prix' }).uncheck();
+      await expect(preview).not.toContainText('€');
+
+      await composition.getByRole('button', { name: 'Retoucher « Menu Tentation »' }).click();
+      const editor = page.getByRole('textbox', { name: 'Texte de la prestation dans cette brochure' });
+      await editor.click();
+      await page.keyboard.press('Control+a');
+      await page.keyboard.type('Texte de la brochure');
+      await page.getByRole('button', { name: 'Valider' }).click();
+      await expect(preview).toContainText('Texte de la brochure');
+
+      await expect.poll(async () => JSON.stringify((await sql<{ content: unknown }>(`select content from public.brochures where id = $1`, [b.id]))[0].content), { timeout: 10_000 })
+        .toContain('Texte de la brochure');
+      expect((await sql<{ description: string }>(`select description from public.prestations where id = $1`, [menu.id]))[0].description).toBe('<p>Entrée, plat, dessert</p>');
+
+      await page.screenshot({ path: 'e2e/screenshots/brochure-editeur-desktop.png' });
+      await page.setViewportSize({ width: 360, height: 780 });
+      await page.reload();
+      await expect(page.getByLabel('Nom de la brochure')).toHaveValue('Mariages 2027', { timeout: 20_000 });
+      expect(await horizontalOverflow(page)).toBe(0);
+      await page.screenshot({ path: 'e2e/screenshots/brochure-editeur-mobile.png', fullPage: true });
+    });
+  });
 });

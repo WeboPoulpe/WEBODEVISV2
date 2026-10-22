@@ -151,4 +151,15 @@ describe('brochures : serveur', () => {
     expect(row.view_count).toBe(1);
     expect(row.viewed_at).not.toBeNull();
   });
+  it('données de l’éditeur : la brochure, le catalogue de l’entreprise et ses coordonnées ; rien pour un autre compte', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Éditeur' });
+    const data = (await br.getBrochureEditorData(id!))!;
+    expect(data.brochure.name).toBe('Éditeur');
+    expect(data.catalog.map((p) => p.name)).toContain('Menu Tentation');
+    expect(data.company).toMatchObject({ name: 'Traiteur Brochure', email: 'contact@b.fr' });
+    current = STRANGER;
+    expect(await br.getBrochureEditorData(id!)).toBeNull();
+    current = OWNER;
+  });
 });
