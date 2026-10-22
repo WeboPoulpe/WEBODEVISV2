@@ -122,6 +122,7 @@ test.describe('brochures', () => {
     });
   });
   test('une demande depuis la dernière page arrive dans les Prospects', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(120_000);
     const t = await brochureAccount('brochure-demande');
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
     try {
@@ -130,18 +131,21 @@ test.describe('brochures', () => {
       await expect(page.getByRole('heading', { name: 'Mariages 2027' })).toBeVisible({ timeout: 20_000 });
       const next = page.getByRole('button', { name: 'Page suivante' });
       while (await next.isEnabled()) { await next.click(); await page.waitForTimeout(750); }
-      await page.getByLabel('Prénom').fill('Camille');
-      // Revenir en arrière puis revenir au formulaire : la saisie est toujours là.
+      // Sur téléphone, le formulaire est en plein écran.
+      const sheet = page.getByRole('dialog');
+      await sheet.getByLabel('Prénom').fill('Camille');
+      // Revenir au livre, tourner les pages, revenir au formulaire : la saisie est toujours là.
+      await sheet.getByRole('button', { name: 'Revenir au livre' }).click();
       await page.getByRole('button', { name: 'Page précédente' }).click();
       await page.waitForTimeout(750);
       await page.getByRole('button', { name: 'Page suivante' }).click();
       await page.waitForTimeout(750);
-      await expect(page.getByLabel('Prénom')).toHaveValue('Camille');
-      await page.getByLabel('Nom', { exact: true }).fill('Martin');
-      await page.getByLabel('Email').fill(`camille-${Date.now()}@test.webodevis.local`);
-      await page.getByLabel('Invités').fill('80');
-      await page.getByRole('button', { name: 'Envoyer ma demande' }).click();
-      await expect(page.getByText('Merci, votre demande est envoyée.')).toBeVisible({ timeout: 15_000 });
+      await expect(sheet.getByLabel('Prénom')).toHaveValue('Camille');
+      await sheet.getByLabel('Nom', { exact: true }).fill('Martin');
+      await sheet.getByLabel('Email').fill(`camille-${Date.now()}@test.webodevis.local`);
+      await sheet.getByLabel('Invités').fill('80');
+      await sheet.getByRole('button', { name: 'Envoyer ma demande' }).click();
+      await expect(sheet.getByText('Merci, votre demande est envoyée.')).toBeVisible({ timeout: 15_000 });
       await page.screenshot({ path: 'e2e/screenshots/brochure-formulaire-mobile.png' });
       const rows = await sql<{ brochure_id: string; guest_count: number }>(`select brochure_id, guest_count from public.prospect_requests where owner_user_id = $1`, [t.user.id]);
       expect(rows).toEqual([{ brochure_id: t.brochureId, guest_count: 80 }]);
@@ -158,6 +162,41 @@ test.describe('brochures', () => {
     } finally {
       await context.close();
       await sql(`delete from public.prospect_requests where owner_user_id = $1`, [t.user.id]);
+      await deleteAccount(t.user.id);
+    }
+  });
+  test('sur téléphone, le formulaire s’ouvre en plein écran', async ({ browser }: { browser: Browser }) => {
+    const t = await brochureAccount('brochure-plein-ecran');
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+    try {
+      const page = await context.newPage();
+      await page.goto(`/b/${t.token}`);
+      await expect(page.getByRole('heading', { name: 'Mariages 2027' })).toBeVisible({ timeout: 20_000 });
+      const next = page.getByRole('button', { name: 'Page suivante' });
+      while (await next.isEnabled()) { await next.click(); await page.waitForTimeout(750); }
+      const sheet = page.getByRole('dialog');
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByRole('button', { name: 'Envoyer ma demande' })).toBeVisible();
+      expect((await sheet.boundingBox())!.height).toBeGreaterThanOrEqual(800);
+      await sheet.getByLabel('Prénom').fill('Camille');
+      await page.screenshot({ path: 'e2e/screenshots/brochure-formulaire-plein-ecran.png' });
+      await sheet.getByRole('button', { name: 'Revenir au livre' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Page précédente' }).click();
+      await page.waitForTimeout(750);
+      await page.getByRole('button', { name: 'Page suivante' }).click();
+      await page.waitForTimeout(750);
+      await expect(page.getByRole('dialog').getByLabel('Prénom')).toHaveValue('Camille');
+
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(`/b/${t.token}`);
+      await expect(page.getByRole('heading', { name: 'Mariages 2027' })).toBeVisible();
+      const nextDesk = page.getByRole('button', { name: 'Page suivante' });
+      while (await nextDesk.isEnabled()) { await nextDesk.click(); await page.waitForTimeout(750); }
+      await expect(page.getByRole('button', { name: 'Envoyer ma demande' })).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    } finally {
+      await context.close();
       await deleteAccount(t.user.id);
     }
   });

@@ -30,9 +30,11 @@ function useBookSize(double: boolean, reserved: number) {
   return size;
 }
 
-export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente', next: 'Page suivante' }, reserved = 120, allowDouble = true }: {
+export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente', next: 'Page suivante' }, reserved = 120, allowDouble = true, onPageChange }: {
   pages: ReactNode[];
   ariaLabel: string;
+  /** Pages visibles (index) après chaque tour, et au premier affichage. */
+  onPageChange?: (visible: number[]) => void;
   labels?: { prev: string; next: string };
   /** Hauteur à laisser libre autour du livre (en-tête, boutons), en pixels. */
   reserved?: number;
@@ -55,6 +57,11 @@ export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente
     return double ? v - (v % 2) : v;
   }, [double, last]);
   useEffect(() => { setAt((a) => clampAt(a)); }, [clampAt]);
+  const onChange = useRef(onPageChange);
+  onChange.current = onPageChange;
+  useEffect(() => {
+    onChange.current?.(double ? [at - 1, at].filter((i) => i >= 0 && i <= last) : [at]);
+  }, [at, double, last]);
 
   const go = useCallback((dir: 1 | -1) => {
     if (turn) return;
