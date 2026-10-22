@@ -104,6 +104,25 @@ arrive à la dernière page (aujourd'hui il est à l'étroit dans la page du liv
   pour l'ordinateur.
 - **Hauteur de page** : mesurée dans le navigateur (éditeur) pour l'alerte « page trop pleine ».
 
+## Choix de Claude après relecture (à vérifier en relisant)
+
+- **Une seule source de vérité selon l'éditeur actif.** En mode avancé, `layout` fait foi ; en mode simple,
+  `content.sections` fait foi. Ce que le traiteur a fait dans un éditeur n'est jamais perdu en changeant d'éditeur,
+  seule la disposition l'est :
+  - avancé → simple : `content.sections` est reconstruit depuis les blocs Prestation, dans l'ordre des pages (une
+    section par bloc Titre rencontré, sinon « Nos prestations »), retouches comprises. `layout` est gardé tel quel.
+  - simple → avancé, sans `layout` gardé : conversion des pages simples en blocs (voir plus haut).
+  - simple → avancé, avec un `layout` gardé : la fenêtre propose « Reprendre ma mise en page avancée » (les
+    prestations ajoutées en mode simple depuis s'ajoutent sur une page à la fin, celles retirées disparaissent de la
+    mise en page) ou « Repartir de la mise en page simple » (nouvelle conversion).
+- **Le style reste, comme thème.** En mode avancé, le choix Éditorial / Carte / Magazine reste visible sous le nom
+  « Thème » : il donne l'allure de la couverture, du contact et du formulaire, et les réglages par défaut des blocs.
+  Les réglages d'un bloc ou d'une page passent devant.
+- **Texte d'un bloc Prestation : « complet » ou « court »** (extrait d'environ 150 caractères). La conversion reprend
+  ce que le style montrait : complet en Éditorial, court en Carte et Magazine (même rendu, pas d'alerte « trop pleine »).
+- **Pages spéciales en mode avancé** : couverture facultative, une au plus, toujours en premier ; contact facultatif,
+  un au plus, avant le formulaire ; formulaire toujours en dernier, non supprimable. Le serveur refuse le reste.
+
 ## Laissé au constructeur
 
 - Le découpage exact des composants, la mise en œuvre du glisser-déposer natif, la palette de couleurs proposée (celle
