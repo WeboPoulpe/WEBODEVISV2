@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Copy, CopyPlus, ExternalLink, Loader2, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, Copy, CopyPlus, ExternalLink, Loader2, Plus, Send, Trash2 } from 'lucide-react';
+import SendBrochureModal from '@/components/brochures/SendBrochureModal';
 import Modal from '@/components/ui/Modal';
 import { btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { useFeedback } from '@/components/ui/Feedback';
@@ -24,6 +25,7 @@ export default function BrochuresPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
 
   // Raccourci du menu : « Nouvelle brochure ».
   useUrlAction({ nouvelle: () => setCreating('') });
@@ -108,6 +110,7 @@ export default function BrochuresPage() {
                 </div>
                 <div className="mt-auto flex items-center gap-1">
                   <Link href={`/brochures/${b.id}`} className={cn(btnSecondary, 'flex-1 justify-center')}>Ouvrir</Link>
+                  <button type="button" onClick={() => setSending(b.id)} disabled={!b.is_active} className={iconBtn} aria-label="Envoyer" title={b.is_active ? 'Envoyer' : 'Lien désactivé'}><Send className="h-4 w-4" /></button>
                   <button type="button" onClick={() => copyLink(b)} className={iconBtn} aria-label="Copier le lien" title="Copier le lien"><Copy className="h-4 w-4" /></button>
                   <a href={`/b/${b.share_token}`} target="_blank" rel="noreferrer" className={iconBtn} aria-label="Voir comme le lecteur" title="Voir comme le lecteur"><ExternalLink className="h-4 w-4" /></a>
                   <button type="button" onClick={() => duplicate(b)} className={iconBtn} aria-label="Dupliquer" title="Dupliquer"><CopyPlus className="h-4 w-4" /></button>
@@ -118,6 +121,8 @@ export default function BrochuresPage() {
           ))}
         </ul>
       )}
+
+      {sending && <SendBrochureModal brochureId={sending} onClose={() => setSending(null)} />}
 
       {creating !== null && (
         <Modal title="Nouvelle brochure" onClose={() => setCreating(null)}

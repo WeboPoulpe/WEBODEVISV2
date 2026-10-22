@@ -6,8 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, Plus, X, Phone, Mail, MapPin, Calendar, Users2,
   MessageSquare, ChevronDown, FileText, Copy, Check, Link2,
-  Loader2, Trash2, RefreshCw, Eye, AlertCircle,
+  Loader2, Trash2, RefreshCw, Eye, AlertCircle, BookOpen,
 } from 'lucide-react';
+import SendBrochureModal from '@/components/brochures/SendBrochureModal';
+import { listBrochures, type BrochureSummary } from '@/server/brochures';
 import { companyIds } from '@/lib/companyFilter';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
@@ -107,6 +109,9 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [brochureUrl, setBrochureUrl] = useState('');
+  // Brochures du module, proposées à la place d'une adresse saisie à la main.
+  const [brochures, setBrochures] = useState<BrochureSummary[]>([]);
+  useEffect(() => { listBrochures().then((all) => setBrochures(all.filter((b) => b.is_active))).catch(() => {}); }, []);
 
   const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/` : '';
 
@@ -226,6 +231,17 @@ function TokenManagerModal({ onClose }: { onClose: () => void }) {
 
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">URL brochure (affiché après envoi)</label>
+                {brochures.length > 0 && (
+                  <select
+                    value=""
+                    aria-label="Choisir une de vos brochures"
+                    onChange={(e) => { const b = brochures.find((x) => x.id === e.target.value); if (b) setBrochureUrl(`${window.location.origin}/b/${b.share_token}`); }}
+                    className="mb-2 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    <option value="">Choisir une de vos brochures…</option>
+                    {brochures.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                )}
                 <div className="flex gap-2">
                   <input
                     value={brochureUrl}
@@ -619,6 +635,7 @@ function ProspectDrawer({
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [sendingBrochure, setSendingBrochure] = useState(false);
 
   const handleStatus = async (s: ProspectStatus) => {
     setUpdatingStatus(true);
@@ -798,6 +815,18 @@ function ProspectDrawer({
             <FileText className="h-4 w-4" />
             Créer un devis
           </button>
+        )}
+        <button
+          onClick={() => setSendingBrochure(true)}
+          className="flex items-center justify-center gap-2 w-full py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+        >
+          <BookOpen className="h-4 w-4" />
+          Envoyer une brochure
+        </button>
+        {sendingBrochure && (
+          <SendBrochureModal defaultTo={prospect.email} prospectId={prospect.id} onClose={() => setSendingBrochure(false)}
+            // La demande (et son devis rattaché) passe à « Brochure envoyée » si elle était nouvelle.
+            onSent={() => { if (prospect.status === 'nouveau') handleStatus('broch_envoyee'); }} />
         )}
         <SaveAsCustomerButton prospect={prospect} />
         <button

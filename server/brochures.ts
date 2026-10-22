@@ -6,13 +6,17 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { brochures, prestations, profiles } from '@/db/schema';
+import { brochures, prestations, profiles, prospect_requests } from '@/db/schema';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { defaultVatRate } from '@/lib/vat';
 import {
   BROCHURE_STYLES, paginateBrochure, parseBrochureContent,
   type BrochureContent, type BrochureCover, type BrochurePage, type BrochureStyle, type CatalogPrestation,
 } from '@/lib/brochure';
+import { appOrigin, sendMail } from '@/lib/mail';
+import { brochureEmail } from '@/lib/mail/templates';
+import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
+import { isValidEmail, MAX_RECIPIENTS, splitEmails, uniqueEmails } from '@/lib/emailList';
 import { companyIdsOf } from './companyScope';
 import { getSessionUser, requireUser, requireWriter } from './session';
 
@@ -255,4 +259,47 @@ export async function recordBrochureView(token: string): Promise<void> {
   }
   await db.update(brochures).set({ view_count: sql`${brochures.view_count} + 1`, viewed_at: new Date().toISOString() })
     .where(eq(brochures.id, row.id));
+}
+
+/**
+ * Envoie le lien de la brochure par email, au nom de l'entreprise (une adresse ou plusieurs). Envoyée à une demande
+ * de Prospects de l'entreprise encore « nouvelle », celle-ci passe à « Brochure envoyée ».
+ */
+export async function sendBrochure(input: { brochureId: string; to: string; message?: string; prospectId?: string }): Promise<{ error: string | null }> {
+  const user = await requireWriter();
+  if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
+  const recipients = uniqueEmails(splitEmails(input.to ?? ''));
+  if (recipients.length === 0) return { error: 'Indiquez l’adresse email du destinataire.' };
+  const invalid = recipients.filter((e) => !isValidEmail(e));
+  if (invalid.length) return { error: invalid.length === 1 ? `L’adresse « ${invalid[0]} » n’est pas valide.` : `Ces adresses ne sont pas valides : ${invalid.join(', ')}.` };
+  if (recipients.length > MAX_RECIPIENTS) return { error: `Une brochure part à ${MAX_RECIPIENTS} adresses au plus.` };
+
+  const row = await getBrochure(input.brochureId);
+  if (!row) return { error: NOT_FOUND };
+  if (!row.is_active) return { error: 'Le lien de cette brochure est désactivé : réactivez-le avant de l’envoyer.' };
+  const company = await companyProfile(row.owner_user_id);
+  const companyName = company?.name || 'Votre traiteur';
+  const mail = {
+    fromName: companyName,
+    replyTo: company?.email || user.email,
+    ...brochureEmail({
+      companyName, brochureName: row.name, message: input.message ?? null,
+      link: `${await appOrigin()}/b/${row.share_token}`, language: row.language === 'en' ? 'en' : 'fr',
+    }),
+  };
+  // Un email par destinataire, l'un après l'autre (Resend limite le nombre d'envois par seconde).
+  const failed: string[] = [];
+  for (const to of recipients) {
+    const res = await sendMail({ to, ...mail });
+    if (res.error) failed.push(to);
+  }
+  if (failed.length === recipients.length) return { error: 'L’email n’a pas pu partir. Vérifiez l’adresse, puis réessayez.' };
+
+  if (input.prospectId && UUID.test(input.prospectId)) {
+    await db.update(prospect_requests).set({ status: 'broch_envoyee', updated_at: new Date().toISOString() }).where(and(
+      eq(prospect_requests.id, input.prospectId), eq(prospect_requests.status, 'nouveau'),
+      sql`${prospect_requests.owner_user_id} in ${companyIdsOf(user.id)}`,
+    ));
+  }
+  return failed.length ? { error: `L’email n’a pas pu partir vers : ${failed.join(', ')}.` } : { error: null };
 }

@@ -207,3 +207,35 @@ describe('brochures : formulaire de fin', () => {
     expect(sent.map((m) => m.to).sort()).toEqual(['contact@b.fr', 'lou@exemple.fr']);
   });
 });
+
+describe('brochures : envoi', () => {
+  const tokenOf = async (id: string) => (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;
+  const prospect = async (owner: string, email: string) => (await pg.query<{ id: string }>(
+    `insert into prospect_requests (first_name, last_name, email, owner_user_id, status) values ('P', 'Q', $2, $1, 'nouveau') returning id`, [owner, email])).rows[0].id;
+
+  it('l’email contient le lien de la brochure ; envoyée à une demande, celle-ci passe « Brochure envoyée »', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Envoi' });
+    const pid = await prospect(OWNER, 'p1@exemple.fr');
+    sent.length = 0;
+    expect(await br.sendBrochure({ brochureId: id!, to: 'p1@exemple.fr', message: 'Voici notre brochure', prospectId: pid })).toEqual({ error: null });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe('p1@exemple.fr');
+    expect(sent[0].html).toContain(`/b/${await tokenOf(id!)}`);
+    expect((await pg.query<{ status: string }>(`select status from prospect_requests where id = $1`, [pid])).rows[0].status).toBe('broch_envoyee');
+  });
+
+  it('demande d’une autre entreprise inchangée ; adresse invalide, brochure désactivée, démo : refusé', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Garde' });
+    const foreign = await prospect(STRANGER, 'p2@exemple.fr');
+    expect((await br.sendBrochure({ brochureId: id!, to: 'p2@exemple.fr', prospectId: foreign })).error).toBeNull();
+    expect((await pg.query<{ status: string }>(`select status from prospect_requests where id = $1`, [foreign])).rows[0].status).toBe('nouveau');
+    expect((await br.sendBrochure({ brochureId: id!, to: 'pas-un-email' })).error).toBeTruthy();
+    await br.saveBrochure(id!, { is_active: false });
+    expect((await br.sendBrochure({ brochureId: id!, to: 'p3@exemple.fr' })).error).toBeTruthy();
+    current = '0d3e0000-0000-4000-8000-000000000001';
+    expect((await br.sendBrochure({ brochureId: id!, to: 'p3@exemple.fr' })).error).toMatch(/démonstration/);
+    current = OWNER;
+  });
+});

@@ -150,6 +150,31 @@ export function prospectAckEmail({ companyName, prospect }: { companyName: strin
 }
 
 // ── Devis envoyé au client ────────────────────────────────────────────────────
+/** Une brochure envoyée par le traiteur : son message et le lien pour la feuilleter. */
+export function brochureEmail({ companyName, brochureName, message, link, language }: {
+  companyName: string;
+  brochureName: string;
+  message?: string | null;
+  link: string;
+  language: 'fr' | 'en';
+}): Email {
+  const en = language === 'en';
+  return {
+    subject: en ? `${companyName}: ${brochureName}` : `${companyName} : ${brochureName}`,
+    html: renderEmail({
+      brand: companyName,
+      preheader: en ? `${companyName} sends you its brochure.` : `${companyName} vous envoie sa brochure.`,
+      title: brochureName,
+      paragraphs: message?.trim()
+        ? [multiline(message.trim())]
+        : [en ? `${esc(companyName)} sends you its brochure: browse it and send your request from its last page.` : `${esc(companyName)} vous envoie sa brochure : feuilletez-la, et envoyez votre demande depuis sa dernière page.`],
+      button: { label: en ? 'Browse the brochure' : 'Feuilleter la brochure', url: link },
+      note: en ? 'For any question, simply reply to this email.' : 'Pour toute question, répondez simplement à cet email.',
+      footer: en ? `Sent by ${companyName} with WeboDevis.` : `Envoyé par ${companyName} avec WeboDevis.`,
+    }),
+  };
+}
+
 export function quoteProposalEmail({ companyName, quoteNumber, clientName, eventType, eventDate, guestCount, message, link }: {
   companyName: string;
   quoteNumber?: string | null;

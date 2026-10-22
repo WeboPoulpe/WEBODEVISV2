@@ -5,7 +5,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import SendBrochureModal from './SendBrochureModal';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 import { btnSecondary, cardCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { useFeedback } from '@/components/ui/Feedback';
@@ -74,6 +75,7 @@ export default function BrochureEditor({ brochure, catalog, company }: { brochur
   const [token, setToken] = useState(brochure.share_token);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
   const [picking, setPicking] = useState(false);
+  const [sending, setSending] = useState(false);
   const [retouch, setRetouch] = useState<{ section: number; item: number } | null>(null);
 
   // Enregistrement automatique, 800 ms après le dernier changement (rien à l'ouverture : la brochure est déjà enregistrée).
@@ -189,6 +191,7 @@ export default function BrochureEditor({ brochure, catalog, company }: { brochur
                 Lien actif
               </label>
               <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
                 <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
                 <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
                 <button type="button" onClick={renew} className={btnSecondary}><RefreshCw className="h-4 w-4" /> Nouveau lien</button>
@@ -287,6 +290,7 @@ export default function BrochureEditor({ brochure, catalog, company }: { brochur
         </div>
       </div>
 
+      {sending && <SendBrochureModal brochureId={brochure.id} onClose={() => setSending(false)} />}
       {picking && <PrestationPicker catalog={catalog} already={inBrochure} onAdd={addPrestations} onClose={() => setPicking(false)} />}
       {retouch && retouched && retouchedPrestation && (
         <ItemRetouch item={retouched} prestation={retouchedPrestation} language={draft.language} onClose={() => setRetouch(null)}
