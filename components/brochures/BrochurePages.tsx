@@ -3,7 +3,7 @@
 // ordinateur. Rendu partagé par le lien public et l'aperçu de l'éditeur.
 
 import type { ReactNode } from 'react';
-import type { BrochureCover, BrochurePage, BrochureStyle, ResolvedItem } from '@/lib/brochure';
+import { shortText, type BrochureCover, type BrochurePage, type BrochureStyle, type ResolvedItem } from '@/lib/brochure';
 
 export interface BrochureCompany { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null }
 
@@ -23,11 +23,6 @@ const body = { fontSize: cq(3.4), lineHeight: 1.5, color: MUTED };
 // Texte riche des fiches : ses tailles écrites en pixels sont ramenées à la page.
 const rich = 'wb-rich [&_*]:!max-w-full [&_img]:!h-auto';
 
-/** Texte d'une fiche sans balises, raccourci (style Carte et Magazine). */
-function shortText(html: string, max: number): string {
-  const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, '')}…` : text;
-}
 
 function Photo({ url, style }: { url: string | null | undefined; style?: React.CSSProperties }) {
   if (!url) return <div style={{ background: 'linear-gradient(135deg,#d9c8ad,#9c8a6c)', ...style }} />;

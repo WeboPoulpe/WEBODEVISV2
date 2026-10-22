@@ -68,6 +68,12 @@ export type BrochurePage =
   | { kind: 'contact' }
   | { kind: 'form' };
 
+/** Texte d'une fiche sans balises, raccourci (style Carte et Magazine, texte « court » d'un bloc). */
+export function shortText(html: string, max: number): string {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, '')}…` : text;
+}
+
 /** Prestations par page selon le style. */
 export const ITEMS_PER_PAGE: Record<BrochureStyle, number> = { editorial: 1, carte: 6, magazine: 3 };
 
