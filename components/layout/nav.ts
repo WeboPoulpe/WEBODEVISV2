@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, Users, CalendarDays, CalendarRange, Package, Carrot, LayoutTemplate,
-  UserCheck, Users2, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun,
+  UserCheck, Users2, BookOpen, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -37,6 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/factures', icon: Receipt, label: 'Factures', exact: false },
       { href: '/clients', icon: Users, label: 'Clients', exact: false },
       { href: '/prospects', icon: UserCheck, label: 'Prospects', exact: false, badge: 'newProspects' },
+      { href: '/brochures', icon: BookOpen, label: 'Brochures', exact: false },
     ],
   },
   {

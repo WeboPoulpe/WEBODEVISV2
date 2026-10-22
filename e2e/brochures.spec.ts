@@ -1,5 +1,5 @@
 import { test, expect, type Browser } from '@playwright/test';
-import { createAccount, deleteAccount, horizontalOverflow, sql } from './helpers';
+import { createAccount, deleteAccount, horizontalOverflow, sql, withAccount } from './helpers';
 
 // Brochures : le lien public se feuillette, sans compte. Chaque test travaille sur un compte d'essai créé pour lui,
 // puis supprimé : aucun compte réel n'est touché.
@@ -46,5 +46,26 @@ test.describe('brochures', () => {
       await context.close();
       await deleteAccount(t.user.id);
     }
+  });
+  test('créer une brochure depuis la liste', async ({ browser }: { browser: Browser }) => {
+    await withAccount(browser, 'brochure-liste', async (page) => {
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.goto('/brochures');
+      await page.getByRole('button', { name: 'Nouvelle brochure' }).click();
+      await page.getByLabel('Nom de la brochure').fill('Mariages 2027');
+      await page.getByRole('button', { name: 'Créer', exact: true }).click();
+      await expect(page).toHaveURL(/\/brochures\/[0-9a-f-]{36}/, { timeout: 15_000 });
+      await page.goto('/brochures');
+      const card = page.getByRole('listitem').filter({ hasText: 'Mariages 2027' });
+      await expect(card).toContainText('Éditorial');
+      await expect(card).toContainText('0 ouverture');
+      await card.getByRole('button', { name: 'Copier le lien' }).click();
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/b\/[A-Za-z0-9_-]{16,}$/);
+      await page.setViewportSize({ width: 360, height: 780 });
+      await page.reload();
+      await expect(page.getByRole('listitem').filter({ hasText: 'Mariages 2027' })).toBeVisible();
+      expect(await horizontalOverflow(page)).toBe(0);
+      await page.screenshot({ path: 'e2e/screenshots/brochures-liste-mobile.png' });
+    });
   });
 });

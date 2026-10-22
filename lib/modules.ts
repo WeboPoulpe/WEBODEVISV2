@@ -18,7 +18,7 @@ export const MODULES: AppModule[] = [
     key: 'prospects',
     label: 'Demandes de devis',
     description: 'Formulaire à intégrer au site du traiteur, demandes reçues dans l’app.',
-    routes: ['/prospects'],
+    routes: ['/prospects', '/brochures'],
     standard: true,
   },
   {

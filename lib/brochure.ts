@@ -9,6 +9,7 @@ import { sanitizeHtml } from './sanitize';
 
 export type BrochureStyle = 'editorial' | 'carte' | 'magazine';
 export const BROCHURE_STYLES: BrochureStyle[] = ['editorial', 'carte', 'magazine'];
+export const STYLE_LABELS: Record<BrochureStyle, string> = { editorial: 'Éditorial', carte: 'Carte', magazine: 'Magazine' };
 
 export interface BrochureItem {
   prestationId: string;

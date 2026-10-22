@@ -1,7 +1,7 @@
 import {
   FilePlus2, Library, UploadCloud, Send, UserPlus, Search, Link2, Inbox, CalendarPlus, CalendarRange, History,
   Printer, Plus, ShoppingBasket, Boxes, AlertTriangle, Percent, Carrot, CalendarDays, Truck, ListChecks, Wrench,
-  PackageOpen, LayoutTemplate, FolderTree, Bell, Building2, Users, ClipboardList, Settings, FileText, Wallet,
+  PackageOpen, LayoutTemplate, FolderTree, Bell, Building2, Users, ClipboardList, Settings, FileText, Wallet, BookOpen,
 } from 'lucide-react';
 
 // Mégamenu de la barre latérale : une entrée par page du menu (même `href` que dans components/layout/nav.ts).
@@ -76,6 +76,12 @@ export const NAV_MEGA: Record<string, NavMegaEntry> = {
       { label: 'Mon formulaire', hint: 'Le lien et le code à mettre sur votre site', href: '/prospects?action=formulaire', icon: Link2 },
     ],
     preview: 'prospects',
+  },
+  '/brochures': {
+    summary: 'Vos prestations présentées comme un livre qu’on feuillette, envoyé par lien. La dernière page est un formulaire de demande.',
+    actions: [
+      { label: 'Nouvelle brochure', hint: 'Mariages, entreprises, cocktails…', href: '/brochures?action=nouvelle', icon: BookOpen },
+    ],
   },
   '/journee': {
     summary: 'Les événements d’aujourd’hui et de demain : horaires, lieu, équipe, plats et allergènes. Une fois ouverte, la page reste consultable sans réseau.',
