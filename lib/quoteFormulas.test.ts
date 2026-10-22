@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { chosenFormula, documentForFormula, effectiveLines, formulaPending, parseFormulas, quoteLines } from './quoteFormulas';
-import { formulaTotals, quoteTotalTTC } from './quoteTotals';
+import { formulaTotals, perGuest, quoteFormulaRange, quoteTotalTTC } from './quoteTotals';
 import { linesFromQuote } from './invoices';
 import { generateQuoteHtml, type QuoteHtmlData } from './generateQuoteHtml';
 
@@ -114,5 +114,46 @@ describe('formules : document', () => {
   it('les noms de formule sont échappés', () => {
     const html = generateQuoteHtml(data({ formulas: [{ id: 'x', name: '<img src=x onerror=alert(1)>' }] }));
     expect(html).not.toContain('<img src=x');
+  });
+});
+
+describe('formules : après coup', () => {
+  const data = (formulas: typeof FORMULAS, lines: typeof LINES): QuoteHtmlData => ({
+    companyName: 'T', clientName: 'C', vatRate: 10, guestCount: 50, services: lines, formulas,
+  });
+
+  it('formule supprimée depuis : ses plats restent (devenus communs), seul son titre part', () => {
+    // Document généré avec les deux formules, puis Prestige supprimée sans resynchroniser le document.
+    const html = generateQuoteHtml(data(FORMULAS, LINES));
+    const tradition = [FORMULAS[1]];
+    const shown = documentForFormula(html, tradition, 'tradition');
+    expect(shown).toContain('Menu Prestige');
+    expect(shown).not.toMatch(/webo-formula-title[^>]*data-webo-formula="prestige"/);
+    expect(shown).toContain('Menu Tradition');
+  });
+
+  it('formule sans ligne propre : pas d’en-tête vide dans le tableau', () => {
+    const html = generateQuoteHtml(data([...FORMULAS, { id: 'vide', name: 'Formule Vide' }], LINES));
+    expect(html).not.toMatch(/<tr data-webo-formula="vide"/);
+    expect(html).toContain('Formule Vide');
+  });
+
+  it('prix par personne de chaque formule dans le document', () => {
+    const html = generateQuoteHtml(data(FORMULAS, LINES));
+    // Prestige : (500 + 3000) × 1,1 = 3 850 € pour 50 convives.
+    expect(html).toMatch(/soit 77,00\s€ TTC par personne/);
+  });
+
+  it('« de … à … » tant que rien n’est choisi, puis plus rien', () => {
+    expect(quoteFormulaRange(quote())).toEqual({ min: 2750, max: 3850 });
+    expect(quoteFormulaRange(quote({ chosen_formula_id: 'tradition' }))).toBeNull();
+    expect(quoteFormulaRange(quote({ formulas: [FORMULAS[0]] }))).toBeNull();
+    expect(perGuest(3850, 50)).toBe(77);
+    expect(perGuest(3850, 0)).toBeNull();
+  });
+
+  it('formule retenue à 0 € : le total est 0, pas le montant enregistré d’une autre formule', () => {
+    const free = LINES.map((l) => (l.formula === 'tradition' ? { ...l, unitPrice: 0 } : l.formula ? l : { ...l, unitPrice: 0 }));
+    expect(quoteTotalTTC({ ...quote({ services: free, chosen_formula_id: 'tradition' }), total_amount: 3850 })).toBe(0);
   });
 });

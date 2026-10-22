@@ -28,7 +28,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const QUOTE_SELECT =
-  'id, client_name, event_type, event_date, event_location, guest_count, total_amount, status, services, checklist, event_materials, event_material_checks';
+  'id, client_name, event_type, event_date, event_location, guest_count, total_amount, status, services, checklist, event_materials, event_material_checks, formulas, chosen_formula_id';
 
 export default function EvenementPage() {
   const { id } = useParams<{ id: string }>();

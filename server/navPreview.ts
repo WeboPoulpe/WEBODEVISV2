@@ -8,6 +8,8 @@ import { checklistProgress, materialProgress } from '@/lib/events/prep';
 import { enabledModules } from '@/lib/modules';
 import type { NavPreviewKey } from '@/lib/navMega';
 import { CONFIRMED_STATUSES, PENDING_STATUSES, quoteStatusLabel } from '@/lib/quoteStatus';
+import { quoteLines } from '@/lib/quoteFormulas';
+import { formulaSql } from './formulaColumns';
 import { requireUser } from './session';
 
 // Aperçu vivant du mégamenu de la barre latérale : quelques lignes et un ou deux chiffres par page.
@@ -90,9 +92,9 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
       const week = key === 'calendrier';
       const end = addDays(today, 6);
       const [events, [count], courses, team] = await Promise.all([
-        rows<{ id: string; client_name: string; event_type: string | null; event_date: string; guest_count: number | null; checklist: unknown; event_materials: unknown; event_material_checks: unknown; services: unknown }>(sql`
+        rows<{ id: string; client_name: string; event_type: string | null; event_date: string; guest_count: number | null; checklist: unknown; event_materials: unknown; event_material_checks: unknown; services: unknown; formulas: unknown; chosen_formula_id: string | null }>(sql`
           select q.id, q.client_name, q.event_type, q.event_date::text as event_date, q.guest_count,
-            q.checklist, q.event_materials, q.event_material_checks, q.services
+            q.checklist, q.event_materials, q.event_material_checks, q.services, ${await formulaSql('q')}
           from public.quotes q where ${upcomingConfirmed} ${week ? sql`and q.event_date <= ${end}::date` : sql``}
           order by q.event_date limit 3`),
         rows<{ n: number }>(sql`select count(*)::int as n from public.quotes q where ${upcomingConfirmed} ${week ? sql`and q.event_date <= ${end}::date` : sql``}`),
@@ -111,7 +113,8 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
       ]);
       const pointsOf = (e: (typeof events)[number]) => {
         const check = checklistProgress(e.checklist);
-        const mat = materialProgress(e.event_materials, e.services, e.event_material_checks);
+        // Devis à formules : seules les lignes de la formule retenue sont à préparer (comme le tableau de bord).
+        const mat = materialProgress(e.event_materials, quoteLines(e), e.event_material_checks);
         const c = courses.find((r) => r.quote_id === e.id);
         const t = team.find((r) => r.quote_id === e.id);
         return (check.total - check.done > 0 ? 1 : 0) + (mat.total - mat.done > 0 ? 1 : 0)

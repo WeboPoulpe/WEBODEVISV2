@@ -16,7 +16,7 @@ import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
 import { syncWeboDocument } from '@/lib/weboFinancials';
-import { effectiveLines, parseFormulas } from '@/lib/quoteFormulas';
+import { effectiveLines, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { quoteVatBreakdown, vatRowsForDisplay, resolveGuestSplit } from '@/lib/quoteTotals';
 import VatRateSelect from '@/components/devis/VatRateSelect';
 import CompanySearch from '@/components/clients/CompanySearch';
@@ -362,6 +362,15 @@ export default function QuoteInlineEditor({
   const [client,   setClient]   = useState<ClientInfo>(initialClient);
   const [event,    setEvent]    = useState<EventInfo>(initialEvent);
   const [services, setServices] = useState<ServiceLine[]>(initialServices);
+  // Formules au choix du devis (réglées dans l'éditeur WeboWord) : les totaux ne comptent que la formule retenue
+  // (à défaut, la première), comme partout ailleurs.
+  const [formulaState, setFormulaState] = useState<{ formulas: QuoteFormula[]; chosen: string | null }>({ formulas: [], chosen: null });
+  useEffect(() => {
+    createClient().from('quotes').select('formulas, chosen_formula_id').eq('id', quoteId).maybeSingle().then(({ data, error: err }) => {
+      if (!err && data) setFormulaState({ formulas: parseFormulas(data.formulas), chosen: (data.chosen_formula_id as string | null) ?? null });
+    });
+  }, [quoteId]);
+  const countedLines = effectiveLines(services, formulaState.formulas, formulaState.chosen);
   const [options,  setOptions]  = useState<Options>(initialOptions);
   const [template, setTemplate] = useState<QuoteTemplate>((initialTemplate as QuoteTemplate) ?? 'standard');
 
@@ -388,10 +397,10 @@ export default function QuoteInlineEditor({
 
   // ── Totals ───────────────────────────────────────────────────────────────────
   // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
-  const totals = quoteVatBreakdown(services, options.vatRate);
-  const totalsWithOptions = quoteVatBreakdown(services, options.vatRate, 0, 0, { includeOptions: true });
+  const totals = quoteVatBreakdown(countedLines, options.vatRate);
+  const totalsWithOptions = quoteVatBreakdown(countedLines, options.vatRate, 0, 0, { includeOptions: true });
   const ht     = totals.ht;
-  const optionHt = services.filter((s) => !s.isPageBreak).reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
+  const optionHt = countedLines.filter((s) => !s.isPageBreak).reduce((sum, s) => sum + (s.isOption ? s.quantity * s.unitPrice : 0), 0);
   const ttc    = totals.ttc;
   const vatRows = vatRowsForDisplay(totals, options.vatRate);
 
@@ -472,7 +481,7 @@ export default function QuoteInlineEditor({
   const handleRegenerateWeboWord = async () => {
     if (!user) return;
     setSaving(true); setError(null);
-    const ttc2  = quoteVatBreakdown(services, options.vatRate).ttc;
+    const ttc2  = quoteVatBreakdown(countedLines, options.vatRate).ttc;
     const payload = {
       client_first_name:   client.firstName,
       client_last_name:    client.lastName,

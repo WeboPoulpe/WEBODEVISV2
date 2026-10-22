@@ -35,6 +35,9 @@ export interface EventQuote {
   checklist: ChecklistItem[] | null;
   event_materials: MaterialItem[] | null;
   event_material_checks: string[] | null;
+  /** Formules au choix du devis et formule retenue (voir lib/quoteFormulas.ts). */
+  formulas?: unknown;
+  chosen_formula_id?: string | null;
 }
 
 // ── Erreurs ───────────────────────────────────────────────────────────────────

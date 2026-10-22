@@ -8,7 +8,7 @@
 // Centralisé ici pour que l'éditeur, le PDF (generateQuoteHtml), la sauvegarde
 // WeboWord et la liste des devis calculent tous la MÊME chose.
 
-import { effectiveLines, quoteLines, type QuoteFormula } from './quoteFormulas';
+import { chosenFormula, effectiveLines, parseFormulas, quoteLines, type QuoteFormula } from './quoteFormulas';
 
 export interface PricedLine {
   quantity?: number;
@@ -135,7 +135,33 @@ export function quoteTotalTTC(quote: {
   if (Array.isArray(quote.services) && quote.services.length > 0) {
     const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
     const { ht, ttc } = quoteVatBreakdown(quoteLines<VatLine>(quote), quoteDefaultRate(quote.vat_rate), adults, children);
-    if (ht > 0) return ttc;
+    // Devis à formules : le montant enregistré peut être celui d'une autre formule, il ne sert pas de repli.
+    if (ht > 0 || parseFormulas(quote.formulas).length > 0) return ttc;
   }
   return quote.total_amount == null ? null : Number(quote.total_amount);
+}
+
+/**
+ * Devis à formules sans formule retenue : le total TTC le plus bas et le plus haut des formules (« de … à … »
+ * dans la liste des devis). Null pour un devis sans formule ou dont la formule est retenue.
+ */
+export function quoteFormulaRange(quote: {
+  vat_rate?: number | string | null;
+  guest_count?: number | null;
+  guest_count_adults?: number | null;
+  guest_count_children?: number | null;
+  services: unknown;
+  formulas?: unknown;
+  chosen_formula_id?: string | null;
+}): { min: number; max: number } | null {
+  const formulas = parseFormulas(quote.formulas);
+  if (formulas.length < 2 || chosenFormula(formulas, quote.chosen_formula_id) || !Array.isArray(quote.services)) return null;
+  const { adults, children } = resolveGuestSplit(quote.guest_count, quote.guest_count_adults, quote.guest_count_children);
+  const ttcs = formulaTotals(quote.services as VatLine[], formulas, quoteDefaultRate(quote.vat_rate), adults, children).map((t) => t.totals.ttc);
+  return { min: Math.min(...ttcs), max: Math.max(...ttcs) };
+}
+
+/** Prix TTC par convive (adultes et enfants comptés), ou null sans convive. */
+export function perGuest(ttc: number, guests: number | null | undefined): number | null {
+  return guests && guests > 0 ? ttc / guests : null;
 }

@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import { scaleToGuests } from '@/lib/quoteScale';
+import { parseFormulas } from '@/lib/quoteFormulas';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import { defaultVatRate } from '@/lib/vat';
 
@@ -182,6 +183,8 @@ export default function NouveauDevisOnboarding() {
       const { data: tpl } = await supabase.from('devis_templates').select('*').eq('id', startFrom).maybeSingle();
       if (tpl) {
         const services = scaleToGuests((tpl.services ?? []) as Record<string, unknown>[], guests);
+        // Formules au choix du modèle : le devis les reprend, sans formule retenue.
+        const formulas = parseFormulas(tpl.formulas);
         const html = tpl.content_html ? syncWeboDocument(tpl.content_html, {
           all: {
             companyName: '', clientName: clientName.trim(), clientEmail: clientEmail || null, clientPhone: clientPhone || null,
@@ -190,6 +193,7 @@ export default function NouveauDevisOnboarding() {
             eventType, eventDate, eventLocation: eventLocation || null, guestCount: guests,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             services: services.filter((l) => !l.isPageBreak) as any,
+            formulas,
             vatRate: Number(tpl.vat_rate ?? 20), hidePrice: !!tpl.hide_price, language,
           },
           financials: true,
@@ -198,6 +202,7 @@ export default function NouveauDevisOnboarding() {
         fromTemplate = {
           services, content_html: html, remarks: tpl.remarks ?? null, vat_rate: tpl.vat_rate ?? 20, hide_price: tpl.hide_price ?? false,
           selected_font_size: tpl.selected_font_size || 12, ...(tpl.selected_font ? { selected_font: tpl.selected_font } : {}),
+          ...(formulas.length ? { formulas } : {}),
         };
       }
     }

@@ -362,6 +362,8 @@ export const devis_templates = pgTable("devis_templates", {
 	remarks: text(),
 	vat_rate: numeric().default('20'),
 	hide_price: boolean().default(false),
+	// Formules au choix du devis enregistré comme modèle (voir lib/quoteFormulas.ts), reprises par les devis créés.
+	formulas: jsonb(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [

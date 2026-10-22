@@ -197,6 +197,12 @@ function blocksInRange(el: HTMLElement, range: Range): HTMLElement[] {
 export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBack, selectedFont: initFont, selectedFontSize: initSize, editorSettings: initSettings, updatedAt, formulas = [], chosenFormulaId: initChosen = null }: Props) {
   // Formule retenue (elle peut changer depuis le panneau Prestations sans recharger la page).
   const [chosenFormulaId, setChosenFormulaId] = useState<string | null>(initChosen);
+  // Formule retenue depuis le menu « Statut du devis » (QuoteEditorActions, hors de l'éditeur).
+  useEffect(() => {
+    const onChosen = (e: Event) => setChosenFormulaId((e as CustomEvent<{ id: string | null }>).detail.id);
+    window.addEventListener('weboword:formula-chosen', onChosen);
+    return () => window.removeEventListener('weboword:formula-chosen', onChosen);
+  }, []);
   const router = useRouter();
   const { profile, user } = useAuth();
   const { confirm, notify } = useFeedback();

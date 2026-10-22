@@ -2,12 +2,12 @@
 
 import crypto from 'node:crypto';
 import { headers } from 'next/headers';
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { notifications, profiles, quote_acceptances, quotes } from '@/db/schema';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { quoteAcceptedClientEmail, quoteAcceptedOwnerEmail, type AcceptanceDetails } from '@/lib/mail/templates';
-import { isPending } from '@/lib/quoteStatus';
+import { isPending, PENDING_STATUSES } from '@/lib/quoteStatus';
 import { chosenFormula, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { formulaTotals, quoteDefaultRate, quoteTotalTTC, resolveGuestSplit } from '@/lib/quoteTotals';
 import { acceptanceFormulaName, quoteColumns } from './formulaColumns';
@@ -51,6 +51,8 @@ export interface PublicAcceptance {
 export interface PublicFormula extends QuoteFormula {
   totalHT: number;
   totalTTC: number;
+  /** Prix TTC par convive (adultes et enfants), null sans convive. */
+  perGuestTTC: number | null;
 }
 
 export interface AcceptanceState {
@@ -91,7 +93,7 @@ function publicFormulas(q: QuoteRow): PublicFormula[] {
   const { adults, children } = resolveGuestSplit(q.guest_count, q.guest_count_adults, q.guest_count_children);
   const lines = Array.isArray(q.services) ? q.services : [];
   return formulaTotals(lines, formulas, quoteDefaultRate(q.vat_rate), adults, children)
-    .map(({ formula, totals }) => ({ ...formula, totalHT: totals.ht, totalTTC: totals.ttc }));
+    .map(({ formula, totals }) => ({ ...formula, totalHT: totals.ht, totalTTC: totals.ttc, perGuestTTC: adults + children > 0 ? totals.ttc / (adults + children) : null }));
 }
 
 /** Ce que la page publique doit montrer : bouton d'acceptation, devis expiré ou déjà accepté. */
@@ -183,10 +185,17 @@ export async function acceptQuote(input: {
     await tx.execute(sql`select set_config('app.user_id', ${owner}, true)`);
     // Le devis est mis à jour AVANT l'enregistrement de l'accord : changer la formule retenue rend caduc un accord
     // en cours (déclencheur invalidate_quote_acceptance), pas celui qu'on enregistre ici.
-    await tx.update(quotes).set({
+    // Seulement s'il est encore à signer et tel que le client l'a lu (même date de modification) : deux signatures
+    // simultanées, ou une modification du traiteur entre-temps, ne donnent pas deux accords différents.
+    const updated = await tx.update(quotes).set({
       status: 'valide', updated_at: new Date().toISOString(),
       ...(formula ? { chosen_formula_id: formula.id, total_amount: total == null ? null : total.toFixed(2) } : {}),
-    }).where(eq(quotes.id, q.id));
+    }).where(and(
+      eq(quotes.id, q.id),
+      inArray(quotes.status, PENDING_STATUSES),
+      q.updated_at == null ? isNull(quotes.updated_at) : eq(quotes.updated_at, q.updated_at),
+    )).returning({ id: quotes.id });
+    if (updated.length === 0) return null;
     // Colonnes nommées une à une : celles de la formule n'existent qu'avec la migration 0031.
     const inserted = await tx.execute<{ id: string }>(sql`
       insert into public.quote_acceptances (quote_id, signer_name, signer_role, signature, content_hash, total_ttc, ip, user_agent${formula ? sql`, formula_id, formula_name` : sql``})
@@ -202,6 +211,7 @@ export async function acceptQuote(input: {
     });
     return row.at;
   });
+  if (accepted === null) return { error: 'Ce devis vient d’être modifié ou accepté. Rechargez la page pour voir sa dernière version.' };
 
   // Emails : ils ne bloquent pas l'acceptation s'ils ne partent pas.
   const [p] = await db.select({ company: profiles.company_name, email: profiles.email, companyEmail: profiles.company_email })

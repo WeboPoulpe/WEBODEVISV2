@@ -107,9 +107,14 @@ describe('formules au choix : acceptation en ligne', () => {
     expect(f.lines.map((l) => l.label)).toEqual(['Service en salle', 'Menu Tradition']);
   });
 
-  it('changer ensuite la formule retenue rend l’accord caduc', async () => {
-    expect((await chooseQuoteFormula(quoteId, 'prestige')).error).toBeNull();
-    expect(await quoteRow(quoteId)).toMatchObject({ chosen_formula_id: 'prestige', total_amount: '3850.00' });
+  it('changer ensuite la formule retenue : confirmation demandée, puis accord caduc et devis à signer de nouveau', async () => {
+    // Sans confirmation, rien ne change : l'accord signé porte sur l'autre formule.
+    expect(await chooseQuoteFormula(quoteId, 'prestige')).toEqual({ error: null, needsResign: true });
+    expect((await quoteRow(quoteId)).chosen_formula_id).toBe('tradition');
+    expect((await acceptanceState(TOKEN))!.acceptance).not.toBeNull();
+
+    expect(await chooseQuoteFormula(quoteId, 'prestige', { confirmResign: true })).toMatchObject({ error: null, resigned: true });
+    expect(await quoteRow(quoteId)).toMatchObject({ chosen_formula_id: 'prestige', total_amount: '3850.00', status: 'devis_envoye' });
     expect((await acceptanceState(TOKEN))!.acceptance).toBeNull();
     expect((await pg.query(`select 1 from quote_acceptances where quote_id = $1 and invalidated_at is not null`, [quoteId])).rows).toHaveLength(1);
   });
@@ -131,7 +136,7 @@ describe('formules au choix : retenue par le traiteur', () => {
 
   it('accord par téléphone : la formule retenue fixe le total, le client signe pour elle', async () => {
     current = OWNER;
-    expect(await chooseQuoteFormula(phoneQuoteId, 'prestige')).toEqual({ error: null, totalTTC: 3850 });
+    expect(await chooseQuoteFormula(phoneQuoteId, 'prestige')).toEqual({ error: null, totalTTC: 3850, resigned: false });
     expect((await quoteRow(phoneQuoteId)).total_amount).toBe('3850.00');
     expect((await acceptanceState(TOKEN_PHONE))!.chosenFormulaId).toBe('prestige');
     // Le client ne peut pas signer pour une autre formule que celle retenue par le traiteur.
@@ -139,5 +144,33 @@ describe('formules au choix : retenue par le traiteur', () => {
     expect((await sign(null, TOKEN_PHONE)).error).toBeNull();
     const { rows } = await pg.query<{ formula_id: string }>(`select formula_id from quote_acceptances where quote_id = $1`, [phoneQuoteId]);
     expect(rows[0].formula_id).toBe('prestige');
+  });
+});
+
+describe('formules au choix : garde-fous', () => {
+  const insertQuote = async (token: string) => (await pg.query<{ id: string }>(`
+    insert into quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, vat_rate, services, formulas, share_token, valid_until)
+    values ($1, $1, 'Garde', '2026-12-12', 'mariage', 50, 'devis_envoye', 10, $2::jsonb, $3::jsonb, $4, '2099-01-01') returning id`,
+    [OWNER, JSON.stringify(SERVICES), JSON.stringify(FORMULAS), token])).rows[0].id;
+
+  it('devis facturé (acompte émis) : la formule retenue ne change plus', async () => {
+    current = OWNER;
+    const id = await insertQuote('jeton-garde-facture-0001');
+    expect((await chooseQuoteFormula(id, 'tradition')).error).toBeNull();
+    await pg.query(`insert into customer_invoices (owner_user_id, created_by, quote_id, kind, status, number, seller, buyer, lines)
+      values ($1, $1, $2, 'acompte', 'emise', 'F-TEST-0001', '{}', '{}', '[]')`, [OWNER, id]);
+    expect((await chooseQuoteFormula(id, 'prestige')).error).toMatch(/facture/);
+    expect((await quoteRow(id)).chosen_formula_id).toBe('tradition');
+    // Une facture annulée par un avoir ne bloque plus.
+    await pg.query(`update customer_invoices set status = 'annulee' where quote_id = $1`, [id]);
+    expect((await chooseQuoteFormula(id, 'prestige')).error).toBeNull();
+  });
+
+  it('deux signatures en même temps : une seule est enregistrée', async () => {
+    const id = await insertQuote('jeton-garde-double-0002');
+    const results = await Promise.all([sign('prestige', 'jeton-garde-double-0002'), sign('tradition', 'jeton-garde-double-0002')]);
+    expect(results.filter((r) => r.error === null)).toHaveLength(1);
+    const { rows } = await pg.query(`select 1 from quote_acceptances where quote_id = $1 and invalidated_at is null`, [id]);
+    expect(rows).toHaveLength(1);
   });
 });

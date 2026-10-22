@@ -1,12 +1,14 @@
 import { generateQuoteHtml, generatedTextFragments, type QuoteHtmlData, type QuoteHtmlOptions } from './generateQuoteHtml';
+import { lineFormulaId, parseFormulas } from './quoteFormulas';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Mise à jour ciblée d'un content_html WeboWord déjà mis en forme, SANS tout
 // régénérer :
 //   1) le bloc financier (tableau des prestations + totaux) est remplacé par sa
 //      version fraîche (repéré par [data-webo-financials]) ;
-//   2) le bloc TEXTE des prestations nouvellement ajoutées est ajouté à la fin de
-//      la carte gastronomique (conteneur .gastro-menu) ;
+//   2) le bloc TEXTE des prestations nouvellement ajoutées est ajouté à la carte
+//      gastronomique (conteneur .gastro-menu), puis la carte est rangée par formule
+//      (plats communs, puis chaque formule sous son titre) ;
 //   3) (option `parties`) les cartes Client et Événement sont remplacées par leur
 //      version fraîche ; l'intro et l'en-tête de la carte gastro aussi, mais
 //      seulement s'ils ont encore la forme du texte généré (sinon le traiteur les
@@ -77,6 +79,63 @@ function pickInner(html: string, selector: string): string | null {
   return el ? el.innerHTML : null;
 }
 
+/**
+ * Devis à formules : range les plats de la carte. Chaque plat (bloc div de .gastro-menu, avec ce qui le suit
+ * jusqu'au plat suivant) prend la formule de sa ligne (repère data-webo-dish = nom de la prestation) ; à défaut,
+ * il garde la sienne si elle existe encore, sinon il devient commun. Puis : plats communs, et chaque formule
+ * sous son titre (titres refaits, noms à jour). Sans formule : repères et titres retirés, ordre inchangé.
+ * Le contenu des plats n'est jamais touché. Vrai si la carte a changé.
+ */
+function regroupCarte(doc: Document, all: QuoteHtmlData, opts: QuoteHtmlOptions): boolean {
+  const menu = doc.querySelector('.gastro-menu');
+  if (!menu) return false;
+  const before = menu.innerHTML;
+  const formulas = parseFormulas(all.formulas);
+  const known = new Set(formulas.map((f) => f.id));
+
+  // Formule de chaque ligne, par nom (deux lignes du même nom : dans l'ordre).
+  const byName = new Map<string, (string | null)[]>();
+  for (const s of all.services ?? []) {
+    if (!s?.name || s.removed) continue;
+    const list = byName.get(s.name) ?? [];
+    list.push(lineFormulaId(s, formulas));
+    byName.set(s.name, list);
+  }
+
+  // Blocs : un plat (div) et ce qui le suit ; ce qui précède le premier plat reste en tête.
+  const head: Element[] = [];
+  const units: { els: Element[]; formula: string | null }[] = [];
+  for (const child of Array.from(menu.children)) {
+    if (child.classList.contains('webo-formula-title')) { child.remove(); continue; }
+    if (child.tagName !== 'DIV') { (units.length ? units[units.length - 1].els : head).push(child); continue; }
+    const name = child.getAttribute('data-webo-dish');
+    const queue = name != null ? byName.get(name) : undefined;
+    const own = child.getAttribute('data-webo-formula');
+    const formula = queue && queue.length ? queue.shift()! : (own && known.has(own) ? own : null);
+    if (formula) child.setAttribute('data-webo-formula', formula); else child.removeAttribute('data-webo-formula');
+    units.push({ els: [child], formula });
+  }
+
+  if (formulas.length === 0) return menu.innerHTML !== before;
+
+  // Titres frais (nom, mention « à choisir »), tels que le générateur les écrit.
+  const fresh = new DOMParser().parseFromString(generateQuoteHtml(all, opts), 'text/html');
+  const titleOf = (id: string): Element | null => {
+    const t = Array.from(fresh.querySelectorAll('.gastro-menu .webo-formula-title')).find((el) => el.getAttribute('data-webo-formula') === id);
+    return t ? doc.importNode(t, true) : null;
+  };
+  const order: Element[] = [...head, ...units.filter((u) => !u.formula).flatMap((u) => u.els)];
+  for (const f of formulas) {
+    const own = units.filter((u) => u.formula === f.id);
+    if (own.length === 0) continue;
+    const title = titleOf(f.id);
+    if (title) order.push(title);
+    order.push(...own.flatMap((u) => u.els));
+  }
+  for (const el of order) menu.appendChild(el);
+  return menu.innerHTML !== before;
+}
+
 export function syncWeboDocument(
   existingHtml: string,
   input: WeboSyncInput,
@@ -139,6 +198,9 @@ export function syncWeboDocument(
       }
     }
   }
+
+  // ── 2 bis) Carte rangée par formule (lignes déplacées, formules ajoutées, renommées ou supprimées) ──
+  if (input.financials !== false && regroupCarte(doc, input.all, opts)) changed = true;
 
   // ── 3) Client / Événement (+ intro et en-tête de carte si non retouchés) ────
   if (input.parties) {

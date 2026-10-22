@@ -21,7 +21,8 @@ import Sheet, { SheetTabs } from '@/components/ui/Sheet';
 import { useAuth } from '@/context/AuthContext';
 import ImportDevisModal from '@/components/devis/ImportDevisModal';
 import FinanceSheet from '@/components/devis/FinanceSheet';
-import { quoteTotalTTC } from '@/lib/quoteTotals';
+import { quoteFormulaRange, quoteTotalTTC } from '@/lib/quoteTotals';
+import { useFormulaGate } from '@/components/devis/FormulaGate';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { PENDING_STATUSES, CONFIRMED_STATUSES, REJECTED_STATUSES, QUOTE_STATUSES, QUOTE_STATUS_LABELS } from '@/lib/quoteStatus';
 import { QuoteFolder, descendantIds, folderCounts, folderPathLabel } from '@/lib/quoteFolders';
@@ -123,6 +124,17 @@ function quoteDisplayName(q: { internal_name?: string | null; client_name?: stri
 // Total TTC hors options, au vrai taux de TVA du devis (partagé avec le tableau de bord).
 const computeQuoteTotal = quoteTotalTTC;
 
+/**
+ * Montant affiché d'un devis : « 4 500 € – 6 200 € » tant que le client n'a pas choisi entre plusieurs formules
+ * (tri et totaux de colonne gardent la première formule), sinon le total TTC. Null : devis non chiffré.
+ */
+function amountLabel(q: Quote): string | null {
+  const range = quoteFormulaRange(q);
+  if (range && range.max > 0) return range.min === range.max ? formatCurrency(range.min) : `${formatCurrency(range.min)} – ${formatCurrency(range.max)}`;
+  const t = computeQuoteTotal(q);
+  return t ? formatCurrency(t) : null;
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 const EVENT_ICONS: Record<string, React.ElementType> = {
   mariage: Heart, anniversaire: PartyPopper, dîner: UtensilsCrossed, diner: UtensilsCrossed,
@@ -213,9 +225,11 @@ interface ProspectResult {
 
 // ── Commercial Sheet ──────────────────────────────────────────────────────────
 function DevisSheet({
-  quote, onClose, onStatusChange, onDelete, onDuplicate, onProspectLinked, onRenamed, folderLabel, onMoveFolder, onBill,
+  quote, onClose, onStatusChange, beforeStatus, onDelete, onDuplicate, onProspectLinked, onRenamed, folderLabel, onMoveFolder, onBill,
 }: {
-  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void; onBill: () => void;
+  quote: Quote; onClose: () => void; onStatusChange: (id: string, status: string) => void;
+  /** Avant un changement de statut : formule demandée pour un devis à formules qu'on valide. Faux : on n'y touche pas. */
+  beforeStatus: (q: Quote, status: string) => Promise<boolean>; onDelete: (id: string) => void; onDuplicate: (id: string) => void; onProspectLinked: (quoteId: string, prospectId: string) => void; onRenamed: (id: string, name: string | null) => void; folderLabel: string; onMoveFolder: () => void; onBill: () => void;
 }) {
   const [tab, setTab] = useState<'apercu' | 'suivi' | 'historique'>('apercu');
   const { notify } = useFeedback();
@@ -275,6 +289,7 @@ function DevisSheet({
   const sheetChosen = chosenFormula(sheetFormulas, quote.chosen_formula_id)?.id ?? null;
 
   const handleStatusChange = async (s: string) => {
+    if (!(await beforeStatus(quote, s))) return;
     setSavingStatus(true);
     const supabase = createClient();
     await supabase.from('quotes').update({ status: s }).eq('id', quote.id);
@@ -471,10 +486,13 @@ function DevisSheet({
                 })}
               </div>
               {sheetFormulas.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1.5">
+                <p className={cn('text-xs mt-1.5', !sheetChosen && isConfirmed(status) ? 'text-amber-700' : 'text-gray-500')}>
                   {sheetChosen
                     ? `Formule retenue : ${sheetFormulas.find((f) => f.id === sheetChosen)?.name ?? ''}.`
-                    : 'Plusieurs formules au choix : le client choisira la sienne en signant.'}
+                    : isConfirmed(status)
+                      // Devis validé avant que la formule soit demandée au passage : rien n'est choisi.
+                      ? `Devis validé sans formule retenue : les courses, la production et les marges comptent « ${sheetFormulas[0].name} ». Retenez la bonne dans l’éditeur, panneau Prestations.`
+                      : 'Plusieurs formules au choix : le client choisira la sienne en signant.'}
                 </p>
               )}
             </div>
@@ -497,10 +515,10 @@ function DevisSheet({
               </p>
             </div>
           )}
-          {(() => { const t = computeQuoteTotal(quote); return t ? (
+          {(() => { const t = amountLabel(quote); return t ? (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-              <span className="text-sm text-gray-600">Total TTC</span>
-              <span className="text-lg font-bold text-gray-900">{formatCurrency(t)}</span>
+              <span className="text-sm text-gray-600">{quoteFormulaRange(quote) ? 'Total TTC selon la formule' : 'Total TTC'}</span>
+              <span className="text-lg font-bold text-gray-900">{t}</span>
             </div>
           ) : null; })()}
           {/* Facturation : factures du devis et « Facturer » pour un devis confirmé */}
@@ -625,7 +643,7 @@ function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, fol
   quote: Quote; onOpen: () => void; onMenu: () => void; onDragStart: (item: DragItem) => void; onDragEnd: () => void; dragging: boolean; folderLabel: string;
   selected: boolean; onToggle: () => void;
 }) {
-  const total = computeQuoteTotal(quote);
+  const total = amountLabel(quote);
   return (
     <li
       draggable
@@ -652,12 +670,12 @@ function QuoteRow({ quote, onOpen, onMenu, onDragStart, onDragEnd, dragging, fol
           </span>
           <span className="flex items-center gap-2 mt-2 lg:hidden">
             <StatusPill status={quote.status} />
-            {total ? <span className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(total)}</span> : null}
+            {total ? <span className="text-sm font-semibold text-gray-900 tabular-nums">{total}</span> : null}
           </span>
         </span>
         <span className="hidden lg:block w-40 flex-shrink-0"><StatusPill status={quote.status} /></span>
         <span className="hidden lg:block w-36 flex-shrink-0 text-right font-display font-bold text-gray-900 tabular-nums">
-          {total ? formatCurrency(total) : <span className="font-sans font-normal text-gray-400">Non chiffré</span>}
+          {total ?? <span className="font-sans font-normal text-gray-400">Non chiffré</span>}
         </span>
       </button>
       <button onClick={onMenu} className={cn(iconBtn, 'mr-2')} aria-label={`Actions pour ${quoteDisplayName(quote)}`}>
@@ -691,9 +709,9 @@ function ProspectRow({ p, onStatus, onConvert }: { p: ProspectLite; onStatus: (i
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 function PipelineView({
-  quotes, prospects, onStatusChange, onOpenSheet, onDuplicate, onProspectStatus, onConvertProspect, onMove,
+  quotes, prospects, onStatusChange, beforeStatus, onOpenSheet, onDuplicate, onProspectStatus, onConvertProspect, onMove,
 }: {
-  quotes: Quote[]; prospects: ProspectLite[]; onStatusChange: (id: string, s: string) => void; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void; onProspectStatus: (id: string, s: string) => void; onConvertProspect: (id: string) => void; onMove: (q: Quote) => void;
+  quotes: Quote[]; prospects: ProspectLite[]; onStatusChange: (id: string, s: string) => void; beforeStatus: (q: Quote, status: string) => Promise<boolean>; onOpenSheet: (q: Quote) => void; onDuplicate: (id: string) => void; onProspectStatus: (id: string, s: string) => void; onConvertProspect: (id: string) => void; onMove: (q: Quote) => void;
 }) {
   // useRef for draggingId so async handleDrop always reads the current value
   // (avoids stale closure bug when the React re-render hasn't happened yet on fast drags)
@@ -704,6 +722,11 @@ function PipelineView({
   const handleDrop = async (targetStatus: string) => {
     const id = draggingIdRef.current;
     if (!id) return;
+    const dropped = quotes.find((q) => q.id === id);
+    if (dropped && !(await beforeStatus(dropped, targetStatus))) {
+      draggingIdRef.current = null; setDraggingId(null); setDraggingOver(null);
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase.from('quotes').update({ status: targetStatus }).eq('id', id);
     if (!error) {
@@ -771,7 +794,7 @@ function PipelineView({
                     </div>
                     {q.event_date && <p className="text-[10px] text-gray-400 flex items-center gap-1 mb-1.5"><CalendarDays className="h-2.5 w-2.5" />{formatDate(q.event_date)}</p>}
                     <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-gray-100">
-                      {(() => { const t = computeQuoteTotal(q); return t ? <p className="text-xs font-bold text-gray-900 tabular-nums">{formatCurrency(t)}</p> : <span />; })()}
+                      {(() => { const t = amountLabel(q); return t ? <p className="text-xs font-bold text-gray-900 tabular-nums">{t}</p> : <span />; })()}
                       <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => onOpenSheet(q)} title="Aperçu" className="p-1 text-gray-300 hover:text-primary hover:bg-primary-50 rounded transition-colors"><Eye className="h-3 w-3" /></button>
                         <Link href={`/devis/${q.id}/imprimer`} target="_blank" title="PDF" className="p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"><Printer className="h-3 w-3" /></Link>
@@ -958,6 +981,18 @@ export default function DevisPage() {
     setSheetQuote((prev) => prev?.id === id ? { ...prev, status } : prev);
   }, []);
 
+  // Devis à formules validé sans formule : la fenêtre la demande, et la liste prend la formule retenue.
+  const { gate: formulaGate, dialog: formulaDialog } = useFormulaGate();
+  const beforeStatus = useCallback(async (q: Quote, status: string) => {
+    const res = await formulaGate({ ...q, label: quoteDisplayName(q) }, status);
+    if (res.chosen) {
+      const chosen = res.chosen;
+      setQuotes((prev) => prev.map((x) => (x.id === q.id ? { ...x, chosen_formula_id: chosen } : x)));
+      setSheetQuote((prev) => (prev?.id === q.id ? { ...prev, chosen_formula_id: chosen } : prev));
+    }
+    return res.ok;
+  }, [formulaGate]);
+
   const handleProspectLinked = useCallback((id: string, pid: string) => {
     setQuotes((prev) => prev.map((q) => q.id === id ? { ...q, prospect_id: pid } : q));
     setSheetQuote((prev) => prev?.id === id ? { ...prev, prospect_id: pid } : prev);
@@ -1067,8 +1102,12 @@ export default function DevisPage() {
   // ── Actions groupées ───────────────────────────────────────────────────────
   const clearSelection = useCallback(() => { setSelectedIds(new Set()); setBulkError(null); }, []);
 
-  const bulkSetStatus = useCallback(async (targets: Quote[], status: string) => {
-    if (targets.length === 0 || !status) return;
+  const bulkSetStatus = useCallback(async (all: Quote[], status: string) => {
+    if (all.length === 0 || !status) return;
+    // Devis à formules : la formule est demandée pour chacun ; un devis laissé sans choix garde son statut.
+    const targets: Quote[] = [];
+    for (const q of all) if (await beforeStatus(q, status)) targets.push(q);
+    if (targets.length === 0) return;
     setBulkBusy(true); setBulkError(null);
     const supabase = createClient();
     const ids = targets.map((q) => q.id);
@@ -1085,7 +1124,7 @@ export default function DevisPage() {
     setQuotes((prev) => prev.map((q) => (idSet.has(q.id) ? { ...q, status } : q)));
     setBulkBusy(false);
     clearSelection();
-  }, [clearSelection]);
+  }, [clearSelection, beforeStatus]);
 
   const bulkMove = useCallback(async (targets: Quote[], folderId: string | null) => {
     if (targets.length === 0) return;
@@ -1261,7 +1300,7 @@ export default function DevisPage() {
       )}
 
       {view === 'pipeline' ? (
-        <PipelineView quotes={base} prospects={scopedProspects} onStatusChange={handleStatusChange} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} onMove={(q) => setMoveQuote(q)} />
+        <PipelineView quotes={base} prospects={scopedProspects} onStatusChange={handleStatusChange} beforeStatus={beforeStatus} onOpenSheet={(q) => setSheetQuote(q)} onDuplicate={handleDuplicate} onProspectStatus={handleProspectStatus} onConvertProspect={handleConvertProspect} onMove={(q) => setMoveQuote(q)} />
       ) : (
         <>
           {/* Volets */}
@@ -1425,8 +1464,10 @@ export default function DevisPage() {
         </Modal>
       )}
 
+      {formulaDialog}
+
       {sheetQuote && (
-        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked}
+        <DevisSheet quote={sheetQuote} onClose={() => setSheetQuote(null)} onStatusChange={handleStatusChange} beforeStatus={beforeStatus} onDelete={handleDelete} onDuplicate={handleDuplicate} onProspectLinked={handleProspectLinked}
           folderLabel={folderLabelOf(sheetQuote)}
           onMoveFolder={() => setMoveQuote(sheetQuote)}
           onBill={() => setBillQuote(sheetQuote)}

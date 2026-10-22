@@ -150,6 +150,7 @@ const T = {
     remarques: 'REMARQUES',
     cgv: 'Conditions Générales de Vente',
     aChoisir: 'à choisir',
+    parPersonne: 'TTC par personne',
     formulesNote: 'Formules au choix : le total dépend de la formule retenue.',
     formuleRetenue: 'Formule retenue',
   },
@@ -188,6 +189,7 @@ const T = {
     remarques: 'REMARKS',
     cgv: 'Terms & Conditions',
     aChoisir: 'to be chosen',
+    parPersonne: 'per guest, incl. VAT',
     formulesNote: 'Choice of packages: the total depends on the package selected.',
     formuleRetenue: 'Selected package',
   },
@@ -368,7 +370,11 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   const tableRows = shownFormulas.length === 0
     ? activeServices.map(tableRow).join('')
     : activeServices.filter((s) => !formulaOf(s)).map(tableRow).join('')
-      + shownFormulas.map((f) => formulaHeaderRow(f) + activeServices.filter((s) => formulaOf(s) === f.id).map(tableRow).join('')).join('');
+      + shownFormulas.map((f) => {
+        // Une formule sans ligne propre n'a pas d'en-tête vide dans le tableau (son total reste affiché).
+        const own = activeServices.filter((s) => formulaOf(s) === f.id);
+        return own.length ? formulaHeaderRow(f) + own.map(tableRow).join('') : '';
+      }).join('');
 
   // ── Menu items Page 2 — use gastroCardHtml if available, otherwise fallback ──
   // Chaque plat porte data-webo-dish (nom de la prestation, déjà échappé) : l'éditeur s'en sert pour renvoyer sa
@@ -404,6 +410,8 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       }).join('');
 
   // ── Totaux : un bloc pour le devis, ou un bloc par formule (lignes communes + lignes de la formule) ──
+  // Convives (adultes et enfants) : prix par personne de chaque formule, pour comparer.
+  const guests = adults + children;
   const totalsBox = (lines: QuoteHtmlData['services'], f?: QuoteFormula) => {
     const { totals, htSansOption, ttc, optionHt, ttcAvecOptions } = totalsOf(lines);
     // Une ligne de TVA par taux présent (au moins une, au taux du devis, si le devis est vide).
@@ -425,6 +433,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       <div style="display:flex;justify-content:space-between;gap:14px;font-size:15px;font-weight:bold;color:${accentColor};">
         <span>${t.totalTtc}</span><span>${m(ttc)}</span>
       </div>
+      ${f && guests > 0 ? `<div style="margin-top:3px;font-size:11px;color:#888;text-align:right;">${lang === 'en' ? '' : 'soit '}${m(ttc / guests)} ${t.parPersonne}</div>` : ''}
       ${optionHt > 0 ? `
       <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${lightBorder};">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;">

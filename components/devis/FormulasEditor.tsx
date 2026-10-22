@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Copy, Loader2, Plus, Trash2 } from 'lucide-react';
 import { chooseQuoteFormula } from '@/server/quoteFormulas';
 import { MAX_FORMULAS, newFormulaId, type QuoteFormula } from '@/lib/quoteFormulas';
 import type { VatBreakdown } from '@/lib/quoteTotals';
@@ -9,13 +9,18 @@ import { useFeedback } from '@/components/ui/Feedback';
 
 const euros = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
 
-// Formules au choix d'un devis, dans le panneau Prestations de l'éditeur : ajouter, renommer, supprimer une
-// formule, voir son total, et retenir celle du client quand il a donné son accord autrement qu'en ligne.
+// Formules au choix d'un devis, dans le panneau Prestations de l'éditeur : ajouter, dupliquer (avec ses lignes),
+// renommer, supprimer une formule, voir son total et son prix par convive, et retenir celle du client quand il a
+// donné son accord autrement qu'en ligne.
 // Les lignes se rangent dans une formule depuis leur carte (liste « Formule »).
-export default function FormulasEditor({ quoteId, formulas, onFormulasChange, totals, hidePrice, chosenFormulaId, dirty, onChosen }: {
+export default function FormulasEditor({ quoteId, formulas, onFormulasChange, onDuplicate, guests, totals, hidePrice, chosenFormulaId, dirty, onChosen }: {
   quoteId: string;
   formulas: QuoteFormula[];
   onFormulasChange: (next: QuoteFormula[]) => void;
+  /** Nouvelle formule copiée de celle-ci, avec une copie de ses lignes. */
+  onDuplicate: (f: QuoteFormula) => void;
+  /** Convives (adultes et enfants), pour le prix par personne. */
+  guests: number;
   /** Total de chaque formule (lignes communes comprises). */
   totals: { formula: QuoteFormula; totals: VatBreakdown }[];
   hidePrice: boolean;
@@ -42,18 +47,28 @@ export default function FormulasEditor({ quoteId, formulas, onFormulasChange, to
 
   const choose = async (id: string | null) => {
     if (id === chosenFormulaId) return;
-    if (chosenFormulaId && !(await confirm({
-      title: 'Changer la formule retenue ?',
-      message: 'Si le client a déjà signé en ligne, son accord portait sur l’autre formule : il ne sera plus valable.',
-      confirmLabel: 'Changer',
-    }))) return;
     setBusy(true);
     try {
-      const res = await chooseQuoteFormula(quoteId, id);
+      let res = await chooseQuoteFormula(quoteId, id);
+      // Devis signé en ligne : l'accord portait sur l'autre formule ; il faut le dire avant de le rendre caduc.
+      if (res.needsResign) {
+        const ok = await confirm({
+          title: 'Le client a déjà signé ce devis',
+          message: 'Son accord porte sur la formule qu’il a choisie. Si vous changez de formule, cet accord ne sera plus valable : le devis repasse « envoyé » et le client devra le signer de nouveau.',
+          confirmLabel: 'Changer et faire re-signer',
+          danger: true,
+        });
+        if (!ok) return;
+        res = await chooseQuoteFormula(quoteId, id, { confirmResign: true });
+      }
       if (res.error) { notify(res.error, { tone: 'error' }); return; }
       onChosen(id);
       const f = formulas.find((x) => x.id === id);
-      notify(f ? `Formule « ${f.name} » retenue : le devis prend son total.` : 'Plus de formule retenue : le client choisira en signant.', { tone: 'success' });
+      notify(
+        (f ? `Formule « ${f.name} » retenue : le devis prend son total.` : 'Plus de formule retenue : le client choisira en signant.')
+          + (res.resigned ? ' Le devis est de nouveau à signer.' : ''),
+        { tone: 'success' },
+      );
     } catch {
       notify('La formule n’a pas pu être retenue. Vérifiez votre connexion et vos droits, puis réessayez.', { tone: 'error' });
     } finally {
@@ -75,7 +90,17 @@ export default function FormulasEditor({ quoteId, formulas, onFormulasChange, to
           <div className="flex items-center gap-1.5">
             <input value={f.name} maxLength={80} onChange={(e) => update(f.id, { name: e.target.value })}
               placeholder="Nom de la formule" aria-label="Nom de la formule" className={`${inputCls} text-xs font-medium flex-1 py-1.5`} />
-            {!hidePrice && <span className="text-xs font-semibold tabular-nums text-gray-700 whitespace-nowrap">{euros(ttcOf(f.id))}</span>}
+            {!hidePrice && (
+              <span className="text-right leading-tight whitespace-nowrap">
+                <span className="block text-xs font-semibold tabular-nums text-gray-700">{euros(ttcOf(f.id))}</span>
+                {guests > 0 && <span className="block text-[10px] tabular-nums text-gray-500">{euros(ttcOf(f.id) / guests)} / pers.</span>}
+              </span>
+            )}
+            {formulas.length < MAX_FORMULAS && (
+              <button type="button" onClick={() => onDuplicate(f)} title="Dupliquer la formule, avec ses lignes" aria-label={`Dupliquer « ${f.name} »`} className="p-1 text-gray-300 hover:text-primary hover:bg-primary-50 rounded">
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button type="button" onClick={() => remove(f)} title="Supprimer la formule" className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded">
               <Trash2 className="h-3.5 w-3.5" />
             </button>

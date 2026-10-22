@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { formulaTotals, quoteVatBreakdown, resolveGuestSplit } from '@/lib/quoteTotals';
 import FormulasEditor from './FormulasEditor';
-import { effectiveLines, lineFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
+import { effectiveLines, lineFormulaId, newFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import RecipientPicker from '@/components/devis/RecipientPicker';
 import CompanySearch from '@/components/clients/CompanySearch';
@@ -175,6 +175,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [editingServicePhotoIdx, setEditingServicePhotoIdx] = useState<number | null>(null);
+  // Lignes cochées pour être rangées ensemble dans une formule (index ; vidé quand l'ordre ou la liste change).
+  const [picked, setPicked] = useState<Set<number>>(new Set());
 
   const onDragStart = (e: React.DragEvent, idx: number) => {
     setDragIdx(idx);
@@ -196,6 +198,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       arr.splice(idx, 0, moved);
       return arr;
     });
+    setPicked(new Set());
     setDragIdx(null);
     setDragOverIdx(null);
   };
@@ -415,7 +418,13 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // TVA ventilée par taux : chaque ligne a le sien, sinon le taux par défaut du devis.
     // Devis à formules : le total de la formule retenue (à défaut, de la première).
     const formulaIds = new Set(formulas.map((f) => f.id));
-    const keptChoice = chosenFormulaId && formulaIds.has(chosenFormulaId) ? chosenFormulaId : null;
+    // Formule retenue relue au moment d'appliquer : le client a pu signer pendant que le panneau était ouvert.
+    let currentChoice = chosenFormulaId;
+    if (formulasSupported) {
+      const { data: now } = await createClient().from('quotes').select('chosen_formula_id').eq('id', quoteId).maybeSingle();
+      if (now) currentChoice = (now.chosen_formula_id as string | null) ?? null;
+    }
+    const keptChoice = currentChoice && formulaIds.has(currentChoice) ? currentChoice : null;
     const totalTtc = quoteVatBreakdown(effectiveLines(services, formulas, keptChoice), vatRate, adults, children).ttc;
 
     // ⚠️ On NE régénère JAMAIS tout le document WeboWord : le texte mis en forme
@@ -450,7 +459,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       language,
       services,
       // Formules : seulement quand la base les connaît (migration 0031). Une formule retenue puis supprimée ne l'est plus.
-      ...(formulasSupported ? { formulas: formulas.length ? parseFormulas(formulas) : null, ...(keptChoice !== chosenFormulaId ? { chosen_formula_id: keptChoice } : {}) } : {}),
+      ...(formulasSupported ? { formulas: formulas.length ? parseFormulas(formulas) : null, ...(keptChoice !== currentChoice ? { chosen_formula_id: keptChoice } : {}) } : {}),
     };
 
     // Si les données financières ont changé (ajout/suppr/qté/prix, couverts, TVA…),
@@ -711,6 +720,14 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                           return rest;
                         }));
                       }}
+                      onDuplicate={(f) => {
+                        // Nouvelle formule juste après l'originale, avec une copie de chacune de ses lignes.
+                        const copy: QuoteFormula = { id: newFormulaId(), name: `${f.name} (copie)`.slice(0, 80), ...(f.description ? { description: f.description } : {}) };
+                        setFormulas((prev) => { const i = prev.findIndex((x) => x.id === f.id); const next = [...prev]; next.splice(i + 1, 0, copy); return next; });
+                        setServices((prev) => [...prev, ...prev.filter((s) => s.formula === f.id && !s.removed).map((s) => ({ ...s, id: crypto.randomUUID(), formula: copy.id }))]);
+                        setPicked(new Set());
+                      }}
+                      guests={guestSplit.adults + guestSplit.children}
                       totals={formulaTotals(services, formulas, vatRate, guestSplit.adults, guestSplit.children)}
                       hidePrice={hidePrice}
                       chosenFormulaId={chosenFormulaId}
@@ -725,7 +742,33 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                       <p className="text-xs text-gray-400 italic text-center py-4">Aucune prestation</p>
                     ) : (
                       <>
-                        <p className="text-xs text-gray-500">Glissez une prestation pour changer son ordre.</p>
+                        <p className="text-xs text-gray-500">Glissez une prestation pour changer son ordre.{formulas.length > 0 && ' Cochez-en plusieurs pour les ranger ensemble dans une formule.'}</p>
+                        {formulas.length > 0 && picked.size > 0 && (
+                          <div className="sticky top-0 z-10 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-50 px-3 py-2">
+                            <span className="text-xs font-medium text-gray-700 whitespace-nowrap">{picked.size} ligne{picked.size > 1 ? 's' : ''}</span>
+                            <select
+                              value="__"
+                              aria-label="Ranger les lignes cochées dans"
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === '__') return;
+                                setServices((prev) => prev.map((s, i) => {
+                                  if (!picked.has(i)) return s;
+                                  const next: Service = { ...s, formula: v };
+                                  if (!v) delete next.formula;
+                                  return next;
+                                }));
+                                setPicked(new Set());
+                              }}
+                              className={`${inputCls} text-xs py-1 flex-1`}
+                            >
+                              <option value="__" disabled>Ranger dans…</option>
+                              <option value="">Commune à toutes les formules</option>
+                              {formulas.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                            </select>
+                            <button type="button" onClick={() => setPicked(new Set())} className="text-xs text-gray-500 hover:text-gray-700">Annuler</button>
+                          </div>
+                        )}
                         {services.map((svc, idx) => (
                         <div
                           key={svc.id || idx}
@@ -746,13 +789,22 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                             <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-primary mt-1.5 flex-shrink-0" title="Glisser pour réordonner">
                               <GripVertical className="h-4 w-4" />
                             </div>
+                            {formulas.length > 0 && (
+                              <input
+                                type="checkbox"
+                                checked={picked.has(idx)}
+                                onChange={() => setPicked((prev) => { const next = new Set(prev); if (next.has(idx)) next.delete(idx); else next.add(idx); return next; })}
+                                aria-label={`Cocher « ${svc.name || 'ligne'} » pour la ranger dans une formule`}
+                                className="mt-2 h-3.5 w-3.5 flex-shrink-0 accent-primary"
+                              />
+                            )}
                             <input
                               value={svc.name}
                               onChange={(e) => setServices((prev) => prev.map((s, i) => i === idx ? { ...s, name: e.target.value } : s))}
                               placeholder="Nom de la prestation"
                               className={`${inputCls} text-xs font-medium flex-1`}
                             />
-                            <button onClick={() => setServices((prev) => prev.filter((_, i) => i !== idx))}
+                            <button onClick={() => { setServices((prev) => prev.filter((_, i) => i !== idx)); setPicked(new Set()); }}
                               className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>

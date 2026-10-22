@@ -11,6 +11,7 @@ import PrintBreaks from '@/components/devis/PrintBreaks';
 import { documentHasCgv } from '@/lib/cgvDetect';
 import { appResetCss, documentFonts, googleFontsHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 import { documentForFormula, parseFormulas, quoteLines } from '@/lib/quoteFormulas';
+import { generateQuoteHtml, type QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 
 /** Accord signé en ligne par le client, imprimé à la fin du document. */
 export interface QuoteRenderAcceptance {
@@ -45,12 +46,33 @@ export interface QuoteRenderProfile extends LegalProfile {
   cgv?: string | null;
 }
 
+/** Document généré depuis les données du devis (comme « Régénérer le document » dans l'éditeur). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function generatedDocument(q: any, profile: QuoteRenderProfile | null): string {
+  const name = (q.client_first_name && q.client_last_name) ? `${q.client_first_name} ${q.client_last_name}`.trim() : (q.client_name ?? '');
+  return generateQuoteHtml({
+    companyName: profile?.company_name ?? 'Votre entreprise', clientName: name || 'Client',
+    clientEmail: q.client_email ?? null, clientPhone: q.client_phone ?? null, clientAddress: q.client_address ?? null,
+    eventType: q.event_type ?? null, eventDate: q.event_date ?? null, eventLocation: q.event_location ?? null,
+    guestCount: q.guest_count ?? null, guestCountAdults: q.guest_count_adults ?? null, guestCountChildren: q.guest_count_children ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    services: (Array.isArray(q.services) ? q.services : []).filter((s: any) => !s?.isPageBreak),
+    formulas: parseFormulas(q.formulas), vatRate: Number(q.vat_rate ?? 20), remarks: q.remarks ?? null, hidePrice: !!q.hide_price,
+    cgv: profile?.cgv ?? null, language: q.language === 'en' ? 'en' : 'fr',
+  }, { template: (q.template ?? 'standard') as QuoteHtmlOptions['template'], font: q.selected_font ?? undefined });
+}
+
 /**
  * Le document d'un devis, tel qu'il est imprimé et tel que le client le consulte en ligne.
  * Une seule version du rendu : la page d'impression et la page publique l'utilisent toutes les deux.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function QuoteRender({ quote, profile, acceptance = null }: { quote: any; profile: QuoteRenderProfile | null; acceptance?: QuoteRenderAcceptance | null }) {
+export default function QuoteRender({ quote: source, profile, acceptance = null }: { quote: any; profile: QuoteRenderProfile | null; acceptance?: QuoteRenderAcceptance | null }) {
+  // Devis à formules sans document mis en forme (document effacé puis jamais réenregistré) : l'ancien rendu ne
+  // présenterait qu'une formule ; le document généré les présente toutes, comme le client doit les comparer.
+  const quote = !source.content_html && parseFormulas(source.formulas).length > 0
+    ? { ...source, content_html: generatedDocument(source, profile) }
+    : source;
   // ── Devis rédigé dans l'éditeur : son contenu est rendu tel quel ─────────────
   if (quote.content_html) {
     const settings = outputSettings(quote);

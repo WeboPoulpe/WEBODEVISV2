@@ -44,10 +44,13 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
   const [templateName, setTemplateName] = useState('');
   // Formules au choix du devis copié (migration 0031 ; null sans elles) : la copie les reprend, sans formule retenue.
   const [formulas, setFormulas] = useState<QuoteFormula[] | null>(null);
+  // Lecture des formules terminée (réussie ou non) : sans elle, la copie compterait toutes les formules à la fois.
+  const [formulasRead, setFormulasRead] = useState(false);
 
   useEffect(() => {
     createClient().from('quotes').select('formulas').eq('id', quoteId).maybeSingle().then(({ data, error: err }) => {
       if (!err) setFormulas(parseFormulas(data?.formulas));
+      setFormulasRead(true);
     });
     createClient().from('quotes').select(SOURCE_COLUMNS).eq('id', quoteId).single().then(({ data, error: err }) => {
       if (err || !data) { setError('Ce devis n’a pas pu être lu. Fermez et réessayez.'); return; }
@@ -72,7 +75,7 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
   }, [search, otherClient]);
 
   const create = async () => {
-    if (!source) return;
+    if (!source || !formulasRead) return;
     if (otherClient && !customer) { setError('Choisissez le client du nouveau devis, ou gardez le même.'); return; }
     setSaving(true); setError(null);
     const supabase = createClient();
@@ -134,6 +137,7 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
         user_id: userId, name: templateName.trim(), services: source.services ?? [], content_html: source.content_html,
         template: source.template || 'classique', selected_font: source.selected_font, selected_font_size: source.selected_font_size || 12,
         remarks: source.remarks ?? null, vat_rate: source.vat_rate ?? 20, hide_price: source.hide_price ?? false,
+        ...(formulas && formulas.length ? { formulas } : {}),
       });
     }
 
@@ -167,7 +171,7 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
       onClose={() => !saving && onClose()}
       footer={<>
         <button onClick={onClose} disabled={saving} className={btnGhost}>Annuler</button>
-        <button onClick={create} disabled={!source || saving || (asTemplate && !templateName.trim())} className={btnPrimary}>
+        <button onClick={create} disabled={!source || !formulasRead || saving || (asTemplate && !templateName.trim())} className={btnPrimary}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}Créer la copie
         </button>
       </>}

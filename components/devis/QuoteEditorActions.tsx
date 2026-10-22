@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import SendQuoteModal from './SendQuoteModal';
 import DuplicateQuoteModal from './DuplicateQuoteModal';
 import { useFeedback } from '@/components/ui/Feedback';
+import { useFormulaGate } from './FormulaGate';
 
 // Actions du devis depuis l'éditeur : statut, envoi au client, copie, événement. Plus besoin de repasser par la liste.
 // Envoyer et dupliquer enregistrent d'abord le document ouvert.
@@ -28,6 +29,7 @@ export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light 
   const [meta, setMeta] = useState<QuoteMeta | null>(null);
   const [busy, setBusy] = useState<'send' | 'copy' | 'status' | null>(null);
   const [open, setOpen] = useState<'send' | 'copy' | null>(null);
+  const { gate, dialog } = useFormulaGate();
 
   const load = useCallback(() => {
     createClient().from('quotes').select('status, client_email, event_type, event_date, prospect_id').eq('id', quoteId).maybeSingle()
@@ -39,6 +41,14 @@ export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light 
     if (!meta) return;
     setBusy('status');
     const supabase = createClient();
+    // Devis à formules qu'on valide sans formule retenue : la fenêtre la demande (voir FormulaGate).
+    const { data: q } = await supabase.from('quotes')
+      .select('formulas, chosen_formula_id, services, vat_rate, guest_count, guest_count_adults, guest_count_children, client_name')
+      .eq('id', quoteId).maybeSingle();
+    const res = q ? await gate({ id: quoteId, ...q, label: (q.client_name as string | null) ?? null }, status) : { ok: true };
+    if (!res.ok) { setBusy(null); return; }
+    // L'éditeur ouvert prend la formule retenue (impression, page du client).
+    if ('chosen' in res && res.chosen) window.dispatchEvent(new CustomEvent('weboword:formula-chosen', { detail: { id: res.chosen } }));
     const { error } = await supabase.from('quotes').update({ status }).eq('id', quoteId);
     if (!error && meta.prospect_id) await supabase.from('prospect_requests').update({ status }).eq('id', meta.prospect_id);
     setBusy(null);
@@ -56,6 +66,7 @@ export default function QuoteEditorActions({ quoteId, itemBase, itemIdle, light 
   if (!meta) return null;
   return (
     <>
+      {dialog}
       <label className={cn('block px-3 pt-2', !light && 'sb-label')}>
         <span className={cn('block text-xs mb-1', light ? 'text-gray-500' : 'text-white/50')}>Statut du devis</span>
         <select value={meta.status} onChange={(e) => changeStatus(e.target.value)} disabled={busy === 'status'} aria-label="Statut du devis"

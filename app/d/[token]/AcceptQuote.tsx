@@ -72,6 +72,7 @@ export default function AcceptQuote({ token, companyName, validUntil, isCompany,
               </span>
               {f.description && <span className="text-sm text-gray-600">{f.description}</span>}
               {!hidePrice && <span className="mt-1 text-lg font-semibold tabular-nums text-gray-900">{euros(f.totalTTC)} <span className="text-xs font-normal text-gray-500">TTC</span></span>}
+              {!hidePrice && f.perGuestTTC != null && <span className="text-sm tabular-nums text-gray-600">soit {euros(f.perGuestTTC)} par personne</span>}
             </label>
           );
         })}

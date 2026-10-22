@@ -14,8 +14,9 @@ import { btnGhost, btnPrimary, btnSecondary, iconBtn, iconBtnDanger, inputCls, l
 import { cn } from '@/lib/utils';
 import {
   Check, EmptyState, ErrorBanner, esc, isMaterielLine, isPersonnelLine, money, printDocument, useActionError,
-  type EventQuote, type MaterialItem, type Supplier,
+  type EventQuote, type MaterialItem, type ServiceLine, type Supplier,
 } from './shared';
+import { quoteLines as linesThatCount } from '@/lib/quoteFormulas';
 import { useFeedback } from '@/components/ui/Feedback';
 
 interface RentalItem {
@@ -69,7 +70,8 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   // ── À préparer : matériel ajouté à la main + lignes matériel / personnel du devis ──
   const materials = quote.event_materials ?? [];
   const lineChecks = quote.event_material_checks ?? [];
-  const quoteLines = (quote.services ?? []).filter((l) => !l.isPageBreak && !l.removed && (isMaterielLine(l) || isPersonnelLine(l)));
+  // Devis à formules : seulement les lignes communes et celles de la formule retenue.
+  const quoteLines = linesThatCount<ServiceLine>(quote).filter((l) => !l.isPageBreak && !l.removed && (isMaterielLine(l) || isPersonnelLine(l)));
   const [name, setName] = useState('');
   const [qty, setQty] = useState('1');
   const [unit, setUnit] = useState('');

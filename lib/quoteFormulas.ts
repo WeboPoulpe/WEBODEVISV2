@@ -127,15 +127,18 @@ function removeElements(html: string, drop: (openTag: string) => boolean): strin
 
 /**
  * Le document d'un devis à formules une fois la formule retenue : les lignes, totaux et plats des autres
- * formules (repérés par data-webo-formula) et les mentions « à choisir » sont retirés. Sans formule retenue, ou
- * pour un document sans ces repères, le document tel quel.
+ * formules (repérés par data-webo-formula) et les mentions « à choisir » sont retirés. Un repère qui désigne une
+ * formule supprimée depuis ne retire rien (ses lignes sont devenues communes), sauf le titre de cette formule
+ * dans la carte. Sans formule retenue, ou pour un document sans ces repères, le document tel quel.
  */
 export function documentForFormula(html: string, formulas: readonly QuoteFormula[], chosenId: string | null | undefined): string {
   const chosen = chosenFormula(formulas, chosenId);
   if (!chosen || !html || !html.includes('data-webo-formula')) return html;
+  const known = new Set(formulas.map((f) => f.id));
   return removeElements(html, (tag) => {
     if (/\sdata-webo-formula-pending\b/i.test(tag)) return true;
     const id = /\sdata-webo-formula="([^"]*)"/i.exec(tag)?.[1];
-    return id != null && id !== chosen.id;
+    if (id == null || id === chosen.id) return false;
+    return known.has(id) || /\sclass="[^"]*\bwebo-formula-title\b/i.test(tag);
   });
 }
