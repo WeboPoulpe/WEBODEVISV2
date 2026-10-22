@@ -15,7 +15,7 @@ import { formulaTotals, quoteVatBreakdown, resolveGuestSplit } from '@/lib/quote
 import FormulasEditor from './FormulasEditor';
 import { effectiveLines, lineFormulaId, newFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
-import { cardFromDescription, translateCarteToEnglish, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
+import { cardFromDescription, isBlankHtml, translateCarteToEnglish, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
 import { sanitizeHtml } from '@/lib/sanitize';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import RecipientPicker from '@/components/devis/RecipientPicker';
@@ -408,10 +408,28 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
    * qui n'a pas encore d'anglais, pour les prochains devis. Les lignes sont complétées sur place.
    * Renvoie le nombre de morceaux restés en français (service de traduction indisponible ou quota épuisé).
    */
-  const translateServicesToEnglish = async (): Promise<{ missed: number; translated: string[] }> => {
-    const todo = services.filter((s) => s.name?.trim() && !s.removed && !s.isPageBreak && (!s.gastroCardHtmlEn || !s.nameEn));
+  /** Fiches anglaises déjà écrites dans le catalogue, par nom de prestation : elles ne sont jamais retraduites. */
+  const catalogueEnglish = async (names: string[]): Promise<Map<string, string>> => {
+    const unique = [...new Set(names.filter(Boolean))];
+    if (unique.length === 0) return new Map();
+    const { data } = await createClient().from('prestations').select('name, gastro_card_html_en').in('name', unique);
+    return new Map(((data ?? []) as { name: string; gastro_card_html_en: string | null }[])
+      .filter((p) => p.gastro_card_html_en && !isBlankHtml(p.gastro_card_html_en))
+      .map((p) => [p.name, p.gastro_card_html_en as string]));
+  };
+
+  const translateServicesToEnglish = async (known: Map<string, string>): Promise<{ missed: number; translated: string[] }> => {
+    // Le nom n'est traduit que si la fiche anglaise n'a pas de titre (h2, h3) où le tableau le lit.
+    const titled = (html: unknown) => typeof html === 'string' && /<h[23][^>]*>[\s\S]*?[^\s<][\s\S]*?<\/h[23]>/i.test(html);
+    const todo = services.filter((s) => s.name?.trim() && !s.removed && !s.isPageBreak && (!s.gastroCardHtmlEn || (!s.nameEn && !titled(s.gastroCardHtmlEn))));
     if (todo.length === 0) return { missed: 0, translated: [] };
     const sb = createClient();
+    // Lignes dont la prestation a déjà sa version anglaise : reprise telle quelle, sans traduction.
+    const reused: string[] = [];
+    for (const s of todo) {
+      const en = !s.gastroCardHtmlEn ? known.get(s.name) : undefined;
+      if (en) { s.gastroCardHtmlEn = en; reused.push(s.name); }
+    }
     const { data: q } = await sb.from('quotes').select('selected_font').eq('id', quoteId).maybeSingle();
     const font = (q?.selected_font as string | null) ?? undefined;
     let missed = 0;
@@ -419,6 +437,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     for (const [i, s] of todo.entries()) {
       setTranslating(`${i + 1} / ${todo.length}`);
       if (!s.gastroCardHtmlEn) {
+        // (les fiches du catalogue ont déjà été reprises ci-dessus)
         const fr = (s.gastroCardHtml as string | null | undefined)
           || cardFromDescription({ name: s.name, description: s.description ?? '' }, { template: template as QuoteHtmlOptions['template'], font });
         const res = await translateHtmlFrToEnDetailed(fr);
@@ -426,7 +445,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
         // Rien de traduit : on ne garde pas une « version anglaise » qui serait en français.
         if (!fr || res.html !== fr) { s.gastroCardHtmlEn = sanitizeHtml(res.html); cards.set(s.name, s.gastroCardHtmlEn as string); }
       }
-      if (!s.nameEn) {
+      if (!s.nameEn && !titled(s.gastroCardHtmlEn)) {
         const nameEn = await translateTextFrToEn(s.name);
         if (nameEn) s.nameEn = nameEn; else missed++;
       }
@@ -437,12 +456,17 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // n'est jamais remplacée).
     await Promise.all([...cards].map(([name, html]) =>
       sb.from('prestations').update({ gastro_card_html_en: html }).eq('name', name).is('gastro_card_html_en', null)));
-    return { missed, translated: [...cards.keys()] };
+    return { missed, translated: [...reused, ...cards.keys()] };
   };
 
   const save = async () => {
     setSaving(true);
-    const english = language === 'en' ? await translateServicesToEnglish() : { missed: 0, translated: [] };
+    // Devis en anglais : versions anglaises du catalogue (lignes et plats de la carte), reprises sans retraduire.
+    const sheetNow = getSheetHtml?.() ?? '';
+    const known = language === 'en'
+      ? await catalogueEnglish([...services.map((s) => s.name), ...Array.from(new DOMParser().parseFromString(sheetNow, 'text/html').querySelectorAll('[data-webo-dish]'), (d) => d.getAttribute('data-webo-dish') ?? '')])
+      : new Map<string, string>();
+    const english = language === 'en' ? await translateServicesToEnglish(known) : { missed: 0, translated: [] };
     const newGuestTotal = (parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0) || parseInt(guestCount) || 0;
     const previousGuests = initialGuestTotal.current;
     if (syncQuantities && previousGuests > 0 && newGuestTotal > 0 && newGuestTotal !== previousGuests) {
@@ -608,7 +632,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // Devis en anglais : chaque plat de la carte encore en français est traduit sur place, qu'il soit une ligne du
     // devis ou non ; sa fiche anglaise va dans la prestation du même nom qui n'a pas encore d'anglais.
     if (language === 'en' && typeof updatePayload.content_html === 'string') {
-      const carte = await translateCarteToEnglish(updatePayload.content_html, (done, total) => setTranslating(`carte ${done} / ${total}`));
+      const carte = await translateCarteToEnglish(updatePayload.content_html, (done, total) => setTranslating(`carte ${done} / ${total}`), known);
       setTranslating(null);
       english.missed += carte.missed;
       if (carte.html !== updatePayload.content_html) updatePayload.content_html = carte.html;

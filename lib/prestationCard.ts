@@ -177,11 +177,16 @@ export function dishCardHtml(el: HTMLElement): string {
 }
 
 /**
- * Devis en anglais : traduit sur place chaque plat de la carte encore en français (sans repère data-webo-lang="en"),
- * qu'il corresponde à une ligne du devis ou non, et le marque comme anglais. Navigateur seulement.
- * `cards` : fiche anglaise de chaque plat repéré (nom de sa prestation), à enregistrer dans la prestation.
+ * Devis en anglais : passe en anglais chaque plat de la carte encore en français (sans repère data-webo-lang="en"),
+ * qu'il corresponde à une ligne du devis ou non, et le marque comme anglais. Un plat dont la prestation a déjà sa
+ * fiche anglaise (`known`, par nom) la reprend telle quelle ; les autres sont traduits. Navigateur seulement.
+ * `cards` : fiche anglaise de chaque plat traduit et repéré (nom de sa prestation), à enregistrer dans la prestation.
  */
-export async function translateCarteToEnglish(html: string, onProgress?: (done: number, total: number) => void): Promise<{ html: string; missed: number; cards: [string, string][] }> {
+export async function translateCarteToEnglish(
+  html: string,
+  onProgress?: (done: number, total: number) => void,
+  known: ReadonlyMap<string, string> = new Map(),
+): Promise<{ html: string; missed: number; cards: [string, string][] }> {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const dishes = Array.from(doc.querySelectorAll<HTMLElement>('.gastro-menu > div'))
     .filter((d) => d.getAttribute('data-webo-lang') !== 'en' && !isBlankHtml(d.innerHTML));
@@ -190,12 +195,20 @@ export async function translateCarteToEnglish(html: string, onProgress?: (done: 
   const cards: [string, string][] = [];
   for (const [i, d] of dishes.entries()) {
     onProgress?.(i + 1, dishes.length);
+    const name = d.getAttribute('data-webo-dish');
+    const existing = name ? known.get(name) : undefined;
+    if (existing) {
+      // Fiche anglaise du catalogue : pas de traduction. (Le plat sans fiche était centré par son enveloppe.)
+      d.style.textAlign = '';
+      d.innerHTML = existing;
+      d.setAttribute('data-webo-lang', 'en');
+      continue;
+    }
     const res = await translateHtmlFrToEnDetailed(d.innerHTML);
     missed += res.missed;
     if (res.html === d.innerHTML) continue;
     d.innerHTML = res.html;
     d.setAttribute('data-webo-lang', 'en');
-    const name = d.getAttribute('data-webo-dish');
     if (name) cards.push([name, dishCardHtml(d)]);
   }
   return { html: doc.body.innerHTML, missed, cards };
