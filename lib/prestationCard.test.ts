@@ -6,7 +6,7 @@ const OPTS = { template: 'classique' as const, font: 'Georgia' };
 
 /** Le bloc .gastro-menu d'un devis d'une seule prestation, sans le repère des plats (propre au devis). */
 const menuOf = (html: string) => html.match(/<div class="gastro-menu"[\s\S]*?<\/div>\s*(?=<!-- ── Pied de carte)/)![0].trim()
-  .replace(/ data-webo-(?:dish|lang)="[^"]*"/g, '');
+  .replace(/ data-webo-(?:dish|lang|line)="[^"]*"/g, '');
 
 describe('bloc de la carte, édité sur place', () => {
   it('description : le bloc du devis, avec la description remplacée par la zone modifiable', () => {

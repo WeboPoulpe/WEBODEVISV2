@@ -7,7 +7,7 @@
 // Hors du texte du devis : jamais imprimé, jamais enregistré dans le document.
 
 import { useEffect, useState } from 'react';
-import { CopyPlus, Plus, RefreshCw } from 'lucide-react';
+import { CopyPlus, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { dishCardHtml, isBlankHtml } from '@/lib/prestationCard';
@@ -165,6 +165,21 @@ export function DishLayoutButtons({ editorRef, sheetRef, quoteId }: {
     }
   };
 
+  /**
+   * Retire le plat de la carte du devis (pas la ligne du tableau, ni la prestation du catalogue). Utile quand le plat
+   * n'est plus relié à sa ligne (prestation renommée dans un ancien devis) : supprimer la ligne ne l'emporte pas.
+   */
+  const removeDish = async (dish: Dish) => {
+    setOpen(null);
+    const ok = await confirm({
+      title: `Retirer « ${dish.name} » de la carte ?`,
+      message: 'Le plat disparaît de ce devis. La ligne du tableau et la prestation du catalogue ne changent pas : retirez la ligne dans le panneau Prestations si elle n’a plus lieu d’être. Pensez à enregistrer.',
+      confirmLabel: 'Retirer',
+      danger: true,
+    });
+    if (ok) dish.el.remove();
+  };
+
   if (dishes.length === 0) return null;
   return (
     // Sur un écran étroit, la feuille prend toute la largeur : pas de place à côté pour les boutons.
@@ -195,6 +210,17 @@ export function DishLayoutButtons({ editorRef, sheetRef, quoteId }: {
                 <span>
                   <span className="block font-medium text-gray-800">Mettre à jour la prestation</span>
                   <span className="block text-xs text-gray-500">« {d.name} » prend cette mise en page.</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => removeDish(d)}
+                className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-red-50"
+              >
+                <Trash2 className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                <span>
+                  <span className="block font-medium text-red-700">Retirer ce plat du devis</span>
+                  <span className="block text-xs text-gray-500">La prestation du catalogue ne change pas.</span>
                 </span>
               </button>
               {newName === null ? (

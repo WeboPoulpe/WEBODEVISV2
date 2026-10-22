@@ -113,6 +113,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   // Ids des prestations présentes au chargement → permet de détecter les AJOUTS
   // (pour n'ajouter que leur bloc texte à la fin de la carte gastronomique).
   const initialServiceIds = useRef<Set<string>>(new Set());
+  // Lignes au chargement : celles supprimées depuis voient leur plat quitter la carte.
+  const initialLines = useRef<{ id: string | null; name: string }[]>([]);
   // Empreinte des champs qui alimentent les cartes Client / Événement du document.
   const initialParties = useRef<string>('');
   // Langue du devis au chargement : un changement refait la carte dans la nouvelle langue.
@@ -290,6 +292,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           initialServiceIds.current = new Set(
             loadedServices.map((s: Service) => s.id as string | undefined).filter(Boolean) as string[],
           );
+          initialLines.current = loadedServices
+            .filter((s: Service) => s.name?.trim() && !s.isPageBreak)
+            .map((s: Service) => ({ id: (s.id as string | undefined) ?? null, name: s.name }));
           initialParties.current = JSON.stringify({
             clientName: loadedClientName, clientEmail: loadedClientEmail, clientPhone: loadedClientPhone,
             clientAddress: loadedClientAddress, clientType: loadedClientType, clientSiret: loadedClientSiret,
@@ -566,6 +571,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       const baseHtml = sheetHtml ?? (cur?.content_html as string | null | undefined) ?? null;
       if (cur && baseHtml) {
         const mapSvc = (s: Service) => ({
+          id: (s.id as string | undefined) ?? null,
           name: s.name,
           description: s.description ?? null,
           quantity: s.quantity,
@@ -615,6 +621,10 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
               language,
             },
             added: addedServices,
+            // Lignes supprimées dans le panneau (par identifiant ; une ligne sans identifiant, par son nom).
+            removedLines: initialLines.current.filter((l) => (l.id
+              ? !services.some((s) => s.id === l.id)
+              : !services.some((s) => s.name === l.name))),
             financials: finChanged,
             // Répercute client / événement dans le document (cartes + intro/en-tête si non retouchés).
             parties: partiesChanged,

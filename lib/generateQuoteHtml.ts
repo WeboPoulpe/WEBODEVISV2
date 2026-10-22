@@ -24,6 +24,8 @@ export interface QuoteHtmlData {
   eventLocation?: string | null;
   guestCount?: number | null;
   services: Array<{
+    /** Identifiant de la ligne : relie son plat de la carte à elle (data-webo-line), même renommée. */
+    id?: string | null;
     name: string;
     description?: string | null;
     quantity: number;
@@ -231,6 +233,7 @@ function safeData(d: QuoteHtmlData): QuoteHtmlData {
     cgv: d.cgv ? sanitizeHtml(d.cgv) : d.cgv,
     services: d.services.map((s) => ({
       ...s,
+      id: typeof s.id === 'string' ? esc(s.id) : null,
       name: esc(s.name) ?? '',
       nameEn: esc(s.nameEn),
       description: s.description ? sanitizeHtml(s.description) : s.description,
@@ -389,13 +392,13 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     // Use English version if language is 'en' AND English version exists, otherwise French
     const cardHtml = d.language === 'en' ? (s.gastroCardHtmlEn || s.gastroCardHtml) : s.gastroCardHtml;
     if (cardHtml) {
-      return `<div${formulaAttr(s)} data-webo-dish="${s.name}"${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
+      return `<div${formulaAttr(s)} data-webo-dish="${s.name}"${s.id ? ` data-webo-line="${s.id}"` : ''}${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
     }
     const optBadge = s.isOption
       ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
       : '';
     return `
-      <div${formulaAttr(s)} data-webo-dish="${s.name}"${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
+      <div${formulaAttr(s)} data-webo-dish="${s.name}"${s.id ? ` data-webo-line="${s.id}"` : ''}${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
         <p style="font-size:15px;font-weight:normal;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
         ${s.description
           ? `<div class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</div>`

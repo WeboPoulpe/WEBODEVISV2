@@ -32,6 +32,8 @@ export interface WeboSyncInput {
   relang?: boolean;
   /** Plats (noms des prestations) à refaire seuls, par exemple après la traduction de leur fiche. */
   refreshDishes?: string[];
+  /** Lignes supprimées du devis : leur plat quitte la carte (retrouvé par l'identifiant de la ligne, sinon par son nom). */
+  removedLines?: { id?: string | null; name: string }[];
   /** Rempli par la synchronisation : blocs de texte laissés tels quels parce que réécrits à la main. */
   kept?: ('intro' | 'menuTitle')[];
 }
@@ -84,6 +86,21 @@ function pickInner(html: string, selector: string): string | null {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const el = doc.querySelector(selector);
   return el ? el.innerHTML : null;
+}
+
+/** Retire de la carte le plat de chaque ligne supprimée. Vrai si un plat est parti. */
+function removeDishes(doc: Document, removed: { id?: string | null; name: string }[]): boolean {
+  const menu = doc.querySelector('.gastro-menu');
+  if (!menu) return false;
+  let changed = false;
+  for (const r of removed) {
+    const dishes = Array.from(menu.querySelectorAll(':scope > [data-webo-dish]'));
+    const dish = (r.id && dishes.find((d) => d.getAttribute('data-webo-line') === r.id))
+      // Repli sur le nom : seulement un plat qui n'est relié à aucune autre ligne par son identifiant.
+      || dishes.find((d) => d.getAttribute('data-webo-dish') === r.name && !d.getAttribute('data-webo-line'));
+    if (dish) { dish.remove(); changed = true; }
+  }
+  return changed;
 }
 
 /**
@@ -139,10 +156,13 @@ function regroupCarte(doc: Document, all: QuoteHtmlData, opts: QuoteHtmlOptions)
   const formulas = parseFormulas(all.formulas);
   const known = new Set(formulas.map((f) => f.id));
 
-  // Formule de chaque ligne, par nom (deux lignes du même nom : dans l'ordre).
+  // Formule de chaque ligne : par identifiant (repère data-webo-line), sinon par nom (deux lignes du même nom :
+  // dans l'ordre). Un plat relié par identifiant prend aussi le nom actuel de sa ligne (ligne renommée).
+  const byId = new Map<string, { formula: string | null; name: string }>();
   const byName = new Map<string, (string | null)[]>();
   for (const s of all.services ?? []) {
     if (!s?.name || s.removed) continue;
+    if (s.id) byId.set(s.id, { formula: lineFormulaId(s, formulas), name: s.name });
     const list = byName.get(s.name) ?? [];
     list.push(lineFormulaId(s, formulas));
     byName.set(s.name, list);
@@ -155,9 +175,11 @@ function regroupCarte(doc: Document, all: QuoteHtmlData, opts: QuoteHtmlOptions)
     if (child.classList.contains('webo-formula-title')) { child.remove(); continue; }
     if (child.tagName !== 'DIV') { (units.length ? units[units.length - 1].els : head).push(child); continue; }
     const name = child.getAttribute('data-webo-dish');
-    const queue = name != null ? byName.get(name) : undefined;
+    const line = byId.get(child.getAttribute('data-webo-line') ?? '');
+    if (line && line.name !== name) child.setAttribute('data-webo-dish', line.name);
+    const queue = !line && name != null ? byName.get(name) : undefined;
     const own = child.getAttribute('data-webo-formula');
-    const formula = queue && queue.length ? queue.shift()! : (own && known.has(own) ? own : null);
+    const formula = line ? line.formula : queue && queue.length ? queue.shift()! : (own && known.has(own) ? own : null);
     if (formula) child.setAttribute('data-webo-formula', formula); else child.removeAttribute('data-webo-formula');
     units.push({ els: [child], formula });
   }
@@ -244,6 +266,9 @@ export function syncWeboDocument(
       }
     }
   }
+
+  // ── 2 a) Lignes supprimées : leur plat quitte la carte ──
+  if (input.removedLines?.length && removeDishes(doc, input.removedLines)) changed = true;
 
   // ── 2 bis) Nouvelle langue : plats, signature et validité refaits dans cette langue ──
   if (input.relang && relangDocument(doc, input.all, opts)) changed = true;

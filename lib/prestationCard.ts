@@ -20,7 +20,7 @@ export const EDIT_ATTR = 'data-presta-edit';
 /** Le bloc .gastro-menu du document généré (colonne des plats de la carte), sans le repère des plats du devis. */
 function menuBlock(html: string): string {
   const m = html.match(/<div class="gastro-menu"[\s\S]*?<\/div>\s*(?=<!-- ── Pied de carte)/);
-  return m ? m[0].trim().replace(/ data-webo-(?:dish|lang)="[^"]*"/g, '') : '';
+  return m ? m[0].trim().replace(/ data-webo-(?:dish|lang|line)="[^"]*"/g, '') : '';
 }
 
 /**

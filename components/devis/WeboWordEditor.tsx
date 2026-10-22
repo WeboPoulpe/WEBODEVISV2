@@ -604,6 +604,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         services: svcs
           .filter((s) => !s.isPageBreak)
           .map((s) => ({
+            id: s.id ?? null,
             name: s.name,
             description: s.description,
             quantity: s.quantity,
