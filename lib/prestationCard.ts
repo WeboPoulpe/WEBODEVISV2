@@ -20,7 +20,7 @@ export const EDIT_ATTR = 'data-presta-edit';
 /** Le bloc .gastro-menu du document généré (colonne des plats de la carte), sans le repère des plats du devis. */
 function menuBlock(html: string): string {
   const m = html.match(/<div class="gastro-menu"[\s\S]*?<\/div>\s*(?=<!-- ── Pied de carte)/);
-  return m ? m[0].trim().replace(/ data-webo-dish="[^"]*"/g, '') : '';
+  return m ? m[0].trim().replace(/ data-webo-(?:dish|lang)="[^"]*"/g, '') : '';
 }
 
 /**
@@ -101,6 +101,8 @@ const MENU_TITLES: Record<string, string> = {
 /** Termes de cuisine remplacés avant traduction (le service les laisse ensuite tels quels). */
 const MENU_TERMS: [RegExp, string][] = [
   [/gratin dauphinois/gi, 'dauphinoise potatoes'],
+  [/pièces? montées?(?: à choux)?/gi, 'croquembouche'],
+  [/cascade (?:à|de) champagne/gi, 'champagne tower'],
   [/pièces? cocktail/gi, 'canapés'],
   [/poêlée forestière/gi, 'pan-fried wild mushrooms'],
   [/vin d[’']honneur/gi, 'drinks reception'],
@@ -158,4 +160,43 @@ export async function translateHtmlFrToEnDetailed(html: string): Promise<{ html:
 /** Comme translateHtmlFrToEnDetailed, sans le compte des morceaux restés en français. */
 export async function translateHtmlFrToEn(html: string): Promise<string> {
   return (await translateHtmlFrToEnDetailed(html)).html;
+}
+
+/** Repères propres au devis : ils ne passent pas dans la fiche (l'interligne et la police d'un paragraphe, oui). */
+const QUOTE_ONLY = /^data-webo-(?!lh$|font$)/;
+
+/** Fiche de la carte tirée d'un plat : son contenu, sans les repères du devis, centré s'il l'était. */
+export function dishCardHtml(el: HTMLElement): string {
+  const copy = el.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll('*').forEach((n) => {
+    Array.from(n.attributes).forEach((a) => { if (QUOTE_ONLY.test(a.name)) n.removeAttribute(a.name); });
+  });
+  const inner = copy.innerHTML.trim();
+  // Le plat sans fiche est centré par son enveloppe, que la fiche n'a pas : le centrage passe dans la fiche.
+  return el.style.textAlign === 'center' ? `<div style="text-align:center;">${inner}</div>` : inner;
+}
+
+/**
+ * Devis en anglais : traduit sur place chaque plat de la carte encore en français (sans repère data-webo-lang="en"),
+ * qu'il corresponde à une ligne du devis ou non, et le marque comme anglais. Navigateur seulement.
+ * `cards` : fiche anglaise de chaque plat repéré (nom de sa prestation), à enregistrer dans la prestation.
+ */
+export async function translateCarteToEnglish(html: string, onProgress?: (done: number, total: number) => void): Promise<{ html: string; missed: number; cards: [string, string][] }> {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const dishes = Array.from(doc.querySelectorAll<HTMLElement>('.gastro-menu > div'))
+    .filter((d) => d.getAttribute('data-webo-lang') !== 'en' && !isBlankHtml(d.innerHTML));
+  if (dishes.length === 0) return { html, missed: 0, cards: [] };
+  let missed = 0;
+  const cards: [string, string][] = [];
+  for (const [i, d] of dishes.entries()) {
+    onProgress?.(i + 1, dishes.length);
+    const res = await translateHtmlFrToEnDetailed(d.innerHTML);
+    missed += res.missed;
+    if (res.html === d.innerHTML) continue;
+    d.innerHTML = res.html;
+    d.setAttribute('data-webo-lang', 'en');
+    const name = d.getAttribute('data-webo-dish');
+    if (name) cards.push([name, dishCardHtml(d)]);
+  }
+  return { html: doc.body.innerHTML, missed, cards };
 }

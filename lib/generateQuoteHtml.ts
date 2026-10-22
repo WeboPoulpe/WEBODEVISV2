@@ -382,18 +382,20 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   // ── Menu items Page 2 — use gastroCardHtml if available, otherwise fallback ──
   // Chaque plat porte data-webo-dish (nom de la prestation, déjà échappé) : l'éditeur s'en sert pour renvoyer sa
   // mise en page à la prestation.
+  // Plat écrit en anglais (devis en anglais) : la traduction de la carte ne le retraduit pas.
+  const dishLang = lang === 'en' ? ' data-webo-lang="en"' : '';
   const menuItem = (s: QuoteHtmlData['services'][number]) => {
     // If prestation has a custom gastro_card_html, use it as-is (wrapped in container)
     // Use English version if language is 'en' AND English version exists, otherwise French
     const cardHtml = d.language === 'en' ? (s.gastroCardHtmlEn || s.gastroCardHtml) : s.gastroCardHtml;
     if (cardHtml) {
-      return `<div${formulaAttr(s)} data-webo-dish="${s.name}" style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
+      return `<div${formulaAttr(s)} data-webo-dish="${s.name}"${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
     }
     const optBadge = s.isOption
       ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
       : '';
     return `
-      <div${formulaAttr(s)} data-webo-dish="${s.name}" style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
+      <div${formulaAttr(s)} data-webo-dish="${s.name}"${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
         <p style="font-size:15px;font-weight:normal;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
         ${s.description
           ? `<div class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</div>`

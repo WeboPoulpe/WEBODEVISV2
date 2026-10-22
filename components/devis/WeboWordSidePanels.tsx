@@ -15,7 +15,7 @@ import { formulaTotals, quoteVatBreakdown, resolveGuestSplit } from '@/lib/quote
 import FormulasEditor from './FormulasEditor';
 import { effectiveLines, lineFormulaId, newFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
-import { cardFromDescription, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
+import { cardFromDescription, translateCarteToEnglish, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
 import { sanitizeHtml } from '@/lib/sanitize';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import RecipientPicker from '@/components/devis/RecipientPicker';
@@ -603,6 +603,18 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
         );
         if (updated) updatePayload.content_html = updated;
       }
+    }
+
+    // Devis en anglais : chaque plat de la carte encore en français est traduit sur place, qu'il soit une ligne du
+    // devis ou non ; sa fiche anglaise va dans la prestation du même nom qui n'a pas encore d'anglais.
+    if (language === 'en' && typeof updatePayload.content_html === 'string') {
+      const carte = await translateCarteToEnglish(updatePayload.content_html, (done, total) => setTranslating(`carte ${done} / ${total}`));
+      setTranslating(null);
+      english.missed += carte.missed;
+      if (carte.html !== updatePayload.content_html) updatePayload.content_html = carte.html;
+      const sb = createClient();
+      await Promise.all(carte.cards.map(([name, html]) =>
+        sb.from('prestations').update({ gastro_card_html_en: sanitizeHtml(html) }).eq('name', name).is('gastro_card_html_en', null)));
     }
 
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);

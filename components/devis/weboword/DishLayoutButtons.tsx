@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { CopyPlus, Plus, RefreshCw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { isBlankHtml } from '@/lib/prestationCard';
+import { dishCardHtml, isBlankHtml } from '@/lib/prestationCard';
 import { useFeedback } from '@/components/ui/Feedback';
 import { useAuth } from '@/context/AuthContext';
 import { SHEET_WIDTH_PX } from './pageView';
@@ -24,20 +24,6 @@ function dishName(el: HTMLElement): string | null {
   if (marked) return marked;
   const first = el.firstElementChild;
   return first?.tagName === 'P' ? (first.textContent || '').trim() || null : null;
-}
-
-/** Repères propres au devis : ils ne passent pas dans la fiche (l'interligne et la police d'un paragraphe, oui). */
-const QUOTE_ONLY = /^data-webo-(?!lh$|font$)/;
-
-/** Fiche de la carte tirée d'un plat : son contenu, sans les repères du devis, centré s'il l'était. */
-export function dishCardHtml(el: HTMLElement): string {
-  const copy = el.cloneNode(true) as HTMLElement;
-  copy.querySelectorAll('*').forEach((n) => {
-    Array.from(n.attributes).forEach((a) => { if (QUOTE_ONLY.test(a.name)) n.removeAttribute(a.name); });
-  });
-  const inner = copy.innerHTML.trim();
-  // Le plat sans fiche est centré par son enveloppe, que la fiche n'a pas : le centrage passe dans la fiche.
-  return el.style.textAlign === 'center' ? `<div style="text-align:center;">${inner}</div>` : inner;
 }
 
 export function DishLayoutButtons({ editorRef, sheetRef, quoteId }: {
