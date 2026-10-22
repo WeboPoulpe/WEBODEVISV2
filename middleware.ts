@@ -15,6 +15,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/e/') ||
     // /d/ : devis consulté par le client, à partir du lien reçu par email.
     pathname.startsWith('/d/') ||
+    // /b/ : brochure feuilletée à partir du lien reçu.
+    pathname.startsWith('/b/') ||
     pathname.startsWith('/reset-password') ||
     // /invitation/ : lien reçu par un collaborateur invité, qui n'a pas encore de compte.
     pathname.startsWith('/invitation/') ||

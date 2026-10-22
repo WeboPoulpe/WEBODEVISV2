@@ -95,9 +95,10 @@ describe('brochures : serveur', () => {
   it('lien public : pages, entreprise, aucun identifiant interne ; prix masqués : aucune donnée de prix', async () => {
     current = OWNER;
     const { id } = await br.createBrochure({ name: 'Public' });
-    await br.saveBrochure(id!, { content, style: 'carte' });
+    await br.saveBrochure(id!, { content: { ...content, about: { enabled: true, html: '<p>Depuis 2010</p>' } }, style: 'carte' });
     const pub = (await br.getPublicBrochure(await tokenOf(id!)))!;
     expect(pub.company.name).toBe('Traiteur Brochure');
+    expect(pub.about.html).toBe('<p>Depuis 2010</p>');
     expect(pub.pages.map((p) => p.kind)).toEqual(['cover', 'about', 'items', 'contact', 'form']);
     const json = JSON.stringify(pub);
     expect(json).toContain('Menu Tentation');

@@ -35,6 +35,8 @@ export interface PublicBrochure {
   style: BrochureStyle;
   language: 'fr' | 'en';
   cover: BrochureCover;
+  /** Page « qui sommes-nous » (vide si elle est désactivée). */
+  about: { html: string; photoUrl: string | null };
   pages: BrochurePage[];
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
@@ -195,10 +197,12 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
   const [company, catalog] = await Promise.all([companyProfile(row.owner_user_id), catalogFor(row)]);
   const language = row.language === 'en' ? 'en' : 'fr';
   const style = row.style as BrochureStyle;
+  const content = parseBrochureContent(row.content);
   return {
     name: row.name, style, language,
     cover: parseCover(row.cover, row.name),
-    pages: paginateBrochure(parseBrochureContent(row.content), catalog, style, {
+    about: content.about.enabled ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null } : { html: '', photoUrl: null },
+    pages: paginateBrochure(content, catalog, style, {
       show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language, forEditor: false,
     }),
     company: {
