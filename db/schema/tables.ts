@@ -374,6 +374,43 @@ export const devis_templates = pgTable("devis_templates", {
 		}).onDelete("cascade"),
 ]);
 
+// Brochures : catalogue de prestations feuilletable, envoyé par lien (voir lib/brochure.ts, server/brochures.ts).
+export const brochures = pgTable("brochures", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	owner_user_id: uuid().notNull(),
+	user_id: uuid().notNull(),
+	name: text().notNull(),
+	style: text().default('editorial').notNull(),
+	language: text().default('fr').notNull(),
+	show_prices: boolean().default(true).notNull(),
+	price_mode: text().default('ttc').notNull(),
+	vat_rate: numeric().default('20').notNull(),
+	is_active: boolean().default(true).notNull(),
+	share_token: text().notNull(),
+	cover: jsonb().default({}).notNull(),
+	content: jsonb().default({}).notNull(),
+	view_count: integer().default(0).notNull(),
+	viewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_brochures_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.owner_user_id],
+			foreignColumns: [users.id],
+			name: "brochures_owner_user_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "brochures_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("brochures_share_token_key").on(table.share_token),
+	check("brochures_style_check", sql`style = ANY (ARRAY['editorial'::text, 'carte'::text, 'magazine'::text])`),
+	check("brochures_language_check", sql`language = ANY (ARRAY['fr'::text, 'en'::text])`),
+	check("brochures_price_mode_check", sql`price_mode = ANY (ARRAY['ht'::text, 'ttc'::text])`),
+]);
+
 export const event_attachments = pgTable("event_attachments", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	quote_id: uuid().notNull(),
@@ -1197,7 +1234,14 @@ export const prospect_requests = pgTable("prospect_requests", {
 	owner_user_id: uuid(),
 	user_token: text(),
 	guest_count_children: integer(),
+	// Brochure d'où vient la demande (formulaire en fin de brochure), sinon null.
+	brochure_id: uuid(),
 }, (table) => [
+	foreignKey({
+			columns: [table.brochure_id],
+			foreignColumns: [brochures.id],
+			name: "prospect_requests_brochure_id_fkey"
+		}).onDelete("set null"),
 	foreignKey({
 			columns: [table.user_token],
 			foreignColumns: [user_prospect_tokens.token],

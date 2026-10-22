@@ -73,6 +73,8 @@ export const RULES: Record<string, TableRule> = {
   quote_folders: { ...both(team('owner_user_id')), admin: ALL },
   quote_templates: both((t, u) => `(${t}.owner_user_id = ${u} or ${t}.user_id = ${u})`),
   devis_templates: both(team('user_id')),
+  // Brochures : l'équipe de l'entreprise. Le lien public est lu côté serveur seulement (server/brochures.ts).
+  brochures: both(team('owner_user_id')),
   prospect_requests: {
     ...both((t, u) =>
       `(${t}.owner_user_id in ${companyMembers(u)} or ${t}.user_token in (select k.token from public.user_prospect_tokens k where k.user_id in ${companyMembers(u)}))`),

@@ -232,6 +232,13 @@
       "when": 1792664117022,
       "tag": "0032_template_formulas",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792687326669,
+      "tag": "0033_brochures",
+      "breakpoints": true
     }
   ]
 }
