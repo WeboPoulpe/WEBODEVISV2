@@ -200,4 +200,45 @@ test.describe('brochures', () => {
       await deleteAccount(t.user.id);
     }
   });
+  test('brochure en éditeur avancé : le lien public montre les blocs', async ({ browser }: { browser: Browser }) => {
+    const user = await createAccount('brochure-blocs', { companyName: 'Traiteur Blocs' });
+    const [a] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Menu Tentation', 76, 'dîner', '<p>Entrée, plat, dessert</p>') returning id`, [user.id]);
+    const [b] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Champêtre chic', 88, 'dîner', '<p>Vin d''honneur compris</p>') returning id`, [user.id]);
+    const token = `jeton-e2e-blocs-${Date.now()}`;
+    const prest = (id: string, pid: string) => ({ id, type: 'prestation', prestationId: pid, photo: 'top', show: { name: true, text: true, price: true }, text: 'short' });
+    const layout = { pages: [
+      { id: 'c', kind: 'cover', blocks: [] },
+      { id: 'p', kind: 'blocks', background: '#EDE6DA', blocks: [
+        { id: 't', type: 'title', text: 'Nos menus', level: 'l' },
+        { id: 'cols', type: 'columns', count: 2, gap: 12, cols: [[prest('a', a.id)], [prest('b', b.id)]] },
+        { id: 's', type: 'separator', color: '#B4502D', width: 40 },
+      ] },
+      { id: 'f', kind: 'form', blocks: [] },
+    ] };
+    await sql(`insert into public.brochures (owner_user_id, user_id, name, share_token, cover, editor_mode, layout) values ($1, $1, 'Mariages 2027', $2, '{"title":"Mariages 2027"}'::jsonb, 'advanced', $3::jsonb)`,
+      [user.id, token, JSON.stringify(layout)]);
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+    try {
+      const page = await context.newPage();
+      await page.goto(`/b/${token}`);
+      await expect(page.getByRole('heading', { name: 'Mariages 2027' })).toBeVisible({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Page suivante' }).click();
+      await page.waitForTimeout(750);
+      await expect(page.getByText('Nos menus')).toBeVisible();
+      const left = await page.getByRole('heading', { name: 'Menu Tentation' }).boundingBox();
+      const right = await page.getByRole('heading', { name: 'Champêtre chic' }).boundingBox();
+      expect(Math.abs(left!.y - right!.y)).toBeLessThanOrEqual(2);
+      expect(right!.x).toBeGreaterThan(left!.x);
+      await expect(page.getByText(/91,20\s€ TTC/)).toBeVisible();
+      await page.screenshot({ path: 'e2e/screenshots/brochure-blocs-mobile.png' });
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(`/b/${token}`);
+      await page.getByRole('button', { name: 'Page suivante' }).click();
+      await page.waitForTimeout(750);
+      await page.screenshot({ path: 'e2e/screenshots/brochure-blocs-desktop.png' });
+    } finally {
+      await context.close();
+      await deleteAccount(user.id);
+    }
+  });
 });

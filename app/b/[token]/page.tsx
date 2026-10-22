@@ -30,6 +30,8 @@ export default async function BrochurePublicPage({ params }: { params: Promise<{
   await recordBrochureView(token).catch(() => {});
   return (
     <main className="min-h-screen bg-[#EDE6DA] flex flex-col items-center justify-center px-4 py-6">
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      {brochure.fontsHref && <link rel="stylesheet" href={brochure.fontsHref} />}
       <BrochureBook brochure={brochure} token={token} />
     </main>
   );

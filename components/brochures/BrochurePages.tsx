@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { shortText, type BrochureCover, type BrochureStyle, type ResolvedItem } from '@/lib/brochure';
 import type { PublicPage } from '@/lib/brochureLayout';
+import BlockPage from './BlockPage';
 
 export interface BrochureCompany { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null }
 
@@ -186,8 +187,7 @@ export function BrochurePageView({ page, style, cover, company, language, about,
     case 'about': return <About html={about.html} photoUrl={about.photoUrl} language={language} />;
     case 'items': return <Items style={style} sectionTitle={page.sectionTitle} items={page.items} language={language} />;
     case 'contact': return <Contact company={company} language={language} />;
-    // Pages à blocs (éditeur avancé) : rendu ajouté avec BlockPage.
-    case 'blocks': return null;
+    case 'blocks': return <BlockPage page={page} theme={style} />;
     case 'form':
       return (
         <div style={{ position: 'absolute', inset: 0, padding: cq(8), overflowY: 'auto', color: INK }}>

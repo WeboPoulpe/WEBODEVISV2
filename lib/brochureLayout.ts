@@ -47,6 +47,13 @@ export interface ResolvedPage { kind: PageKind; background: string | null; font:
 /** Une page du lien public : celles de l'éditeur simple, ou une page à blocs de l'éditeur avancé. */
 export type PublicPage = BrochurePage | { kind: 'blocks'; background: string | null; font: string | null; blocks: ResolvedBlock[] };
 
+/** Polices choisies dans une mise en page (pages et blocs), pour les charger. */
+export function layoutFonts(l: BrochureLayout | null): string[] {
+  if (!l) return [];
+  const fonts = l.pages.flatMap((p) => [p.font, ...p.blocks.flatMap((b) => [b.type !== 'spacer' ? b.style?.font : null, ...(b.type === 'columns' ? b.cols.flat().map((c) => (c.type !== 'spacer' ? c.style?.font : null)) : [])])]);
+  return [...new Set(fonts.filter((f): f is string => !!f))];
+}
+
 /** Identifiants des prestations citées par une mise en page. */
 export function layoutPrestationIds(l: BrochureLayout): string[] {
   return [...new Set(blocksInOrder(l).flatMap((b) => (b.type === 'prestation' ? [b.prestationId] : [])))];

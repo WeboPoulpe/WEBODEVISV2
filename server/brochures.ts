@@ -14,13 +14,14 @@ import {
   type BrochureContent, type BrochureCover, type BrochurePage, type BrochureStyle, type CatalogPrestation, type PriceOptions,
 } from '@/lib/brochure';
 import {
-  layoutError, layoutFromSimple, layoutPrestationIds, mergeLayout, parseLayout, resolveLayout, sanitizeLayout, sectionsFromLayout,
+  layoutError, layoutFonts, layoutFromSimple, layoutPrestationIds, mergeLayout, parseLayout, resolveLayout, sanitizeLayout, sectionsFromLayout,
   type PublicPage,
 } from '@/lib/brochureLayout';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { brochureEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { isValidEmail, MAX_RECIPIENTS, splitEmails, uniqueEmails } from '@/lib/emailList';
+import { googleFontsHref } from '@/lib/quoteOutput';
 import { companyIdsOf } from './companyScope';
 import { getSessionUser, requireUser, requireWriter } from './session';
 
@@ -47,6 +48,8 @@ export interface PublicBrochure {
   about: { html: string; photoUrl: string | null };
   /** Pages de l'éditeur simple, ou pages de la mise en page avancée (pages à blocs déjà résolues). */
   pages: PublicPage[];
+  /** Feuille Google Fonts des polices choisies dans les blocs (éditeur avancé), ou null. */
+  fontsHref: string | null;
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
 
@@ -280,6 +283,7 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
     cover: parseCover(row.cover, row.name),
     about: content.about.enabled ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null } : { html: '', photoUrl: null },
     pages: publicPages(row, content, catalog, { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language }),
+    fontsHref: row.editor_mode === 'advanced' ? googleFontsHref(layoutFonts(parseLayout(row.layout))) : null,
     company: {
       name: company?.name ?? '', logoUrl: company?.logoUrl ?? null, address: company?.address ?? null,
       phone: company?.phone ?? null, email: company?.email ?? null, website: company?.website ?? null,
