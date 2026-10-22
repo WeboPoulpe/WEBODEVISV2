@@ -114,4 +114,28 @@ test.describe('brochures', () => {
       await page.screenshot({ path: 'e2e/screenshots/brochure-editeur-mobile.png', fullPage: true });
     });
   });
+  test('une demande depuis la dernière page arrive dans les Prospects', async ({ browser }: { browser: Browser }) => {
+    const t = await brochureAccount('brochure-demande');
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+    try {
+      const page = await context.newPage();
+      await page.goto(`/b/${t.token}`);
+      await expect(page.getByRole('heading', { name: 'Mariages 2027' })).toBeVisible({ timeout: 20_000 });
+      const next = page.getByRole('button', { name: 'Page suivante' });
+      while (await next.isEnabled()) { await next.click(); await page.waitForTimeout(750); }
+      await page.getByLabel('Prénom').fill('Camille');
+      await page.getByLabel('Nom', { exact: true }).fill('Martin');
+      await page.getByLabel('Email').fill(`camille-${Date.now()}@test.webodevis.local`);
+      await page.getByLabel('Invités').fill('80');
+      await page.getByRole('button', { name: 'Envoyer ma demande' }).click();
+      await expect(page.getByText('Merci, votre demande est envoyée.')).toBeVisible({ timeout: 15_000 });
+      await page.screenshot({ path: 'e2e/screenshots/brochure-formulaire-mobile.png' });
+      const rows = await sql<{ brochure_id: string; guest_count: number }>(`select brochure_id, guest_count from public.prospect_requests where owner_user_id = $1`, [t.user.id]);
+      expect(rows).toEqual([{ brochure_id: t.brochureId, guest_count: 80 }]);
+    } finally {
+      await context.close();
+      await sql(`delete from public.prospect_requests where owner_user_id = $1`, [t.user.id]);
+      await deleteAccount(t.user.id);
+    }
+  });
 });

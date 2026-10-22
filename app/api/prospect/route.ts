@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { QueryBuilder } from '@/lib/compat/builder';
 import { executeQuery } from '@/server/compat/execute';
-import { eq } from 'drizzle-orm';
-import { db } from '@/db';
-import { profiles } from '@/db/schema';
-import { appOrigin, sendMail } from '@/lib/mail';
 import { isDemoUser } from '@/lib/demo';
-import { prospectAckEmail, prospectNotificationEmail, type ProspectDetails } from '@/lib/mail/templates';
+import type { ProspectDetails } from '@/lib/mail/templates';
+import { notifyProspect } from '@/server/prospectMail';
 
 // ── CORS helper ──────────────────────────────────────────────────────────────
 const corsHeaders = {
@@ -125,29 +122,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Emails : alerte au traiteur, accusé de réception à la personne. Un envoi raté ne perd pas la demande.
-    const [owner] = await db
-      .select({ email: profiles.email, company_name: profiles.company_name, company_email: profiles.company_email })
-      .from(profiles).where(eq(profiles.id, tokenData.user_id)).limit(1);
-    if (owner) {
-      const prospect: ProspectDetails = {
-        firstName: first_name.trim(),
-        lastName: last_name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: body.phone?.trim() || null,
-        eventType: body.event_type || null,
-        eventDate: body.event_date || null,
-        guestCount: parseInt(body.guest_count) || null,
-        guestCountChildren: parseInt(body.guest_count_children) || null,
-        location: body.service_address?.trim() || body.address?.trim() || null,
-        message: body.message?.trim() || null,
-      };
-      const catererEmail = owner.company_email || owner.email;
-      const companyName = owner.company_name || 'Votre traiteur';
-      await Promise.all([
-        sendMail({ to: catererEmail, replyTo: prospect.email, ...prospectNotificationEmail({ prospect, appUrl: await appOrigin() }) }),
-        sendMail({ to: prospect.email, fromName: companyName, replyTo: catererEmail, ...prospectAckEmail({ companyName, prospect }) }),
-      ]);
-    }
+    const prospect: ProspectDetails = {
+      firstName: first_name.trim(),
+      lastName: last_name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: body.phone?.trim() || null,
+      eventType: body.event_type || null,
+      eventDate: body.event_date || null,
+      guestCount: parseInt(body.guest_count) || null,
+      guestCountChildren: parseInt(body.guest_count_children) || null,
+      location: body.service_address?.trim() || body.address?.trim() || null,
+      message: body.message?.trim() || null,
+    };
+    await notifyProspect({ ownerId: tokenData.user_id, prospect });
 
     return NextResponse.json(
       { success: true, message: 'Demande de devis enregistrée avec succès' },

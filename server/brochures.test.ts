@@ -30,6 +30,8 @@ vi.mock('@/db', () => ({
 }));
 
 const br = await import('./brochures');
+const req = await import('./brochureRequests');
+const mail = await import('./prospectMail');
 
 const PRESTATION = '00000000-0000-4000-8000-0000000000c1';
 
@@ -161,5 +163,47 @@ describe('brochures : serveur', () => {
     current = STRANGER;
     expect(await br.getBrochureEditorData(id!)).toBeNull();
     current = OWNER;
+  });
+});
+
+describe('brochures : formulaire de fin', () => {
+  const fields = { first_name: 'Camille', last_name: 'Martin', email: 'camille@exemple.fr', event_type: 'Mariage', guest_count: 80, message: 'Bonjour' };
+  const tokenOf = async (id: string) => (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;
+
+  it('une demande valide arrive dans les Prospects du traiteur, avec la brochure ; deux emails partent', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Formulaire' });
+    sent.length = 0;
+    expect(await req.submitBrochureRequest(await tokenOf(id!), fields)).toEqual({ error: null });
+    const { rows } = await pg.query<{ owner_user_id: string; brochure_id: string; user_token: string | null; status: string }>(
+      `select owner_user_id, brochure_id, user_token, status from prospect_requests where email = 'camille@exemple.fr'`);
+    expect(rows).toEqual([{ owner_user_id: OWNER, brochure_id: id, user_token: null, status: 'nouveau' }]);
+    expect(sent.map((m) => m.to).sort()).toEqual(['camille@exemple.fr', 'contact@b.fr']);
+    expect(sent.find((m) => m.to === 'contact@b.fr')!.html).toContain('Formulaire');
+  });
+
+  it('email invalide ou brochure désactivée : refusé, rien d’enregistré', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Refus' });
+    const token = await tokenOf(id!);
+    expect((await req.submitBrochureRequest(token, { ...fields, email: 'pas-un-email' })).error).toBeTruthy();
+    await br.saveBrochure(id!, { is_active: false });
+    expect((await req.submitBrochureRequest(token, { ...fields, email: 'autre@exemple.fr' })).error).toBeTruthy();
+    const { rows } = await pg.query(`select 1 from prospect_requests where brochure_id = $1`, [id]);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('au-delà de 5 demandes par heure depuis la même connexion : refusé', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Rafale' });
+    const token = await tokenOf(id!);
+    for (let i = 0; i < 5; i++) expect((await req.submitBrochureRequest(token, { ...fields, email: `r${i}@exemple.fr` })).error).toBeNull();
+    expect((await req.submitBrochureRequest(token, { ...fields, email: 'r6@exemple.fr' })).error).toMatch(/Trop de demandes/);
+  });
+
+  it('notifyProspect : la notification au traiteur et l’accusé à la personne', async () => {
+    sent.length = 0;
+    await mail.notifyProspect({ ownerId: OWNER, prospect: { firstName: 'Lou', lastName: 'Bé', email: 'lou@exemple.fr' } });
+    expect(sent.map((m) => m.to).sort()).toEqual(['contact@b.fr', 'lou@exemple.fr']);
   });
 });

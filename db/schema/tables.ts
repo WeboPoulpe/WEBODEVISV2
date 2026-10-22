@@ -1236,6 +1236,8 @@ export const prospect_requests = pgTable("prospect_requests", {
 	guest_count_children: integer(),
 	// Brochure d'où vient la demande (formulaire en fin de brochure), sinon null.
 	brochure_id: uuid(),
+	// Empreinte de l'adresse IP (jamais l'adresse elle-même) : limite des envois depuis une même connexion.
+	ip_hash: text(),
 }, (table) => [
 	foreignKey({
 			columns: [table.brochure_id],
