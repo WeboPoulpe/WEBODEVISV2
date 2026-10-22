@@ -140,3 +140,35 @@ test('sur téléphone : la page tient dans l’écran, on écrit, le menu donne 
     await expect(page.getByRole('button', { name: 'Dupliquer' }).last()).toBeVisible();
   });
 });
+
+test('le « + » d’un plat crée une nouvelle prestation avec sa mise en page, sans toucher l’originale', async ({ browser }) => {
+  await withAccount(browser, 'plat-copie', async ({ page, userId }) => {
+    await sql(`insert into public.prestations (user_id, name, unit_price, category, gastro_card_html) values ($1, 'Menu Prestige', 30, 'menu', '<p>Ancienne fiche</p>')`, [userId]);
+    try {
+      const id = await newQuote(userId);
+      await openEditor(page, id);
+      const dish = page.locator('#weboword-sheet [data-webo-dish="Menu Prestige"]');
+      await dish.locator('p').first().click();
+      await page.keyboard.press('End');
+      await page.keyboard.type(' retouché');
+
+      await page.getByRole('button', { name: 'Mise en page de « Menu Prestige »' }).click();
+      await page.getByRole('button', { name: /Créer une nouvelle prestation/ }).click();
+      await page.getByLabel('Nom de la nouvelle prestation').fill('Menu Prestige Été');
+      await page.getByRole('button', { name: 'Créer', exact: true }).click();
+
+      const rows = () => sql<{ name: string; unit_price: string; category: string | null; gastro_card_html: string | null }>(
+        `select name, unit_price, category, gastro_card_html from public.prestations where user_id = $1 order by name`, [userId]);
+      await expect.poll(async () => (await rows()).length, { timeout: 15_000 }).toBe(2);
+      const [original, copy] = await rows();
+      expect(original.gastro_card_html).toBe('<p>Ancienne fiche</p>');
+      expect(copy.name).toBe('Menu Prestige Été');
+      expect(Number(copy.unit_price)).toBe(30);
+      expect(copy.category).toBe('menu');
+      expect(copy.gastro_card_html).toContain('Menu Prestige retouché');
+      expect(copy.gastro_card_html).not.toContain('data-webo-dish');
+    } finally {
+      await sql(`delete from public.prestations where user_id = $1`, [userId]);
+    }
+  });
+});

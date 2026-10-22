@@ -227,10 +227,10 @@ test.describe('éditeur de devis', () => {
       await t.page.keyboard.press('Control+s');
       await expect(t.page.getByText('Devis enregistré')).toBeVisible({ timeout: 15_000 });
       await typeInSheet(other, 'Version B.');
-      let asked = '';
-      other.once('dialog', (d) => { asked = d.message(); d.dismiss(); });
       await other.keyboard.press('Control+s');
-      await expect.poll(() => asked, { timeout: 15_000 }).toContain('enregistré ailleurs');
+      // La fenêtre de l'application (plus celle du navigateur) prévient ; on garde l'autre version.
+      await expect(other.getByText('Ce devis a été modifié ailleurs')).toBeVisible({ timeout: 15_000 });
+      await other.getByRole('button', { name: 'Annuler' }).click();
       // L'autre version n'a pas été écrasée.
       expect(await t.html()).toContain('Version A.');
       expect(await t.html()).not.toContain('Version B.');

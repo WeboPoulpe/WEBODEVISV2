@@ -444,6 +444,22 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   <p data-webo-formula-pending="1" style="margin:0 0 10px;text-align:right;font-size:11px;color:#888;font-style:italic;">${t.formulesNote}</p>`)
       + shownFormulas.map((f) => totalsBox(effectiveLines(activeServices, formulas, f.id), f)).join('');
 
+  // Cadre « Bon pour accord » et durée de validité : après les CGV quand le devis les contient (même page).
+  const signatureHtml = `<div data-webo-sign="1" style="display:flex;gap:14px;margin-top:16px;">
+  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
+    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.bonAccord}</p>
+    <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">${t.dateSignature}</p>
+  </div>
+  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
+    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.prestataire}</p>
+    <p style="font-size:12px;font-weight:600;margin:0;">${d.companyName}</p>
+  </div>
+</div>
+
+<div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
+  <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">${t.devisValide}</p>
+</div>`;
+
   return `${googleFontImport}
 <!-- ═══════════════════════ PAGE 1 — DEVIS FINANCIER ═══════════════════════ -->
 <div style="font-family:${fontFamily};color:#1a1a1a;line-height:1.65;">
@@ -549,28 +565,13 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   </div>
 </div>
 
-<!-- ═══════════════════════ REMARQUES + SIGNATURES + CONDITIONS ═══════════════════════ -->
+<!-- ═══════════ REMARQUES, puis CONDITIONS et SIGNATURES : avec des CGV, la signature les suit sur leur page ═══════════ -->
 ${d.remarks ? `
 <div style="margin:20px 0 16px;">
   <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.remarques}</p>
   <p style="font-size:12px;color:#555;white-space:pre-line;margin:0;">${d.remarks}</p>
 </div>
 ` : ''}
-
-<div data-webo-sign="1" style="display:flex;gap:14px;margin-top:16px;">
-  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.bonAccord}</p>
-    <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">${t.dateSignature}</p>
-  </div>
-  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.prestataire}</p>
-    <p style="font-size:12px;font-weight:600;margin:0;">${d.companyName}</p>
-  </div>
-</div>
-
-<div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
-  <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">${t.devisValide}</p>
-</div>
 
 ${d.cgv ? `
 <!-- ═══════════════════════ CONDITIONS GÉNÉRALES DE VENTE ═══════════════════════ -->
@@ -582,6 +583,10 @@ ${d.cgv ? `
   </div>
   <div style="font-size:10px;color:#555;line-height:1.6;">${d.cgv}</div>
 </div>
-` : ''}
+
+${signatureHtml}
+` : `
+${signatureHtml}
+`}
 `.trim();
 }

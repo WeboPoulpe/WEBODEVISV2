@@ -1619,7 +1619,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
           </div>
         )}
 
-        <div style={sheetZoom < 1 && fitSheet ? { zoom: sheetZoom } : undefined}>
+        <div className="relative" style={sheetZoom < 1 && fitSheet ? { zoom: sheetZoom } : undefined}>
         {/* Page de garde */}
         {coverConfig.enabled && (
           <>
@@ -1678,10 +1678,11 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
 
           {/* Vue en pages : bandes entre les feuilles, posées par-dessus, hors du texte du devis. */}
           <PageSheets bands={printPreview.bands} />
-
-          {/* « + » en face de chaque plat : sa mise en page devient celle de la prestation. */}
-          <DishLayoutButtons editorRef={editorRef} sheetRef={sheetRef} quoteId={quoteId} />
         </div>
+
+        {/* « + » en face de chaque plat (mise en page vers la prestation) : hors de la feuille, dont la remise à zéro
+            des styles de l'application casserait ses boutons ; placé par rapport à elle. */}
+        <DishLayoutButtons editorRef={editorRef} sheetRef={sheetRef} quoteId={quoteId} />
 
         {/* Page photos */}
         {photosConfig.enabled && (

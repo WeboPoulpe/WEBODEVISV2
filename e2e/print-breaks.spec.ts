@@ -13,7 +13,8 @@ const M = 'https://repere.test/';
 const mark = (name: string, text: string) => `<a href="${M}${name}" style="color:inherit;text-decoration:none;">${text}</a>`;
 
 const longCard = `<div><h3 style="text-align:center;font-size:16px;margin:0 0 8px;">${mark('plat1', 'M. Ateliers des Rêves vin d’honneur compris 84 €/pers')}</h3>`
-  + Array.from({ length: 40 }, (_, i) => `<p style="margin:0 0 4px;text-align:center;">Atelier ${i + 1} : bouchée de saison, condiment maison et herbes fraîches</p>`).join('')
+  // Plus haute qu'une page utile (A4 moins les marges, environ 1 016 px) : c'est ce qui la rend « longue ».
+  + Array.from({ length: 60 }, (_, i) => `<p style="margin:0 0 4px;text-align:center;">Atelier ${i + 1} : bouchée de saison, condiment maison et herbes fraîches</p>`).join('')
   + '</div>';
 const short = (i: number) => ({
   name: `Plat court ${i}`, quantity: 40, unitPrice: 20,
