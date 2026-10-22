@@ -11,8 +11,12 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { defaultVatRate } from '@/lib/vat';
 import {
   BROCHURE_STYLES, paginateBrochure, parseBrochureContent,
-  type BrochureContent, type BrochureCover, type BrochurePage, type BrochureStyle, type CatalogPrestation,
+  type BrochureContent, type BrochureCover, type BrochurePage, type BrochureStyle, type CatalogPrestation, type PriceOptions,
 } from '@/lib/brochure';
+import {
+  layoutError, layoutFromSimple, layoutPrestationIds, mergeLayout, parseLayout, resolveLayout, sanitizeLayout, sectionsFromLayout,
+  type PublicPage,
+} from '@/lib/brochureLayout';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { brochureEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
@@ -41,7 +45,8 @@ export interface PublicBrochure {
   cover: BrochureCover;
   /** Page « qui sommes-nous » (vide si elle est désactivée). */
   about: { html: string; photoUrl: string | null };
-  pages: BrochurePage[];
+  /** Pages de l'éditeur simple, ou pages de la mise en page avancée (pages à blocs déjà résolues). */
+  pages: PublicPage[];
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
 
@@ -114,7 +119,7 @@ export async function getBrochure(id: string): Promise<BrochureRow | null> {
   return row ?? null;
 }
 
-type Editable = Pick<BrochureRow, 'name' | 'style' | 'language' | 'show_prices' | 'price_mode' | 'vat_rate' | 'cover' | 'content' | 'is_active'>;
+type Editable = Pick<BrochureRow, 'name' | 'style' | 'language' | 'show_prices' | 'price_mode' | 'vat_rate' | 'cover' | 'content' | 'is_active' | 'layout'>;
 
 export async function saveBrochure(id: string, patch: Partial<Editable>): Promise<{ error: string | null }> {
   const user = await requireWriter();
@@ -140,6 +145,13 @@ export async function saveBrochure(id: string, patch: Partial<Editable>): Promis
   }
   if (patch.cover !== undefined) set.cover = parseCover(patch.cover, set.name ?? '');
   if (patch.content !== undefined) set.content = cleanContent(patch.content);
+  if (patch.layout !== undefined) {
+    const layout = parseLayout(patch.layout);
+    if (!layout) return { error: 'Mise en page illisible.' };
+    const problem = layoutError(layout);
+    if (problem) return { error: problem };
+    set.layout = sanitizeLayout(layout);
+  }
   const done = await db.update(brochures).set({ ...set, updated_at: new Date().toISOString() })
     .where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
   return done.length ? { error: null } : { error: NOT_FOUND };
@@ -183,7 +195,11 @@ async function byToken(token: string, activeOnly: boolean): Promise<BrochureRow 
 
 /** Prestations du catalogue de l'entreprise citées par la brochure. */
 async function catalogFor(row: BrochureRow): Promise<Map<string, CatalogPrestation>> {
-  const ids = [...new Set(parseBrochureContent(row.content).sections.flatMap((s) => s.items.map((i) => i.prestationId)))].filter((i) => UUID.test(i));
+  const layout = row.editor_mode === 'advanced' ? parseLayout(row.layout) : null;
+  const ids = [...new Set([
+    ...parseBrochureContent(row.content).sections.flatMap((s) => s.items.map((i) => i.prestationId)),
+    ...(layout ? layoutPrestationIds(layout) : []),
+  ])].filter((i) => UUID.test(i));
   if (ids.length === 0) return new Map();
   const rows = await db.select({
     id: prestations.id, name: prestations.name, description: prestations.description,
@@ -217,6 +233,40 @@ export async function getBrochureEditorData(id: string): Promise<{ brochure: Bro
   };
 }
 
+/** Pages du lien public : mise en page avancée (pages à blocs résolues) ou pagination de l'éditeur simple. */
+function publicPages(row: BrochureRow, content: BrochureContent, catalog: Map<string, CatalogPrestation>, o: Omit<PriceOptions, 'forEditor'>): PublicPage[] {
+  const layout = row.editor_mode === 'advanced' ? parseLayout(row.layout) : null;
+  if (!layout) return paginateBrochure(content, catalog, row.style as BrochureStyle, { ...o, forEditor: false });
+  return resolveLayout(layout, catalog, { ...o, forEditor: false })
+    .map((p): PublicPage => (p.kind === 'blocks' ? { kind: 'blocks', background: p.background, font: p.font, blocks: p.blocks } : { kind: p.kind }));
+}
+
+/**
+ * Change d'éditeur. Vers l'avancé : conversion des pages simples, ou, si une mise en page avancée est gardée, choix
+ * demandé (`needsChoice`) puis reprise (`resume`, mise à jour des prestations) ou nouvelle conversion. Vers le
+ * simple : les sections sont reconstruites depuis les blocs (contenu gardé, disposition perdue), la mise en page
+ * avancée reste de côté.
+ */
+export async function switchBrochureEditor(id: string, to: 'simple' | 'advanced', opts: { resume?: boolean } = {}): Promise<{ error: string | null; needsChoice?: boolean }> {
+  const user = await requireWriter();
+  const row = await getBrochure(id);
+  if (!row) return { error: NOT_FOUND };
+  const content = parseBrochureContent(row.content);
+  const set: Partial<BrochureRow> = { editor_mode: to };
+  if (to === 'simple') {
+    const layout = parseLayout(row.layout);
+    if (row.editor_mode === 'advanced' && layout) set.content = { ...content, sections: sectionsFromLayout(layout) };
+  } else {
+    const saved = parseLayout(row.layout);
+    if (saved && row.editor_mode !== 'advanced' && opts.resume === undefined) return { error: null, needsChoice: true };
+    set.layout = saved && (opts.resume || row.editor_mode === 'advanced')
+      ? mergeLayout(saved, content)
+      : layoutFromSimple(content, row.style as BrochureStyle, await catalogFor({ ...row, editor_mode: 'simple' }));
+  }
+  await db.update(brochures).set({ ...set, updated_at: new Date().toISOString() }).where(and(eq(brochures.id, row.id), mine(user.id)));
+  return { error: null };
+}
+
 /** La brochure telle que le lecteur la feuillette, ou null (jeton invalide, inconnu, lien désactivé). */
 export async function getPublicBrochure(token: string): Promise<PublicBrochure | null> {
   const row = await byToken(token, true);
@@ -229,9 +279,7 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
     name: row.name, style, language,
     cover: parseCover(row.cover, row.name),
     about: content.about.enabled ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null } : { html: '', photoUrl: null },
-    pages: paginateBrochure(content, catalog, style, {
-      show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language, forEditor: false,
-    }),
+    pages: publicPages(row, content, catalog, { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language }),
     company: {
       name: company?.name ?? '', logoUrl: company?.logoUrl ?? null, address: company?.address ?? null,
       phone: company?.phone ?? null, email: company?.email ?? null, website: company?.website ?? null,

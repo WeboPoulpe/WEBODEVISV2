@@ -9,7 +9,7 @@
 import { sanitizeHtml } from './sanitize';
 import {
   paginateBrochure, resolveItems, shortText,
-  type BrochureContent, type BrochureItem, type BrochureSection, type BrochureStyle, type CatalogPrestation,
+  type BrochureContent, type BrochureItem, type BrochurePage, type BrochureSection, type BrochureStyle, type CatalogPrestation,
   type PriceOptions, type ResolvedItem,
 } from './brochure';
 
@@ -43,6 +43,22 @@ export type ResolvedBlock =
   | Exclude<Block, Prestation | { type: 'columns' }>
   | (Omit<Extract<Block, { type: 'columns' }>, 'cols'> & { cols: ResolvedBlock[][] });
 export interface ResolvedPage { kind: PageKind; background: string | null; font: string | null; blocks: ResolvedBlock[] }
+
+/** Une page du lien public : celles de l'éditeur simple, ou une page à blocs de l'éditeur avancé. */
+export type PublicPage = BrochurePage | { kind: 'blocks'; background: string | null; font: string | null; blocks: ResolvedBlock[] };
+
+/** Identifiants des prestations citées par une mise en page. */
+export function layoutPrestationIds(l: BrochureLayout): string[] {
+  return [...new Set(blocksInOrder(l).flatMap((b) => (b.type === 'prestation' ? [b.prestationId] : [])))];
+}
+
+/** Le HTML d'une mise en page (blocs Texte, retouches) passé par le nettoyage. */
+export function sanitizeLayout(l: BrochureLayout): BrochureLayout {
+  const clean = (b: Block): Block => (b.type === 'text' ? { ...b, html: sanitizeHtml(b.html) }
+    : b.type === 'prestation' && b.html ? { ...b, html: sanitizeHtml(b.html) }
+      : b.type === 'columns' ? { ...b, cols: b.cols.map((c) => c.map(clean)) } : b);
+  return { pages: l.pages.map((p) => ({ ...p, blocks: p.blocks.map(clean) })) };
+}
 
 export const newBlockId = () => `b${Math.random().toString(36).slice(2, 10)}`;
 const newPageId = () => `p${Math.random().toString(36).slice(2, 10)}`;

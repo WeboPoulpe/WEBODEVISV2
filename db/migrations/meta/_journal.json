@@ -246,6 +246,13 @@
       "when": 1792689152716,
       "tag": "0034_prospect_ip_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792695625358,
+      "tag": "0035_brochure_layout",
+      "breakpoints": true
     }
   ]
 }

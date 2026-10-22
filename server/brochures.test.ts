@@ -252,3 +252,68 @@ describe('brochures : envoi', () => {
     current = OWNER;
   });
 });
+
+describe('brochures : éditeur avancé', () => {
+  const layoutOf = async (id: string) => (await pg.query<{ layout: { pages: { kind: string; blocks: { type: string; html?: string; text?: string }[] }[] } | null; editor_mode: string }>(
+    `select layout, editor_mode from brochures where id = $1`, [id])).rows[0];
+  const tokenOf = async (id: string) => (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;
+  const content = { sections: [{ id: 's1', title: 'Menus', items: [{ prestationId: PRESTATION }] }] };
+
+  it('passer en avancé convertit les pages ; une brochure jamais passée en avancé garde ses pages', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Avancé' });
+    await br.saveBrochure(id!, { content, style: 'carte' });
+    const before = (await br.getPublicBrochure(await tokenOf(id!)))!.pages.map((p) => p.kind);
+    expect(before).toEqual(['cover', 'about', 'items', 'contact', 'form']);
+    expect(await br.switchBrochureEditor(id!, 'advanced')).toEqual({ error: null });
+    const row = await layoutOf(id!);
+    expect(row.editor_mode).toBe('advanced');
+    expect(row.layout!.pages[0].kind).toBe('cover');
+    expect(row.layout!.pages.at(-1)!.kind).toBe('form');
+    expect((await br.getPublicBrochure(await tokenOf(id!)))!.pages.map((p) => p.kind)).toContain('blocks');
+  });
+
+  it('mise en page refusée si ses règles sont violées ; HTML nettoyé', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Règles' });
+    await br.switchBrochureEditor(id!, 'advanced');
+    const good = (await layoutOf(id!)).layout!;
+    const twoCovers = { pages: [{ id: 'c1', kind: 'cover', blocks: [] }, { id: 'c2', kind: 'cover', blocks: [] }, { id: 'f', kind: 'form', blocks: [] }] };
+    expect((await br.saveBrochure(id!, { layout: twoCovers })).error).toBeTruthy();
+    expect((await layoutOf(id!)).layout).toEqual(good);
+    const withScript = { pages: [{ id: 'b', kind: 'blocks', blocks: [{ id: 't', type: 'text', html: '<p>ok</p><script>x()</script>' }] }, { id: 'f', kind: 'form', blocks: [] }] };
+    expect((await br.saveBrochure(id!, { layout: withScript })).error).toBeNull();
+    const saved = (await layoutOf(id!)).layout!;
+    expect(saved.pages[0].blocks[0].html).toContain('<p>ok</p>');
+    expect(saved.pages[0].blocks[0].html).not.toContain('script');
+  });
+
+  it('mode avancé, prix masqués : aucun prix ni identifiant sur le lien', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Prix avancé' });
+    await br.saveBrochure(id!, { content, show_prices: false });
+    await br.switchBrochureEditor(id!, 'advanced');
+    const json = JSON.stringify(await br.getPublicBrochure(await tokenOf(id!)));
+    expect(json).toContain('Menu Tentation');
+    expect(json).not.toMatch(/€|unit_price/);
+    expect(json).not.toContain(PRESTATION);
+  });
+
+  it('retour au simple puis à l’avancé : choix demandé ; reprendre garde la mise en page faite à la main', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Aller-retour' });
+    await br.saveBrochure(id!, { content });
+    await br.switchBrochureEditor(id!, 'advanced');
+    const l = (await layoutOf(id!)).layout!;
+    const blocksPage = l.pages.find((p) => p.kind === 'blocks' && p.blocks.some((b) => b.type === 'prestation'))!;
+    blocksPage.blocks.unshift({ type: 'title', text: 'Ajouté à la main' } as never);
+    await br.saveBrochure(id!, { layout: l });
+    expect((await br.switchBrochureEditor(id!, 'simple')).error).toBeNull();
+    const simple = (await br.getBrochure(id!))!;
+    expect(JSON.stringify(simple.content)).toContain(PRESTATION);
+    expect(await br.switchBrochureEditor(id!, 'advanced')).toEqual({ error: null, needsChoice: true });
+    expect((await layoutOf(id!)).editor_mode).toBe('simple');
+    expect((await br.switchBrochureEditor(id!, 'advanced', { resume: true })).error).toBeNull();
+    expect(JSON.stringify((await layoutOf(id!)).layout)).toContain('Ajouté à la main');
+  });
+});
