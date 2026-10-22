@@ -37,6 +37,8 @@ export interface QuoteHtmlData {
     vatRate?: number | null;
     gastroCardHtml?: string | null;
     gastroCardHtmlEn?: string | null;
+    /** Nom traduit (devis en anglais), quand la fiche anglaise n'a pas de titre à lire. */
+    nameEn?: string | null;
     /** Formule de la ligne (identifiant dans `formulas`) ; absente : ligne commune à toutes les formules. */
     formula?: string | null;
   }>;
@@ -230,6 +232,7 @@ function safeData(d: QuoteHtmlData): QuoteHtmlData {
     services: d.services.map((s) => ({
       ...s,
       name: esc(s.name) ?? '',
+      nameEn: esc(s.nameEn),
       description: s.description ? sanitizeHtml(s.description) : s.description,
       gastroCardHtml: s.gastroCardHtml ? sanitizeHtml(s.gastroCardHtml) : s.gastroCardHtml,
       gastroCardHtmlEn: s.gastroCardHtmlEn ? sanitizeHtml(s.gastroCardHtmlEn) : s.gastroCardHtmlEn,
@@ -333,7 +336,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   const tableRow = (s: QuoteHtmlData['services'][number]) => {
     // For EN devis, prefer English title from gastroCardHtmlEn if available
     const displayName = lang === 'en'
-      ? (extractEnTitle(s.gastroCardHtmlEn) || s.name || '—')
+      ? (extractEnTitle(s.gastroCardHtmlEn) || s.nameEn || s.name || '—')
       : (s.name || '—');
     const badge = s.isFree
       ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.inclusBadge}</span>`

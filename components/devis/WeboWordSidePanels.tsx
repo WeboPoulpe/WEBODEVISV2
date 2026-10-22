@@ -15,6 +15,9 @@ import { formulaTotals, quoteVatBreakdown, resolveGuestSplit } from '@/lib/quote
 import FormulasEditor from './FormulasEditor';
 import { effectiveLines, lineFormulaId, newFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
+import { cardFromDescription, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
+import { sanitizeHtml } from '@/lib/sanitize';
+import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import RecipientPicker from '@/components/devis/RecipientPicker';
 import CompanySearch from '@/components/clients/CompanySearch';
 import type { CompanyResult } from '@/lib/companies';
@@ -112,6 +115,10 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const initialServiceIds = useRef<Set<string>>(new Set());
   // Empreinte des champs qui alimentent les cartes Client / Événement du document.
   const initialParties = useRef<string>('');
+  // Langue du devis au chargement : un changement refait la carte dans la nouvelle langue.
+  const initialLanguage = useRef<'fr' | 'en'>('fr');
+  // Traduction en cours des prestations (devis en anglais) : « 2 / 5 ».
+  const [translating, setTranslating] = useState<string | null>(null);
 
   // Client picker
   const [clientSearch, setClientSearch] = useState('');
@@ -272,6 +279,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setHidePrice(loadedHidePrice);
           setTemplate(loadedTemplate);
           setLanguage(loadedLanguage);
+          initialLanguage.current = loadedLanguage;
           setServices(loadedServices);
 
           initialFinancials.current = JSON.stringify({
@@ -394,8 +402,47 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   };
 
   // ── Save (all panels save all fields) ──
+  /**
+   * Devis en anglais : chaque prestation sans version anglaise est traduite (sa fiche, ou à défaut son nom et sa
+   * description mis en carte, puis son nom pour le tableau). La fiche traduite est enregistrée dans la prestation
+   * qui n'a pas encore d'anglais, pour les prochains devis. Les lignes sont complétées sur place.
+   * Renvoie le nombre de morceaux restés en français (service de traduction indisponible ou quota épuisé).
+   */
+  const translateServicesToEnglish = async (): Promise<{ missed: number; translated: string[] }> => {
+    const todo = services.filter((s) => s.name?.trim() && !s.removed && !s.isPageBreak && (!s.gastroCardHtmlEn || !s.nameEn));
+    if (todo.length === 0) return { missed: 0, translated: [] };
+    const sb = createClient();
+    const { data: q } = await sb.from('quotes').select('selected_font').eq('id', quoteId).maybeSingle();
+    const font = (q?.selected_font as string | null) ?? undefined;
+    let missed = 0;
+    const cards = new Map<string, string>();
+    for (const [i, s] of todo.entries()) {
+      setTranslating(`${i + 1} / ${todo.length}`);
+      if (!s.gastroCardHtmlEn) {
+        const fr = (s.gastroCardHtml as string | null | undefined)
+          || cardFromDescription({ name: s.name, description: s.description ?? '' }, { template: template as QuoteHtmlOptions['template'], font });
+        const res = await translateHtmlFrToEnDetailed(fr);
+        missed += res.missed;
+        // Rien de traduit : on ne garde pas une « version anglaise » qui serait en français.
+        if (!fr || res.html !== fr) { s.gastroCardHtmlEn = sanitizeHtml(res.html); cards.set(s.name, s.gastroCardHtmlEn as string); }
+      }
+      if (!s.nameEn) {
+        const nameEn = await translateTextFrToEn(s.name);
+        if (nameEn) s.nameEn = nameEn; else missed++;
+      }
+    }
+    setTranslating(null);
+    setServices([...services]);
+    // Prestations du catalogue encore sans anglais : elles gardent la traduction (une version anglaise existante
+    // n'est jamais remplacée).
+    await Promise.all([...cards].map(([name, html]) =>
+      sb.from('prestations').update({ gastro_card_html_en: html }).eq('name', name).is('gastro_card_html_en', null)));
+    return { missed, translated: [...cards.keys()] };
+  };
+
   const save = async () => {
     setSaving(true);
+    const english = language === 'en' ? await translateServicesToEnglish() : { missed: 0, translated: [] };
     const newGuestTotal = (parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0) || parseInt(guestCount) || 0;
     const previousGuests = initialGuestTotal.current;
     if (syncQuantities && previousGuests > 0 && newGuestTotal > 0 && newGuestTotal !== previousGuests) {
@@ -506,6 +553,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           vatRate: s.vatRate ?? null,
           gastroCardHtml: (s.gastroCardHtml as string | null | undefined) ?? null,
           gastroCardHtmlEn: (s.gastroCardHtmlEn as string | null | undefined) ?? null,
+          nameEn: (s.nameEn as string | null | undefined) ?? null,
           formula: lineFormulaId(s, formulas),
         });
         // Prestations réellement ajoutées depuis le chargement (nouvel id).
@@ -546,6 +594,10 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
             financials: finChanged,
             // Répercute client / événement dans le document (cartes + intro/en-tête si non retouchés).
             parties: partiesChanged,
+            // Langue changée : plats de la carte, signature et validité refaits dans la nouvelle langue.
+            relang: language !== initialLanguage.current,
+            // Déjà en anglais : seuls les plats qui viennent d'être traduits sont refaits (les autres gardent leurs retouches).
+            refreshDishes: english.translated,
           },
           { template, font: (cur.selected_font as string | null) ?? undefined },
         );
@@ -558,9 +610,15 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     setSaving(false);
     if (error) { notify('Les modifications n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.', { tone: 'error' }); return; }
     const parts = [kept.includes('intro') && 'l’introduction', kept.includes('menuTitle') && 'le titre du menu'].filter(Boolean);
-    onApplied(partiesChanged && parts.length
-      ? `Client ou événement modifié : ${parts.join(' et ')}, réécrit${parts.length > 1 ? 's' : ''} à la main, n’${parts.length > 1 ? 'ont' : 'a'} pas été mis à jour. Relisez-l${parts.length > 1 ? 'es' : 'e'} dans le document.`
-      : undefined);
+    const notes = [
+      partiesChanged && parts.length
+        ? `Client ou événement modifié : ${parts.join(' et ')}, réécrit${parts.length > 1 ? 's' : ''} à la main, n’${parts.length > 1 ? 'ont' : 'a'} pas été mis à jour. Relisez-l${parts.length > 1 ? 'es' : 'e'} dans le document.`
+        : null,
+      english.missed > 0
+        ? `Traduction en anglais incomplète : ${english.missed} passage${english.missed > 1 ? 's sont restés' : ' est resté'} en français (service de traduction indisponible ou limite du jour atteinte). Corrigez-les dans le document, ou réappliquez plus tard.`
+        : null,
+    ].filter(Boolean);
+    onApplied(notes.length ? notes.join('\n\n') : undefined);
   };
 
   if (!activePanel) return null;
@@ -1250,7 +1308,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           {activePanel !== 'cover' && activePanel !== 'photos' && (
             <button onClick={save} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Appliquer
+              {translating ? `Traduction ${translating}…` : 'Appliquer'}
             </button>
           )}
         </div>

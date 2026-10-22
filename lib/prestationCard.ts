@@ -85,25 +85,77 @@ export function isBlankHtml(html: string | null | undefined): boolean {
 }
 
 /**
- * Traduit les textes d'un HTML du français vers l'anglais (service gratuit MyMemory, morceau par morceau), en gardant
- * la mise en forme. Navigateur seulement. Les morceaux qui n'ont pas pu être traduits restent en français.
+ * Titres de carte traduits tels quels (le service gratuit les traduit mal : « Votre entrée » → « your entrance »).
+ * Clés en minuscules, sans ponctuation finale.
  */
-export async function translateHtmlFrToEn(html: string): Promise<string> {
+const MENU_TITLES: Record<string, string> = {
+  'votre entrée': 'Starter', 'entrée': 'Starter', 'entrées': 'Starters', 'votre entrée au choix': 'Your choice of starter',
+  'votre plat': 'Main course', 'votre plat chaud': 'Main course', 'plat chaud': 'Main course', 'plats': 'Main courses',
+  'votre plat chaud et ses deux légumes': 'Main course with two vegetables', 'votre plat chaud et ses 2 légumes': 'Main course with two vegetables',
+  'fromage': 'Cheese', 'fromages': 'Cheese', 'votre dessert': 'Dessert', 'dessert': 'Dessert', 'desserts': 'Desserts',
+  'au choix': 'Your choice of', 'ou': 'or', 'pour finir': 'To finish', 'boissons': 'Drinks',
+  'les pièces cocktail': 'Cocktail canapés', 'pièces cocktail': 'Cocktail canapés', 'les pièces prestige': 'Premium canapés',
+  'vin d’honneur': 'Drinks reception', "vin d'honneur": 'Drinks reception',
+};
+
+/** Termes de cuisine remplacés avant traduction (le service les laisse ensuite tels quels). */
+const MENU_TERMS: [RegExp, string][] = [
+  [/gratin dauphinois/gi, 'dauphinoise potatoes'],
+  [/pièces? cocktail/gi, 'canapés'],
+  [/poêlée forestière/gi, 'pan-fried wild mushrooms'],
+  [/vin d[’']honneur/gi, 'drinks reception'],
+  [/mesclun/gi, 'mixed leaves'],
+  [/petits pains/gi, 'bread rolls'],
+];
+
+/**
+ * Traduit un texte du français vers l'anglais (service gratuit MyMemory, après le glossaire de cuisine ci-dessus).
+ * Navigateur seulement. Null si le service n'a pas donné de vraie traduction (réseau, quota du jour épuisé…) : le
+ * texte reste alors en français.
+ */
+export async function translateTextFrToEn(text: string): Promise<string | null> {
+  const txt = text.trim();
+  if (txt.length < 2) return null;
+  const title = MENU_TITLES[txt.toLowerCase().replace(/[\s:.…]+$/, '')];
+  if (title) return title;
+  const prepared = MENU_TERMS.reduce((acc, [re, en]) => acc.replace(re, en), txt);
+  try {
+    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(prepared)}&langpair=fr|en`);
+    const data = await res.json();
+    const out = data?.responseData?.translatedText;
+    // Quota épuisé ou erreur : le service répond par un message (« MYMEMORY WARNING… »), pas par une traduction.
+    if (Number(data?.responseStatus) !== 200 || typeof out !== 'string' || !out.trim() || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(out)) return null;
+    // Le service renvoie parfois des entités HTML (&#39;, &quot;) : on les décode en texte.
+    const decode = document.createElement('textarea');
+    decode.innerHTML = out;
+    return decode.value;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Traduit les textes d'un HTML du français vers l'anglais, morceau par morceau, en gardant la mise en forme.
+ * Navigateur seulement. `missed` : morceaux restés en français (service indisponible, quota du jour épuisé).
+ */
+export async function translateHtmlFrToEnDetailed(html: string): Promise<{ html: string; missed: number }> {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
   const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+  let missed = 0;
   for (const n of nodes) {
     const txt = (n.textContent || '').trim();
-    if (txt.length < 2) continue;
-    try {
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=fr|en`);
-      const data = await res.json();
-      const out = data?.responseData?.translatedText;
-      if (typeof out === 'string' && out) n.textContent = (n.textContent || '').replace(txt, out);
-    } catch { /* morceau laissé en français */ }
+    if (txt.length < 2 || !/[a-zà-ÿ]/i.test(txt)) continue;
+    const out = await translateTextFrToEn(txt);
+    if (out) n.textContent = (n.textContent || '').replace(txt, out); else missed++;
     await new Promise((r) => setTimeout(r, 100));
   }
-  return tmp.innerHTML;
+  return { html: tmp.innerHTML, missed };
+}
+
+/** Comme translateHtmlFrToEnDetailed, sans le compte des morceaux restés en français. */
+export async function translateHtmlFrToEn(html: string): Promise<string> {
+  return (await translateHtmlFrToEnDetailed(html)).html;
 }

@@ -616,6 +616,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
             vatRate: s.vatRate ?? null,
             gastroCardHtml: s.gastroCardHtml,
             gastroCardHtmlEn: s.gastroCardHtmlEn,
+            nameEn: s.nameEn ?? null,
             formula: lineFormulaId(s, formulas),
           })),
         // Toutes les formules restent dans le document : la page du client et l'impression ne montrent que la retenue.

@@ -25,6 +25,13 @@ export interface WeboSyncInput {
   financials?: boolean;
   /** À activer quand le client ou l'événement ont changé. */
   parties?: boolean;
+  /**
+   * La langue du devis a changé : les plats de la carte (fiches dans la nouvelle langue), le cadre « Bon pour
+   * accord » et la durée de validité sont refaits.
+   */
+  relang?: boolean;
+  /** Plats (noms des prestations) à refaire seuls, par exemple après la traduction de leur fiche. */
+  refreshDishes?: string[];
   /** Rempli par la synchronisation : blocs de texte laissés tels quels parce que réécrits à la main. */
   kept?: ('intro' | 'menuTitle')[];
 }
@@ -77,6 +84,45 @@ function pickInner(html: string, selector: string): string | null {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const el = doc.querySelector(selector);
   return el ? el.innerHTML : null;
+}
+
+/**
+ * Changement de langue : chaque plat de la carte (repère data-webo-dish) est remplacé par sa version fraîche,
+ * fiche dans la nouvelle langue ; un document d'avant les repères reçoit la carte entière. Le cadre « Bon pour
+ * accord » et la durée de validité qui le suit sont refaits aussi. Vrai si quelque chose a changé.
+ */
+function relangDocument(doc: Document, all: QuoteHtmlData, opts: QuoteHtmlOptions, only?: Set<string>): boolean {
+  const fresh = new DOMParser().parseFromString(generateQuoteHtml(all, opts), 'text/html');
+  let changed = false;
+  const menu = doc.querySelector('.gastro-menu');
+  const freshMenu = fresh.querySelector('.gastro-menu');
+  if (menu && freshMenu) {
+    const byName = new Map<string, Element[]>();
+    for (const d of Array.from(freshMenu.querySelectorAll(':scope > [data-webo-dish]'))) {
+      const name = d.getAttribute('data-webo-dish') ?? '';
+      byName.set(name, [...(byName.get(name) ?? []), d]);
+    }
+    const dishes = Array.from(menu.querySelectorAll(':scope > [data-webo-dish]'))
+      .filter((d) => !only || only.has(d.getAttribute('data-webo-dish') ?? ''));
+    if (dishes.length === 0 && !only) {
+      menu.innerHTML = freshMenu.innerHTML;
+      changed = true;
+    }
+    for (const d of dishes) {
+      const next = byName.get(d.getAttribute('data-webo-dish') ?? '')?.shift();
+      if (next) { d.replaceWith(doc.importNode(next, true)); changed = true; }
+    }
+  }
+  const sign = only ? null : doc.querySelector('[data-webo-sign]');
+  const freshSign = fresh.querySelector('[data-webo-sign]');
+  if (sign && freshSign) {
+    const validity = sign.nextElementSibling;
+    const freshValidity = freshSign.nextElementSibling;
+    if (validity && freshValidity && /valable|valid/i.test(validity.textContent || '')) validity.replaceWith(doc.importNode(freshValidity, true));
+    sign.replaceWith(doc.importNode(freshSign, true));
+    changed = true;
+  }
+  return changed;
 }
 
 /**
@@ -199,7 +245,11 @@ export function syncWeboDocument(
     }
   }
 
-  // ── 2 bis) Carte rangée par formule (lignes déplacées, formules ajoutées, renommées ou supprimées) ──
+  // ── 2 bis) Nouvelle langue : plats, signature et validité refaits dans cette langue ──
+  if (input.relang && relangDocument(doc, input.all, opts)) changed = true;
+  else if (input.refreshDishes?.length && relangDocument(doc, input.all, opts, new Set(input.refreshDishes))) changed = true;
+
+  // ── 2 ter) Carte rangée par formule (lignes déplacées, formules ajoutées, renommées ou supprimées) ──
   if (input.financials !== false && regroupCarte(doc, input.all, opts)) changed = true;
 
   // ── 3) Client / Événement (+ intro et en-tête de carte si non retouchés) ────
