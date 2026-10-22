@@ -15,6 +15,7 @@ import { formulaTotals, quoteVatBreakdown, resolveGuestSplit } from '@/lib/quote
 import FormulasEditor from './FormulasEditor';
 import { effectiveLines, lineFormulaId, newFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
+import { isPerGuestPrestation } from '@/lib/brochure';
 import { cardFromDescription, isBlankHtml, translateCarteToEnglish, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
 import { sanitizeHtml } from '@/lib/sanitize';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
@@ -374,9 +375,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addPrestation = (p: any) => {
-    const category = String(p.category ?? '').toLowerCase();
-    const perGuest = !['matériel', 'materiel', 'personnel', 'logistique'].includes(category)
-      && !/forfait/i.test(p.name ?? '') && Number(p.unit_price ?? 0) < 150;
+    const perGuest = isPerGuestPrestation(p);
     const newSvc: Service = {
       id: crypto.randomUUID(),
       name: p.name,
