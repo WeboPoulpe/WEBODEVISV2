@@ -241,4 +241,63 @@ test.describe('brochures', () => {
       await deleteAccount(user.id);
     }
   });
+  test('éditeur avancé : passer en avancé, ajouter et déplacer des blocs', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(180_000);
+    await withAccount(browser, 'brochure-avance', async (page, userId) => {
+      const [a] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Menu Tentation', 76, 'dîner', '<p>Entrée, plat, dessert</p>') returning id`, [userId]);
+      const [c] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Champêtre chic', 88, 'dîner', '<p>Vin d''honneur compris</p>') returning id`, [userId]);
+      const token = `jeton-e2e-avance-${Date.now()}`;
+      const content = { about: { enabled: false, html: '' }, contact: { enabled: true }, sections: [{ id: 's1', title: 'Nos menus', items: [{ prestationId: a.id }, { prestationId: c.id }] }] };
+      const [b] = await sql<{ id: string }>(`insert into public.brochures (owner_user_id, user_id, name, share_token, cover, content) values ($1, $1, 'Mariages 2027', $2, '{"title":"Mariages 2027"}'::jsonb, $3::jsonb) returning id`,
+        [userId, token, JSON.stringify(content)]);
+      await page.goto(`/brochures/${b.id}`);
+      await expect(page.getByLabel('Nom de la brochure')).toHaveValue('Mariages 2027', { timeout: 20_000 });
+
+      await page.getByRole('button', { name: 'Éditeur avancé' }).click();
+      const pages = page.getByRole('button', { name: /^Page \d+/ });
+      await expect(pages).toHaveCount(5, { timeout: 15_000 });
+      await pages.nth(1).click();
+      const canvas = page.getByRole('region', { name: 'Page en cours' });
+      await page.getByRole('button', { name: 'Ajouter : Titre' }).click();
+      await expect(canvas.getByRole('heading', { name: 'Titre', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Monter le bloc' }).click();
+      await page.getByRole('button', { name: 'Monter le bloc' }).click();
+      await page.getByRole('button', { name: 'Ajouter une page' }).click();
+      await expect(pages).toHaveCount(6);
+      await page.getByRole('button', { name: 'Supprimer la page' }).click();
+      await page.getByRole('button', { name: 'Supprimer', exact: true }).click();
+      await expect(pages).toHaveCount(5);
+      await expect(page.getByText('Enregistré')).toBeVisible({ timeout: 10_000 });
+
+      const reader = await page.context().newPage();
+      await reader.goto(`/b/${token}`);
+      await reader.getByRole('button', { name: 'Page suivante' }).click();
+      await reader.waitForTimeout(750);
+      const first = reader.getByRole('heading').first();
+      await expect(first).toHaveText('Titre');
+      await reader.close();
+
+      await page.getByRole('button', { name: 'Éditeur simple' }).click();
+      await page.getByRole('button', { name: 'Passer à l’éditeur simple' }).click();
+      const composition = page.getByRole('region', { name: 'Composition' });
+      await expect(composition).toContainText('Menu Tentation', { timeout: 15_000 });
+      await expect(composition).toContainText('Champêtre chic');
+
+      await page.getByRole('button', { name: 'Éditeur avancé' }).click();
+      await page.getByRole('button', { name: 'Reprendre ma mise en page avancée' }).click();
+      await expect(pages).toHaveCount(5, { timeout: 15_000 });
+      await pages.nth(1).click();
+      await expect(canvas.getByRole('heading', { name: 'Titre', exact: true })).toBeVisible();
+
+      for (let i = 0; i < 25; i++) await page.getByRole('button', { name: 'Ajouter : Espace' }).click();
+      await expect(page.getByText('Page trop pleine').first()).toBeVisible();
+      await page.screenshot({ path: 'e2e/screenshots/brochure-avance-desktop.png' });
+
+      await page.setViewportSize({ width: 360, height: 780 });
+      await page.reload();
+      await expect(page.getByRole('button', { name: /^Page \d+/ }).first()).toBeVisible({ timeout: 20_000 });
+      expect(await horizontalOverflow(page)).toBe(0);
+      await page.screenshot({ path: 'e2e/screenshots/brochure-avance-mobile.png', fullPage: true });
+    });
+  });
 });
