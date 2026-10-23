@@ -267,6 +267,13 @@
       "when": 1792750026776,
       "tag": "0037_webo_assistant",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792751380641,
+      "tag": "0038_webo_busy",
+      "breakpoints": true
     }
   ]
 }

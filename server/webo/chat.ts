@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { db } from '@/db';
 import { webo_conversations, webo_proposals } from '@/db/schema';
 import { isDemoUser } from '@/lib/demo';
@@ -9,9 +9,9 @@ import { modelCostUsd } from '@/lib/webo/models';
 import { coinsForCost } from '@/lib/webocoins';
 import { requireUser, requireWriter } from '../session';
 import { getWeboSettings } from '../settings';
-import { companyIdFor, debitCoins, recordUsage, walletOf } from '../weboWallet';
+import { companyIdFor, debitCoins, recordUsage, settleDebit, walletOf } from '../weboWallet';
 import { routeMessage, runSpecialist, type CallUsage } from './agents';
-import type { AgentName, ProposalSummary } from './tools';
+import { isUuid, type AgentName, type ProposalSummary } from './tools';
 
 // La discussion avec Webo : un message du traiteur → l'aiguilleur choisit le spécialiste → réponse et propositions.
 // Chaque réponse est payée au coût réel de ses appels × coefficient (au plus le solde restant).
@@ -56,69 +56,79 @@ export async function sendWeboMessage(conversationId: string | null, text: strin
   const companyId = await companyIdFor(user.id);
   if (isDemoUser(companyId)) return { error: 'Webo n’est pas disponible dans la démonstration.' };
 
+  // 1. La conversation, réservée le temps de la réponse : un second envoi en même temps attend son tour.
+  const busyUntil = () => new Date(Date.now() + 3 * 60_000).toISOString();
   let conv: typeof webo_conversations.$inferSelect | undefined;
   if (conversationId) {
-    [conv] = await db.select().from(webo_conversations)
-      .where(and(eq(webo_conversations.id, conversationId), eq(webo_conversations.user_id, user.id))).limit(1);
-    if (!conv) return { error: 'Conversation introuvable.' };
+    if (!isUuid(conversationId)) return { error: 'Conversation introuvable.' };
+    [conv] = await db.update(webo_conversations).set({ busy_until: busyUntil() })
+      .where(and(eq(webo_conversations.id, conversationId), eq(webo_conversations.user_id, user.id),
+        or(isNull(webo_conversations.busy_until), lt(webo_conversations.busy_until, new Date().toISOString()))))
+      .returning();
+    if (!conv) {
+      const [exists] = await db.select({ id: webo_conversations.id }).from(webo_conversations)
+        .where(and(eq(webo_conversations.id, conversationId), eq(webo_conversations.user_id, user.id))).limit(1);
+      return { error: exists ? 'Webo répond encore à votre message précédent : un instant.' : 'Conversation introuvable.' };
+    }
   }
+  const release = async () => { if (conv) await db.update(webo_conversations).set({ busy_until: null }).where(eq(webo_conversations.id, conv.id)); };
   const transcript = ((conv?.transcript ?? []) as TranscriptEntry[]);
-  if (transcript.length >= MAX_ENTRIES) return { error: 'Cette conversation est complète : commencez-en une nouvelle.' };
+  if (transcript.length >= MAX_ENTRIES) { await release(); return { error: 'Cette conversation est complète : commencez-en une nouvelle.' }; }
 
-  const wallet = await walletOf(companyId);
-  if (wallet.total < MIN_COINS) return { error: `Il faut au moins ${MIN_COINS} WeboCoins pour écrire à Webo. Vous en avez ${wallet.total}.` };
-
+  // 2. Réservation de 5 pièces avant tout appel : sans elles, pas de Claude (même avec plusieurs envois en parallèle).
+  const hold = await debitCoins(companyId, { userId: user.id, amount: MIN_COINS, reason: `Webo : ${message.slice(0, 60)}`, idempotencyKey: `chat:${crypto.randomUUID()}` });
+  if (!hold.ok) {
+    await release();
+    const total = (await walletOf(companyId)).total;
+    return { error: `Il faut au moins ${MIN_COINS} WeboCoins pour écrire à Webo. Vous en avez ${total}.` };
+  }
   if (!conv) {
-    [conv] = await db.insert(webo_conversations).values({ company_id: companyId, user_id: user.id, title: message.slice(0, 80) }).returning();
+    [conv] = await db.insert(webo_conversations).values({ company_id: companyId, user_id: user.id, title: message.slice(0, 80), busy_until: busyUntil() }).returning();
   }
   const history = await historyText(transcript);
   const ctx = { userId: user.id, companyId, conversationId: conv.id, proposals: [] as string[] };
 
-  let agent: AgentName;
+  // 3. Aiguilleur puis spécialiste ; chaque appel fait est compté, même si la suite échoue.
+  let agent: AgentName = 'aide';
   let replyText: string;
+  let failed = false;
   const usage: CallUsage[] = [];
   try {
     const routed = await routeMessage(message, history);
     agent = routed.agent;
     usage.push(...routed.usage);
-    const out = await runSpecialist(agent, ctx, history, message, todayFr());
-    replyText = out.text;
-    usage.push(...out.usage);
-  } catch {
-    return { error: 'Webo n’a pas pu répondre. Réessayez dans un instant.', conversationId: conv.id };
+    replyText = (await runSpecialist(agent, ctx, history, message, todayFr(), usage, Date.now() + 50_000)).text;
+  } catch (e) {
+    console.error('[webo] réponse', e);
+    failed = true;
+    replyText = 'Je n’ai pas pu terminer ma réponse. Réessayez dans un instant.';
   }
 
-  // Paiement : coût réel × coefficient, au plus le solde restant.
+  // 4. Paiement : la réservation est ramenée au coût réel × coefficient (au plus le solde).
   const settings = await getWeboSettings();
   const costUsd = usage.reduce((s, u) => s + modelCostUsd(u.model, u), 0);
   const due = usage.length ? coinsForCost(costUsd, settings.actionCoefficient, settings.usdEur) : 0;
-  let coins = 0;
-  if (due > 0) {
-    const key = `chat:${conv.id}:${transcript.length}`;
-    for (let attempt = 0; attempt < 2 && coins === 0; attempt++) {
-      const amount = Math.min(due, (await walletOf(companyId)).total);
-      if (amount <= 0) break;
-      const debit = await debitCoins(companyId, { userId: user.id, amount, reason: `Webo : ${message.slice(0, 60)}`, idempotencyKey: key });
-      if (debit.ok) {
-        coins = amount;
-        await recordUsage(debit.ledgerId, {
-          model: `webo-${agent}`, input: usage.reduce((s, u) => s + u.input + u.cacheWrite + u.cacheRead, 0),
-          output: usage.reduce((s, u) => s + u.output, 0), costUsd,
-        });
-      }
-    }
+  const coins = await settleDebit(hold.ledgerId, due, `Webo : ${message.slice(0, 60)}`);
+  if (usage.length) {
+    await recordUsage(hold.ledgerId, {
+      model: `webo-${agent}`, input: usage.reduce((s, u) => s + u.input + u.cacheWrite + u.cacheRead, 0),
+      output: usage.reduce((s, u) => s + u.output, 0), costUsd,
+    });
   }
 
+  // 5. L'échange est gardé (même raté), et la conversation libérée.
   const now = new Date().toISOString();
   const next: TranscriptEntry[] = [
     ...transcript,
     { role: 'user', text: message, at: now },
     { role: 'assistant', text: replyText, agent, proposalIds: ctx.proposals, coins, at: now },
   ];
-  await db.update(webo_conversations).set({ transcript: next, updated_at: now }).where(eq(webo_conversations.id, conv.id));
+  await db.update(webo_conversations).set({ transcript: next, updated_at: now, busy_until: null }).where(eq(webo_conversations.id, conv.id));
+  const balance = (await walletOf(companyId)).total;
+  if (failed) return { error: replyText, conversationId: conv.id, balance };
   const props = await proposalsByIds(ctx.proposals);
   return {
-    error: null, conversationId: conv.id, balance: (await walletOf(companyId)).total,
+    error: null, conversationId: conv.id, balance,
     reply: { text: replyText, agent, proposals: ctx.proposals.map((id) => props.get(id)!).filter(Boolean), coins },
   };
 }
@@ -132,7 +142,7 @@ export async function listWeboConversations(): Promise<{ id: string; title: stri
 
 export async function getWeboConversation(id: string): Promise<{ id: string; transcript: TranscriptEntry[]; proposals: Record<string, ProposalView> } | null> {
   const user = await requireUser();
-  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  if (!isUuid(id)) return null;
   const [conv] = await db.select().from(webo_conversations).where(and(eq(webo_conversations.id, id), eq(webo_conversations.user_id, user.id))).limit(1);
   if (!conv) return null;
   const transcript = conv.transcript as TranscriptEntry[];

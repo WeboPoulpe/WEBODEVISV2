@@ -68,17 +68,27 @@ Tiens compte de la conversation en cours. Réponds seulement avec le JSON demand
   return { agent, usage: [usageOf(res)] };
 }
 
-/** Le spécialiste répond, en utilisant ses outils (8 tours au plus). */
-export async function runSpecialist(agent: AgentName, ctx: ToolContext, history: string, text: string, today: string): Promise<AgentReply> {
-  if (weboFake()) return fakeSpecialist(agent, ctx, text);
+/**
+ * Le spécialiste répond, en utilisant ses outils (8 tours au plus). `usage` reçoit le coût de chaque appel au fur et à
+ * mesure (il reste payé si la suite échoue) ; passé `deadline` (horodatage), plus de nouvel appel : Webo répond avec
+ * ce qu'il a déjà fait.
+ */
+export async function runSpecialist(agent: AgentName, ctx: ToolContext, history: string, text: string, today: string, usage: CallUsage[], deadline: number): Promise<AgentReply> {
+  if (weboFake()) {
+    const out = await fakeSpecialist(agent, ctx, text);
+    usage.push(...out.usage);
+    return { text: out.text, usage };
+  }
   const model = agent === 'aide' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
   const tools = toolsFor(agent);
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
     content: `Aujourd'hui : ${today}.\n${history ? `\nConversation jusqu'ici :\n${history}\n` : ''}\nMessage du traiteur :\n${text}`,
   }];
-  const usage: CallUsage[] = [];
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    if (round > 0 && Date.now() > deadline) {
+      return { text: 'Je n’ai pas eu le temps de tout faire. Voici où j’en suis : relancez-moi pour continuer.', usage };
+    }
     const res = await callClaude({
       model, max_tokens: MAX_TOKENS, system: systemFor(agent), messages,
       output_config: { effort: agent === 'aide' ? 'low' : 'medium' },

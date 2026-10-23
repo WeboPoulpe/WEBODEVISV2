@@ -124,6 +124,54 @@ export async function refundDebit(ledgerId: string): Promise<void> {
   });
 }
 
+/**
+ * Ramène un débit (une réservation) à son montant final : rend la différence (pièces gardées d'abord, pièces du mois si
+ * le mois n'a pas changé) ou prend le complément, au plus le solde. Une seule ligne au journal. Renvoie le montant final.
+ */
+export async function settleDebit(ledgerId: string, wanted: number, reason: string, now: Date = new Date()): Promise<number> {
+  const [line] = await db.select().from(webo_ledger).where(and(eq(webo_ledger.id, ledgerId), eq(webo_ledger.kind, 'debit'))).limit(1);
+  if (!line) return 0;
+  const reserved = -line.coins;
+  const target = Math.max(0, Math.floor(wanted));
+  if (target < reserved) {
+    const back = reserved - target;
+    const backKept = Math.min(back, line.from_kept);
+    const backMonth = back - backKept;
+    const debitMonth = monthKeyParis(new Date(line.created_at));
+    await db.transaction(async (tx) => {
+      await tx.update(webo_wallets).set({
+        kept_coins: sql`${webo_wallets.kept_coins} + ${backKept}`,
+        month_coins: sql`${webo_wallets.month_coins} + (case when ${webo_wallets.month_key} = ${debitMonth} then ${backMonth} else 0 end)`,
+      }).where(eq(webo_wallets.company_id, line.company_id));
+      await tx.update(webo_ledger).set({
+        coins: -target, from_kept: line.from_kept - backKept, from_month: line.from_month - backMonth, reason: reason.slice(0, 200),
+      }).where(eq(webo_ledger.id, ledgerId));
+    });
+    return target;
+  }
+  let extraTaken = 0;
+  for (let attempt = 0; attempt < 3 && target > reserved && extraTaken === 0; attempt++) {
+    const wallet = await walletOf(line.company_id, now);
+    const extra = Math.min(target - reserved, wallet.total);
+    if (extra <= 0) break;
+    const split = splitDebit(wallet.month, wallet.kept, extra)!;
+    const [done] = await db.update(webo_wallets).set({
+      month_coins: sql`${webo_wallets.month_coins} - ${split.fromMonth}`,
+      kept_coins: sql`${webo_wallets.kept_coins} - ${split.fromKept}`,
+    }).where(and(
+      eq(webo_wallets.company_id, line.company_id), eq(webo_wallets.month_key, wallet.monthKey),
+      gte(webo_wallets.month_coins, split.fromMonth), gte(webo_wallets.kept_coins, split.fromKept),
+    )).returning({ id: webo_wallets.company_id });
+    if (!done) continue;
+    extraTaken = extra;
+    await db.update(webo_ledger).set({
+      coins: -(reserved + extra), from_month: line.from_month + split.fromMonth, from_kept: line.from_kept + split.fromKept,
+    }).where(eq(webo_ledger.id, ledgerId));
+  }
+  await db.update(webo_ledger).set({ reason: reason.slice(0, 200) }).where(eq(webo_ledger.id, ledgerId));
+  return reserved + extraTaken;
+}
+
 /** Coût réel d'un débit lié à un appel à Claude. */
 export async function recordUsage(ledgerId: string, u: { model: string; input: number; output: number; costUsd: number }): Promise<void> {
   await db.update(webo_ledger).set({ model: u.model, input_tokens: u.input, output_tokens: u.output, cost_usd: u.costUsd.toFixed(6) })

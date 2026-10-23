@@ -25,8 +25,9 @@ export interface ProposalSummary {
 
 const eur = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
 const str = (v: unknown, max = 500) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
-const nullableStr = { type: ['string', 'null'] } as const;
-const nullableNum = { type: ['number', 'null'] } as const;
+// Champs facultatifs : forme anyOf, documentée pour les outils stricts.
+const nullableStr = { anyOf: [{ type: 'string' }, { type: 'null' }] } as const;
+const nullableNum = { anyOf: [{ type: 'number' }, { type: 'null' }] } as const;
 
 function tool(name: string, description: string, properties: Record<string, unknown>): Anthropic.Tool {
   return {
@@ -46,9 +47,11 @@ const TOOLS: Record<string, Anthropic.Tool> = {
   propose_quote: tool('propose_quote', 'Propose un nouveau devis au traiteur (il le validera). Client existant (customer_id) ou nouveau client (new_customer). Lignes : prestation_id du catalogue quand elle existe (son prix est repris), sinon nom seul ; quantity null = règle habituelle (couverts pour une prestation au couvert, sinon 1) ; unit_price seulement pour une ligne hors catalogue dont le traiteur a donné le prix.', {
     customer_id: nullableStr,
     new_customer: {
-      type: ['object', 'null'],
-      properties: { first_name: { type: 'string' }, last_name: { type: 'string' }, email: { type: 'string' }, phone: nullableStr },
-      required: ['first_name', 'last_name', 'email', 'phone'], additionalProperties: false,
+      anyOf: [{
+        type: 'object',
+        properties: { first_name: { type: 'string' }, last_name: { type: 'string' }, email: { type: 'string' }, phone: nullableStr },
+        required: ['first_name', 'last_name', 'email', 'phone'], additionalProperties: false,
+      }, { type: 'null' }],
     },
     client_name: { type: 'string' },
     event_type: { type: 'string' },
@@ -91,7 +94,7 @@ export const toolsFor = (agent: AgentName): Anthropic.Tool[] => BY_AGENT[agent].
 
 class ToolError extends Error {}
 const fail = (m: string): never => { throw new ToolError(m); };
-const isUuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v);
+export const isUuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const like = (q: string) => `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
 
 async function catalogueById(ctx: ToolContext, ids: string[]) {
@@ -172,7 +175,8 @@ const HANDLERS: Record<string, Handler> = {
 
   async propose_quote(ctx, i) {
     const date = str(i.event_date, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) fail('Date de l’événement attendue au format AAAA-MM-JJ.');
+    // La date doit exister (pas de 30 février) : elle doit se relire à l'identique.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) fail('Date de l’événement attendue au format AAAA-MM-JJ, et qui existe.');
     const guests = Number(i.guest_count);
     if (!Number.isInteger(guests) || guests < 1 || guests > 5000) fail('Nombre de couverts entre 1 et 5 000.');
     const eventType = str(i.event_type, 60) || 'Autre';
@@ -222,10 +226,12 @@ const HANDLERS: Record<string, Handler> = {
     return propose(ctx, 'quote', payload, {
       title: 'Nouveau devis',
       fields: [
-        { label: 'Client', value: clientName + (newCustomer ? ` (nouveau client, ${newCustomer.email})` : '') },
+        { label: 'Client', value: clientName + (newCustomer ? ` (nouveau client, ${newCustomer.email}${newCustomer.phone ? `, ${newCustomer.phone}` : ''})` : '') },
         { label: 'Événement', value: `${eventType} le ${d}/${m}/${y}` },
         { label: 'Couverts', value: String(guests) },
         ...(payload.eventLocation ? [{ label: 'Lieu', value: payload.eventLocation }] : []),
+        // Tout ce qui sera écrit dans le devis est montré avant validation.
+        ...(payload.remarks ? [{ label: 'Remarques', value: payload.remarks }] : []),
       ],
       lines: lines.map((l) => ({ label: l.name, detail: `${l.quantity} × ${eur(l.unitPrice)}${l.fromCatalogue ? '' : l.unitPrice ? ' (hors catalogue)' : ' (à chiffrer)'}`, amount: eur(l.quantity * l.unitPrice) })),
       total: `${eur(totals.ht)} HT · ${eur(totals.ttc)} TTC`,
@@ -305,6 +311,8 @@ export async function runTool(ctx: ToolContext, name: string, input: unknown): P
     return JSON.stringify(await handler(ctx, (input && typeof input === 'object' ? input : {}) as Record<string, unknown>));
   } catch (e) {
     if (e instanceof ToolError) return JSON.stringify({ error: e.message });
-    throw e;
+    // Erreur inattendue (base, donnée illisible) : rendue au modèle comme une erreur, la réponse continue.
+    console.error('[webo] outil', name, e);
+    return JSON.stringify({ error: 'Cette recherche n’a pas pu être faite.' });
   }
 }

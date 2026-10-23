@@ -11,6 +11,7 @@ import { companyIdsOf } from '../companyScope';
 import { createInvoiceDraft } from '../invoices';
 import { requireWriter } from '../session';
 import { companyIdFor } from '../weboWallet';
+import { isUuid } from './tools';
 
 // Valider ou annuler une proposition de Webo. La proposition passe d'abord de « proposée » à « faite » ou « annulée »
 // par une mise à jour conditionnelle (une seule exécution, même sur un double clic), puis l'écriture est faite ici,
@@ -74,7 +75,7 @@ async function sendProspectReply(companyId: string, p: { prospectId: string; to:
 export async function decideProposal(id: string, decision: 'accept' | 'cancel'): Promise<{ error: string | null; result?: ProposalResult }> {
   const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
-  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return { error: 'Proposition introuvable.' };
+  if (!isUuid(id)) return { error: 'Proposition introuvable.' };
   const companyId = await companyIdFor(user.id);
   const now = new Date().toISOString();
   const [taken] = await db.update(webo_proposals)

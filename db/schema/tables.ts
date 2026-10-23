@@ -2089,6 +2089,8 @@ export const webo_conversations = pgTable("webo_conversations", {
 	user_id: uuid().notNull(),
 	title: text().default('').notNull(),
 	transcript: jsonb().default([]).notNull(),
+	// Webo répond à un message de cette conversation jusqu'à cette heure : un second envoi attend son tour.
+	busy_until: timestamp({ withTimezone: true, mode: 'string' }),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [

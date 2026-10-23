@@ -24,7 +24,7 @@ let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); }, get pool() { return null; } }));
 
 type Reply = { model: string; stop_reason: string; content: unknown[]; usage: { input_tokens: number; output_tokens: number } };
-let script: Reply[] = [];
+let script: (Reply | Error)[] = [];
 const sentParams: Record<string, unknown>[] = [];
 vi.mock('@/lib/webo/client', () => ({
   weboAvailable: () => true,
@@ -33,11 +33,14 @@ vi.mock('@/lib/webo/client', () => ({
     sentParams.push(params);
     const next = script.shift();
     if (!next) throw new Error('script vide');
+    await new Promise((r) => setTimeout(r, 5));
+    if (next instanceof Error) throw next;
     return next;
   },
 }));
 
 const chat = await import('./chat');
+const agents = await import('./agents');
 const route = (agent: string): Reply => ({ model: 'claude-haiku-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ agent }) }], usage: { input_tokens: 1000, output_tokens: 100 } });
 const say = (text: string, usage = { input_tokens: 10_000, output_tokens: 1000 }, model = 'claude-sonnet-5-5'): Reply => ({ model, stop_reason: 'end_turn', content: [{ type: 'text', text }], usage });
 const use = (name: string, input: unknown): Reply => ({ model: 'claude-sonnet-5-5', stop_reason: 'tool_use', content: [{ type: 'tool_use', id: `t-${name}-${Math.random()}`, name, input }], usage: { input_tokens: 2000, output_tokens: 200 } });
@@ -122,6 +125,52 @@ describe('discussion avec Webo', () => {
     current = READER;
     await expect(chat.sendWeboMessage(null, 'Bonjour')).rejects.toThrow();
     expect(sentParams).toHaveLength(0);
+  });
+
+  it('deux envois en même temps sur la même conversation : un seul passe, l’autre attend son tour', async () => {
+    script = [route('aide'), say('Bonjour', undefined, 'claude-haiku-5-5')];
+    const first = await chat.sendWeboMessage(null, 'Bonjour');
+    sentParams.length = 0;
+    script = [route('aide'), say('Un', undefined, 'claude-haiku-5-5'), route('aide'), say('Deux', undefined, 'claude-haiku-5-5')];
+    const [a, b] = await Promise.all([chat.sendWeboMessage(first.conversationId!, 'Un'), chat.sendWeboMessage(first.conversationId!, 'Deux')]);
+    expect([a.error, b.error].filter(Boolean)).toHaveLength(1);
+    expect(sentParams).toHaveLength(2);
+    const conv = await chat.getWeboConversation(first.conversationId!);
+    expect(conv!.transcript).toHaveLength(4);
+  });
+
+  it('solde juste : deux conversations en même temps, une seule part chez Claude', async () => {
+    await pg.exec(`insert into webo_wallets (company_id, month_key, month_coins, kept_coins) values ('${CHEF}', '9999-12', 5, 0)`);
+    script = [route('aide'), say('Un', undefined, 'claude-haiku-5-5'), route('aide'), say('Deux', undefined, 'claude-haiku-5-5')];
+    const [a, b] = await Promise.all([chat.sendWeboMessage(null, 'Un'), chat.sendWeboMessage(null, 'Deux')]);
+    expect([a.error, b.error].filter(Boolean)).toHaveLength(1);
+    expect(sentParams).toHaveLength(2);
+    expect(await balance()).toBeGreaterThanOrEqual(0);
+  });
+
+  it('erreur d’outil inattendue (identifiant fait de tirets) : la réponse continue et se paie', async () => {
+    script = [route('factures'), use('get_quote', { quote_id: '------------------------------------' }), say('Je ne trouve pas ce devis.')];
+    const r = await chat.sendWeboMessage(null, 'Facture le devis ---');
+    expect(r.error).toBeNull();
+    expect(r.reply!.coins).toBeGreaterThan(0);
+  });
+
+  it('Claude tombe en panne en route : ce qui a été consommé est payé, l’échange est gardé', async () => {
+    script = [route('devis'), use('search_catalogue', { query: 'x' }), new Error('panne')];
+    const r = await chat.sendWeboMessage(null, 'Prépare un devis');
+    expect(r.error).toBeTruthy();
+    expect(await balance()).toBeLessThan(200);
+    const conv = await chat.getWeboConversation(r.conversationId!);
+    expect(conv!.transcript).toHaveLength(2);
+  });
+
+  it('délai dépassé : le spécialiste s’arrête et répond avec ce qu’il a', async () => {
+    script = [use('search_catalogue', { query: 'x' }), use('search_catalogue', { query: 'y' })];
+    const usage: unknown[] = [];
+    const conv = (await pg.query<{ id: string }>(`insert into webo_conversations (company_id, user_id) values ($1, $1) returning id`, [CHEF])).rows[0].id;
+    const out = await agents.runSpecialist('devis', { userId: CHEF, companyId: CHEF, conversationId: conv, proposals: [] }, '', 'x', 'jeudi', usage as never, Date.now() - 1);
+    expect(out.text).toMatch(/temps/);
+    expect(usage).toHaveLength(1);
   });
 
   it('historique redonné au spécialiste au message suivant, avec le sort des propositions', async () => {

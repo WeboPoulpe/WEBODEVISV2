@@ -76,9 +76,24 @@ describe('outils de Webo', () => {
     expect((await call('propose_quote', { ...quoteInput([]), customer_id: OTHER })).error).toBeTruthy();
   });
 
+  it('identifiant invalide (tirets seuls) : erreur rendue au modèle, pas d’exception', async () => {
+    expect((await call('get_quote', { quote_id: '------------------------------------' })).error).toBeTruthy();
+  });
+
+  it('outils : types facultatifs en anyOf (forme documentée), jamais en liste de types', () => {
+    for (const a of ['devis', 'factures', 'catalogue', 'prospects'] as const) expect(JSON.stringify(toolsFor(a))).not.toContain('"type":["');
+  });
+
+  it('remarques et téléphone du nouveau client visibles sur la carte', async () => {
+    const r = await call('propose_quote', { ...quoteInput([]), customer_id: null, new_customer: { first_name: 'Paul', last_name: 'Roy', email: 'paul@r.fr', phone: '0601020304' }, remarks: 'Allergie aux noix' });
+    expect(JSON.stringify(r.summary)).toContain('Allergie aux noix');
+    expect(JSON.stringify(r.summary)).toContain('0601020304');
+  });
+
   it('date ou couverts invalides : refusés', async () => {
     expect((await call('propose_quote', { ...quoteInput([]), event_date: '12/06/2027' })).error).toBeTruthy();
     expect((await call('propose_quote', { ...quoteInput([]), guest_count: 0 })).error).toBeTruthy();
+    expect((await call('propose_quote', { ...quoteInput([]), event_date: '2027-02-30' })).error).toBeTruthy();
   });
 
   it('proposer une mise à jour de prix : ancien et nouveau prix au résumé', async () => {
