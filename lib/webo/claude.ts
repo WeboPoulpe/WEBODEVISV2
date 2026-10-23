@@ -1,6 +1,7 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { MENU_GLOSSARY } from '../menuGlossary';
+import { anthropicKey } from './client';
 
 // Webo, l'IA de WeboDevis : traduction d'une fiche prestation (nom + texte mis en forme) du français vers l'anglais,
 // par Claude Haiku 5.5. Côté serveur seulement : la clé (ANTHROPIC_API_KEY) ne quitte jamais le serveur.
@@ -33,7 +34,7 @@ export interface WeboUsage { input: number; output: number; cacheWrite: number; 
 const fake = () => process.env.WEBO_FAKE === '1' && process.env.NODE_ENV !== 'production';
 
 /** Webo est utilisable : clé présente (ou traduction simulée). */
-export const weboAvailable = (): boolean => fake() || !!process.env.ANTHROPIC_API_KEY;
+export const weboAvailable = (): boolean => fake() || !!anthropicKey();
 
 let client: Anthropic | null = null;
 
@@ -43,7 +44,7 @@ export async function translateFicheFrToEn(f: { name: string; html: string }): P
     return { name: `EN ${f.name}`, html: f.html.replace(/>([^<]*\S[^<]*)</g, '>EN $1<'), usage: { input: 100, output: 50, cacheWrite: 0, cacheRead: 0 } };
   }
   // Attente courte et un seul nouvel essai : une fiche bloquée ne retient pas l'action serveur.
-  client ??= new Anthropic({ timeout: 60_000, maxRetries: 1 });
+  client ??= new Anthropic({ apiKey: anthropicKey(), timeout: 60_000, maxRetries: 1 });
   const res = await client.messages.create({
     model: WEBO_MODEL,
     max_tokens: 16000,

@@ -8,14 +8,16 @@ import Anthropic from '@anthropic-ai/sdk';
 let client: Anthropic | null = null;
 
 export const weboFake = () => process.env.WEBO_FAKE === '1' && process.env.NODE_ENV !== 'production';
-export const weboAvailable = () => weboFake() || !!process.env.ANTHROPIC_API_KEY;
+/** La clé Anthropic : ANTHROPIC_API_KEY, ou API_KEY_ANTHROPIC (nom aussi utilisé dans les réglages du projet). */
+export const anthropicKey = (): string | undefined => process.env.ANTHROPIC_API_KEY || process.env.API_KEY_ANTHROPIC || undefined;
+export const weboAvailable = () => weboFake() || !!anthropicKey();
 
 /**
  * Un appel à Claude. `fallbacks: 'default'` : en cas de refus par les garde-fous du modèle, l'API relance la même
  * demande sur un autre modèle (beta server-side-fallback-2026-07-01), utilisé pour les spécialistes Sonnet 5.5.
  */
 export async function callClaude(params: Anthropic.MessageCreateParamsNonStreaming & { fallbacks?: 'default' }): Promise<Anthropic.Message> {
-  client ??= new Anthropic({ timeout: 30_000, maxRetries: 1 });
+  client ??= new Anthropic({ apiKey: anthropicKey(), timeout: 30_000, maxRetries: 1 });
   if (params.fallbacks) {
     const { fallbacks, ...rest } = params;
     return (await client.beta.messages.create({ ...rest, betas: ['server-side-fallback-2026-07-01'], fallbacks } as never)) as unknown as Anthropic.Message;
@@ -28,7 +30,7 @@ export async function callClaudeStream(
   params: Anthropic.MessageCreateParamsNonStreaming & { fallbacks?: 'default' },
   onText: (delta: string) => void,
 ): Promise<Anthropic.Message> {
-  client ??= new Anthropic({ timeout: 30_000, maxRetries: 1 });
+  client ??= new Anthropic({ apiKey: anthropicKey(), timeout: 30_000, maxRetries: 1 });
   if (params.fallbacks) {
     const { fallbacks, ...rest } = params;
     const stream = client.beta.messages.stream({ ...rest, betas: ['server-side-fallback-2026-07-01'], fallbacks } as never);
