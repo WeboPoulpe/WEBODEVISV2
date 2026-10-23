@@ -5,7 +5,8 @@ import { db } from '@/db';
 import { customers, prestations, profiles, prospect_requests, quotes, webo_proposals } from '@/db/schema';
 import { isPerGuestPrestation } from '@/lib/brochure';
 import { quoteTotalTTC, quoteVatBreakdown } from '@/lib/quoteTotals';
-import { applyQuoteUpdate, EDITABLE_STATUSES, type QuoteUpdateSpec } from '@/lib/webo/quoteUpdate';
+import { applyQuoteUpdate, EDITABLE_STATUSES, QUOTE_TEMPLATES, TEMPLATE_LABEL, type QuoteTemplate, type QuoteUpdateSpec } from '@/lib/webo/quoteUpdate';
+import { QUOTE_FONTS } from '@/lib/quoteOutput';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
 import { getDashboard } from '../dashboard';
@@ -91,6 +92,10 @@ const TOOLS: Record<string, Anthropic.Tool> = {
       },
     },
     remove_lines: { type: 'array', items: { type: 'string' } },
+    template: { anyOf: [{ type: 'string', enum: ['classique', 'standard', 'mariage', 'business'] }, { type: 'null' }], description: 'Style du devis : classique, standard (violet), mariage, business.' },
+    font: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'Police du devis (Georgia, Playfair Display, Lora, Montserrat, Cormorant Garamond, Inter…).' },
+    language: { anyOf: [{ type: 'string', enum: ['fr', 'en'] }, { type: 'null' }] },
+    hide_price: { anyOf: [{ type: 'boolean' }, { type: 'null' }], description: 'Masquer les prix sur le devis.' },
   }),
   propose_quote_send: tool('propose_quote_send', 'Propose d’envoyer un devis au client par email (lien de consultation), avec un message d’accompagnement. Sert aussi aux relances.', {
     quote_id: { type: 'string' }, to: { type: 'string' }, message: { type: 'string' },
@@ -346,8 +351,13 @@ const HANDLERS: Record<string, Handler> = {
     const current = (Array.isArray(q.services) ? q.services : []) as { name?: string }[];
     for (const n of remove) if (!current.some((l) => (l.name ?? '').toLowerCase() === n.toLowerCase())) fail(`Aucune ligne « ${n} » dans ce devis.`);
     const add = await buildLines(ctx, i.add_lines, guests ?? q.guest_count);
-    const spec: QuoteUpdateSpec = { quoteId: q.id, guestCount: guests, eventDate: date, eventLocation: str(i.event_location, 200) || null, add, remove };
-    if (spec.guestCount == null && !spec.eventDate && !spec.eventLocation && !add.length && !remove.length) fail('Rien à changer.');
+    const template = i.template == null ? null : (QUOTE_TEMPLATES.includes(i.template as QuoteTemplate) ? i.template as QuoteTemplate : fail('Style inconnu : classique, standard, mariage ou business.'));
+    const font = i.font == null ? null : (QUOTE_FONTS.find((f) => f.toLowerCase() === str(i.font, 60).toLowerCase()) ?? fail(`Police inconnue. Polices possibles : ${QUOTE_FONTS.join(', ')}.`));
+    const language = i.language === 'fr' || i.language === 'en' ? i.language : null;
+    const hidePrice = typeof i.hide_price === 'boolean' ? i.hide_price : null;
+    const spec: QuoteUpdateSpec = { quoteId: q.id, guestCount: guests, eventDate: date, eventLocation: str(i.event_location, 200) || null, add, remove, template, font, language, hidePrice };
+    const look = template != null || font != null || language != null || hidePrice != null;
+    if (spec.guestCount == null && !spec.eventDate && !spec.eventLocation && !add.length && !remove.length && !look) fail('Rien à changer.');
     const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count, adults: q.guest_count_adults, children: q.guest_count_children }, spec);
     // Même calcul que la liste des devis : formule retenue (à défaut la première), adultes et enfants.
     const before = quoteTotalTTC({ ...q, services: q.services }) ?? 0;
@@ -360,6 +370,10 @@ const HANDLERS: Record<string, Handler> = {
         ...(date ? [{ label: 'Date', value: `${q.event_date} → ${date}` }] : []),
         ...(spec.eventLocation ? [{ label: 'Lieu', value: spec.eventLocation }] : []),
         ...(remove.length ? [{ label: 'Retirées', value: remove.join(', ') }] : []),
+        ...(template ? [{ label: 'Style', value: TEMPLATE_LABEL[template] }] : []),
+        ...(font ? [{ label: 'Police', value: font }] : []),
+        ...(language ? [{ label: 'Langue', value: language === 'en' ? 'Anglais' : 'Français' }] : []),
+        ...(hidePrice != null ? [{ label: 'Prix', value: hidePrice ? 'Masqués' : 'Affichés' }] : []),
       ],
       lines: add.map((l) => ({ label: `+ ${l.name}`, detail: `${l.quantity} × ${eur(l.unitPrice)}`, amount: eur(l.quantity * l.unitPrice) })),
       total: `${eur(before)} → ${eur(after)} TTC`,

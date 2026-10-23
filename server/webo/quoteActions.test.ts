@@ -30,7 +30,7 @@ const { runTool } = await import('./tools');
 const { decideProposal } = await import('./execute');
 let conv = '';
 const call = async (name: string, input: unknown) => JSON.parse(await runTool({ userId: CHEF, companyId: CHEF, conversationId: conv, proposals: [] }, name, input));
-const update = (over: Record<string, unknown> = {}) => ({ quote_id: Q, guest_count: null, event_date: null, event_location: null, add_lines: [], remove_lines: [], ...over });
+const update = (over: Record<string, unknown> = {}) => ({ quote_id: Q, guest_count: null, event_date: null, event_location: null, add_lines: [], remove_lines: [], template: null, font: null, language: null, hide_price: null, ...over });
 
 beforeAll(async () => {
   pg = await createTestDb();
@@ -96,6 +96,19 @@ describe('modifier un devis à formules et à prix enfant', () => {
     const [q] = (await pg.query<{ total_amount: string; guest_count_adults: number }>(`select total_amount, guest_count_adults from quotes where id = $1`, [F])).rows;
     expect(Number(q.total_amount)).toBeCloseTo(3960, 2);
     expect(q.guest_count_adults).toBe(60);
+  });
+});
+
+describe('apparence d’un devis', () => {
+  it('style, police, langue, prix masqués : changés à la validation ; valeurs hors liste refusées', async () => {
+    const look = (over: Record<string, unknown>) => update({ template: null, font: null, language: null, hide_price: null, ...over });
+    expect((await call('propose_quote_update', look({ template: 'fluo' }))).error).toBeTruthy();
+    expect((await call('propose_quote_update', look({ font: 'Comic Sans' }))).error).toBeTruthy();
+    const r = await call('propose_quote_update', look({ template: 'mariage', font: 'Playfair Display', language: 'en', hide_price: true }));
+    expect(JSON.stringify(r.summary)).toMatch(/Mariage/);
+    expect((await decideProposal(r.proposal_id, 'accept')).error).toBeNull();
+    const [q] = (await pg.query<{ template: string; selected_font: string; language: string; hide_price: boolean }>(`select template, selected_font, language, hide_price from quotes where id = $1`, [Q])).rows;
+    expect(q).toEqual({ template: 'mariage', selected_font: 'Playfair Display', language: 'en', hide_price: true });
   });
 });
 

@@ -24,7 +24,7 @@ export interface ProposalResult {
   href: string;
   label: string;
   /** Le document mis en forme du devis est à remettre à jour dans le navigateur (lignes ajoutées, noms retirés). */
-  resync?: { quoteId: string; added: string[]; removed: string[] };
+  resync?: { quoteId: string; added: string[]; removed: string[]; relang?: boolean };
 }
 
 type QuotePayload = {
@@ -136,10 +136,12 @@ export async function decideProposal(id: string, decision: 'accept' | 'cancel'):
         await db.update(quotes).set({
           services: next.services, guest_count: next.guestCount, guest_count_adults: next.adults, total_amount: String(total),
           ...(spec.eventDate ? { event_date: spec.eventDate } : {}), ...(spec.eventLocation ? { event_location: spec.eventLocation } : {}),
+          ...(spec.template ? { template: spec.template } : {}), ...(spec.font ? { selected_font: spec.font } : {}),
+          ...(spec.language ? { language: spec.language } : {}), ...(spec.hidePrice != null ? { hide_price: spec.hidePrice } : {}),
           updated_at: new Date().toISOString(),
         }).where(eq(quotes.id, q.id));
         const addedIds = next.services.slice(next.services.length - spec.add.length).map((l) => String(l.id));
-        result = { href: `/devis/${q.id}/modifier?mode=weboword`, label: 'Ouvrir le devis', ...(q.content_html ? { resync: { quoteId: q.id, added: addedIds, removed: spec.remove } } : {}) };
+        result = { href: `/devis/${q.id}/modifier?mode=weboword`, label: 'Ouvrir le devis', ...(q.content_html ? { resync: { quoteId: q.id, added: addedIds, removed: spec.remove, relang: !!spec.language && spec.language !== q.language } } : {}) };
         break;
       }
       case 'quote_send': {

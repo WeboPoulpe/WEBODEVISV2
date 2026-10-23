@@ -13,7 +13,16 @@ export interface QuoteUpdateSpec {
   add: ({ name: string; quantity: number; unitPrice: number } & Record<string, unknown>)[];
   /** Noms des lignes retirées (sans tenir compte des majuscules). */
   remove: string[];
+  /** Apparence (null ou absent : inchangée). */
+  template?: QuoteTemplate | null;
+  font?: string | null;
+  language?: 'fr' | 'en' | null;
+  hidePrice?: boolean | null;
 }
+
+export const QUOTE_TEMPLATES = ['classique', 'standard', 'mariage', 'business'] as const;
+export type QuoteTemplate = (typeof QUOTE_TEMPLATES)[number];
+export const TEMPLATE_LABEL: Record<QuoteTemplate, string> = { classique: 'Classique', standard: 'Violet', mariage: 'Mariage', business: 'Business' };
 
 type Line = { id?: string; name?: string; quantity?: number } & Record<string, unknown>;
 

@@ -7,7 +7,7 @@ import { parseFormulas } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import type { QuoteHtmlData, QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 
-export interface ResyncInfo { quoteId: string; added: string[]; removed: string[] }
+export interface ResyncInfo { quoteId: string; added: string[]; removed: string[]; /** La langue a changé : plats de la carte et mentions refaits. */ relang?: boolean }
 
 export async function resyncQuoteDocument(info: ResyncInfo): Promise<boolean> {
   const sb = createClient();
@@ -32,6 +32,7 @@ export async function resyncQuoteDocument(info: ResyncInfo): Promise<boolean> {
     removedLines: info.removed.map((name) => ({ name })),
     financials: true,
     parties: true,
+    relang: !!info.relang,
   }, { template: (q.template ?? 'classique') as QuoteHtmlOptions['template'], font: (q.selected_font as string | null) ?? undefined });
   if (!synced) return false;
   const { error } = await sb.from('quotes').update({ content_html: synced }).eq('id', info.quoteId);
