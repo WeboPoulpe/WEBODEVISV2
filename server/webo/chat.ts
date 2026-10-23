@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { webo_conversations } from '@/db/schema';
 import { requireUser, requireWriter } from '../session';
@@ -29,11 +29,38 @@ export async function sendWeboMessage(conversationId: string | null, text: strin
   return runWeboTurn(user, { conversationId, text }, () => {});
 }
 
-export async function listWeboConversations(): Promise<{ id: string; title: string; updated_at: string }[]> {
+export interface ConversationRow { id: string; title: string; updated_at: string }
+
+/** Conversations de l'utilisateur, 30 par page, plus récentes d'abord ; recherche dans le titre et les messages. */
+export async function listWeboConversations(opts: { query?: string; page?: number } = {}): Promise<{ rows: ConversationRow[]; more: boolean }> {
   const user = await requireUser();
-  return db.select({ id: webo_conversations.id, title: webo_conversations.title, updated_at: webo_conversations.updated_at })
-    .from(webo_conversations).where(eq(webo_conversations.user_id, user.id))
-    .orderBy(desc(webo_conversations.updated_at)).limit(20);
+  const size = 30;
+  const page = Math.max(0, Math.floor(Number(opts.page ?? 0) || 0));
+  const q = typeof opts.query === 'string' ? opts.query.trim().slice(0, 100) : '';
+  const like = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+  const rows = await db.select({ id: webo_conversations.id, title: webo_conversations.title, updated_at: webo_conversations.updated_at })
+    .from(webo_conversations)
+    .where(and(eq(webo_conversations.user_id, user.id), q ? or(ilike(webo_conversations.title, like), sql`${webo_conversations.transcript}::text ilike ${like}`) : undefined))
+    .orderBy(desc(webo_conversations.updated_at)).limit(size + 1).offset(page * size);
+  return { rows: rows.slice(0, size), more: rows.length > size };
+}
+
+export async function renameWeboConversation(id: string, title: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const clean = typeof title === 'string' ? title.trim().slice(0, 120) : '';
+  if (!isUuid(id) || !clean) return { error: 'Titre invalide.' };
+  const [row] = await db.update(webo_conversations).set({ title: clean })
+    .where(and(eq(webo_conversations.id, id), eq(webo_conversations.user_id, user.id))).returning({ id: webo_conversations.id });
+  return row ? { error: null } : { error: 'Conversation introuvable.' };
+}
+
+/** Supprime une conversation (et ses propositions, qui ne sont donc plus validables). */
+export async function deleteWeboConversation(id: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!isUuid(id)) return { error: 'Conversation introuvable.' };
+  const [row] = await db.delete(webo_conversations)
+    .where(and(eq(webo_conversations.id, id), eq(webo_conversations.user_id, user.id))).returning({ id: webo_conversations.id });
+  return row ? { error: null } : { error: 'Conversation introuvable.' };
 }
 
 export async function getWeboConversation(id: string): Promise<{ id: string; transcript: TranscriptEntry[]; proposals: Record<string, ProposalView> } | null> {

@@ -81,7 +81,7 @@ describe('discussion avec Webo', () => {
     expect(r.balance).toBe(199);
     const conv = await chat.getWeboConversation(r.conversationId!);
     expect(conv?.transcript.map((e) => e.role)).toEqual(['user', 'assistant']);
-    expect((await chat.listWeboConversations())[0].title).toMatch(/^Comment je fais/);
+    expect((await chat.listWeboConversations()).rows[0].title).toMatch(/^Comment je fais/);
   });
 
   it('spécialiste Devis : outils puis proposition affichée en carte ; Sonnet plus cher', async () => {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, Users, CalendarDays, CalendarRange, Package, Carrot, LayoutTemplate,
-  UserCheck, Users2, BookOpen, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun,
+  UserCheck, Users2, BookOpen, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -33,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Commerce',
     items: [
       { href: '/', icon: LayoutDashboard, label: 'Tableau de bord', exact: true },
+      { href: '/webo', icon: Sparkles, label: 'Webo', exact: false },
       { href: '/devis', icon: FileText, label: 'Devis', exact: false, badge: 'pendingDevis' },
       { href: '/factures', icon: Receipt, label: 'Factures', exact: false },
       { href: '/clients', icon: Users, label: 'Clients', exact: false },

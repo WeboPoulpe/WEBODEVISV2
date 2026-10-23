@@ -98,6 +98,37 @@ test.describe('assistant Webo', () => {
     });
   });
 
+  test('page Webo : historique par date, recherche, renommer, supprimer, reprendre une conversation', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(150_000);
+    await withAccount(browser, 'webo-historique', async (page, userId) => {
+      const entry = (text: string) => JSON.stringify([{ role: 'user', text, at: new Date().toISOString() }, { role: 'assistant', text: `Réponse à : ${text}`, agent: 'aide', at: new Date().toISOString() }]);
+      await sql(`insert into public.webo_conversations (company_id, user_id, title, transcript, updated_at) values
+        ($1, $1, 'Mariage Dupont', $2::jsonb, now()), ($1, $1, 'Acompte gala', $3::jsonb, now() - interval '3 days')`,
+        [userId, entry('Devis avec trou normand'), entry('Acompte de 30 %')]);
+      await page.goto('/webo');
+      const list = page.getByRole('complementary', { name: 'Conversations' });
+      await expect(list.getByText('Aujourd’hui')).toBeVisible({ timeout: 30_000 });
+      await expect(list.getByText('7 derniers jours')).toBeVisible();
+      await page.getByLabel('Rechercher dans l’historique').fill('trou normand');
+      await expect(list.getByRole('button', { name: 'Acompte gala', exact: true })).toHaveCount(0);
+      await list.getByRole('button', { name: 'Mariage Dupont', exact: true }).click();
+      await expect(page.getByText('Réponse à : Devis avec trou normand')).toBeVisible();
+      await expect(page).toHaveURL(/\/webo\?c=/);
+      await list.getByRole('button', { name: 'Renommer « Mariage Dupont »' }).click();
+      await list.getByLabel('Nouveau titre').fill('Mariage Claire Dupont');
+      await list.getByLabel('Nouveau titre').press('Enter');
+      await expect(list.getByRole('button', { name: 'Mariage Claire Dupont', exact: true })).toBeVisible();
+      await page.getByLabel('Rechercher dans l’historique').fill('');
+      await list.getByRole('button', { name: 'Supprimer « Acompte gala »' }).click();
+      await page.getByRole('button', { name: 'Supprimer', exact: true }).click();
+      await expect(list.getByRole('button', { name: 'Acompte gala', exact: true })).toHaveCount(0);
+      expect(await sql(`select 1 from public.webo_conversations where user_id = $1 and title = 'Acompte gala'`, [userId])).toHaveLength(0);
+      // Pas de bulle par-dessus la page Webo.
+      await expect(page.getByRole('button', { name: 'Ouvrir Webo' })).toHaveCount(0);
+      await page.screenshot({ path: 'e2e/screenshots/webo-page-desktop.png' });
+    });
+  });
+
   test('Paramètres : ce que Webo retient, et l’oublier', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     await withAccount(browser, 'webo-memoire', async (page, userId) => {
