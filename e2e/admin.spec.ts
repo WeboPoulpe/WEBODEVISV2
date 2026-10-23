@@ -7,17 +7,19 @@ import { shot, horizontalOverflow, sql, withAccount, testEmail, deleteAccountByE
 // n'y modifient que ce qu'ils ont créé.
 
 test.describe('administration', () => {
-  for (const { name, url, heading } of [
+  for (const { name, url, heading, ready } of [
     { name: 'admin-vue-d-ensemble', url: '/admin', heading: 'Vue d’ensemble' },
     { name: 'admin-comptes', url: '/admin/comptes', heading: 'Comptes' },
     { name: 'admin-demandes', url: '/admin/demandes', heading: 'Demandes' },
     { name: 'admin-reglages', url: '/admin/reglages', heading: 'Réglages' },
-  ]) {
+    { name: 'admin-webocoins', url: '/admin/webocoins', heading: 'WeboCoins', ready: 'Pièces dépensées' },
+  ] as { name: string; url: string; heading: string; ready?: string }[]) {
     test(`${name} : s'affiche sans débordement`, async ({ browser, viewport }, testInfo) => {
       await withAccount(browser, 'admin-pages', async (page) => {
         await page.goto(url);
         await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
         await expect(page.locator('.animate-pulse')).toHaveCount(0, { timeout: 20_000 });
+        if (ready) await expect(page.getByText(ready)).toBeVisible({ timeout: 20_000 });
         await shot(page, testInfo, name);
         expect(await horizontalOverflow(page)).toBe(0);
       }, { role: 'admin', viewport });
