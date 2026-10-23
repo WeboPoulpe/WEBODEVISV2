@@ -1,7 +1,9 @@
 import 'server-only';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { customers, profiles, prospect_requests, quotes } from '@/db/schema';
+import { customers, ingredient_stocks, profiles, prospect_requests, quotes, stock_movements, supplier_order_items, supplier_orders } from '@/db/schema';
+import { createSupplierOrders } from '../events';
+import { sendSupplierOrder } from '../supplierOrders';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
 import { quoteOfProspect } from './moreTools';
@@ -80,12 +82,77 @@ async function prospectToQuote(user: User, companyId: string, p: Record<string, 
   return { href: `/devis/${q.id}/modifier?mode=weboword`, label: 'Ouvrir le devis' };
 }
 
+type Move = { ingredientId: string; name: string; unit: string; type: 'in' | 'out' | 'adjust'; quantity: number; reason: string | null };
+
+async function moveStock(user: User, companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
+  const moves = (p.moves ?? []) as Move[];
+  await db.transaction(async (tx) => {
+    // Le stock revérifié au moment d'écrire, lignes verrouillées : une sortie ne dépasse jamais ce qu'il y a.
+    const ids = [...new Set(moves.map((m) => m.ingredientId))];
+    const rows = await tx.select({ id: ingredient_stocks.ingredient_id, q: ingredient_stocks.quantity }).from(ingredient_stocks)
+      .where(and(eq(ingredient_stocks.company_id, companyId), inArray(ingredient_stocks.ingredient_id, ids))).for('update');
+    const left = new Map(rows.map((r) => [r.id, Number(r.q)]));
+    for (const m of moves) {
+      const have = left.get(m.ingredientId) ?? 0;
+      if (m.type === 'out' && m.quantity > have) throw new Error(`Sortie impossible : il ne reste que ${have} ${m.unit} de « ${m.name} ».`);
+      left.set(m.ingredientId, m.type === 'in' ? have + m.quantity : m.type === 'out' ? have - m.quantity : m.quantity);
+    }
+    await tx.insert(stock_movements).values(moves.map((m) => ({
+      user_id: user.id, ingredient_id: m.ingredientId, movement_type: m.type, quantity: String(m.quantity), reason: m.reason ?? 'Webo',
+    })));
+  });
+  return { href: '/stock', label: 'Voir le stock' };
+}
+
+async function createOrder(user: User, companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
+  const items = (p.items ?? []) as { ingredientId: string; quantity: number; unitPrice: number }[];
+  const id = await db.transaction(async (tx) => {
+    const [o] = await tx.insert(supplier_orders).values({
+      user_id: user.id, supplier_id: String(p.supplierId), status: 'draft', total_amount: String(p.total ?? 0), notes: (p.notes as string | null) ?? null,
+    }).returning({ id: supplier_orders.id });
+    await tx.insert(supplier_order_items).values(items.map((x) => ({ order_id: o.id, ingredient_id: x.ingredientId, quantity: String(x.quantity), unit_price: String(x.unitPrice) })));
+    return o.id;
+  });
+  return { href: `/commandes?id=${id}`, label: 'Voir la commande' };
+}
+
+async function receiveOrder(user: User, companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
+  const id = String(p.orderId);
+  await db.transaction(async (tx) => {
+    const [o] = await tx.select({ id: supplier_orders.id, status: supplier_orders.status }).from(supplier_orders)
+      .where(and(eq(supplier_orders.id, id), sql`${supplier_orders.user_id} in ${companyIdsOf(companyId)}`)).for('update').limit(1);
+    if (!o) throw new Error('Commande introuvable.');
+    if (o.status === 'received' || o.status === 'cancelled') throw new Error('Cette commande est déjà reçue ou annulée.');
+    const items = await tx.select().from(supplier_order_items).where(eq(supplier_order_items.order_id, id));
+    if (items.length) {
+      await tx.insert(stock_movements).values(items.map((x) => ({
+        user_id: user.id, ingredient_id: x.ingredient_id, movement_type: 'in', quantity: String(x.quantity), reason: 'Commande reçue (Webo)', order_id: id,
+      })));
+    }
+    await tx.update(supplier_orders).set({ status: 'received', received_at: new Date().toISOString(), updated_at: new Date().toISOString() }).where(eq(supplier_orders.id, id));
+  });
+  return { href: '/stock', label: 'Voir le stock' };
+}
+
 /** Exécute une proposition de ces modules ; null si la sorte n'en fait pas partie. */
 export async function executeMore(kind: string, p: Record<string, unknown>, user: User, companyId: string): Promise<MoreResult | null> {
   switch (kind) {
     case 'customer_upsert': return upsertCustomer(user, companyId, p);
     case 'prospect_status': return setProspectStatus(user, companyId, p);
     case 'prospect_to_quote': return prospectToQuote(user, companyId, p);
+    case 'stock_movement': return moveStock(user, companyId, p);
+    case 'supplier_order': return createOrder(user, companyId, p);
+    case 'supplier_order_receive': return receiveOrder(user, companyId, p);
+    case 'supplier_order_send': {
+      const r = await sendSupplierOrder({ orderId: String(p.orderId), to: String(p.to), message: String(p.message), deliveryDate: (p.deliveryDate as string | null) ?? null });
+      if (r.error) throw new Error(r.error);
+      return { href: '/commandes', label: 'Voir les commandes' };
+    }
+    case 'event_orders': {
+      const r = await createSupplierOrders(String(p.quoteId));
+      if (r.error) throw new Error(r.error);
+      return { href: '/commandes', label: `Voir les commandes (${r.created} créée${r.created > 1 ? 's' : ''})` };
+    }
     default: return null;
   }
 }

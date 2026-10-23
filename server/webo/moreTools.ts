@@ -1,10 +1,10 @@
 import 'server-only';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import type Anthropic from '@anthropic-ai/sdk';
 import { db } from '@/db';
-import { customers, prospect_requests, quotes } from '@/db/schema';
+import { customers, ingredient_stocks, ingredients, prospect_requests, quotes, supplier_order_items, supplier_orders, suppliers } from '@/db/schema';
 import { companyIdsOf } from '../companyScope';
-import { fail, isUuid, nullableStr, propose, str, tool, type AgentName, type Handler, type ToolContext } from './toolKit';
+import { eur, fail, isUuid, like, nullableStr, propose, str, tool, type AgentName, type Handler, type ToolContext } from './toolKit';
 
 // Outils de Webo pour le reste du logiciel : clients et prospects, stock et commandes fournisseurs, factures émises
 // et paiements, brochures. Même règle : lire, ou proposer (une carte que le traiteur valide).
@@ -28,12 +28,43 @@ export const MORE_TOOLS: Record<string, Anthropic.Tool> = {
   propose_prospect_status: tool('propose_prospect_status', `Propose de changer le statut d’un prospect (et de son devis s’il en a un). Statuts : ${PROSPECT_STATUSES.join(', ')}.`, {
     prospect_id: { type: 'string' }, status: { type: 'string', enum: [...PROSPECT_STATUSES] },
   }),
+  stock_levels: tool('stock_levels', 'Niveaux de stock (ingrédients de l’entreprise et du catalogue commun) ; low_only : seulement ce qui est sous le seuil d’alerte.', {
+    query: nullableStr, low_only: { type: 'boolean' },
+  }),
+  propose_stock_movement: tool('propose_stock_movement', 'Propose des mouvements de stock : in (entrée), out (sortie, jamais plus que le stock), adjust (inventaire : la quantité devient celle indiquée).', {
+    movements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { ingredient_id: { type: 'string' }, type: { type: 'string', enum: ['in', 'out', 'adjust'] }, quantity: { type: 'number' }, reason: nullableStr },
+        required: ['ingredient_id', 'type', 'quantity', 'reason'], additionalProperties: false,
+      },
+    },
+  }),
+  list_suppliers: tool('list_suppliers', 'Fournisseurs de l’entreprise.', { query: nullableStr }),
+  list_supplier_orders: tool('list_supplier_orders', 'Commandes fournisseurs récentes (statut : draft, sent, received, cancelled ; null = toutes).', {
+    status: { anyOf: [{ type: 'string', enum: ['draft', 'sent', 'received', 'cancelled'] }, { type: 'null' }] },
+  }),
+  propose_supplier_order: tool('propose_supplier_order', 'Propose une commande fournisseur en brouillon (ingrédients et quantités ; prix d’achat du catalogue).', {
+    supplier_id: { type: 'string' },
+    items: {
+      type: 'array',
+      items: { type: 'object', properties: { ingredient_id: { type: 'string' }, quantity: { type: 'number' } }, required: ['ingredient_id', 'quantity'], additionalProperties: false },
+    },
+    notes: nullableStr,
+  }),
+  propose_supplier_order_send: tool('propose_supplier_order_send', 'Propose d’envoyer une commande au fournisseur par email (to null = l’email du fournisseur), avec un message et une date de livraison souhaitée (AAAA-MM-JJ, facultative).', {
+    order_id: { type: 'string' }, to: nullableStr, message: { type: 'string' }, delivery_date: nullableStr,
+  }),
+  propose_supplier_order_receive: tool('propose_supplier_order_receive', 'Propose de marquer une commande comme reçue : ses quantités entrent en stock.', { order_id: { type: 'string' } }),
+  propose_event_orders: tool('propose_event_orders', 'Propose de créer les commandes fournisseurs (brouillons) depuis la liste de courses d’un événement, une par fournisseur.', { quote_id: { type: 'string' } }),
   propose_prospect_to_quote: tool('propose_prospect_to_quote', 'Propose de transformer la demande d’un prospect en devis (client retrouvé par email ou créé, devis « à faire » avec l’événement de la demande).', {
     prospect_id: { type: 'string' },
   }),
 };
 
 export const MORE_BY_AGENT: Partial<Record<AgentName, string[]>> = {
+  stock: ['stock_levels', 'propose_stock_movement', 'list_suppliers', 'list_supplier_orders', 'propose_supplier_order', 'propose_supplier_order_send', 'propose_supplier_order_receive', 'propose_event_orders', 'list_events', 'propose_memory'],
   clients: ['search_customers', 'get_customer', 'propose_customer', 'list_prospects', 'propose_prospect_status', 'propose_prospect_to_quote', 'propose_memory'],
 };
 
@@ -56,6 +87,28 @@ export async function quoteOfProspect(companyId: string, prospectId: string) {
   const [q] = await db.select({ id: quotes.id }).from(quotes).where(and(eq(quotes.prospect_id, prospectId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
   return q ?? null;
 }
+
+
+/** Ingrédients visibles par l'entreprise : les siens et ceux du catalogue commun. */
+const visibleIngredient = (ctx: ToolContext) => sql`(${ingredients.user_id} is null or ${ingredients.user_id} in ${companyIdsOf(ctx.companyId)})`;
+
+export async function stockOf(companyId: string, ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const rows = await db.select({ id: ingredient_stocks.ingredient_id, q: ingredient_stocks.quantity }).from(ingredient_stocks)
+    .where(and(eq(ingredient_stocks.company_id, companyId), inArray(ingredient_stocks.ingredient_id, ids)));
+  return new Map(rows.map((r) => [r.id, Number(r.q)]));
+}
+
+const orderScope = (ctx: ToolContext) => sql`${supplier_orders.user_id} in ${companyIdsOf(ctx.companyId)}`;
+async function orderOf(ctx: ToolContext, id: unknown) {
+  if (!isUuid(id)) fail('Commande introuvable.');
+  const [o] = await db.select({ id: supplier_orders.id, status: supplier_orders.status, supplierId: supplier_orders.supplier_id, supplier: suppliers.name, email: suppliers.email, total: supplier_orders.total_amount })
+    .from(supplier_orders).innerJoin(suppliers, eq(suppliers.id, supplier_orders.supplier_id))
+    .where(and(eq(supplier_orders.id, id as string), orderScope(ctx))).limit(1);
+  return o ?? fail('Commande introuvable.');
+}
+
+const MOVE_LABEL: Record<string, string> = { in: 'Entrée', out: 'Sortie', adjust: 'Inventaire' };
 
 export const MORE_HANDLERS: Record<string, Handler> = {
   async get_customer(ctx, i) {
@@ -114,6 +167,123 @@ export const MORE_HANDLERS: Record<string, Handler> = {
       title: `Prospect ${p.first_name} ${p.last_name}`,
       fields: [{ label: 'Statut', value: `${STATUS_LABEL[p.status] ?? p.status} → ${STATUS_LABEL[status]}` }],
       note: 'Son devis, s’il en a un, prend le même statut.',
+    });
+  },
+
+  async stock_levels(ctx, i) {
+    const q = str(i.query, 80);
+    const rows = await db.select({ id: ingredients.id, name: ingredients.name, unit: ingredients.unit, quantity: ingredient_stocks.quantity, min_alert: ingredient_stocks.min_alert })
+      .from(ingredients)
+      .leftJoin(ingredient_stocks, and(eq(ingredient_stocks.ingredient_id, ingredients.id), eq(ingredient_stocks.company_id, ctx.companyId)))
+      .where(and(visibleIngredient(ctx), q ? ilike(ingredients.name, like(q)) : undefined,
+        i.low_only === true ? sql`${ingredient_stocks.min_alert} > 0 and ${ingredient_stocks.quantity} <= ${ingredient_stocks.min_alert}` : (q ? undefined : sql`${ingredient_stocks.ingredient_id} is not null`)))
+      .orderBy(ingredients.name).limit(30);
+    return { results: rows.map((r) => ({ ...r, quantity: Number(r.quantity ?? 0), min_alert: Number(r.min_alert ?? 0), low: Number(r.min_alert ?? 0) > 0 && Number(r.quantity ?? 0) <= Number(r.min_alert ?? 0) })) };
+  },
+
+  async propose_stock_movement(ctx, i) {
+    const raw = (Array.isArray(i.movements) ? i.movements : []).slice(0, 30) as Record<string, unknown>[];
+    if (!raw.length) fail('Aucun mouvement.');
+    const ids = [...new Set(raw.map((m) => String(m.ingredient_id ?? '')).filter(isUuid))];
+    const found = ids.length ? await db.select({ id: ingredients.id, name: ingredients.name, unit: ingredients.unit }).from(ingredients).where(and(inArray(ingredients.id, ids), visibleIngredient(ctx))) : [];
+    const byId = new Map(found.map((f) => [f.id, f]));
+    const current = await stockOf(ctx.companyId, ids);
+    const left = new Map(current);
+    const moves = raw.map((m) => {
+      const ing = byId.get(String(m.ingredient_id)) ?? fail('Ingrédient introuvable.');
+      const type = m.type === 'in' || m.type === 'out' || m.type === 'adjust' ? m.type : fail('Type de mouvement inconnu.');
+      const quantity = Number(m.quantity);
+      if (!Number.isFinite(quantity) || quantity < 0 || quantity > 1_000_000 || (type !== 'adjust' && quantity === 0)) fail(`Quantité invalide pour « ${ing.name} ».`);
+      const have = left.get(ing.id) ?? 0;
+      if (type === 'out' && quantity > have) fail(`Sortie impossible : il n’y a que ${have} ${ing.unit} de « ${ing.name} » en stock.`);
+      left.set(ing.id, type === 'in' ? have + quantity : type === 'out' ? have - quantity : quantity);
+      return { ingredientId: ing.id, name: ing.name, unit: ing.unit, type, quantity, reason: str(m.reason, 200) || null };
+    });
+    return propose(ctx, 'stock_movement', { moves }, {
+      title: 'Mouvements de stock',
+      fields: moves.map((m) => ({ label: MOVE_LABEL[m.type], value: `${m.name} : ${m.type === 'adjust' ? '→ ' : m.type === 'in' ? '+' : '−'}${m.quantity} ${m.unit}${m.reason ? ` (${m.reason})` : ''}` })),
+    });
+  },
+
+  async list_suppliers(ctx, i) {
+    const q = str(i.query, 80);
+    const rows = await db.select({ id: suppliers.id, name: suppliers.name, email: suppliers.email, phone: suppliers.phone, contact: suppliers.contact_person })
+      .from(suppliers)
+      .where(and(sql`(${suppliers.owner_user_id} in ${companyIdsOf(ctx.companyId)} or ${suppliers.user_id} in ${companyIdsOf(ctx.companyId)})`, q ? ilike(suppliers.name, like(q)) : undefined))
+      .orderBy(suppliers.name).limit(30);
+    return { results: rows };
+  },
+
+  async list_supplier_orders(ctx, i) {
+    const status = typeof i.status === 'string' ? i.status : null;
+    const rows = await db.select({ id: supplier_orders.id, supplier: suppliers.name, status: supplier_orders.status, total: supplier_orders.total_amount, created_at: supplier_orders.created_at, ordered_at: supplier_orders.ordered_at })
+      .from(supplier_orders).innerJoin(suppliers, eq(suppliers.id, supplier_orders.supplier_id))
+      .where(and(orderScope(ctx), status ? eq(supplier_orders.status, status) : undefined))
+      .orderBy(desc(supplier_orders.created_at)).limit(15);
+    return { results: rows };
+  },
+
+  async propose_supplier_order(ctx, i) {
+    if (!isUuid(i.supplier_id)) fail('Fournisseur introuvable.');
+    const [sup] = await db.select().from(suppliers)
+      .where(and(eq(suppliers.id, i.supplier_id as string), sql`(${suppliers.owner_user_id} in ${companyIdsOf(ctx.companyId)} or ${suppliers.user_id} in ${companyIdsOf(ctx.companyId)})`)).limit(1);
+    if (!sup) fail('Fournisseur introuvable.');
+    const raw = (Array.isArray(i.items) ? i.items : []).slice(0, 60) as Record<string, unknown>[];
+    if (!raw.length) fail('Commande vide.');
+    const ids = [...new Set(raw.map((m) => String(m.ingredient_id ?? '')).filter(isUuid))];
+    const found = ids.length ? await db.select({ id: ingredients.id, name: ingredients.name, unit: ingredients.unit, price: ingredients.volume_unit_price }).from(ingredients).where(and(inArray(ingredients.id, ids), visibleIngredient(ctx))) : [];
+    const byId = new Map(found.map((f) => [f.id, f]));
+    const items = raw.map((m) => {
+      const ing = byId.get(String(m.ingredient_id)) ?? fail('Ingrédient introuvable.');
+      const quantity = Number(m.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) fail(`Quantité invalide pour « ${ing.name} ».`);
+      return { ingredientId: ing.id, name: ing.name, unit: ing.unit, quantity, unitPrice: Number(ing.price ?? 0) };
+    });
+    const total = Math.round(items.reduce((s, x) => s + x.quantity * x.unitPrice, 0) * 100) / 100;
+    return propose(ctx, 'supplier_order', { supplierId: sup!.id, items, notes: str(i.notes, 500) || null, total }, {
+      title: `Commande à ${sup!.name}`,
+      fields: [{ label: 'Fournisseur', value: sup!.name }, ...(i.notes ? [{ label: 'Notes', value: str(i.notes, 500) }] : [])],
+      lines: items.map((x) => ({ label: x.name, detail: `${x.quantity} ${x.unit}${x.unitPrice ? ` × ${eur(x.unitPrice)}` : ''}`, amount: x.unitPrice ? eur(x.quantity * x.unitPrice) : '—' })),
+      total: total ? `${eur(total)} HT (prix du catalogue)` : undefined,
+      note: 'La commande est créée en brouillon : rien ne part au fournisseur sans un envoi.',
+    });
+  },
+
+  async propose_supplier_order_send(ctx, i) {
+    const o = await orderOf(ctx, i.order_id);
+    if (!['draft', 'sent'].includes(o.status)) fail('Cette commande n’est plus à envoyer.');
+    const to = (str(i.to, 200) || o.email || '').toLowerCase();
+    if (!EMAIL.test(to)) fail('Adresse email du fournisseur manquante ou invalide : demandez-la au traiteur.');
+    const message = str(i.message, 3000) || fail('Message attendu.');
+    const date = typeof i.delivery_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(i.delivery_date) ? i.delivery_date : null;
+    return propose(ctx, 'supplier_order_send', { orderId: o.id, to, message, deliveryDate: date }, {
+      title: `Envoyer la commande à ${o.supplier}`,
+      fields: [{ label: 'À', value: to }, ...(date ? [{ label: 'Livraison souhaitée', value: date }] : []), { label: 'Message', value: message }],
+      note: 'Le fournisseur reçoit la commande par email quand vous validez.',
+    });
+  },
+
+  async propose_supplier_order_receive(ctx, i) {
+    const o = await orderOf(ctx, i.order_id);
+    if (o.status === 'received') fail('Cette commande est déjà reçue.');
+    if (o.status === 'cancelled') fail('Cette commande est annulée.');
+    const items = await db.select({ name: ingredients.name, unit: ingredients.unit, quantity: supplier_order_items.quantity })
+      .from(supplier_order_items).innerJoin(ingredients, eq(ingredients.id, supplier_order_items.ingredient_id)).where(eq(supplier_order_items.order_id, o.id));
+    return propose(ctx, 'supplier_order_receive', { orderId: o.id }, {
+      title: `Commande ${o.supplier} reçue`,
+      fields: items.map((x) => ({ label: 'Entrée', value: `${x.name} : +${Number(x.quantity)} ${x.unit}` })),
+      note: 'Ces quantités entrent en stock quand vous validez.',
+    });
+  },
+
+  async propose_event_orders(ctx, i) {
+    if (!isUuid(i.quote_id)) fail('Événement introuvable.');
+    const [q] = await db.select({ id: quotes.id, client: quotes.client_name }).from(quotes).where(and(eq(quotes.id, i.quote_id as string), sql`${quotes.owner_user_id} in ${companyIdsOf(ctx.companyId)}`)).limit(1);
+    if (!q) fail('Événement introuvable.');
+    return propose(ctx, 'event_orders', { quoteId: q!.id }, {
+      title: `Commandes pour ${q!.client}`,
+      fields: [{ label: 'Action', value: 'Créer une commande par fournisseur depuis la liste de courses' }],
+      note: 'Brouillons seulement ; les commandes automatiques déjà faites pour cet événement sont refaites.',
     });
   },
 
