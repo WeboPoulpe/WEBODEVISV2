@@ -3,8 +3,8 @@ import { createTestDb } from '@/db/testDb';
 import { modelCostUsd, WEBO_MODELS } from './models';
 
 describe('Webo : modèles et coût réel', () => {
-  it('Haiku pour l’aiguilleur et l’aide, Sonnet pour les spécialistes', () => {
-    expect(WEBO_MODELS).toEqual({ router: 'claude-haiku-5-5', help: 'claude-haiku-5-5', specialist: 'claude-sonnet-5-5' });
+  it('Haiku 5.5 partout (choix de Maxence : un devis à 1–2 pièces) ; Sonnet gardé en réserve', () => {
+    expect(WEBO_MODELS).toEqual({ router: 'claude-haiku-5-5', help: 'claude-haiku-5-5', specialist: 'claude-haiku-5-5', strong: 'claude-sonnet-5-5' });
   });
 
   it('coût par modèle ; un modèle inconnu prend le tarif de Sonnet', () => {

@@ -92,7 +92,7 @@ export async function runSpecialist(
     if (onText) for (const w of out.text.split(/(?<= )/)) onText(w);
     return { text: out.text, usage };
   }
-  const model = agent === 'aide' || agent === 'journee' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
+  const model: string = agent === 'aide' || agent === 'journee' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
   const tools = toolsFor(agent);
   const prompt = `Aujourd'hui : ${today}.\n${context ? `\n${context}\n` : ''}${history ? `\nConversation jusqu'ici :\n${history}\n` : ''}\nMessage du traiteur :\n${text}`;
   const messages: Anthropic.MessageParam[] = [{
@@ -111,7 +111,8 @@ export async function runSpecialist(
       cache_control: { type: 'ephemeral' as const },
       output_config: { effort: (model === WEBO_MODELS.help ? 'low' : 'medium') as 'low' | 'medium' },
       ...(tools.length ? { tools } : {}),
-      ...(model === WEBO_MODELS.specialist ? { fallbacks: 'default' as const } : {}),
+      // Repli serveur en cas de refus : seulement sur Sonnet 5.5 (Haiku n'en a pas, l'API refuserait le paramètre).
+      ...(model === WEBO_MODELS.strong ? { fallbacks: 'default' as const } : {}),
     };
     const res = onText ? await callClaudeStream(params, onText) : await callClaude(params);
     usage.push(usageOf(res));

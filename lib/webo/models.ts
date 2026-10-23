@@ -1,7 +1,8 @@
-// Modèles de Webo et leur coût réel. Aiguilleur et aide : Claude Haiku 5.5 (rapide, presque gratuit) ; spécialistes
-// qui préparent devis, factures, prestations et réponses : Claude Sonnet 5.5 (meilleur rapport qualité/prix pour agir).
+// Modèles de Webo et leur coût réel. Tout passe par Claude Haiku 5.5 (choix de Maxence, 2026-10-23 : un devis complet
+// à 1–2 pièces au lieu d'une dizaine avec Sonnet). `strong` (Sonnet 5.5) reste disponible pour un spécialiste dont la
+// qualité ne suffirait pas sur Haiku (à décider d'après les réponses notées 👎).
 
-export const WEBO_MODELS = { router: 'claude-haiku-5-5', help: 'claude-haiku-5-5', specialist: 'claude-sonnet-5-5' } as const;
+export const WEBO_MODELS = { router: 'claude-haiku-5-5', help: 'claude-haiku-5-5', specialist: 'claude-haiku-5-5', strong: 'claude-sonnet-5-5' } as const;
 
 /** Prix en dollars par million de jetons : entrée, sortie. */
 const PRICES: Record<string, [number, number]> = {

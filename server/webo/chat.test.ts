@@ -98,7 +98,9 @@ describe('discussion avec Webo', () => {
     // Le spécialiste reçoit ses outils, l'aiguilleur aucun.
     expect(sentParams[0].tools).toBeUndefined();
     expect((sentParams[1].tools as { name: string }[]).map((t) => t.name)).toContain('propose_quote');
-    expect(sentParams[1].model).toBe('claude-sonnet-5-5');
+    expect(sentParams[1].model).toBe('claude-haiku-5-5');
+    // Haiku n'a pas de repli serveur : le paramètre fallbacks ne doit pas partir (sinon refus de l'API).
+    expect(sentParams[1].fallbacks).toBeUndefined();
     expect(r.reply!.coins).toBeGreaterThan(1);
   });
 
