@@ -76,6 +76,35 @@ describe('Webo : clients', () => {
   });
 });
 
+describe('Webo : revérifications à la validation', () => {
+  it('email pris entre la proposition et la validation : refus clair, pas de doublon', async () => {
+    const r = await call('propose_customer', customer({ email: 'nouveau@client.fr', first_name: 'Nouveau', last_name: 'Client' }));
+    await pg.exec(`insert into users (id, email, password_hash) values ('00000000-0000-4000-8000-000000000a03', 'm@c.fr', 'x');
+      insert into profiles (id, email, parent_user_id) values ('00000000-0000-4000-8000-000000000a03', 'm@c.fr', '${CHEF}');
+      insert into customers (owner_user_id, user_id, customer_type, first_name, last_name, email) values ('00000000-0000-4000-8000-000000000a03', '00000000-0000-4000-8000-000000000a03', 'particulier', 'Déjà', 'Là', 'nouveau@client.fr');`);
+    const res = await decideProposal(r.proposal_id, 'accept');
+    expect(res.error).toMatch(/existe déjà/);
+    expect((await pg.query(`select 1 from customers where email = 'nouveau@client.fr'`)).rows).toHaveLength(1);
+  });
+
+  it('deux cartes pour transformer le même prospect, validées en même temps : un seul devis', async () => {
+    const P2 = '00000000-0000-4000-8000-000000000a22';
+    await pg.exec(`insert into prospect_requests (id, owner_user_id, first_name, last_name, email, event_type, event_date, guest_count) values ('${P2}', '${CHEF}', 'Tom', 'Bas', 'tom@b.fr', 'Gala', '2027-09-01', 40)`);
+    const a = await call('propose_prospect_to_quote', { prospect_id: P2 });
+    const b = await call('propose_prospect_to_quote', { prospect_id: P2 });
+    const res = await Promise.all([decideProposal(a.proposal_id, 'accept'), decideProposal(b.proposal_id, 'accept')]);
+    expect(res.filter((x) => x.error)).toHaveLength(1);
+    expect((await pg.query(`select 1 from quotes where prospect_id = $1`, [P2])).rows).toHaveLength(1);
+  });
+
+  it('statut d’un prospect : un devis confirmé (validé, acompte, payé) ne redescend pas', async () => {
+    const P3 = '00000000-0000-4000-8000-000000000a23';
+    await pg.exec(`insert into prospect_requests (id, owner_user_id, first_name, last_name, email, status) values ('${P3}', '${CHEF}', 'Ana', 'Paye', 'ana@p.fr', 'paye');
+      insert into quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, services, prospect_id) values ('${CHEF}', '${CHEF}', 'Ana Paye', '2027-05-05', 'Gala', 30, 'paye', '[]', '${P3}');`);
+    expect((await call('propose_prospect_status', { prospect_id: P3, status: 'nouveau' })).error).toMatch(/confirm/i);
+  });
+});
+
 describe('Webo : prospects', () => {
   it('statut changé à la validation ; statut inconnu refusé', async () => {
     expect((await call('propose_prospect_status', { prospect_id: LEA, status: 'gagne' })).error).toBeTruthy();

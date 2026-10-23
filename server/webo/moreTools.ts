@@ -99,6 +99,37 @@ async function prospectOf(ctx: ToolContext, id: unknown) {
   return p ?? fail('Demande introuvable.');
 }
 
+/** Un autre client de l'entreprise avec cet email ou ce SIRET (message prêt à montrer), ou null. */
+export async function customerDuplicate(companyId: string, email: string | null, siret: string | null, exceptId: string | null): Promise<string | null> {
+  const scope = sql`${customers.owner_user_id} in ${companyIdsOf(companyId)}`;
+  if (email) {
+    const [d] = await db.select({ id: customers.id }).from(customers).where(and(sql`lower(${customers.email}) = ${email.toLowerCase()}`, scope)).limit(2);
+    if (d && d.id !== exceptId) return 'Un client avec cet email existe déjà : modifiez sa fiche plutôt que d’en créer une.';
+  }
+  if (siret) {
+    const [d] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.siret_number, siret), scope)).limit(2);
+    if (d && d.id !== exceptId) return 'Un client avec ce SIRET existe déjà.';
+  }
+  return null;
+}
+
+const CONFIRMED = ['valide', 'acompte', 'paye'];
+/** Refus si le changement de statut ferait redescendre un devis confirmé (son événement disparaîtrait). */
+export async function prospectStatusProblem(companyId: string, prospectId: string, status: string): Promise<string | null> {
+  const [q] = await db.select({ status: quotes.status }).from(quotes).where(and(eq(quotes.prospect_id, prospectId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
+  if (q && CONFIRMED.includes(q.status) && !CONFIRMED.includes(status)) return 'Son devis est confirmé (validé, acompte ou payé) : changez son statut depuis le devis, pas depuis le prospect.';
+  return null;
+}
+
+/** Ce qui reste à payer sur une facture (TTC moins les paiements enregistrés). */
+export async function invoiceRemaining(invoiceId: string): Promise<number> {
+  const [r] = await db.select({
+    total: customer_invoices.total_ttc,
+    paid: sql<number>`coalesce((select sum(p.amount) from ${customer_invoice_payments} p where p.invoice_id = "customer_invoices"."id"), 0)`,
+  }).from(customer_invoices).where(eq(customer_invoices.id, invoiceId)).limit(1);
+  return r ? Math.round((Number(r.total) - Number(r.paid)) * 100) / 100 : 0;
+}
+
 /** Le devis déjà fait pour un prospect (dans l'entreprise), s'il existe. */
 export async function quoteOfProspect(companyId: string, prospectId: string) {
   const [q] = await db.select({ id: quotes.id }).from(quotes).where(and(eq(quotes.prospect_id, prospectId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
@@ -164,14 +195,8 @@ export const MORE_HANDLERS: Record<string, Handler> = {
       if (type === 'entreprise' && (!fields.companyName || !fields.contactName)) fail('Raison sociale et nom du contact attendus pour une entreprise.');
       fields.type = type;
     }
-    if (fields.email && fields.email !== existing?.email) {
-      const [dup] = await db.select({ id: customers.id }).from(customers).where(and(sql`lower(${customers.email}) = ${fields.email}`, inCompany(ctx))).limit(1);
-      if (dup && dup.id !== existing?.id) fail('Un client avec cet email existe déjà : modifiez sa fiche plutôt que d’en créer une.');
-    }
-    if (fields.siret && fields.siret !== existing?.siret_number) {
-      const [dup] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.siret_number, fields.siret), inCompany(ctx))).limit(1);
-      if (dup && dup.id !== existing?.id) fail('Un client avec ce SIRET existe déjà.');
-    }
+    const dup = await customerDuplicate(ctx.companyId, fields.email, fields.siret, existing?.id ?? null);
+    if (dup) fail(dup);
     const name = existing
       ? (existing.company_name || [existing.first_name, existing.last_name].filter(Boolean).join(' '))
       : (fields.type === 'entreprise' ? fields.companyName : `${fields.firstName} ${fields.lastName}`);
@@ -188,6 +213,8 @@ export const MORE_HANDLERS: Record<string, Handler> = {
     const p = await prospectOf(ctx, i.prospect_id);
     const status = str(i.status, 30);
     if (!(PROSPECT_STATUSES as readonly string[]).includes(status)) fail('Statut inconnu.');
+    const problem = await prospectStatusProblem(ctx.companyId, p.id, status);
+    if (problem) fail(problem);
     return propose(ctx, 'prospect_status', { prospectId: p.id, status }, {
       title: `Prospect ${p.first_name} ${p.last_name}`,
       fields: [{ label: 'Statut', value: `${STATUS_LABEL[p.status] ?? p.status} → ${STATUS_LABEL[status]}` }],
@@ -316,7 +343,7 @@ export const MORE_HANDLERS: Record<string, Handler> = {
     const rows = await db.select({
       id: customer_invoices.id, number: customer_invoices.number, kind: customer_invoices.kind, status: customer_invoices.status, buyer: customer_invoices.buyer,
       total_ttc: customer_invoices.total_ttc, issue_date: customer_invoices.issue_date, due_date: customer_invoices.due_date, quote_id: customer_invoices.quote_id,
-      paid: sql<number>`coalesce((select sum(p.amount) from ${customer_invoice_payments} p where p.invoice_id = ${customer_invoices.id}), 0)`,
+      paid: sql<number>`coalesce((select sum(p.amount) from ${customer_invoice_payments} p where p.invoice_id = "customer_invoices"."id"), 0)`,
     }).from(customer_invoices)
       .where(and(eq(customer_invoices.owner_user_id, ctx.companyId),
         isUuid(i.quote_id) ? eq(customer_invoices.quote_id, i.quote_id as string) : undefined,
@@ -340,6 +367,8 @@ export const MORE_HANDLERS: Record<string, Handler> = {
     if (inv.status === 'brouillon' || inv.status === 'annulee' || inv.kind === 'avoir') fail('Un paiement s’enregistre sur une facture émise.');
     const amount = Math.round(Number(i.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) fail('Montant invalide.');
+    const remaining = await invoiceRemaining(inv.id);
+    if (amount > remaining + 0.005) fail(`Le reste à payer de cette facture est de ${eur(Math.max(0, remaining))}.`);
     const paidOn = str(i.paid_on, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn) || Number.isNaN(Date.parse(paidOn))) fail('Date de paiement attendue au format AAAA-MM-JJ.');
     const method = (Object.keys(PAYMENT_METHODS) as string[]).includes(String(i.method)) ? String(i.method) : 'autre';

@@ -9,7 +9,7 @@ import { sendBrochure } from '../brochures';
 import type { PaymentMethod } from '@/lib/invoices';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
-import { quoteOfProspect } from './moreTools';
+import { customerDuplicate, invoiceRemaining, prospectStatusProblem } from './moreTools';
 
 // Exécution des propositions « du reste du logiciel » (clients, prospects, stock, commandes, brochures, factures),
 // une fois validées par le traiteur. Tout est revérifié ici, dans l'entreprise.
@@ -22,6 +22,20 @@ const todayFr = () => new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe
 async function upsertCustomer(user: User, companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
   const v = (k: string) => (p[k] == null ? null : String(p[k]));
   const note = v('note');
+  // Un autre client a pu prendre cet email ou ce SIRET depuis la proposition.
+  const dup = await customerDuplicate(companyId, v('email'), v('siret'), (p.customerId as string | null) ?? null);
+  if (dup) throw new Error(dup);
+  try {
+    return await writeCustomer(user, companyId, p, v, note);
+  } catch (e) {
+    if ((e as { code?: string; cause?: { code?: string } }).code === '23505' || (e as { cause?: { code?: string } }).cause?.code === '23505') {
+      throw new Error('Un client avec cet email ou ce SIRET existe déjà.');
+    }
+    throw e;
+  }
+}
+
+async function writeCustomer(user: User, companyId: string, p: Record<string, unknown>, v: (k: string) => string | null, note: string | null): Promise<MoreResult> {
   if (p.customerId) {
     const [c] = await db.select().from(customers).where(and(eq(customers.id, String(p.customerId)), sql`${customers.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
     if (!c) throw new Error('Client introuvable.');
@@ -47,6 +61,8 @@ async function upsertCustomer(user: User, companyId: string, p: Record<string, u
 async function setProspectStatus(user: User, companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
   const id = String(p.prospectId);
   const status = String(p.status);
+  const problem = await prospectStatusProblem(companyId, id, status);
+  if (problem) throw new Error(problem);
   await db.transaction(async (tx) => {
     // Qui change le statut du devis lié : lu par le déclencheur d'historique.
     await tx.execute(sql`select set_config('app.user_id', ${user.id}, true)`);
@@ -60,29 +76,35 @@ async function setProspectStatus(user: User, companyId: string, p: Record<string
 
 async function prospectToQuote(user: User, companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
   const id = String(p.prospectId);
-  const [pr] = await db.select().from(prospect_requests).where(and(eq(prospect_requests.id, id), sql`${prospect_requests.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
-  if (!pr) throw new Error('Demande introuvable.');
-  if (await quoteOfProspect(companyId, id)) throw new Error('Cette demande a déjà son devis.');
-  if (!pr.event_date) throw new Error('La demande n’a pas de date d’événement.');
-  const email = pr.email.toLowerCase();
-  let [c] = await db.select().from(customers).where(and(sql`lower(${customers.email}) = ${email}`, sql`${customers.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
-  if (!c) {
-    [c] = await db.insert(customers).values({
-      owner_user_id: user.id, user_id: user.id, customer_type: 'particulier', first_name: pr.first_name, last_name: pr.last_name, email, phone: pr.phone, address: pr.address,
-    }).onConflictDoNothing().returning();
-    if (!c) [c] = await db.select().from(customers).where(and(eq(customers.email, email), eq(customers.owner_user_id, user.id))).limit(1);
-  }
-  const [profile] = await db.select({ vat: profiles.default_vat_rate }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
-  const [q] = await db.insert(quotes).values({
-    owner_user_id: user.id, user_id: user.id, customer_id: c?.id ?? null, prospect_id: id,
-    client_name: `${pr.first_name} ${pr.last_name}`, client_first_name: pr.first_name, client_last_name: pr.last_name, client_email: email, client_phone: pr.phone, client_address: pr.address,
-    event_type: pr.event_type || 'Autre', event_date: pr.event_date, guest_count: Math.max(1, pr.guest_count ?? 1),
-    ...(pr.guest_count_children ? { guest_count_children: pr.guest_count_children } : {}),
-    event_location: pr.service_address, remarks: pr.message, status: 'devis_a_faire', template: 'classique',
-    vat_rate: String(defaultVatRate(profile ? { default_vat_rate: profile.vat } : null)), services: [], total_amount: '0', hide_price: false, language: 'fr',
-  }).returning({ id: quotes.id });
-  await db.update(prospect_requests).set({ status: 'devis_a_faire', updated_at: new Date().toISOString() }).where(eq(prospect_requests.id, id));
-  return { href: `/devis/${q.id}/modifier?mode=weboword`, label: 'Ouvrir le devis' };
+  // Prospect verrouillé le temps de la transformation : deux validations simultanées ne font qu'un devis.
+  const quoteId = await db.transaction(async (tx) => {
+    const [pr] = await tx.select().from(prospect_requests)
+      .where(and(eq(prospect_requests.id, id), sql`${prospect_requests.owner_user_id} in ${companyIdsOf(companyId)}`)).for('update').limit(1);
+    if (!pr) throw new Error('Demande introuvable.');
+    const [already] = await tx.select({ id: quotes.id }).from(quotes).where(and(eq(quotes.prospect_id, id), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
+    if (already) throw new Error('Cette demande a déjà son devis.');
+    if (!pr.event_date) throw new Error('La demande n’a pas de date d’événement.');
+    const email = pr.email.toLowerCase();
+    let [c] = await tx.select().from(customers).where(and(sql`lower(${customers.email}) = ${email}`, sql`${customers.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
+    if (!c) {
+      [c] = await tx.insert(customers).values({
+        owner_user_id: user.id, user_id: user.id, customer_type: 'particulier', first_name: pr.first_name, last_name: pr.last_name, email, phone: pr.phone, address: pr.address,
+      }).onConflictDoNothing().returning();
+      if (!c) [c] = await tx.select().from(customers).where(and(eq(customers.email, email), eq(customers.owner_user_id, user.id))).limit(1);
+    }
+    const [profile] = await tx.select({ vat: profiles.default_vat_rate }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
+    const [q] = await tx.insert(quotes).values({
+      owner_user_id: user.id, user_id: user.id, customer_id: c?.id ?? null, prospect_id: id,
+      client_name: `${pr.first_name} ${pr.last_name}`, client_first_name: pr.first_name, client_last_name: pr.last_name, client_email: email, client_phone: pr.phone, client_address: pr.address,
+      event_type: pr.event_type || 'Autre', event_date: pr.event_date, guest_count: Math.max(1, pr.guest_count ?? 1),
+      ...(pr.guest_count_children ? { guest_count_children: pr.guest_count_children } : {}),
+      event_location: pr.service_address, remarks: pr.message, status: 'devis_a_faire', template: 'classique',
+      vat_rate: String(defaultVatRate(profile ? { default_vat_rate: profile.vat } : null)), services: [], total_amount: '0', hide_price: false, language: 'fr',
+    }).returning({ id: quotes.id });
+    await tx.update(prospect_requests).set({ status: 'devis_a_faire', updated_at: new Date().toISOString() }).where(eq(prospect_requests.id, id));
+    return q.id;
+  });
+  return { href: `/devis/${quoteId}/modifier?mode=weboword`, label: 'Ouvrir le devis' };
 }
 
 type Move = { ingredientId: string; name: string; unit: string; type: 'in' | 'out' | 'adjust'; quantity: number; reason: string | null };
@@ -157,6 +179,9 @@ export async function executeMore(kind: string, p: Record<string, unknown>, user
       return { href: '/factures', label: `Facture ${'number' in r ? r.number : ''} émise · voir les factures` };
     }
     case 'invoice_payment': {
+      // Un autre paiement a pu être enregistré depuis la proposition : jamais au-delà du reste à payer.
+      const remaining = await invoiceRemaining(String(p.invoiceId));
+      if (Number(p.amount) > remaining + 0.005) throw new Error(`Le reste à payer de cette facture n’est plus que de ${Math.max(0, remaining).toFixed(2).replace('.', ',')} € : paiement non enregistré.`);
       const r = await recordPayment(String(p.invoiceId), { paidOn: String(p.paidOn), amount: Number(p.amount), method: String(p.method) as PaymentMethod, note: (p.note as string | null) ?? null });
       if (r.error !== null) throw new Error(r.error);
       return { href: '/factures', label: 'Voir les factures' };

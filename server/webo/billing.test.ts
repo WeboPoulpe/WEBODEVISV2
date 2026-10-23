@@ -83,6 +83,20 @@ describe('Webo : factures', () => {
   });
 });
 
+describe('Webo : paiements sans double compte', () => {
+  it('au-delà du reste à payer : refusé ; deux cartes identiques : la seconde refusée à la validation', async () => {
+    expect((await call('propose_invoice_payment', { invoice_id: ISSUED, amount: 5000, paid_on: '2026-10-21', method: 'virement', note: null })).error).toMatch(/reste/i);
+    const a = await call('propose_invoice_payment', { invoice_id: ISSUED, amount: 1700, paid_on: '2026-10-21', method: 'virement', note: null });
+    const b = await call('propose_invoice_payment', { invoice_id: ISSUED, amount: 1700, paid_on: '2026-10-21', method: 'virement', note: null });
+    // Le premier paiement enregistré (simulé : recordPayment est remplacé, on l'inscrit nous-mêmes).
+    expect((await decideProposal(a.proposal_id, 'accept')).error).toBeNull();
+    await pg.query(`insert into customer_invoice_payments (invoice_id, paid_on, amount, method, created_by) values ($1, '2026-10-21', 1700, 'virement', $2)`, [ISSUED, CHEF]);
+    expect((await call('list_invoices', { quote_id: null, status: null })).results.find((x: { id: string }) => x.id === ISSUED).remaining).toBe(500);
+    const rb = await decideProposal(b.proposal_id, 'accept');
+    expect(rb.error).toMatch(/reste/i);
+  });
+});
+
 describe('Webo : brochures', () => {
   it('envoyer une brochure active ; brochure inactive refusée ; adresse invalide refusée', async () => {
     expect((await call('list_brochures', {})).results.map((b: { name: string }) => b.name)).toContain('Mariages 2027');
