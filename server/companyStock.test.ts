@@ -70,5 +70,6 @@ describe('reprise des stocks existants', () => {
     expect(await q(A, BUTTER)).toEqual({ quantity: '5', min_alert: '0' });
     expect(await q(B, BUTTER)).toEqual({ quantity: '3', min_alert: '0' });
     expect(await q(A, '00000000-0000-4000-8000-00000000c002')).toEqual({ quantity: '7', min_alert: '2' });
-  });
+    // La base en mémoire (schéma complet et migrations) se crée dans le test : plus long qu'un test ordinaire.
+  }, 30_000);
 });
