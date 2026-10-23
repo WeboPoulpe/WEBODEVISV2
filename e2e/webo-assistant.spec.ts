@@ -129,6 +129,32 @@ test.describe('assistant Webo', () => {
     });
   });
 
+  test('page d’un événement : une carte Webo validée apparaît dans la check-list sans recharger (rien d’écrasé)', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(150_000);
+    await withAccount(browser, 'webo-evenement', async (page, userId) => {
+      const [q] = await sql<{ id: string }>(
+        `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, vat_rate, services, checklist)
+         values ($1, $1, 'Famille Lenoir', current_date + 20, 'Mariage', 80, 'valide', 10, '[]'::jsonb, '[{"id":"c1","text":"Nappes blanches","done":false}]'::jsonb) returning id`, [userId]);
+      const [c] = await sql<{ id: string }>(`insert into public.webo_conversations (company_id, user_id, title) values ($1, $1, 'Événement') returning id`, [userId]);
+      const payload = { quoteId: q.id, addChecklist: ['Prévoir des glaçons'], checkChecklist: [], addMaterials: [], runSheet: null, arrival: null, contact: null, assign: [], invite: false };
+      const [p] = await sql<{ id: string }>(
+        `insert into public.webo_proposals (conversation_id, company_id, user_id, kind, payload, summary) values ($1, $2, $2, 'event_update', $3::jsonb, $4::jsonb) returning id`,
+        [c.id, userId, JSON.stringify(payload), JSON.stringify({ title: 'Événement · Famille Lenoir', fields: [{ label: 'À faire', value: '+ Prévoir des glaçons' }] })]);
+      await sql(`update public.webo_conversations set transcript = $2::jsonb where id = $1`, [c.id, JSON.stringify([
+        { role: 'user', text: 'Ajoute des glaçons', at: new Date().toISOString() },
+        { role: 'assistant', text: 'Je vous propose cet ajout.', agent: 'evenements', proposalIds: [p.id], at: new Date().toISOString() },
+      ])]);
+      await page.goto(`/evenements/${q.id}`);
+      await expect(page.getByText('Nappes blanches')).toBeVisible({ timeout: 30_000 });
+      await page.evaluate((id) => localStorage.setItem('webo:last-conversation', id), c.id);
+      await page.getByRole('button', { name: 'Ouvrir Webo' }).click();
+      await page.getByRole('article', { name: 'Événement · Famille Lenoir' }).getByRole('button', { name: 'Valider' }).click();
+      await page.getByRole('button', { name: 'Fermer Webo' }).click();
+      // L'onglet ouvert se met à jour tout seul : l'ajout de Webo est là, et un clic ne l'efface pas.
+      await expect(page.getByText('Prévoir des glaçons')).toBeVisible({ timeout: 15_000 });
+    });
+  });
+
   test('Paramètres : ce que Webo retient, et l’oublier', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     await withAccount(browser, 'webo-memoire', async (page, userId) => {

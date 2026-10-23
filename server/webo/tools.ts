@@ -501,7 +501,9 @@ const HANDLERS: Record<string, Handler> = {
       if (!Number.isFinite(qty) || qty <= 0 || qty > 100_000) fail(`Quantité invalide pour « ${name} ».`);
       return { name, qty, unit: str(r.unit, 30) || 'pièce' };
     });
-    const runSheet = i.run_sheet == null ? null : cleanRunSheet(i.run_sheet);
+    // Un déroulé vide n'efface pas celui qui existe : il vaut « inchangé ».
+    const cleaned = i.run_sheet == null ? null : cleanRunSheet(i.run_sheet);
+    const runSheet = cleaned && cleaned.length ? cleaned : null;
     const time = (v: unknown) => {
       if (v == null || v === '') return null;
       const t = str(v, 5);
@@ -514,10 +516,13 @@ const HANDLERS: Record<string, Handler> = {
       return { extraId: String(r.extra_id ?? ''), arrival: time(r.arrival_time), departure: time(r.departure_time), notes: str(r.mission_notes, 500) || null };
     });
     let names = new Map<string, string>();
+    const noEmail: string[] = [];
     if (assign.length) {
+      if (!(CONFIRMED_STATUSES as string[]).includes(q.status)) fail('Cet événement n’est pas confirmé (devis validé, acompte ou payé) : pas d’extras pour l’instant.');
       const ids = assign.map((a) => a.extraId).filter(isUuid);
-      const found = ids.length ? await db.select({ id: extras.id, name: extras.name }).from(extras).where(and(inArray(extras.id, ids), sql`${extras.user_id} in ${companyIdsOf(ctx.companyId)}`)) : [];
+      const found = ids.length ? await db.select({ id: extras.id, name: extras.name, email: extras.email }).from(extras).where(and(inArray(extras.id, ids), sql`${extras.user_id} in ${companyIdsOf(ctx.companyId)}`)) : [];
       names = new Map(found.map((f) => [f.id, f.name]));
+      for (const f of found) if (!f.email) noEmail.push(f.name);
       for (const a of assign) if (!names.has(a.extraId)) fail('Extra introuvable dans votre équipe.');
     }
     const invite = i.invite_extras === true && assign.length > 0;
@@ -529,12 +534,15 @@ const HANDLERS: Record<string, Handler> = {
         ...(addChecklist.length ? [{ label: 'À faire', value: addChecklist.map((t) => `+ ${t}`).join('\n') }] : []),
         ...(checkChecklist.length ? [{ label: 'Cochés', value: checkChecklist.join('\n') }] : []),
         ...(addMaterials.length ? [{ label: 'Matériel', value: addMaterials.map((m) => `+ ${m.qty} ${m.unit} ${m.name}`).join('\n') }] : []),
-        ...(runSheet ? [{ label: 'Déroulé', value: runSheet.map((s) => `${s.time} ${s.label}${s.note ? ` (${s.note})` : ''}`).join('\n') }] : []),
+        ...(runSheet ? [{ label: 'Déroulé (remplacé)', value: runSheet.map((s) => `${s.time} ${s.label}${s.note ? ` (${s.note})` : ''}`).join('\n') }] : []),
         ...(arrival ? [{ label: 'Arrivée équipe', value: arrival }] : []),
         ...(contact ? [{ label: 'Contact sur place', value: contact }] : []),
         ...(assign.length ? [{ label: 'Extras', value: assign.map((a) => `${names.get(a.extraId)}${a.arrival ? ` · ${a.arrival}${a.departure ? `–${a.departure}` : ''}` : ''}`).join('\n') }] : []),
       ],
-      note: invite ? 'Les extras affectés reçoivent une invitation par email quand vous validez.' : assign.length ? 'Les extras sont affectés sans être prévenus : invitez-les depuis l’événement quand vous voulez.' : undefined,
+      note: [
+        invite ? 'Les extras affectés reçoivent une invitation par email quand vous validez.' : assign.length ? 'Les extras sont affectés sans être prévenus : invitez-les depuis l’événement quand vous voulez.' : '',
+        noEmail.length ? `Sans email : ${noEmail.join(', ')} (à prévenir autrement).` : '',
+      ].filter(Boolean).join(' ') || undefined,
     });
   },
 

@@ -4,6 +4,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { customers, event_extras, extras, prestations, profiles, prospect_requests, quotes, webo_memories, webo_proposals } from '@/db/schema';
 import { inviteToMissions } from '../extras';
+import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
 import { recalculateCourses } from '../events';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { sendMail } from '@/lib/mail';
@@ -157,41 +158,51 @@ export async function decideProposal(id: string, decision: 'accept' | 'cancel'):
           runSheet: { time: string; label: string; note: string }[] | null; arrival: string | null; contact: string | null;
           assign: { extraId: string; arrival: string | null; departure: string | null; notes: string | null }[]; invite: boolean };
         const e = p as unknown as Payload;
-        const [q] = await db.select().from(quotes).where(and(eq(quotes.id, e.quoteId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
-        if (!q) throw new Error('Événement introuvable.');
-        const checks = new Set(e.checkChecklist.map((t) => t.toLowerCase()));
-        const checklist = [
-          ...((Array.isArray(q.checklist) ? q.checklist : []) as { id: string; text: string; done: boolean }[])
-            .map((c) => (checks.has(String(c.text).toLowerCase()) ? { ...c, done: true } : c)),
-          ...e.addChecklist.map((text) => ({ id: crypto.randomUUID(), text, done: false })),
-        ];
-        const materials = [
-          ...((Array.isArray(q.event_materials) ? q.event_materials : []) as unknown[]),
-          ...e.addMaterials.map((m) => ({ id: crypto.randomUUID(), ...m })),
-        ];
-        await db.update(quotes).set({
-          checklist, event_materials: materials,
-          ...(e.runSheet ? { run_sheet: e.runSheet } : {}), ...(e.arrival ? { team_arrival_time: e.arrival } : {}), ...(e.contact ? { onsite_contact: e.contact } : {}),
-          updated_at: new Date().toISOString(),
-        }).where(eq(quotes.id, q.id));
-        if (e.assign.length) {
-          // Extras de l'entreprise seulement (revérifié ici) ; un extra déjà affecté n'est pas doublé.
-          const own = await db.select({ id: extras.id }).from(extras).where(and(inArray(extras.id, e.assign.map((a) => a.extraId)), sql`${extras.user_id} in ${companyIdsOf(companyId)}`));
-          const ok = new Set(own.map((o) => o.id));
-          await db.insert(event_extras).values(e.assign.filter((a) => ok.has(a.extraId)).map((a) => ({
-            quote_id: q.id, extra_id: a.extraId, status: 'a_solliciter', arrival_time: a.arrival, departure_time: a.departure, mission_notes: a.notes,
-          }))).onConflictDoNothing();
-          if (e.invite) {
-            // Tous les extras de la carte pas encore invités (affectés maintenant ou avant).
-            const pending = await db.select({ id: event_extras.id }).from(event_extras)
-              .where(and(eq(event_extras.quote_id, q.id), inArray(event_extras.extra_id, [...ok]), isNull(event_extras.invited_at)));
-            if (pending.length) {
-              const r = await inviteToMissions(pending.map((x) => x.id));
-              if (r.error) throw new Error(r.error);
-            }
+        // Écritures en une transaction, devis verrouillé (pas de mise à jour perdue) ; l'invitation part après.
+        const outcome = await db.transaction(async (tx) => {
+          const [q] = await tx.select().from(quotes).where(and(eq(quotes.id, e.quoteId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).for('update').limit(1);
+          if (!q) throw new Error('Événement introuvable.');
+          if (e.assign.length && !(CONFIRMED_STATUSES as string[]).includes(q.status)) throw new Error('Cet événement n’est plus confirmé : les extras ne sont pas affectés.');
+          const checks = new Set(e.checkChecklist.map((t) => t.toLowerCase()));
+          const checklist = [
+            ...((Array.isArray(q.checklist) ? q.checklist : []) as { id: string; text: string; done: boolean }[])
+              .map((c) => (checks.has(String(c.text).toLowerCase()) ? { ...c, done: true } : c)),
+            ...e.addChecklist.map((text) => ({ id: crypto.randomUUID(), text, done: false })),
+          ];
+          const materials = [
+            ...((Array.isArray(q.event_materials) ? q.event_materials : []) as unknown[]),
+            ...e.addMaterials.map((m) => ({ id: crypto.randomUUID(), ...m, checked: false })),
+          ];
+          await tx.update(quotes).set({
+            checklist, event_materials: materials,
+            ...(e.runSheet && e.runSheet.length ? { run_sheet: e.runSheet } : {}), ...(e.arrival ? { team_arrival_time: e.arrival } : {}), ...(e.contact ? { onsite_contact: e.contact } : {}),
+            updated_at: new Date().toISOString(),
+          }).where(eq(quotes.id, q.id));
+          let ok = new Set<string>();
+          if (e.assign.length) {
+            // Extras de l'entreprise seulement (revérifié ici) ; un extra déjà affecté n'est pas doublé.
+            const own = await tx.select({ id: extras.id }).from(extras).where(and(inArray(extras.id, e.assign.map((a) => a.extraId)), sql`${extras.user_id} in ${companyIdsOf(companyId)}`));
+            ok = new Set(own.map((o) => o.id));
+            const rows = e.assign.filter((a) => ok.has(a.extraId)).map((a) => ({
+              quote_id: q.id, extra_id: a.extraId, status: 'a_solliciter', arrival_time: a.arrival, departure_time: a.departure, mission_notes: a.notes,
+            }));
+            if (rows.length) await tx.insert(event_extras).values(rows).onConflictDoNothing();
+          }
+          return { q, ok };
+        });
+        const q = outcome.q;
+        let label = 'Ouvrir l’événement';
+        if (e.invite && outcome.ok.size) {
+          // Tous les extras de la carte pas encore invités (affectés maintenant ou avant).
+          const pending = await db.select({ id: event_extras.id }).from(event_extras)
+            .where(and(eq(event_extras.quote_id, q.id), inArray(event_extras.extra_id, [...outcome.ok]), isNull(event_extras.invited_at)));
+          if (pending.length) {
+            const r = await inviteToMissions(pending.map((x) => x.id));
+            if (r.error) throw new Error(`Événement mis à jour, mais invitation non envoyée : ${r.error}`);
+            if (r.unreachable?.length) label = `Ouvrir l’événement · à prévenir vous-même : ${r.unreachable.join(', ')}`;
           }
         }
-        result = { href: `/evenements/${q.id}`, label: 'Ouvrir l’événement' };
+        result = { href: `/evenements/${q.id}`, label };
         break;
       }
       case 'courses_recalc': {

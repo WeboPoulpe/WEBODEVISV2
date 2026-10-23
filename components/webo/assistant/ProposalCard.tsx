@@ -39,6 +39,9 @@ export default function ProposalCard({ proposal, onModify, onChange }: {
       const ok = await resyncQuoteDocument(result.resync).catch(() => false);
       if (!ok) notify('Devis modifié. Ouvrez-le et cliquez « Appliquer » pour remettre son document à jour.');
     }
+    // Les pages ouvertes sur ce devis ou cet événement se rechargent (sinon elles écraseraient le changement).
+    const changed = /\/(?:devis|evenements)\/([0-9a-f-]{36})/i.exec(result?.href ?? '')?.[1];
+    if (decision === 'accept' && changed) window.dispatchEvent(new CustomEvent('webo:quote-changed', { detail: changed }));
     onChange({ ...proposal, status: decision === 'accept' ? 'done' : 'cancelled', result });
     if (decision === 'accept') void refresh();
   };

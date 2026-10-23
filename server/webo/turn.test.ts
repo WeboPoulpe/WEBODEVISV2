@@ -83,6 +83,14 @@ describe('tour de discussion en flux', () => {
     await pg.exec(`delete from webo_memories`);
   });
 
+  it('page d’un événement : « cet événement » est celui de la page', async () => {
+    script = [route('evenements'), say('Je regarde cet événement.')];
+    await run('Ajoute des glaçons à la check-list', `/evenements/${MINE}`);
+    const msg = JSON.stringify(sent[1].messages);
+    expect(msg).toContain('Page ouverte');
+    expect(msg).toContain('Famille Lenoir');
+  });
+
   it('chemin vers le devis d’une autre entreprise : ignoré', async () => {
     script = [route('devis'), say('Lequel ?')];
     await run('Ajoute un trou normand', `/devis/${THEIRS}/modifier`);

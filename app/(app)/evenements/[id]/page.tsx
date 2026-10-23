@@ -45,11 +45,18 @@ export default function EvenementPage() {
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Rechargé aussi quand Webo modifie cet événement : les onglets repartent des données à jour (version).
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     createClient().from('quotes').select(QUOTE_SELECT).eq('id', id).maybeSingle().then(({ data }) => {
       setQuote(data as EventQuote | null);
       setLoading(false);
     });
+  }, [id, version]);
+  useEffect(() => {
+    const onChanged = (e: Event) => { if ((e as CustomEvent<string>).detail === id) setVersion((v) => v + 1); };
+    window.addEventListener('webo:quote-changed', onChanged);
+    return () => window.removeEventListener('webo:quote-changed', onChanged);
   }, [id]);
 
   const patchQuote = useCallback((patch: Partial<EventQuote>) => setQuote((q) => (q ? { ...q, ...patch } : q)), []);
@@ -138,13 +145,13 @@ export default function EvenementPage() {
       </div>
 
       <section className={cn(cardCls, 'p-4 sm:p-6')} role="tabpanel">
-        {tab === 'checklist' && <ChecklistTab quote={quote} onChange={(checklist) => patchQuote({ checklist })} />}
-        {tab === 'materiel' && <MaterielTab quote={quote} onChange={patchQuote} />}
-        {tab === 'courses' && <CoursesTab quote={quote} />}
-        {tab === 'extras' && <ExtrasTab quote={quote} />}
+        {tab === 'checklist' && <ChecklistTab key={version} quote={quote} onChange={(checklist) => patchQuote({ checklist })} />}
+        {tab === 'materiel' && <MaterielTab key={version} quote={quote} onChange={patchQuote} />}
+        {tab === 'courses' && <CoursesTab key={version} quote={quote} />}
+        {tab === 'extras' && <ExtrasTab key={version} quote={quote} />}
       </section>
 
-      <RunSheetSection quoteId={quote.id} />
+      <RunSheetSection key={version} quoteId={quote.id} />
 
       {edit && (
         <Modal

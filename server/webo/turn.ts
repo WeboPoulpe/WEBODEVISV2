@@ -68,10 +68,10 @@ export type TurnResult = { error: string | null; conversationId?: string; reply?
 
 /** Le devis de la page ouverte (s'il est de l'entreprise), résumé pour le spécialiste. */
 async function pageContext(ctx: { userId: string; companyId: string; conversationId: string; proposals: string[] }, path: string | undefined): Promise<string> {
-  const id = /^\/devis\/([0-9a-f-]{36})(?:\/|$|\?)/i.exec(path ?? '')?.[1];
+  const id = /^\/(?:devis|evenements)\/([0-9a-f-]{36})(?:\/|$|\?)/i.exec(path ?? '')?.[1];
   if (!id || !isUuid(id)) return '';
   const out = JSON.parse(await runTool(ctx, 'get_quote', { quote_id: id })) as { error?: string };
-  return out.error ? '' : `Page ouverte : le traiteur regarde ce devis (« ce devis » désigne celui-ci).\n${JSON.stringify(out)}`;
+  return out.error ? '' : `Page ouverte : le traiteur regarde ce devis ou cet événement (« ce devis », « cet événement » désignent celui-ci).\n${JSON.stringify(out)}`;
 }
 
 /** Un tour complet. `emit` reçoit les morceaux ; s'il échoue (navigateur parti), le tour continue jusqu'au bout. */

@@ -21,7 +21,8 @@ vi.mock('../session', () => ({
 }));
 vi.mock('@/lib/mail', () => ({ appOrigin: async () => 'https://webodevis.fr', sendMail: async () => ({ error: null }) }));
 const invited: string[][] = [];
-vi.mock('../extras', () => ({ inviteToMissions: async (ids: string[]) => { invited.push(ids); return { error: null, emailed: ids.length, notified: 0, unreachable: [] }; } }));
+let unreachable: string[] = [];
+vi.mock('../extras', () => ({ inviteToMissions: async (ids: string[]) => { invited.push(ids); return { error: null, emailed: ids.length - unreachable.length, notified: 0, unreachable }; } }));
 const recalcs: string[] = [];
 vi.mock('../events', () => ({ recalculateCourses: async (id: string) => { recalcs.push(id); return { error: null, lines: 3, unmatched: [], withoutIngredients: [] }; } }));
 let pg: PGlite;
@@ -102,6 +103,46 @@ describe('Webo et les événements', () => {
     expect((await call('propose_event_update', upd({ assign_extras: [{ extra_id: ALIEN, arrival_time: null, departure_time: null, mission_notes: null }] }))).error).toBeTruthy();
     expect((await call('propose_event_update', upd({ quote_id: THEIRS, add_checklist: ['x'] }))).error).toBeTruthy();
     expect((await call('propose_event_update', upd({ team_arrival_time: '25:99' }))).error).toBeTruthy();
+  });
+
+  it('déroulé vide : ne remplace rien (null), et seul il n’est pas une modification', async () => {
+    expect((await call('propose_event_update', upd({ run_sheet: [] }))).error).toBeTruthy();
+    const before = (await ev()).run_sheet;
+    const r = await call('propose_event_update', upd({ run_sheet: [{ time: '', label: '', note: '' }], add_checklist: ['Vérifier les fleurs'] }));
+    await decideProposal(r.proposal_id, 'accept');
+    expect((await ev()).run_sheet).toEqual(before);
+  });
+
+  it('devis non confirmé : extras refusés (proposition et validation), check-list permise', async () => {
+    await pg.exec(`begin; select set_config('app.user_id', '${CHEF}', true); update quotes set status = 'devis_envoye' where id = '${EV}'; commit;`);
+    expect((await call('propose_event_update', upd({ assign_extras: [{ extra_id: LEA, arrival_time: null, departure_time: null, mission_notes: null }] }))).error).toMatch(/confirm/i);
+    expect((await call('propose_event_update', upd({ add_checklist: ['Relancer le client'] }))).error).toBeUndefined();
+    await pg.exec(`begin; select set_config('app.user_id', '${CHEF}', true); update quotes set status = 'valide' where id = '${EV}'; commit;`);
+    const r = await call('propose_event_update', upd({ assign_extras: [{ extra_id: LEA, arrival_time: null, departure_time: null, mission_notes: null }], invite_extras: true }));
+    await pg.exec(`begin; select set_config('app.user_id', '${CHEF}', true); update quotes set status = 'refus_client' where id = '${EV}'; commit;`);
+    expect((await decideProposal(r.proposal_id, 'accept')).error).toMatch(/confirm/i);
+    expect(invited).toHaveLength(0);
+    await pg.exec(`begin; select set_config('app.user_id', '${CHEF}', true); update quotes set status = 'valide' where id = '${EV}'; commit;`);
+  });
+
+  it('extra injoignable : signalé à la proposition et dans le résultat', async () => {
+    const MUET = '00000000-0000-4000-8000-000000000924';
+    await pg.exec(`insert into extras (id, user_id, name, role, access_token) values ('${MUET}', '${CHEF}', 'Muet Sansmail', 'Plonge', 'tok-muet')`);
+    unreachable = ['Muet Sansmail'];
+    const r = await call('propose_event_update', upd({ assign_extras: [{ extra_id: MUET, arrival_time: null, departure_time: null, mission_notes: null }], invite_extras: true }));
+    expect(JSON.stringify(r.summary)).toMatch(/sans email/i);
+    const res = await decideProposal(r.proposal_id, 'accept');
+    expect(res.result?.label).toMatch(/prévenir/i);
+    unreachable = [];
+  });
+
+  it('extra supprimé entre la proposition et la validation : le reste est appliqué, sans erreur', async () => {
+    const TEMP = '00000000-0000-4000-8000-000000000925';
+    await pg.exec(`insert into extras (id, user_id, name, role, email, access_token) values ('${TEMP}', '${CHEF}', 'Temp Extra', 'Serveur', 't@e.fr', 'tok-temp')`);
+    const r = await call('propose_event_update', upd({ add_checklist: ['Prévoir des glaçons'], assign_extras: [{ extra_id: TEMP, arrival_time: null, departure_time: null, mission_notes: null }] }));
+    await pg.exec(`delete from extras where id = '${TEMP}'`);
+    expect((await decideProposal(r.proposal_id, 'accept')).error).toBeNull();
+    expect((await ev()).checklist.map((c) => c.text)).toContain('Prévoir des glaçons');
   });
 
   it('courses : recalcul proposé puis lancé à la validation', async () => {
