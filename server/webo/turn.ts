@@ -16,7 +16,7 @@ import { memoriesText } from './memoryStore';
 // fil de l'eau) et propositions. Chaque réponse est payée au coût réel de ses appels × coefficient (au plus le solde).
 // Appelé par l'action sendWeboMessage (sans flux) et par la route /api/webo/chat (flux).
 
-export interface TranscriptEntry { role: 'user' | 'assistant'; text: string; agent?: AgentName; proposalIds?: string[]; coins?: number; at: string }
+export interface TranscriptEntry { role: 'user' | 'assistant'; text: string; agent?: AgentName; proposalIds?: string[]; coins?: number; rating?: 'up' | 'down'; at: string }
 export interface ProposalView { id: string; kind: string; status: string; summary: ProposalSummary; result: { href?: string; label?: string; error?: string } | null }
 export interface WeboReply { text: string; agent: AgentName; proposals: ProposalView[]; coins: number }
 

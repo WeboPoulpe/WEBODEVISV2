@@ -4,16 +4,16 @@
 // plein écran sur téléphone). Webo propose ; le traiteur valide chaque action dans sa carte.
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { History, Loader2, Plus, Send, Sparkles, X } from 'lucide-react';
+import { History, Loader2, Plus, Send, Sparkles, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFeedback } from '@/components/ui/Feedback';
 import WeboCoin from '@/components/webo/WeboCoin';
 import { useWallet } from '@/components/webo/WalletContext';
-import { getWeboConversation, listWeboConversations, type ProposalView, type TranscriptEntry } from '@/server/webo/chat';
+import { getWeboConversation, listWeboConversations, rateWeboReply, type ProposalView, type TranscriptEntry } from '@/server/webo/chat';
 import { streamWebo } from '@/lib/webo/stream';
 import ProposalCard from './ProposalCard';
 
-const AGENT_LABEL: Record<string, string> = { devis: 'Devis', factures: 'Factures', catalogue: 'Catalogue', prospects: 'Prospects', aide: 'Aide' };
+const AGENT_LABEL: Record<string, string> = { devis: 'Devis', factures: 'Factures', catalogue: 'Catalogue', prospects: 'Prospects', journee: 'Journée', aide: 'Aide' };
 const SUGGESTIONS = [
   'Prépare un devis pour un mariage de 80 personnes le 14 juin, menu Tentation',
   'Fais l’acompte de 30 % du dernier devis',
@@ -167,6 +167,22 @@ export default function WeboAssistant() {
                       </p>
                     )}
                     <p className={cn('whitespace-pre-line break-words', e.role === 'assistant' && 'rounded-2xl rounded-bl-md bg-white px-3 py-2 text-gray-900 shadow-sm')}>{e.text}</p>
+                    {e.role === 'assistant' && conversationId && (
+                      <div className="mt-1 flex gap-1">
+                        {([['up', 'Réponse utile', ThumbsUp], ['down', 'Réponse à revoir', ThumbsDown]] as const).map(([r, label, Icon]) => (
+                          <button key={r} type="button" aria-label={label} aria-pressed={e.rating === r} title={label}
+                            onClick={async () => {
+                              const next = e.rating === r ? null : r;
+                              const res = await rateWeboReply(conversationId, i, next).catch(() => ({ error: 'Note non enregistrée.' }));
+                              if (res.error) { notify(res.error, { tone: 'error' }); return; }
+                              setEntries((list) => list.map((x, j) => (j === i ? { ...x, rating: next ?? undefined } : x)));
+                            }}
+                            className={cn('rounded-md p-1', e.rating === r ? 'text-primary' : 'text-gray-300 hover:text-gray-500')}>
+                            <Icon className="h-3.5 w-3.5" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {(e.proposalIds ?? []).map((id) => proposals[id] && (
                       <ProposalCard key={id} proposal={proposals[id]}
                         onChange={(next) => setProposals((p) => ({ ...p, [id]: next }))}

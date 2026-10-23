@@ -12,6 +12,18 @@ import { proposalsByIds, runWeboTurn, type ProposalView, type TranscriptEntry, t
 
 export type { ProposalView, TranscriptEntry, WeboReply } from './turn';
 
+/** 👍 / 👎 sur une réponse de Webo (null : retirer la note). Seulement l'auteur de la conversation. */
+export async function rateWeboReply(conversationId: string, index: number, rating: 'up' | 'down' | null): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!isUuid(conversationId) || !Number.isInteger(index) || ![null, 'up', 'down'].includes(rating)) return { error: 'Note impossible.' };
+  const [conv] = await db.select().from(webo_conversations).where(and(eq(webo_conversations.id, conversationId), eq(webo_conversations.user_id, user.id))).limit(1);
+  const transcript = (conv?.transcript ?? []) as TranscriptEntry[];
+  if (!conv || transcript[index]?.role !== 'assistant') return { error: 'Note impossible.' };
+  const next = transcript.map((e, i) => (i === index ? { ...e, rating: rating ?? undefined } : e));
+  await db.update(webo_conversations).set({ transcript: next }).where(eq(webo_conversations.id, conv.id));
+  return { error: null };
+}
+
 export async function sendWeboMessage(conversationId: string | null, text: string): Promise<TurnResult> {
   const user = await requireWriter();
   return runWeboTurn(user, { conversationId, text }, () => {});

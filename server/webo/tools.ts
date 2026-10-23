@@ -8,13 +8,14 @@ import { quoteTotalTTC, quoteVatBreakdown } from '@/lib/quoteTotals';
 import { applyQuoteUpdate, EDITABLE_STATUSES, type QuoteUpdateSpec } from '@/lib/webo/quoteUpdate';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
+import { getDashboard } from '../dashboard';
 import { MAX_MEMORIES, MAX_MEMORY_TEXT, memoryCount } from './memoryStore';
 
 // Outils des spécialistes de Webo. Les lectures ne voient que les données de l'entreprise. Les « propositions »
 // vérifient tout (identifiants de l'entreprise, dates, nombres), reprennent les prix du catalogue, et n'écrivent qu'une
 // ligne dans webo_proposals : l'écriture réelle n'a lieu qu'à la validation (server/webo/execute.ts).
 
-export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'aide';
+export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'journee' | 'aide';
 export interface ToolContext { userId: string; companyId: string; conversationId: string; proposals: string[] }
 
 export interface ProposalSummary {
@@ -95,6 +96,7 @@ const TOOLS: Record<string, Anthropic.Tool> = {
     quote_id: { type: 'string' }, to: { type: 'string' }, message: { type: 'string' },
   }),
   stale_quotes: tool('stale_quotes', 'Devis envoyés sans réponse depuis au moins `days` jours (7 si null) : à relancer.', { days: nullableNum }),
+  day_overview: tool('day_overview', 'La journée du traiteur : ce qu’il y a à faire (relances, acomptes, préparations…), les événements à venir et quelques chiffres.', {}),
   propose_memory: tool('propose_memory', 'Propose de retenir une habitude durable du traiteur (« acompte toujours à 40 % »), redonnée ensuite à chaque conversation. Une phrase courte.', {
     text: { type: 'string' },
   }),
@@ -108,6 +110,7 @@ const BY_AGENT: Record<AgentName, string[]> = {
   factures: ['find_quotes', 'get_quote', 'propose_invoice', 'propose_memory'],
   catalogue: ['search_catalogue', 'propose_prestation', 'propose_prestation_update', 'propose_memory'],
   prospects: ['list_prospects', 'search_catalogue', 'propose_prospect_reply', 'propose_memory'],
+  journee: ['day_overview'],
   aide: [],
 };
 
@@ -384,6 +387,16 @@ const HANDLERS: Record<string, Handler> = {
         sql`${quotes.sent_at} < now() - make_interval(days => ${days})`))
       .orderBy(quotes.sent_at).limit(10);
     return { days, results: rows };
+  },
+
+  async day_overview() {
+    const d = await getDashboard();
+    return {
+      today: d.today,
+      to_do: d.todo.slice(0, 15).map((t) => ({ what: t.title, detail: t.detail, when: t.when })),
+      upcoming_events: d.upcoming.slice(0, 10).map((e) => ({ client: e.client, type: e.eventType, date: e.date, guests: e.guests, missing: e.missing })),
+      pending_quotes: d.summary.pendingCount,
+    };
   },
 
   async propose_memory(ctx, i) {

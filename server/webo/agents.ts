@@ -34,8 +34,9 @@ Règles :
 const ROLES: Record<AgentName, string> = {
   devis: `Ton rôle : préparer des devis. Cherche le client (search_customers) et les prestations (search_catalogue) avant de proposer (propose_quote). Pour un nouveau client il faut prénom, nom et email. Le type d'événement est l'un de : Mariage, Cocktail, Anniversaire, Séminaire, Gala, Communion, Baptême, Autre. Une prestation demandée qui n'est pas au catalogue va en ligne hors catalogue, sans prix si le traiteur n'en a pas donné. Pour « fais comme le devis X » : retrouve-le (find_quotes : nom du client, type d'événement ou année), lis ses lignes (get_quote) et reprends-les par leur nom. Pour changer un devis existant (couverts, date, lignes) : propose_quote_update ; sur la page d'un devis, « ce devis » est celui de la page. Pour envoyer un devis : propose_quote_send avec l'email du client et un message court et chaleureux. Pour les relances : stale_quotes, puis un propose_quote_send par devis avec un message de relance courtois (rappel de l'événement, disponibilité pour en parler). Un message de client collé (mail, SMS) : tires-en le client, l'événement et les prestations, puis propose le devis.`,
   factures: `Ton rôle : préparer des brouillons de facture depuis un devis (acompte, solde, facture totale) avec propose_invoice. Trouve d'abord le devis (find_quotes, get_quote). Une facture préparée reste en brouillon : le traiteur l'émet lui-même.`,
-  catalogue: `Ton rôle : le catalogue de prestations. Pour créer une prestation : propose_prestation (nom, prix HT, catégorie, description courte et appétissante). Pour changer un prix ou une description : cherche-la (search_catalogue) puis propose_prestation_update.`,
+  catalogue: `Ton rôle : le catalogue de prestations. Pour créer une prestation : propose_prestation (nom, prix HT, catégorie, description courte et appétissante : produits, cuisson, accompagnements, en deux ou trois phrases sensorielles, sans superlatif creux ni promesse). Pour changer un prix ou une description : cherche-la (search_catalogue) puis propose_prestation_update.`,
   prospects: `Ton rôle : les demandes de prospects. Lis-les (list_prospects) et rédige des réponses (propose_prospect_reply) : remerciement, reprise de leur projet (date, couverts), une ou deux prestations pertinentes du catalogue si utile, proposition d'échange ou de rendez-vous. Signe au nom de l'entreprise, sans inventer de prix.`,
+  journee: `Ton rôle : résumer la journée du traiteur avec day_overview : d'abord l'urgent (aujourd'hui, en retard), puis les événements des prochains jours et ce qui leur manque, en quelques lignes. Termine par la priorité du moment.`,
   aide: `Ton rôle : expliquer comment utiliser WeboDevis, à partir des guides ci-dessous uniquement. Donne les étapes courtes à suivre et le nom des boutons. Si les guides ne couvrent pas la question, dis-le simplement.`,
 };
 
@@ -46,7 +47,7 @@ function systemFor(agent: AgentName): Anthropic.TextBlockParam[] {
   return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
-const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'aide'];
+const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'journee', 'aide'];
 
 /** Choisit le spécialiste d'un message. */
 export async function routeMessage(text: string, history: string): Promise<{ agent: AgentName; usage: CallUsage[] }> {
@@ -59,7 +60,9 @@ export async function routeMessage(text: string, history: string): Promise<{ age
 - factures : facturer un devis (acompte, solde, facture) ;
 - catalogue : créer une prestation, changer un prix ou une description ;
 - prospects : répondre à des demandes de prospects ;
+- journee : résumer la journée, ce qu'il y a à faire, les événements à venir ;
 - aide : comment utiliser le logiciel, ou tout le reste.
+Un message de client collé (mail, SMS) qui demande une prestation va à devis.
 Tiens compte de la conversation en cours. Réponds seulement avec le JSON demandé.`,
     output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', properties: { agent: { type: 'string', enum: AGENTS } }, required: ['agent'], additionalProperties: false } } },
     messages: [{ role: 'user', content: `${history ? `Conversation en cours :\n${history.slice(-3000)}\n\n` : ''}Nouveau message : ${text}` }],
@@ -87,7 +90,7 @@ export async function runSpecialist(
     if (onText) for (const w of out.text.split(/(?<= )/)) onText(w);
     return { text: out.text, usage };
   }
-  const model = agent === 'aide' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
+  const model = agent === 'aide' || agent === 'journee' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
   const tools = toolsFor(agent);
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
@@ -101,7 +104,7 @@ export async function runSpecialist(
       model, max_tokens: MAX_TOKENS, system: systemFor(agent), messages,
       // Cache automatique : consignes, outils et tours précédents ne sont pas repayés plein tarif à chaque tour.
       cache_control: { type: 'ephemeral' as const },
-      output_config: { effort: (agent === 'aide' ? 'low' : 'medium') as 'low' | 'medium' },
+      output_config: { effort: (model === WEBO_MODELS.help ? 'low' : 'medium') as 'low' | 'medium' },
       ...(tools.length ? { tools } : {}),
       ...(model === WEBO_MODELS.specialist ? { fallbacks: 'default' as const } : {}),
     };
@@ -131,6 +134,7 @@ function fakeRoute(text: string): AgentName {
   if (/factur|acompte|solde/.test(t)) return 'factures';
   if (/prestation|prix|catalogue/.test(t)) return 'catalogue';
   if (/prospect|demande/.test(t)) return 'prospects';
+  if (/journée|aujourd|résum/.test(t)) return 'journee';
   return 'aide';
 }
 
