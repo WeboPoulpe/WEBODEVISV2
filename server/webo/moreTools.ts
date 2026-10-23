@@ -2,7 +2,8 @@ import 'server-only';
 import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import type Anthropic from '@anthropic-ai/sdk';
 import { db } from '@/db';
-import { customers, ingredient_stocks, ingredients, prospect_requests, quotes, supplier_order_items, supplier_orders, suppliers } from '@/db/schema';
+import { brochures, customer_invoice_payments, customer_invoices, customers, ingredient_stocks, ingredients, prospect_requests, quotes, supplier_order_items, supplier_orders, suppliers } from '@/db/schema';
+import { PAYMENT_METHODS } from '@/lib/invoices';
 import { companyIdsOf } from '../companyScope';
 import { eur, fail, isUuid, like, nullableStr, propose, str, tool, type AgentName, type Handler, type ToolContext } from './toolKit';
 
@@ -58,6 +59,20 @@ export const MORE_TOOLS: Record<string, Anthropic.Tool> = {
   }),
   propose_supplier_order_receive: tool('propose_supplier_order_receive', 'Propose de marquer une commande comme reçue : ses quantités entrent en stock.', { order_id: { type: 'string' } }),
   propose_event_orders: tool('propose_event_orders', 'Propose de créer les commandes fournisseurs (brouillons) depuis la liste de courses d’un événement, une par fournisseur.', { quote_id: { type: 'string' } }),
+  list_invoices: tool('list_invoices', 'Factures de l’entreprise (d’un devis si quote_id ; statut : brouillon, emise, payee_partiellement, payee, annulee), avec le montant restant à payer.', {
+    quote_id: nullableStr, status: { anyOf: [{ type: 'string', enum: ['brouillon', 'emise', 'payee_partiellement', 'payee', 'annulee'] }, { type: 'null' }] },
+  }),
+  propose_invoice_issue: tool('propose_invoice_issue', 'Propose d’émettre une facture en brouillon : elle reçoit son numéro et devient définitive (seul un avoir peut l’annuler).', {
+    invoice_id: { type: 'string' },
+  }),
+  propose_invoice_payment: tool('propose_invoice_payment', 'Propose d’enregistrer un paiement reçu sur une facture émise.', {
+    invoice_id: { type: 'string' }, amount: { type: 'number' }, paid_on: { type: 'string', description: 'AAAA-MM-JJ' },
+    method: { type: 'string', enum: ['virement', 'cheque', 'especes', 'carte', 'autre'] }, note: nullableStr,
+  }),
+  list_brochures: tool('list_brochures', 'Brochures de l’entreprise (actives ou non).', {}),
+  propose_brochure_send: tool('propose_brochure_send', 'Propose d’envoyer une brochure (active) par email, avec un message ; prospect_id si c’est pour un prospect (il passe « brochure envoyée »).', {
+    brochure_id: { type: 'string' }, to: { type: 'string' }, message: nullableStr, prospect_id: nullableStr,
+  }),
   propose_prospect_to_quote: tool('propose_prospect_to_quote', 'Propose de transformer la demande d’un prospect en devis (client retrouvé par email ou créé, devis « à faire » avec l’événement de la demande).', {
     prospect_id: { type: 'string' },
   }),
@@ -65,6 +80,8 @@ export const MORE_TOOLS: Record<string, Anthropic.Tool> = {
 
 export const MORE_BY_AGENT: Partial<Record<AgentName, string[]>> = {
   stock: ['stock_levels', 'propose_stock_movement', 'list_suppliers', 'list_supplier_orders', 'propose_supplier_order', 'propose_supplier_order_send', 'propose_supplier_order_receive', 'propose_event_orders', 'list_events', 'propose_memory'],
+  factures: ['list_invoices', 'propose_invoice_issue', 'propose_invoice_payment'],
+  prospects: ['list_brochures', 'propose_brochure_send', 'propose_prospect_status', 'propose_prospect_to_quote'],
   clients: ['search_customers', 'get_customer', 'propose_customer', 'list_prospects', 'propose_prospect_status', 'propose_prospect_to_quote', 'propose_memory'],
 };
 
@@ -109,6 +126,14 @@ async function orderOf(ctx: ToolContext, id: unknown) {
 }
 
 const MOVE_LABEL: Record<string, string> = { in: 'Entrée', out: 'Sortie', adjust: 'Inventaire' };
+
+const INVOICE_KIND: Record<string, string> = { acompte: 'Acompte', solde: 'Solde', facture: 'Facture', avoir: 'Avoir' };
+async function invoiceOf(ctx: ToolContext, id: unknown) {
+  if (!isUuid(id)) fail('Facture introuvable.');
+  const [inv] = await db.select().from(customer_invoices).where(and(eq(customer_invoices.id, id as string), eq(customer_invoices.owner_user_id, ctx.companyId))).limit(1);
+  return inv ?? fail('Facture introuvable.');
+}
+const buyerName = (b: unknown) => (b && typeof b === 'object' && 'name' in b ? String((b as { name: unknown }).name ?? '') : '');
 
 export const MORE_HANDLERS: Record<string, Handler> = {
   async get_customer(ctx, i) {
@@ -284,6 +309,68 @@ export const MORE_HANDLERS: Record<string, Handler> = {
       title: `Commandes pour ${q!.client}`,
       fields: [{ label: 'Action', value: 'Créer une commande par fournisseur depuis la liste de courses' }],
       note: 'Brouillons seulement ; les commandes automatiques déjà faites pour cet événement sont refaites.',
+    });
+  },
+
+  async list_invoices(ctx, i) {
+    const rows = await db.select({
+      id: customer_invoices.id, number: customer_invoices.number, kind: customer_invoices.kind, status: customer_invoices.status, buyer: customer_invoices.buyer,
+      total_ttc: customer_invoices.total_ttc, issue_date: customer_invoices.issue_date, due_date: customer_invoices.due_date, quote_id: customer_invoices.quote_id,
+      paid: sql<number>`coalesce((select sum(p.amount) from ${customer_invoice_payments} p where p.invoice_id = ${customer_invoices.id}), 0)`,
+    }).from(customer_invoices)
+      .where(and(eq(customer_invoices.owner_user_id, ctx.companyId),
+        isUuid(i.quote_id) ? eq(customer_invoices.quote_id, i.quote_id as string) : undefined,
+        typeof i.status === 'string' ? eq(customer_invoices.status, i.status) : undefined))
+      .orderBy(desc(customer_invoices.created_at)).limit(20);
+    return { results: rows.map(({ buyer, ...r }) => ({ ...r, client: buyerName(buyer), total_ttc: Number(r.total_ttc), paid: Number(r.paid), remaining: Math.round((Number(r.total_ttc) - Number(r.paid)) * 100) / 100 })) };
+  },
+
+  async propose_invoice_issue(ctx, i) {
+    const inv = await invoiceOf(ctx, i.invoice_id);
+    if (inv.status !== 'brouillon') fail('Seule une facture en brouillon peut être émise.');
+    return propose(ctx, 'invoice_issue', { invoiceId: inv.id }, {
+      title: `Émettre : ${INVOICE_KIND[inv.kind] ?? inv.kind} · ${buyerName(inv.buyer)}`,
+      fields: [{ label: 'Montant', value: eur(Number(inv.total_ttc)) + ' TTC' }],
+      note: 'Émise, la facture reçoit son numéro et devient définitive : elle ne se modifie plus, seul un avoir peut l’annuler.',
+    });
+  },
+
+  async propose_invoice_payment(ctx, i) {
+    const inv = await invoiceOf(ctx, i.invoice_id);
+    if (inv.status === 'brouillon' || inv.status === 'annulee' || inv.kind === 'avoir') fail('Un paiement s’enregistre sur une facture émise.');
+    const amount = Math.round(Number(i.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) fail('Montant invalide.');
+    const paidOn = str(i.paid_on, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn) || Number.isNaN(Date.parse(paidOn))) fail('Date de paiement attendue au format AAAA-MM-JJ.');
+    const method = (Object.keys(PAYMENT_METHODS) as string[]).includes(String(i.method)) ? String(i.method) : 'autre';
+    const note = str(i.note, 300) || null;
+    return propose(ctx, 'invoice_payment', { invoiceId: inv.id, amount, paidOn, method, note }, {
+      title: `Paiement reçu · ${inv.number ?? ''} ${buyerName(inv.buyer)}`.trim(),
+      fields: [
+        { label: 'Montant', value: eur(amount) }, { label: 'Le', value: paidOn },
+        { label: 'Moyen', value: PAYMENT_METHODS[method as keyof typeof PAYMENT_METHODS] }, ...(note ? [{ label: 'Note', value: note }] : []),
+      ],
+    });
+  },
+
+  async list_brochures(ctx) {
+    const rows = await db.select({ id: brochures.id, name: brochures.name, active: brochures.is_active, views: brochures.view_count })
+      .from(brochures).where(sql`${brochures.owner_user_id} in ${companyIdsOf(ctx.companyId)}`).orderBy(desc(brochures.updated_at)).limit(20);
+    return { results: rows };
+  },
+
+  async propose_brochure_send(ctx, i) {
+    if (!isUuid(i.brochure_id)) fail('Brochure introuvable.');
+    const [b] = await db.select().from(brochures).where(and(eq(brochures.id, i.brochure_id as string), sql`${brochures.owner_user_id} in ${companyIdsOf(ctx.companyId)}`)).limit(1);
+    if (!b) fail('Brochure introuvable.');
+    if (!b!.is_active) fail('Cette brochure est désactivée : réactivez son lien avant de l’envoyer.');
+    const to = str(i.to, 200).toLowerCase();
+    if (!EMAIL.test(to)) fail('Adresse email invalide.');
+    const prospect = i.prospect_id ? await prospectOf(ctx, i.prospect_id) : null;
+    const message = str(i.message, 3000) || null;
+    return propose(ctx, 'brochure_send', { brochureId: b!.id, to, message, prospectId: prospect?.id ?? null }, {
+      title: `Envoyer la brochure « ${b!.name} »`,
+      fields: [{ label: 'À', value: to }, ...(message ? [{ label: 'Message', value: message }] : []), ...(prospect ? [{ label: 'Prospect', value: `${prospect.first_name} ${prospect.last_name} (passe « brochure envoyée »)` }] : [])],
     });
   },
 

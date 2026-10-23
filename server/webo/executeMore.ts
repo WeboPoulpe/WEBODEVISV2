@@ -4,6 +4,9 @@ import { db } from '@/db';
 import { customers, ingredient_stocks, profiles, prospect_requests, quotes, stock_movements, supplier_order_items, supplier_orders } from '@/db/schema';
 import { createSupplierOrders } from '../events';
 import { sendSupplierOrder } from '../supplierOrders';
+import { issueInvoice, recordPayment } from '../invoices';
+import { sendBrochure } from '../brochures';
+import type { PaymentMethod } from '@/lib/invoices';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
 import { quoteOfProspect } from './moreTools';
@@ -147,6 +150,21 @@ export async function executeMore(kind: string, p: Record<string, unknown>, user
       const r = await sendSupplierOrder({ orderId: String(p.orderId), to: String(p.to), message: String(p.message), deliveryDate: (p.deliveryDate as string | null) ?? null });
       if (r.error) throw new Error(r.error);
       return { href: '/commandes', label: 'Voir les commandes' };
+    }
+    case 'invoice_issue': {
+      const r = await issueInvoice(String(p.invoiceId));
+      if (r.error !== null) throw new Error(r.error);
+      return { href: '/factures', label: `Facture ${'number' in r ? r.number : ''} émise · voir les factures` };
+    }
+    case 'invoice_payment': {
+      const r = await recordPayment(String(p.invoiceId), { paidOn: String(p.paidOn), amount: Number(p.amount), method: String(p.method) as PaymentMethod, note: (p.note as string | null) ?? null });
+      if (r.error !== null) throw new Error(r.error);
+      return { href: '/factures', label: 'Voir les factures' };
+    }
+    case 'brochure_send': {
+      const r = await sendBrochure({ brochureId: String(p.brochureId), to: String(p.to), ...(p.message ? { message: String(p.message) } : {}), ...(p.prospectId ? { prospectId: String(p.prospectId) } : {}) });
+      if (r.error) throw new Error(r.error);
+      return { href: '/brochures', label: 'Voir les brochures' };
     }
     case 'event_orders': {
       const r = await createSupplierOrders(String(p.quoteId));
