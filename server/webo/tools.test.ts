@@ -49,6 +49,14 @@ describe('outils de Webo', () => {
     expect(toolsFor('aide')).toEqual([]);
   });
 
+  it('chaque spécialiste : des outils tous définis, sans doublon de nom', () => {
+    for (const agent of ['devis', 'factures', 'catalogue', 'prospects', 'clients', 'stock', 'evenements', 'journee'] as const) {
+      const names = toolsFor(agent).map((t) => t?.name);
+      expect(names.every(Boolean), agent).toBe(true);
+      expect(new Set(names).size, agent).toBe(names.length);
+    }
+  });
+
   it('recherche dans le catalogue : seulement l’entreprise', async () => {
     const r = await call('search_catalogue', { query: 'Menu' });
     expect(r.results.map((p: { name: string }) => p.name)).toEqual(['Menu Tentation']);

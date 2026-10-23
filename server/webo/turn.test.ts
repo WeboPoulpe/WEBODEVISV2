@@ -99,6 +99,15 @@ describe('tour de discussion en flux', () => {
     expect(msg).not.toContain('Page ouverte');
   });
 
+  it('l’aiguilleur connaît les spécialistes Clients et Stock', async () => {
+    script = [route('stock'), say('Voici le stock.')];
+    const events = await run('Qu’est-ce qui est bas en stock ?');
+    expect(events.find((e) => e.type === 'agent')).toMatchObject({ agent: 'stock' });
+    const schema = JSON.stringify((sent[0] as { output_config: unknown }).output_config);
+    expect(schema).toContain('clients');
+    expect(schema).toContain('stock');
+  });
+
   it('consignes et outils mis en cache (cache_control en tête de requête)', async () => {
     script = [route('devis'), say('Bonjour')];
     await run('Bonjour');

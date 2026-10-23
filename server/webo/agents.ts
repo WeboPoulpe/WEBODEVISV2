@@ -50,7 +50,7 @@ function systemFor(agent: AgentName): Anthropic.TextBlockParam[] {
   return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
-const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'evenements', 'journee', 'aide'];
+const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'clients', 'stock', 'evenements', 'journee', 'aide'];
 
 /** Choisit le spécialiste d'un message. */
 export async function routeMessage(text: string, history: string): Promise<{ agent: AgentName; usage: CallUsage[] }> {
@@ -60,9 +60,11 @@ export async function routeMessage(text: string, history: string): Promise<{ age
     max_tokens: 1000,
     system: `Tu aiguilles les messages d'un traiteur vers le bon spécialiste de son logiciel WeboDevis :
 - devis : préparer, chiffrer ou retrouver un devis ;
-- factures : facturer un devis (acompte, solde, facture) ;
+- factures : facturer un devis (acompte, solde, facture), émettre une facture, enregistrer un paiement, ce qui reste à payer ;
 - catalogue : créer une prestation, changer un prix ou une description ;
-- prospects : répondre à des demandes de prospects ;
+- prospects : répondre à des demandes de prospects, leur envoyer une brochure ;
+- clients : créer ou modifier une fiche client, ajouter une note, changer le statut d'un prospect, transformer une demande en devis ;
+- stock : niveaux de stock, entrées, sorties, inventaire, fournisseurs, commandes fournisseurs (créer, envoyer, réceptionner) ;
 - evenements : préparer un événement confirmé (check-list, matériel, déroulé, heure d'arrivée, extras, courses) ;
 - journee : résumer la journée, ce qu'il y a à faire, les événements à venir ;
 - aide : comment utiliser le logiciel, ou tout le reste.
@@ -144,6 +146,8 @@ function fakeRoute(text: string): AgentName {
   if (/factur|acompte|solde/.test(t)) return 'factures';
   if (/prestation|prix|catalogue/.test(t)) return 'catalogue';
   if (/prospect|demande/.test(t)) return 'prospects';
+  if (/stock|inventaire|fournisseur|commande/.test(t)) return 'stock';
+  if (/client|fiche|note/.test(t)) return 'clients';
   if (/extra|check-list|matériel|déroulé|planning|courses/.test(t)) return 'evenements';
   if (/journée|aujourd|résum/.test(t)) return 'journee';
   return 'aide';

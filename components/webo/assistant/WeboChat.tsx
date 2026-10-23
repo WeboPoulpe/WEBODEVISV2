@@ -13,7 +13,7 @@ import { getWeboConversation, rateWeboReply, type ProposalView, type TranscriptE
 import { streamWebo } from '@/lib/webo/stream';
 import ProposalCard from './ProposalCard';
 
-export const AGENT_LABEL: Record<string, string> = { devis: 'Devis', factures: 'Factures', catalogue: 'Catalogue', prospects: 'Prospects', evenements: 'Événements', journee: 'Journée', aide: 'Aide' };
+export const AGENT_LABEL: Record<string, string> = { devis: 'Devis', factures: 'Factures', catalogue: 'Catalogue', prospects: 'Prospects', clients: 'Clients', stock: 'Stock', evenements: 'Événements', journee: 'Journée', aide: 'Aide' };
 const SUGGESTIONS = [
   'Prépare un devis pour un mariage de 80 personnes le 14 juin, menu Tentation',
   'Fais l’acompte de 30 % du dernier devis',
