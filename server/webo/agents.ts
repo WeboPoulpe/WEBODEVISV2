@@ -36,6 +36,7 @@ const ROLES: Record<AgentName, string> = {
   factures: `Ton rôle : préparer des brouillons de facture depuis un devis (acompte, solde, facture totale) avec propose_invoice. Trouve d'abord le devis (find_quotes, get_quote). Une facture préparée reste en brouillon : le traiteur l'émet lui-même.`,
   catalogue: `Ton rôle : le catalogue de prestations. Pour créer une prestation : propose_prestation (nom, prix HT, catégorie, description courte et appétissante : produits, cuisson, accompagnements, en deux ou trois phrases sensorielles, sans superlatif creux ni promesse). Pour changer un prix ou une description : cherche-la (search_catalogue) puis propose_prestation_update.`,
   prospects: `Ton rôle : les demandes de prospects. Lis-les (list_prospects) et rédige des réponses (propose_prospect_reply) : remerciement, reprise de leur projet (date, couverts), une ou deux prestations pertinentes du catalogue si utile, proposition d'échange ou de rendez-vous. Signe au nom de l'entreprise, sans inventer de prix.`,
+  evenements: `Ton rôle : la gestion des événements confirmés (devis validés). Trouve l'événement (list_events, ou celui de la page ouverte), lis-le (get_event), puis propose les changements avec propose_event_update : check-list (ajouter, cocher), matériel à emporter (quantités adaptées aux couverts), déroulé de la journée (heures et étapes), heure d'arrivée de l'équipe, contact sur place, extras (list_extras avec la date pour éviter ceux déjà pris ou indisponibles ; n'invite par email que si le traiteur le demande). Pour la liste de courses : propose_courses_recalc.`,
   journee: `Ton rôle : résumer la journée du traiteur avec day_overview : d'abord l'urgent (aujourd'hui, en retard), puis les événements des prochains jours et ce qui leur manque, en quelques lignes. Termine par la priorité du moment.`,
   aide: `Ton rôle : expliquer comment utiliser WeboDevis, à partir des guides ci-dessous uniquement. Donne les étapes courtes à suivre et le nom des boutons. Si les guides ne couvrent pas la question, dis-le simplement.`,
 };
@@ -47,7 +48,7 @@ function systemFor(agent: AgentName): Anthropic.TextBlockParam[] {
   return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
-const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'journee', 'aide'];
+const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'evenements', 'journee', 'aide'];
 
 /** Choisit le spécialiste d'un message. */
 export async function routeMessage(text: string, history: string): Promise<{ agent: AgentName; usage: CallUsage[] }> {
@@ -60,6 +61,7 @@ export async function routeMessage(text: string, history: string): Promise<{ age
 - factures : facturer un devis (acompte, solde, facture) ;
 - catalogue : créer une prestation, changer un prix ou une description ;
 - prospects : répondre à des demandes de prospects ;
+- evenements : préparer un événement confirmé (check-list, matériel, déroulé, heure d'arrivée, extras, courses) ;
 - journee : résumer la journée, ce qu'il y a à faire, les événements à venir ;
 - aide : comment utiliser le logiciel, ou tout le reste.
 Un message de client collé (mail, SMS) qui demande une prestation va à devis.
@@ -140,6 +142,7 @@ function fakeRoute(text: string): AgentName {
   if (/factur|acompte|solde/.test(t)) return 'factures';
   if (/prestation|prix|catalogue/.test(t)) return 'catalogue';
   if (/prospect|demande/.test(t)) return 'prospects';
+  if (/extra|check-list|matériel|déroulé|planning|courses/.test(t)) return 'evenements';
   if (/journée|aujourd|résum/.test(t)) return 'journee';
   return 'aide';
 }

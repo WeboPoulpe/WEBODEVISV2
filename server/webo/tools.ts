@@ -2,7 +2,9 @@ import 'server-only';
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type Anthropic from '@anthropic-ai/sdk';
 import { db } from '@/db';
-import { customers, prestations, profiles, prospect_requests, quotes, webo_proposals } from '@/db/schema';
+import { customers, event_extras, extras, prestations, profiles, prospect_requests, quotes, webo_proposals } from '@/db/schema';
+import { CONFIRMED_STATUSES } from '@/lib/quoteStatus';
+import { cleanRunSheet } from '@/lib/production';
 import { isPerGuestPrestation } from '@/lib/brochure';
 import { quoteTotalTTC, quoteVatBreakdown } from '@/lib/quoteTotals';
 import { applyQuoteUpdate, EDITABLE_STATUSES, QUOTE_TEMPLATES, TEMPLATE_LABEL, type QuoteTemplate, type QuoteUpdateSpec } from '@/lib/webo/quoteUpdate';
@@ -16,7 +18,7 @@ import { MAX_MEMORIES, MAX_MEMORY_TEXT, memoryCount } from './memoryStore';
 // vérifient tout (identifiants de l'entreprise, dates, nombres), reprennent les prix du catalogue, et n'écrivent qu'une
 // ligne dans webo_proposals : l'écriture réelle n'a lieu qu'à la validation (server/webo/execute.ts).
 
-export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'journee' | 'aide';
+export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'evenements' | 'journee' | 'aide';
 export interface ToolContext { userId: string; companyId: string; conversationId: string; proposals: string[] }
 
 export interface ProposalSummary {
@@ -101,6 +103,44 @@ const TOOLS: Record<string, Anthropic.Tool> = {
     quote_id: { type: 'string' }, to: { type: 'string' }, message: { type: 'string' },
   }),
   stale_quotes: tool('stale_quotes', 'Devis envoyés sans réponse depuis au moins `days` jours (7 si null) : à relancer.', { days: nullableNum }),
+  list_events: tool('list_events', 'Événements confirmés (devis validés, acompte, payés) entre deux dates (AAAA-MM-JJ ; par défaut les 30 prochains jours).', {
+    from: nullableStr, to: nullableStr,
+  }),
+  get_event: tool('get_event', 'Détail d’un événement : check-list, matériel à préparer, déroulé, heure d’arrivée de l’équipe, contact sur place, extras affectés.', {
+    quote_id: { type: 'string' },
+  }),
+  list_extras: tool('list_extras', 'Extras (serveurs, cuisiniers…) de l’entreprise ; avec une date, indique ceux déjà pris ou indisponibles ce jour-là.', {
+    query: nullableStr, date: nullableStr,
+  }),
+  propose_event_update: tool('propose_event_update', 'Propose des changements sur un événement : ajouter ou cocher des éléments de check-list (par leur texte), ajouter du matériel, remplacer le déroulé de la journée (run_sheet, null = inchangé), heure d’arrivée de l’équipe (HH:MM), contact sur place, affecter des extras (et les inviter par email si invite_extras).', {
+    quote_id: { type: 'string' },
+    add_checklist: { type: 'array', items: { type: 'string' } },
+    check_checklist: { type: 'array', items: { type: 'string' } },
+    add_materials: {
+      type: 'array',
+      items: { type: 'object', properties: { name: { type: 'string' }, qty: { type: 'number' }, unit: { type: 'string' } }, required: ['name', 'qty', 'unit'], additionalProperties: false },
+    },
+    run_sheet: {
+      anyOf: [{
+        type: 'array',
+        items: { type: 'object', properties: { time: { type: 'string' }, label: { type: 'string' }, note: { type: 'string' } }, required: ['time', 'label', 'note'], additionalProperties: false },
+      }, { type: 'null' }],
+    },
+    team_arrival_time: nullableStr,
+    onsite_contact: nullableStr,
+    assign_extras: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { extra_id: { type: 'string' }, arrival_time: nullableStr, departure_time: nullableStr, mission_notes: nullableStr },
+        required: ['extra_id', 'arrival_time', 'departure_time', 'mission_notes'], additionalProperties: false,
+      },
+    },
+    invite_extras: { type: 'boolean' },
+  }),
+  propose_courses_recalc: tool('propose_courses_recalc', 'Propose de recalculer la liste de courses d’un événement à partir des recettes de ses prestations.', {
+    quote_id: { type: 'string' },
+  }),
   day_overview: tool('day_overview', 'La journée du traiteur : ce qu’il y a à faire (relances, acomptes, préparations…), les événements à venir et quelques chiffres.', {}),
   propose_memory: tool('propose_memory', 'Propose de retenir une habitude durable du traiteur (« acompte toujours à 40 % »), redonnée ensuite à chaque conversation. Une phrase courte.', {
     text: { type: 'string' },
@@ -115,6 +155,7 @@ const BY_AGENT: Record<AgentName, string[]> = {
   factures: ['find_quotes', 'get_quote', 'propose_invoice', 'propose_memory'],
   catalogue: ['search_catalogue', 'propose_prestation', 'propose_prestation_update', 'propose_memory'],
   prospects: ['list_prospects', 'search_catalogue', 'propose_prospect_reply', 'propose_memory'],
+  evenements: ['list_events', 'get_event', 'list_extras', 'propose_event_update', 'propose_courses_recalc', 'propose_memory'],
   journee: ['day_overview'],
   aide: [],
 };
@@ -401,6 +442,109 @@ const HANDLERS: Record<string, Handler> = {
         sql`${quotes.sent_at} < now() - make_interval(days => ${days})`))
       .orderBy(quotes.sent_at).limit(10);
     return { days, results: rows };
+  },
+
+  async list_events(ctx, i) {
+    const today = new Date().toISOString().slice(0, 10);
+    const day = (v: unknown, fallback: string) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : fallback);
+    const from = day(i.from, today);
+    const to = day(i.to, new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10));
+    const rows = await db.select({ id: quotes.id, number: quotes.quote_number, client: quotes.client_name, type: quotes.event_type, date: quotes.event_date, guests: quotes.guest_count, location: quotes.event_location, status: quotes.status })
+      .from(quotes)
+      .where(and(sql`${quotes.owner_user_id} in ${companyIdsOf(ctx.companyId)}`, inArray(quotes.status, CONFIRMED_STATUSES as string[]),
+        sql`${quotes.event_date} between ${from} and ${to}`))
+      .orderBy(quotes.event_date).limit(30);
+    return { from, to, results: rows };
+  },
+
+  async get_event(ctx, i) {
+    const q = await quoteOf(ctx, i.quote_id);
+    const team = await db.select({ name: extras.name, role: extras.role, status: event_extras.status, arrival: event_extras.arrival_time, departure: event_extras.departure_time })
+      .from(event_extras).innerJoin(extras, eq(extras.id, event_extras.extra_id)).where(eq(event_extras.quote_id, q.id));
+    return {
+      id: q.id, client: q.client_name, type: q.event_type, date: q.event_date, guests: q.guest_count, location: q.event_location, status: q.status,
+      confirmed: (CONFIRMED_STATUSES as string[]).includes(q.status),
+      checklist: q.checklist, materials: q.event_materials, run_sheet: q.run_sheet, team_arrival_time: q.team_arrival_time, onsite_contact: q.onsite_contact, team,
+    };
+  },
+
+  async list_extras(ctx, i) {
+    const q = str(i.query, 80);
+    const date = typeof i.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(i.date) ? i.date : null;
+    const rows = await db.select({ id: extras.id, name: extras.name, role: extras.role, phone: extras.phone, email: extras.email, unavailable: extras.unavailable_dates })
+      .from(extras)
+      .where(and(sql`${extras.user_id} in ${companyIdsOf(ctx.companyId)}`, q ? or(ilike(extras.name, like(q)), ilike(extras.role, like(q))) : undefined))
+      .orderBy(extras.name).limit(30);
+    let busy = new Set<string>();
+    if (date && rows.length) {
+      const taken = await db.select({ extra: event_extras.extra_id }).from(event_extras).innerJoin(quotes, eq(quotes.id, event_extras.quote_id))
+        .where(and(inArray(event_extras.extra_id, rows.map((r) => r.id)), eq(quotes.event_date, date), sql`${event_extras.status} <> 'refuse'`));
+      busy = new Set(taken.map((t) => t.extra));
+    }
+    return {
+      date,
+      results: rows.map(({ unavailable, ...r }) => ({ ...r, ...(date ? { taken_that_day: busy.has(r.id), unavailable_that_day: (unavailable ?? []).includes(date) } : {}) })),
+    };
+  },
+
+  async propose_event_update(ctx, i) {
+    const q = await quoteOf(ctx, i.quote_id);
+    const list = (v: unknown) => (Array.isArray(v) ? v : []);
+    const addChecklist = list(i.add_checklist).map((t) => str(t, 200)).filter(Boolean).slice(0, 30);
+    const current = (Array.isArray(q.checklist) ? q.checklist : []) as { text?: string }[];
+    const checkChecklist = list(i.check_checklist).map((t) => str(t, 200)).filter(Boolean);
+    for (const t of checkChecklist) if (!current.some((c) => (c.text ?? '').toLowerCase() === t.toLowerCase())) fail(`Aucun élément « ${t} » dans la check-list.`);
+    const addMaterials = list(i.add_materials).slice(0, 40).map((m) => {
+      const r = (m ?? {}) as Record<string, unknown>;
+      const name = str(r.name, 120) || fail('Matériel sans nom.');
+      const qty = Number(r.qty);
+      if (!Number.isFinite(qty) || qty <= 0 || qty > 100_000) fail(`Quantité invalide pour « ${name} ».`);
+      return { name, qty, unit: str(r.unit, 30) || 'pièce' };
+    });
+    const runSheet = i.run_sheet == null ? null : cleanRunSheet(i.run_sheet);
+    const time = (v: unknown) => {
+      if (v == null || v === '') return null;
+      const t = str(v, 5);
+      return /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : fail('Heure attendue au format HH:MM.');
+    };
+    const arrival = time(i.team_arrival_time);
+    const contact = str(i.onsite_contact, 300) || null;
+    const assign = list(i.assign_extras).slice(0, 30).map((a) => {
+      const r = (a ?? {}) as Record<string, unknown>;
+      return { extraId: String(r.extra_id ?? ''), arrival: time(r.arrival_time), departure: time(r.departure_time), notes: str(r.mission_notes, 500) || null };
+    });
+    let names = new Map<string, string>();
+    if (assign.length) {
+      const ids = assign.map((a) => a.extraId).filter(isUuid);
+      const found = ids.length ? await db.select({ id: extras.id, name: extras.name }).from(extras).where(and(inArray(extras.id, ids), sql`${extras.user_id} in ${companyIdsOf(ctx.companyId)}`)) : [];
+      names = new Map(found.map((f) => [f.id, f.name]));
+      for (const a of assign) if (!names.has(a.extraId)) fail('Extra introuvable dans votre équipe.');
+    }
+    const invite = i.invite_extras === true && assign.length > 0;
+    if (!addChecklist.length && !checkChecklist.length && !addMaterials.length && !runSheet && !arrival && !contact && !assign.length) fail('Rien à changer.');
+    const payload = { quoteId: q.id, addChecklist, checkChecklist, addMaterials, runSheet, arrival, contact, assign, invite };
+    return propose(ctx, 'event_update', payload, {
+      title: `Événement · ${q.client_name}`,
+      fields: [
+        ...(addChecklist.length ? [{ label: 'À faire', value: addChecklist.map((t) => `+ ${t}`).join('\n') }] : []),
+        ...(checkChecklist.length ? [{ label: 'Cochés', value: checkChecklist.join('\n') }] : []),
+        ...(addMaterials.length ? [{ label: 'Matériel', value: addMaterials.map((m) => `+ ${m.qty} ${m.unit} ${m.name}`).join('\n') }] : []),
+        ...(runSheet ? [{ label: 'Déroulé', value: runSheet.map((s) => `${s.time} ${s.label}${s.note ? ` (${s.note})` : ''}`).join('\n') }] : []),
+        ...(arrival ? [{ label: 'Arrivée équipe', value: arrival }] : []),
+        ...(contact ? [{ label: 'Contact sur place', value: contact }] : []),
+        ...(assign.length ? [{ label: 'Extras', value: assign.map((a) => `${names.get(a.extraId)}${a.arrival ? ` · ${a.arrival}${a.departure ? `–${a.departure}` : ''}` : ''}`).join('\n') }] : []),
+      ],
+      note: invite ? 'Les extras affectés reçoivent une invitation par email quand vous validez.' : assign.length ? 'Les extras sont affectés sans être prévenus : invitez-les depuis l’événement quand vous voulez.' : undefined,
+    });
+  },
+
+  async propose_courses_recalc(ctx, i) {
+    const q = await quoteOf(ctx, i.quote_id);
+    return propose(ctx, 'courses_recalc', { quoteId: q.id }, {
+      title: `Courses · ${q.client_name}`,
+      fields: [{ label: 'Action', value: 'Recalculer la liste de courses depuis les recettes' }],
+      note: 'Les lignes ajoutées à la main sont gardées.',
+    });
   },
 
   async day_overview() {
