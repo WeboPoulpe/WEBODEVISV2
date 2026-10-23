@@ -47,6 +47,38 @@ test.describe('assistant Webo', () => {
     });
   });
 
+  test('modifier un devis déjà mis en forme : validé, son document est remis à jour', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(180_000);
+    await withAccount(browser, 'webo-modif', async (page, userId) => {
+      const [q] = await sql<{ id: string }>(
+        `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, vat_rate, services)
+         values ($1, $1, 'Famille Lenoir', current_date + 90, 'Mariage', 80, 'devis_a_faire', 10, $2::jsonb) returning id`,
+        [userId, JSON.stringify([{ id: 'l1', name: 'Menu Tentation', quantity: 80, unitPrice: 76 }])]);
+      // Le document mis en forme existe : ouvert puis enregistré dans WeboWord.
+      await page.goto(`/devis/${q.id}/modifier?mode=weboword`);
+      await expect(page.locator('#weboword-sheet [data-webo-intro]')).toBeVisible({ timeout: 30_000 });
+      await page.keyboard.press('Control+s');
+      await expect.poll(async () => (await sql<{ c: string | null }>(`select content_html c from public.quotes where id = $1`, [q.id]))[0].c ?? '', { timeout: 20_000 }).toMatch(/6[\s  .]?688/);
+      // Une proposition de Webo (passer à 100 couverts), dans une conversation.
+      const [c] = await sql<{ id: string }>(`insert into public.webo_conversations (company_id, user_id, title) values ($1, $1, 'Couverts') returning id`, [userId]);
+      const [p] = await sql<{ id: string }>(
+        `insert into public.webo_proposals (conversation_id, company_id, user_id, kind, payload, summary) values ($1, $2, $2, 'quote_update', $3::jsonb, $4::jsonb) returning id`,
+        [c.id, userId, JSON.stringify({ quoteId: q.id, guestCount: 100, eventDate: null, eventLocation: null, add: [], remove: [] }), JSON.stringify({ title: 'Modifier le devis', fields: [{ label: 'Couverts', value: '80 → 100' }] })]);
+      await sql(`update public.webo_conversations set transcript = $2::jsonb where id = $1`, [c.id, JSON.stringify([
+        { role: 'user', text: 'Passe à 100 couverts', at: new Date().toISOString() },
+        { role: 'assistant', text: 'Je vous propose ce changement.', agent: 'devis', proposalIds: [p.id], coins: 3, at: new Date().toISOString() },
+      ])]);
+      await page.evaluate((id) => localStorage.setItem('webo:last-conversation', id), c.id);
+      await page.goto('/devis');
+      await page.getByRole('button', { name: 'Ouvrir Webo' }).click();
+      const card = page.getByRole('article', { name: 'Modifier le devis' });
+      await card.getByRole('button', { name: 'Valider' }).click();
+      await expect(card.getByRole('link', { name: 'Ouvrir le devis' })).toBeVisible({ timeout: 20_000 });
+      // 100 × 76 × 1,10 = 8 360 € TTC, dans le tableau du document.
+      await expect.poll(async () => (await sql<{ c: string }>(`select content_html c from public.quotes where id = $1`, [q.id]))[0].c, { timeout: 20_000 }).toMatch(/8[\s  .]?360/);
+    });
+  });
+
   test('Paramètres : ce que Webo retient, et l’oublier', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     await withAccount(browser, 'webo-memoire', async (page, userId) => {

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useFeedback } from '@/components/ui/Feedback';
 import { useWallet } from '@/components/webo/WalletContext';
 import { decideProposal } from '@/server/webo/execute';
+import { resyncQuoteDocument } from '@/lib/webo/resyncQuote';
 import type { ProposalView } from '@/server/webo/chat';
 
 export default function ProposalCard({ proposal, onModify, onChange }: {
@@ -32,7 +33,13 @@ export default function ProposalCard({ proposal, onModify, onChange }: {
       if (decision === 'accept') onChange({ ...proposal, status: 'failed', result: { error: res.error } });
       return;
     }
-    onChange({ ...proposal, status: decision === 'accept' ? 'done' : 'cancelled', result: 'result' in res && res.result ? res.result : null });
+    const result = 'result' in res && res.result ? res.result : null;
+    // Devis modifié : son document mis en forme est remis à jour ici (le serveur n'a pas de DOM).
+    if (result?.resync) {
+      const ok = await resyncQuoteDocument(result.resync).catch(() => false);
+      if (!ok) notify('Devis modifié. Ouvrez-le et cliquez « Appliquer » pour remettre son document à jour.');
+    }
+    onChange({ ...proposal, status: decision === 'accept' ? 'done' : 'cancelled', result });
     if (decision === 'accept') void refresh();
   };
 

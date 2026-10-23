@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { customers, prestations, profiles, prospect_requests, quotes, webo_proposals } from '@/db/schema';
 import { isPerGuestPrestation } from '@/lib/brochure';
 import { quoteTotalTTC, quoteVatBreakdown } from '@/lib/quoteTotals';
+import { applyQuoteUpdate, EDITABLE_STATUSES, type QuoteUpdateSpec } from '@/lib/webo/quoteUpdate';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
 import { MAX_MEMORIES, MAX_MEMORY_TEXT, memoryCount } from './memoryStore';
@@ -78,6 +79,22 @@ const TOOLS: Record<string, Anthropic.Tool> = {
   propose_prestation_update: tool('propose_prestation_update', 'Propose de changer le prix et/ou la description d’une prestation existante.', {
     prestation_id: { type: 'string' }, unit_price: nullableNum, description: nullableStr,
   }),
+  propose_quote_update: tool('propose_quote_update', 'Propose de modifier un devis existant (non validé) : couverts, date, lieu, lignes à ajouter (même forme que propose_quote), lignes à retirer (par leur nom). null ou liste vide = inchangé. Les quantités au couvert suivent le nouveau nombre de couverts.', {
+    quote_id: { type: 'string' }, guest_count: { anyOf: [{ type: 'integer' }, { type: 'null' }] }, event_date: nullableStr, event_location: nullableStr,
+    add_lines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { prestation_id: nullableStr, name: { type: 'string' }, quantity: nullableNum, unit_price: nullableNum },
+        required: ['prestation_id', 'name', 'quantity', 'unit_price'], additionalProperties: false,
+      },
+    },
+    remove_lines: { type: 'array', items: { type: 'string' } },
+  }),
+  propose_quote_send: tool('propose_quote_send', 'Propose d’envoyer un devis au client par email (lien de consultation), avec un message d’accompagnement. Sert aussi aux relances.', {
+    quote_id: { type: 'string' }, to: { type: 'string' }, message: { type: 'string' },
+  }),
+  stale_quotes: tool('stale_quotes', 'Devis envoyés sans réponse depuis au moins `days` jours (7 si null) : à relancer.', { days: nullableNum }),
   propose_memory: tool('propose_memory', 'Propose de retenir une habitude durable du traiteur (« acompte toujours à 40 % »), redonnée ensuite à chaque conversation. Une phrase courte.', {
     text: { type: 'string' },
   }),
@@ -87,7 +104,7 @@ const TOOLS: Record<string, Anthropic.Tool> = {
 };
 
 const BY_AGENT: Record<AgentName, string[]> = {
-  devis: ['search_catalogue', 'search_customers', 'find_quotes', 'get_quote', 'propose_quote', 'propose_memory'],
+  devis: ['search_catalogue', 'search_customers', 'find_quotes', 'get_quote', 'stale_quotes', 'propose_quote', 'propose_quote_update', 'propose_quote_send', 'propose_memory'],
   factures: ['find_quotes', 'get_quote', 'propose_invoice', 'propose_memory'],
   catalogue: ['search_catalogue', 'propose_prestation', 'propose_prestation_update', 'propose_memory'],
   prospects: ['list_prospects', 'search_catalogue', 'propose_prospect_reply', 'propose_memory'],
@@ -124,6 +141,45 @@ async function propose(ctx: ToolContext, kind: string, payload: unknown, summary
 async function vatRateOf(companyId: string): Promise<number> {
   const [p] = await db.select({ v: profiles.default_vat_rate }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
   return defaultVatRate(p ? { default_vat_rate: p.v } : null);
+}
+
+
+export type QuoteLine = { name: string; quantity: number; unitPrice: number; fromCatalogue: boolean } & Record<string, unknown>;
+
+/** Lignes de devis demandées par Webo : prestations du catalogue (prix du catalogue, quantité habituelle) ou hors catalogue. */
+async function buildLines(ctx: ToolContext, input: unknown, guests: number): Promise<QuoteLine[]> {
+  const rawLines = (Array.isArray(input) ? input : []).slice(0, 40) as Record<string, unknown>[];
+  const ids = rawLines.map((l) => l.prestation_id).filter(isUuid);
+  const catalogue = await catalogueById(ctx, ids);
+  // Ligne sans identifiant au nom exact d'une prestation (reprise d'un ancien devis) : c'est elle, au prix du catalogue.
+  const names = rawLines.filter((l) => !l.prestation_id).map((l) => str(l.name, 120).toLowerCase()).filter(Boolean);
+  const byName = new Map<string, typeof prestations.$inferSelect>();
+  if (names.length) {
+    const rows = await db.select().from(prestations).where(and(sql`${prestations.user_id} in ${companyIdsOf(ctx.companyId)}`, inArray(sql`lower(${prestations.name})`, names)));
+    for (const r of rows) byName.set(r.name.toLowerCase(), r);
+  }
+  for (const l of rawLines) {
+    const match = !l.prestation_id ? byName.get(str(l.name, 120).toLowerCase()) : undefined;
+    if (match) { l.prestation_id = match.id; catalogue.set(match.id, match); }
+  }
+  return rawLines.map((l) => {
+    if (l.prestation_id) {
+      const p = catalogue.get(String(l.prestation_id)) ?? fail(`Prestation « ${str(l.name, 80)} » introuvable dans votre catalogue.`);
+      const unitPrice = Number(p.unit_price);
+      const quantity = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity)
+        : isPerGuestPrestation({ ...p, unit_price: unitPrice }) ? guests : 1;
+      return {
+        name: p.name, description: p.description ?? undefined, quantity, unitPrice, category: p.category ?? undefined,
+        ...(p.child_unit_price != null ? { childUnitPrice: Number(p.child_unit_price) } : {}),
+        ...(p.gastro_card_html ? { gastroCardHtml: p.gastro_card_html } : {}), ...(p.gastro_card_html_en ? { gastroCardHtmlEn: p.gastro_card_html_en } : {}),
+        fromCatalogue: true,
+      };
+    }
+    const name = str(l.name, 120) || fail('Ligne sans nom.');
+    const quantity = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
+    const unitPrice = l.unit_price != null && Number(l.unit_price) >= 0 ? Number(l.unit_price) : 0;
+    return { name, quantity, unitPrice, isCustom: true, fromCatalogue: false };
+  });
 }
 
 type Handler = (ctx: ToolContext, input: Record<string, unknown>) => Promise<unknown>;
@@ -205,38 +261,7 @@ const HANDLERS: Record<string, Handler> = {
       clientName ||= `${newCustomer.first_name} ${newCustomer.last_name}`;
     }
     if (!clientName) fail('Nom du client attendu.');
-    const rawLines = (Array.isArray(i.lines) ? i.lines : []).slice(0, 40) as Record<string, unknown>[];
-    const ids = rawLines.map((l) => l.prestation_id).filter(isUuid);
-    const catalogue = await catalogueById(ctx, ids);
-    // Ligne sans identifiant au nom exact d'une prestation (reprise d'un ancien devis) : c'est elle, au prix du catalogue.
-    const names = rawLines.filter((l) => !l.prestation_id).map((l) => str(l.name, 120).toLowerCase()).filter(Boolean);
-    const byName = new Map<string, typeof prestations.$inferSelect>();
-    if (names.length) {
-      const rows = await db.select().from(prestations).where(and(sql`${prestations.user_id} in ${companyIdsOf(ctx.companyId)}`, inArray(sql`lower(${prestations.name})`, names)));
-      for (const r of rows) byName.set(r.name.toLowerCase(), r);
-    }
-    for (const l of rawLines) {
-      const match = !l.prestation_id ? byName.get(str(l.name, 120).toLowerCase()) : undefined;
-      if (match) { l.prestation_id = match.id; catalogue.set(match.id, match); }
-    }
-    const lines = rawLines.map((l) => {
-      if (l.prestation_id) {
-        const p = catalogue.get(String(l.prestation_id)) ?? fail(`Prestation « ${str(l.name, 80)} » introuvable dans votre catalogue.`);
-        const unitPrice = Number(p.unit_price);
-        const quantity = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity)
-          : isPerGuestPrestation({ ...p, unit_price: unitPrice }) ? guests : 1;
-        return {
-          name: p.name, description: p.description ?? undefined, quantity, unitPrice, category: p.category ?? undefined,
-          ...(p.child_unit_price != null ? { childUnitPrice: Number(p.child_unit_price) } : {}),
-          ...(p.gastro_card_html ? { gastroCardHtml: p.gastro_card_html } : {}), ...(p.gastro_card_html_en ? { gastroCardHtmlEn: p.gastro_card_html_en } : {}),
-          fromCatalogue: true,
-        };
-      }
-      const name = str(l.name, 120) || fail('Ligne sans nom.');
-      const quantity = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
-      const unitPrice = l.unit_price != null && Number(l.unit_price) >= 0 ? Number(l.unit_price) : 0;
-      return { name, quantity, unitPrice, isCustom: true, fromCatalogue: false };
-    });
+    const lines = await buildLines(ctx, i.lines, guests);
     const vat = await vatRateOf(ctx.companyId);
     const totals = quoteVatBreakdown(lines, vat, guests, 0);
     const payload = { customerId, newCustomer, clientName, eventType, eventDate: date, guests, eventLocation: str(i.event_location, 200) || null, remarks: str(i.remarks, 2000) || null, vatRate: vat, lines };
@@ -305,6 +330,60 @@ const HANDLERS: Record<string, Handler> = {
         ...(description ? [{ label: 'Nouvelle description', value: description }] : []),
       ],
     });
+  },
+
+  async propose_quote_update(ctx, i) {
+    const q = await quoteOf(ctx, i.quote_id);
+    if (!EDITABLE_STATUSES.includes(q.status)) fail('Ce devis est validé, payé ou refusé : il ne se modifie plus.');
+    const guests = i.guest_count == null ? null : Number(i.guest_count);
+    if (guests != null && (!Number.isInteger(guests) || guests < 1 || guests > 5000)) fail('Nombre de couverts entre 1 et 5 000.');
+    const date = i.event_date ? str(i.event_date, 10) : null;
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) fail('Date attendue au format AAAA-MM-JJ, et qui existe.');
+    const remove = (Array.isArray(i.remove_lines) ? i.remove_lines : []).map((n) => str(n, 120)).filter(Boolean);
+    const current = (Array.isArray(q.services) ? q.services : []) as { name?: string }[];
+    for (const n of remove) if (!current.some((l) => (l.name ?? '').toLowerCase() === n.toLowerCase())) fail(`Aucune ligne « ${n} » dans ce devis.`);
+    const add = await buildLines(ctx, i.add_lines, guests ?? q.guest_count);
+    const spec: QuoteUpdateSpec = { quoteId: q.id, guestCount: guests, eventDate: date, eventLocation: str(i.event_location, 200) || null, add, remove };
+    if (spec.guestCount == null && !spec.eventDate && !spec.eventLocation && !add.length && !remove.length) fail('Rien à changer.');
+    const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count }, spec);
+    const vat = Number(q.vat_rate ?? 20);
+    const before = quoteVatBreakdown((Array.isArray(q.services) ? q.services : []) as never[], vat, q.guest_count, 0).ttc;
+    const after = quoteVatBreakdown(next.services as never[], vat, next.guestCount, 0).ttc;
+    return propose(ctx, 'quote_update', spec, {
+      title: `Modifier le devis ${q.quote_number ?? ''}`.trim(),
+      fields: [
+        { label: 'Client', value: q.client_name },
+        ...(guests != null ? [{ label: 'Couverts', value: `${q.guest_count} → ${guests}` }] : []),
+        ...(date ? [{ label: 'Date', value: `${q.event_date} → ${date}` }] : []),
+        ...(spec.eventLocation ? [{ label: 'Lieu', value: spec.eventLocation }] : []),
+        ...(remove.length ? [{ label: 'Retirées', value: remove.join(', ') }] : []),
+      ],
+      lines: add.map((l) => ({ label: `+ ${l.name}`, detail: `${l.quantity} × ${eur(l.unitPrice)}`, amount: eur(l.quantity * l.unitPrice) })),
+      total: `${eur(before)} → ${eur(after)} TTC`,
+      note: 'Si le devis est déjà mis en forme, son document est remis à jour après validation.',
+    });
+  },
+
+  async propose_quote_send(ctx, i) {
+    const q = await quoteOf(ctx, i.quote_id);
+    const to = str(i.to, 200).toLowerCase();
+    if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to)) fail('Adresse email invalide.');
+    const message = str(i.message, 4000) || fail('Message attendu.');
+    return propose(ctx, 'quote_send', { quoteId: q.id, to, message }, {
+      title: `Envoyer le devis ${q.quote_number ?? ''}`.trim(),
+      fields: [{ label: 'Client', value: q.client_name }, { label: 'À', value: to }, { label: 'Message', value: message }],
+      note: 'Le client reçoit un email avec le lien vers son devis quand vous validez.',
+    });
+  },
+
+  async stale_quotes(ctx, i) {
+    const days = i.days == null ? 7 : Math.min(90, Math.max(1, Math.round(Number(i.days)) || 7));
+    const rows = await db.select({ id: quotes.id, number: quotes.quote_number, client: quotes.client_name, email: quotes.client_email, sent_at: quotes.sent_at, event_date: quotes.event_date })
+      .from(quotes)
+      .where(and(sql`${quotes.owner_user_id} in ${companyIdsOf(ctx.companyId)}`, eq(quotes.status, 'devis_envoye'),
+        sql`${quotes.sent_at} < now() - make_interval(days => ${days})`))
+      .orderBy(quotes.sent_at).limit(10);
+    return { days, results: rows };
   },
 
   async propose_memory(ctx, i) {

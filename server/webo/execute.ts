@@ -9,6 +9,8 @@ import { esc, renderEmail } from '@/lib/mail/layout';
 import { quoteVatBreakdown } from '@/lib/quoteTotals';
 import { companyIdsOf } from '../companyScope';
 import { createInvoiceDraft } from '../invoices';
+import { sendQuoteToClient } from '../quotes';
+import { applyQuoteUpdate, EDITABLE_STATUSES, type QuoteUpdateSpec } from '@/lib/webo/quoteUpdate';
 import { requireWriter } from '../session';
 import { companyIdFor } from '../weboWallet';
 import { isUuid } from './tools';
@@ -18,7 +20,12 @@ import { MAX_MEMORIES, memoryCount } from './memoryStore';
 // par une mise à jour conditionnelle (une seule exécution, même sur un double clic), puis l'écriture est faite ici,
 // par du code déterministe, avec les droits du traiteur. Webo lui-même n'écrit jamais.
 
-export interface ProposalResult { href: string; label: string }
+export interface ProposalResult {
+  href: string;
+  label: string;
+  /** Le document mis en forme du devis est à remettre à jour dans le navigateur (lignes ajoutées, noms retirés). */
+  resync?: { quoteId: string; added: string[]; removed: string[] };
+}
 
 type QuotePayload = {
   customerId: string | null;
@@ -116,6 +123,28 @@ export async function decideProposal(id: string, decision: 'accept' | 'cancel'):
           .returning({ id: prestations.id });
         if (!row) throw new Error('Prestation introuvable.');
         result = { href: `/prestations/${row.id}`, label: 'Ouvrir la prestation' };
+        break;
+      }
+      case 'quote_update': {
+        const spec = p as unknown as QuoteUpdateSpec;
+        const [q] = await db.select().from(quotes).where(and(eq(quotes.id, spec.quoteId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
+        if (!q) throw new Error('Devis introuvable.');
+        if (!EDITABLE_STATUSES.includes(q.status)) throw new Error('Ce devis a été validé, payé ou refusé entre-temps : il ne se modifie plus.');
+        const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count }, spec);
+        const total = quoteVatBreakdown(next.services as never[], Number(q.vat_rate ?? 20), next.guestCount, 0).ttc;
+        await db.update(quotes).set({
+          services: next.services, guest_count: next.guestCount, total_amount: String(total),
+          ...(spec.eventDate ? { event_date: spec.eventDate } : {}), ...(spec.eventLocation ? { event_location: spec.eventLocation } : {}),
+          updated_at: new Date().toISOString(),
+        }).where(eq(quotes.id, q.id));
+        const addedIds = next.services.slice(next.services.length - spec.add.length).map((l) => String(l.id));
+        result = { href: `/devis/${q.id}/modifier?mode=weboword`, label: 'Ouvrir le devis', ...(q.content_html ? { resync: { quoteId: q.id, added: addedIds, removed: spec.remove } } : {}) };
+        break;
+      }
+      case 'quote_send': {
+        const r = await sendQuoteToClient({ quoteId: String(p.quoteId), to: String(p.to), message: String(p.message) });
+        if (r.error) throw new Error(r.error);
+        result = { href: `/devis/${String(p.quoteId)}`, label: 'Voir le devis' };
         break;
       }
       case 'memory': {
