@@ -114,6 +114,8 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
     const timer = window.setTimeout(async () => {
       const res = await saveBrochure(brochure.id, { layout }).catch(() => ({ error: 'réseau' }));
       if (!res.error) savedLayout.current = now;
+      // Refus du serveur (mise en page hors des règles) : le dire, plutôt que d'accuser la connexion.
+      if (res.error && res.error !== 'réseau') notify(`Mise en page non enregistrée : ${res.error}`, { tone: 'error' });
       setSaveState(res.error ? 'error' : 'saved');
     }, 800);
     return () => window.clearTimeout(timer);

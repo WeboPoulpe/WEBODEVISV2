@@ -10,7 +10,7 @@ import { ArrowDown, ArrowUp, Copy, Trash2 } from 'lucide-react';
 import { useFeedback } from '@/components/ui/Feedback';
 import type { BrochureCover, BrochureStyle, CatalogPrestation, PriceOptions } from '@/lib/brochure';
 import {
-  addBlock, addPage, duplicateBlock, duplicatePage, layoutFonts, moveBlock, movePage, newBlock, placeBlock, removeBlock, removePage,
+  addBlock, addPage, duplicateBlock, duplicatePage, layoutError, layoutFonts, moveBlock, movePage, newBlock, placeBlock, removeBlock, removePage,
   resolveLayout, updateBlock, updatePage, type Block, type BlockTarget, type BrochureLayout, type LayoutPage,
 } from '@/lib/brochureLayout';
 import BlockPage from '../BlockPage';
@@ -44,7 +44,7 @@ const findBlock = (blocks: Block[], id: string | null): Block | null => {
 
 const ctl = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#E6DFD3] bg-white text-gray-600 shadow-sm hover:text-primary';
 
-export default function AdvancedEditor({ layout, onChange, catalog, company, settings }: {
+export default function AdvancedEditor({ layout, onChange: commit, catalog, company, settings }: {
   layout: BrochureLayout;
   onChange: (next: BrochureLayout) => void;
   catalog: CatalogPrestation[];
@@ -52,6 +52,16 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
   settings: AdvancedSettings;
 }) {
   const { confirm, notify } = useFeedback();
+  /**
+   * Toute modification passe par ici : celle qui sortirait des limites (40 pages, 30 blocs par page…) est refusée avec
+   * un message, au lieu de partir à l'enregistrement pour y être rejetée. Vrai si elle est appliquée.
+   */
+  const onChange = (next: BrochureLayout): boolean => {
+    const problem = layoutError(next);
+    if (problem && problem !== layoutError(layout)) { notify(problem, { tone: 'error' }); return false; }
+    commit(next);
+    return true;
+  };
   const byId = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
   const [pageId, setPageId] = useState<string | null>(layout.pages.find((p) => p.kind === 'blocks')?.id ?? layout.pages[0]?.id ?? null);
   const [blockId, setBlockId] = useState<string | null>(null);
@@ -77,7 +87,7 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
     if (!page || page.kind !== 'blocks') return;
     if (key === 'prestation') { setPicking({ at }); return; }
     const block = makeBlock(key);
-    onChange(addBlock(layout, page.id, block, at));
+    if (!onChange(addBlock(layout, page.id, block, at))) return;
     setBlockId(block.id);
   };
 
@@ -98,13 +108,13 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
 
   const addPageAfter = () => {
     const next = addPage(layout, 'blocks', pageId ?? undefined);
-    onChange(next);
+    if (!onChange(next)) return;
     setPageId(next.pages.find((p) => !layout.pages.some((q) => q.id === p.id))?.id ?? pageId);
     setBlockId(null);
   };
   const addSpecial = (kind: 'cover' | 'contact') => {
     const next = addPage(layout, kind, pageId ?? undefined);
-    onChange(next);
+    if (!onChange(next)) return;
     setPageId(next.pages.find((p) => !layout.pages.some((q) => q.id === p.id))?.id ?? pageId);
   };
   const removeSelected = async () => {
@@ -113,7 +123,7 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
     if (!ok) return;
     const i = layout.pages.indexOf(page);
     const next = removePage(layout, page.id);
-    onChange(next);
+    if (!onChange(next)) return;
     setPageId(next.pages[Math.max(0, i - 1)]?.id ?? null);
     setBlockId(null);
   };
@@ -194,7 +204,7 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
               next = addBlock(next, page.id, block, picking.at ? { ...picking.at, index: picking.at.index + i } : undefined);
               last = block.id;
             });
-            onChange(next);
+            if (!onChange(next)) return;
             setBlockId(last);
             setPicking(null);
             if (ids.length === 0) notify('Aucune prestation choisie.');

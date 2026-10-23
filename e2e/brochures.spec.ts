@@ -292,6 +292,11 @@ test.describe('brochures', () => {
       for (let i = 0; i < 25; i++) await page.getByRole('button', { name: 'Ajouter : Espace' }).click();
       await expect(page.getByText('Page trop pleine').first()).toBeVisible();
       await page.screenshot({ path: 'e2e/screenshots/brochure-avance-desktop.png' });
+      // Au-delà de 30 blocs sur la page : ajout refusé avec un message, l'enregistrement continue de marcher.
+      for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Ajouter : Espace' }).click();
+      await expect(page.getByText('Une page compte 30 blocs au plus.').first()).toBeVisible();
+      await expect(page.getByText('Enregistré')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText('Non enregistré')).toHaveCount(0);
 
       await page.setViewportSize({ width: 360, height: 780 });
       await page.reload();

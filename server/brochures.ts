@@ -260,11 +260,16 @@ export async function switchBrochureEditor(id: string, to: 'simple' | 'advanced'
     const layout = parseLayout(row.layout);
     if (row.editor_mode === 'advanced' && layout) set.content = { ...content, sections: sectionsFromLayout(layout) };
   } else {
+    // Déjà en avancé (un autre onglet resté en simple) : rien à convertir, et surtout rien à retirer des blocs.
+    if (row.editor_mode === 'advanced') return { error: null };
     const saved = parseLayout(row.layout);
     if (saved && row.editor_mode !== 'advanced' && opts.resume === undefined) return { error: null, needsChoice: true };
-    set.layout = saved && (opts.resume || row.editor_mode === 'advanced')
+    const layout = saved && opts.resume
       ? mergeLayout(saved, content)
       : layoutFromSimple(content, row.style as BrochureStyle, await catalogFor({ ...row, editor_mode: 'simple' }));
+    const error = layoutError(layout);
+    if (error) return { error };
+    set.layout = layout;
   }
   await db.update(brochures).set({ ...set, updated_at: new Date().toISOString() }).where(and(eq(brochures.id, row.id), mine(user.id)));
   return { error: null };

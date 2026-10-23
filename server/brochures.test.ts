@@ -316,4 +316,15 @@ describe('brochures : éditeur avancé', () => {
     expect((await br.switchBrochureEditor(id!, 'advanced', { resume: true })).error).toBeNull();
     expect(JSON.stringify((await layoutOf(id!)).layout)).toContain('Ajouté à la main');
   });
+
+  it('déjà en avancé : repasser en avancé (onglet resté en simple) ne retire aucun bloc', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Deux onglets' });
+    await br.switchBrochureEditor(id!, 'advanced');
+    const l = (await layoutOf(id!)).layout!;
+    l.pages.find((p) => p.kind === 'blocks')!.blocks.push({ id: 'pa', type: 'prestation', prestationId: PRESTATION } as never);
+    await br.saveBrochure(id!, { layout: l });
+    expect(await br.switchBrochureEditor(id!, 'advanced')).toEqual({ error: null });
+    expect(JSON.stringify((await layoutOf(id!)).layout)).toContain(PRESTATION);
+  });
 });

@@ -298,12 +298,39 @@ const prestationBlock = (item: BrochureItem, photo: Prestation['photo'], text: P
   ...(item.photoUrl ? { photoUrl: item.photoUrl } : {}), ...(item.hidePrice ? { hidePrice: true } : {}),
 });
 
+/**
+ * Une mise en page produite par conversion, ramenée dans les limites : une page trop chargée est coupée en plusieurs,
+ * puis, s'il y a trop de pages, les pages à blocs voisines les plus légères sont regroupées. Aucun bloc n'est perdu.
+ */
+function fitLayout(l: BrochureLayout): BrochureLayout {
+  let pages = l.pages.flatMap((p): LayoutPage[] => {
+    if (p.kind !== 'blocks' || countBlocks(p.blocks) <= MAX_BLOCKS_PER_PAGE) return [p];
+    const chunks: Block[][] = [[]];
+    for (const b of p.blocks) {
+      if (countBlocks([...chunks[chunks.length - 1], b]) > MAX_BLOCKS_PER_PAGE) chunks.push([]);
+      chunks[chunks.length - 1].push(b);
+    }
+    return chunks.map((blocks, i) => ({ ...p, id: i === 0 ? p.id : newPageId(), blocks }));
+  });
+  while (pages.length > MAX_PAGES) {
+    let best = -1;
+    for (let i = 0; i + 1 < pages.length; i++) {
+      if (pages[i].kind !== 'blocks' || pages[i + 1].kind !== 'blocks') continue;
+      const n = countBlocks(pages[i].blocks) + countBlocks(pages[i + 1].blocks);
+      if (n <= MAX_BLOCKS_PER_PAGE && (best < 0 || n < countBlocks(pages[best].blocks) + countBlocks(pages[best + 1].blocks))) best = i;
+    }
+    if (best < 0) break;
+    pages = [...pages.slice(0, best), { ...pages[best], blocks: [...pages[best].blocks, ...pages[best + 1].blocks] }, ...pages.slice(best + 2)];
+  }
+  return { pages };
+}
+
 /** Les pages de l'éditeur simple, converties en blocs : la même brochure, désormais modifiable page par page. */
 export function layoutFromSimple(content: BrochureContent, style: BrochureStyle, catalog: ReadonlyMap<string, CatalogPrestation>): BrochureLayout {
   const flat = content.sections.flatMap((s) => s.items);
   const pages = paginateBrochure(content, catalog, style, { show: true, mode: 'ttc', vatRate: 0, language: 'fr', forEditor: true });
   let alternate = 0;
-  return { pages: pages.map((p): LayoutPage => {
+  return fitLayout({ pages: pages.map((p): LayoutPage => {
     if (p.kind === 'about') {
       const blocks: Block[] = [{ ...(newBlock('title') as Block), text: 'Qui sommes-nous', level: 'm' } as Block, { id: newBlockId(), type: 'text', html: content.about.html }];
       if (content.about.photoUrl) blocks.push({ id: newBlockId(), type: 'image', url: content.about.photoUrl, height: 220, fit: 'cover' });
@@ -319,7 +346,7 @@ export function layoutFromSimple(content: BrochureContent, style: BrochureStyle,
       blocks.push(prestationBlock(item, photo, style === 'editorial' ? 'full' : 'short'));
     }
     return { id: newPageId(), kind: 'blocks', blocks };
-  }) };
+  }) });
 }
 
 const blocksInOrder = (l: BrochureLayout): Block[] => l.pages.flatMap((p) => p.blocks.flatMap((b) => (b.type === 'columns' ? b.cols.flat() : [b])));
@@ -353,7 +380,7 @@ export function mergeLayout(l: BrochureLayout, content: BrochureContent): Brochu
   if (added.length === 0) return kept;
   const page: LayoutPage = { id: newPageId(), kind: 'blocks', blocks: added.map((i) => prestationBlock(i, 'top', 'short')) };
   const formIndex = kept.pages.findIndex((p) => p.kind === 'form');
-  return { pages: insertAt(kept.pages, formIndex < 0 ? kept.pages.length : formIndex, page) };
+  return fitLayout({ pages: insertAt(kept.pages, formIndex < 0 ? kept.pages.length : formIndex, page) });
 }
 
 // ── Affichage ────────────────────────────────────────────────────────────────

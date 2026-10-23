@@ -98,6 +98,22 @@ describe('mise en page : conversions', () => {
     expect(ids).toEqual(['p1', 'p3', 'p4']);
     expect(kinds(merged)).toEqual(['cover', 'blocks', 'contact', 'blocks', 'form']);
   });
+
+  it('beaucoup de prestations : la conversion et la reprise respectent les limites (pages, blocs par page) sans en perdre', () => {
+    const ids = Array.from({ length: 60 }, (_, i) => `q${i}`);
+    const big = new Map(ids.map((id) => [id, prestation(id)]));
+    const many = content({ about: { enabled: true, html: '<p>Nous</p>' }, sections: [{ id: 's1', title: 'Menus', items: ids.map((prestationId) => ({ prestationId })) }] });
+    const prestIds = (l: BrochureLayout) => blocksOf(l).flatMap((b) => (b.type === 'prestation' ? [b.prestationId] : []));
+    for (const style of ['editorial', 'carte', 'magazine'] as const) {
+      const l = layoutFromSimple(many, style, big);
+      expect(layoutError(l)).toBeNull();
+      expect(prestIds(l)).toEqual(ids);
+    }
+    const small = layoutFromSimple(content(), 'carte', catalog);
+    const merged = mergeLayout(small, many);
+    expect(layoutError(merged)).toBeNull();
+    expect(prestIds(merged)).toEqual(ids);
+  });
 });
 
 describe('mise en page : affichage', () => {
