@@ -5,17 +5,20 @@
 // (`layout`) est tenue par l'éditeur de brochure, qui l'enregistre.
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { googleFontsHref } from '@/lib/quoteOutput';
 import { ArrowDown, ArrowUp, Copy, Trash2 } from 'lucide-react';
 import { useFeedback } from '@/components/ui/Feedback';
 import type { BrochureCover, BrochureStyle, CatalogPrestation, PriceOptions } from '@/lib/brochure';
 import {
-  addBlock, addPage, duplicateBlock, duplicatePage, moveBlock, movePage, newBlock, placeBlock, removeBlock, removePage,
-  resolveLayout, type Block, type BlockTarget, type BrochureLayout, type LayoutPage,
+  addBlock, addPage, duplicateBlock, duplicatePage, layoutFonts, moveBlock, movePage, newBlock, placeBlock, removeBlock, removePage,
+  resolveLayout, updateBlock, updatePage, type Block, type BlockTarget, type BrochureLayout, type LayoutPage,
 } from '@/lib/brochureLayout';
 import BlockPage from '../BlockPage';
 import { BrochurePageView, type BrochureCompany } from '../BrochurePages';
 import PrestationPicker from '../PrestationPicker';
 import BlockPalette, { type PaletteItem } from './BlockPalette';
+import BlockSettings from './BlockSettings';
+import PageSettings from './PageSettings';
 import PagesStrip, { useOverflow } from './PagesStrip';
 
 export interface AdvancedSettings {
@@ -29,16 +32,24 @@ export interface AdvancedSettings {
 const makeBlock = (key: PaletteItem, prestationId?: string): Block =>
   key === 'columns3' ? { ...(newBlock('columns') as Extract<Block, { type: 'columns' }>), count: 3, cols: [[], [], []] } : newBlock(key, prestationId);
 
+/** Un bloc de la page, au premier niveau ou dans une colonne. */
+const findBlock = (blocks: Block[], id: string | null): Block | null => {
+  if (!id) return null;
+  for (const b of blocks) {
+    if (b.id === id) return b;
+    if (b.type === 'columns') { const inner = findBlock(b.cols.flat(), id); if (inner) return inner; }
+  }
+  return null;
+};
+
 const ctl = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#E6DFD3] bg-white text-gray-600 shadow-sm hover:text-primary';
 
-export default function AdvancedEditor({ layout, onChange, catalog, company, settings, settingsPanel }: {
+export default function AdvancedEditor({ layout, onChange, catalog, company, settings }: {
   layout: BrochureLayout;
   onChange: (next: BrochureLayout) => void;
   catalog: CatalogPrestation[];
   company: BrochureCompany;
   settings: AdvancedSettings;
-  /** Panneau de réglages du bloc ou de la page sélectionnés (ajouté par l'éditeur de brochure). */
-  settingsPanel?: (sel: { page: LayoutPage | null; blockId: string | null }) => ReactNode;
 }) {
   const { confirm, notify } = useFeedback();
   const byId = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
@@ -119,9 +130,12 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
 
   const { ref: canvasRef, over } = useOverflow([layout, pageId]);
   const selectedResolved = page ? resolvedOf(page) : null;
+  const selectedBlock = page ? findBlock(page.blocks, blockId) : null;
+  const fontsHref = googleFontsHref(layoutFonts(layout));
 
   return (
     <div className="space-y-3">
+      {fontsHref && <link rel="stylesheet" href={fontsHref} />}
       <PagesStrip pages={layout.pages} selectedId={pageId} onSelect={(id) => { setPageId(id); setBlockId(null); }} renderPage={renderPage}
         onAdd={addPageAfter} onMove={(dir) => page && onChange(movePage(layout, page.id, dir))}
         onDuplicate={() => page && onChange(duplicatePage(layout, page.id))} onRemove={removeSelected} onReorder={reorder} />
@@ -158,9 +172,14 @@ export default function AdvancedEditor({ layout, onChange, catalog, company, set
         </div>
 
         <div className="order-3 min-w-0">
-          {settingsPanel ? settingsPanel({ page, blockId }) : (
-            <p className="rounded-2xl border border-gray-200 bg-white p-3 text-sm text-gray-500">Cliquez sur un bloc de la page pour le régler.</p>
-          )}
+          <div className="rounded-2xl border border-gray-200 bg-white p-3" role="region" aria-label={selectedBlock ? 'Réglages du bloc' : 'Réglages de la page'}>
+            {selectedBlock ? (
+              <BlockSettings key={selectedBlock.id} block={selectedBlock} catalog={byId} language={settings.language}
+                onChange={(patch) => onChange(updateBlock(layout, selectedBlock.id, patch))} />
+            ) : page ? (
+              <PageSettings page={page} onChange={(patch) => onChange(updatePage(layout, page.id, patch))} />
+            ) : null}
+          </div>
         </div>
       </div>
 

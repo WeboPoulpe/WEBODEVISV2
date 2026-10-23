@@ -39,9 +39,9 @@ const titleStyle = (s: BlockStyle | undefined, base: number): CSSProperties => (
 });
 
 function Photo({ url, style }: { url: string | null; style?: CSSProperties }) {
-  if (!url) return <div style={{ background: 'linear-gradient(135deg,#d9c8ad,#9c8a6c)', ...style }} />;
+  if (!url) return <div data-photo="" style={{ background: 'linear-gradient(135deg,#d9c8ad,#9c8a6c)', ...style }} />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="" style={{ objectFit: 'cover', display: 'block', width: '100%', ...style }} />;
+  return <img data-photo="" src={url} alt="" style={{ objectFit: 'cover', display: 'block', width: '100%', ...style }} />;
 }
 
 function Prestation({ b }: { b: Extract<ResolvedBlock, { type: 'prestation' }> }) {

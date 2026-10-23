@@ -300,4 +300,61 @@ test.describe('brochures', () => {
       await page.screenshot({ path: 'e2e/screenshots/brochure-avance-mobile.png', fullPage: true });
     });
   });
+
+  test('réglages : photo à gauche, texte court, prix masqué, fond de page', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(180_000);
+    await withAccount(browser, 'brochure-reglages', async (page, userId) => {
+      const long = `<p>Entrée ${'de saison, légumes du potager, herbes fraîches et jus corsé, '.repeat(6)}dessert.</p>`;
+      const [a] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Menu Tentation', 76, 'dîner', $2) returning id`, [userId, long]);
+      const before = await sql(`select name, description, unit_price, photo_url from public.prestations where id = $1`, [a.id]);
+      const token = `jeton-e2e-reglages-${Date.now()}`;
+      const layout = { pages: [
+        { id: 'c', kind: 'cover', blocks: [] },
+        { id: 'p', kind: 'blocks', blocks: [{ id: 'pa', type: 'prestation', prestationId: a.id, photo: 'top', show: { name: true, text: true, price: true }, text: 'full' }] },
+        { id: 'f', kind: 'form', blocks: [] },
+      ] };
+      const [b] = await sql<{ id: string }>(`insert into public.brochures (owner_user_id, user_id, name, share_token, cover, editor_mode, layout) values ($1, $1, 'Mariages 2027', $2, '{"title":"Mariages 2027"}'::jsonb, 'advanced', $3::jsonb) returning id`,
+        [userId, token, JSON.stringify(layout)]);
+      await page.goto(`/brochures/${b.id}`);
+      const pages = page.getByRole('button', { name: /^Page \d+/ });
+      await expect(pages).toHaveCount(3, { timeout: 20_000 });
+      await pages.nth(1).click();
+      const canvas = page.getByRole('region', { name: 'Page en cours' });
+      const settings = page.getByRole('region', { name: 'Réglages du bloc' });
+
+      await canvas.getByRole('heading', { name: 'Menu Tentation' }).click();
+      await settings.getByRole('group', { name: 'Photo' }).getByRole('button', { name: 'Gauche' }).click();
+      const photo = await canvas.locator('[data-photo]').boundingBox();
+      const name = await canvas.getByRole('heading', { name: 'Menu Tentation' }).boundingBox();
+      expect(photo!.x).toBeLessThan(name!.x);
+
+      await settings.getByRole('group', { name: 'Texte' }).getByRole('button', { name: 'Court' }).click();
+      const text = await canvas.getByText(/^Entrée/).textContent();
+      expect(text!.length).toBeLessThanOrEqual(151);
+
+      await expect(canvas.getByText(/€/)).toBeVisible();
+      await settings.getByRole('checkbox', { name: 'Prix' }).uncheck();
+      await expect(canvas.getByText(/€/)).toHaveCount(0);
+
+      // Clic hors des blocs : réglages de la page.
+      await canvas.locator('[data-page-scroll]').click({ position: { x: 10, y: 10 } });
+      await page.getByRole('region', { name: 'Réglages de la page' }).getByRole('group', { name: 'Fond de la page' }).getByRole('button', { name: 'Sable' }).click();
+      await expect(page.getByText('Enregistré')).toBeVisible({ timeout: 10_000 });
+      await page.waitForTimeout(1200);
+      await expect(page.getByText('Enregistré')).toBeVisible({ timeout: 10_000 });
+      await page.screenshot({ path: 'e2e/screenshots/brochure-reglages-desktop.png' });
+
+      const reader = await page.context().newPage();
+      await reader.goto(`/b/${token}`);
+      await reader.getByRole('button', { name: 'Page suivante' }).click();
+      await reader.waitForTimeout(750);
+      await expect(reader.getByRole('heading', { name: 'Menu Tentation' })).toBeVisible();
+      const bg = await reader.locator('[data-page-scroll]').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(bg).toBe('rgb(237, 230, 218)');
+      await expect(reader.getByText(/€/)).toHaveCount(0);
+      await reader.close();
+
+      expect(await sql(`select name, description, unit_price, photo_url from public.prestations where id = $1`, [a.id])).toEqual(before);
+    });
+  });
 });
