@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { isDemoUser } from '@/lib/demo';
 import { signOut as endSession } from 'next-auth/react';
 import { FeedbackProvider } from '@/components/ui/Feedback';
+import { WalletProvider } from '@/components/webo/WalletContext';
 
 // Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
@@ -38,6 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <FeedbackProvider>
+    <WalletProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       {showOnboarding && <OnboardingOverlay userId={user!.id} />}
 
@@ -78,6 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <MobileTabBar badges={badges} onHelp={openHelp} />
       <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} page={helpTarget.page ?? null} guideId={helpTarget.guide ?? null} />
     </div>
+    </WalletProvider>
     </FeedbackProvider>
   );
 }

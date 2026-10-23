@@ -1,5 +1,6 @@
 'use client';
 
+import CoinBalance from '@/components/webo/CoinBalance';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { HelpCircle, Plus, Search, Bell, Check, Users, Calendar, FileText, AlertCircle, Info, CheckSquare, X } from 'lucide-react';
@@ -349,6 +350,7 @@ export default function Header({ onHelp }: HeaderProps) {
         >
           <HelpCircle className="h-5 w-5" />
         </button>
+        <CoinBalance />
         <NotificationBell />
         <Link
           href="/devis/nouveau"

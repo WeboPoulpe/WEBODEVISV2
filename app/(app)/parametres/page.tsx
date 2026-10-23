@@ -13,6 +13,7 @@ import RemindersSection from '@/components/parametres/RemindersSection';
 import CalendarFeedSection from '@/components/parametres/CalendarFeedSection';
 import AccountingSection from '@/components/parametres/AccountingSection';
 import EmployerSection from '@/components/parametres/EmployerSection';
+import WeboSection from '@/components/parametres/WeboSection';
 import { errorCls } from '@/components/ui/kit';
 import { isDemoUser } from '@/lib/demo';
 import { changePassword } from '@/server/auth';
@@ -543,6 +544,7 @@ export default function ParametresPage() {
       )}
 
       {/* ── Relances automatiques et abonnement agenda ─────────────────────── */}
+      <WeboSection />
       <RemindersSection />
       <CalendarFeedSection locked={isDemoUser(user?.id) ? 'L’abonnement agenda n’est pas disponible dans la démonstration.' : null} />
       <AccountingSection />
