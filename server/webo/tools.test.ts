@@ -90,6 +90,18 @@ describe('outils de Webo', () => {
     expect(JSON.stringify(r.summary)).toContain('0601020304');
   });
 
+  it('ligne sans identifiant mais au nom exact d’une prestation : reprise du catalogue (prix du catalogue)', async () => {
+    const r = await call('propose_quote', quoteInput([{ prestation_id: null, name: 'menu tentation', quantity: null, unit_price: 99 }]));
+    const [row] = (await pg.query<{ payload: { lines: { name: string; quantity: number; unitPrice: number }[] } }>(`select payload from webo_proposals where id = $1`, [r.proposal_id])).rows;
+    expect(row.payload.lines[0]).toMatchObject({ name: 'Menu Tentation', quantity: 50, unitPrice: 76 });
+  });
+
+  it('devis passés : recherche aussi par type d’événement', async () => {
+    await pg.exec(`insert into quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, services) values ('${CHEF}', '${CHEF}', 'Martin', '2025-07-05', 'Mariage', 90, 'paye', '[]')`);
+    const r = await call('find_quotes', { query: 'mariage' });
+    expect(r.results.map((q: { client: string }) => q.client)).toContain('Martin');
+  });
+
   it('date ou couverts invalides : refusés', async () => {
     expect((await call('propose_quote', { ...quoteInput([]), event_date: '12/06/2027' })).error).toBeTruthy();
     expect((await call('propose_quote', { ...quoteInput([]), guest_count: 0 })).error).toBeTruthy();

@@ -75,6 +75,14 @@ describe('tour de discussion en flux', () => {
     expect(msg).toContain('Famille Lenoir');
   });
 
+  it('habitudes du traiteur redonnées au spécialiste', async () => {
+    await pg.exec(`insert into webo_memories (company_id, text) values ('${CHEF}', 'Toujours proposer le café à part')`);
+    script = [route('devis'), say('Noté.')];
+    await run('Prépare un devis');
+    expect(JSON.stringify(sent[1].messages)).toContain('Toujours proposer le café à part');
+    await pg.exec(`delete from webo_memories`);
+  });
+
   it('chemin vers le devis d’une autre entreprise : ignoré', async () => {
     script = [route('devis'), say('Lequel ?')];
     await run('Ajoute un trou normand', `/devis/${THEIRS}/modifier`);

@@ -2116,6 +2116,19 @@ export const webo_proposals = pgTable("webo_proposals", {
 }, (table) => [
 	foreignKey({ columns: [table.conversation_id], foreignColumns: [webo_conversations.id], name: "webo_proposals_conversation_id_fkey" }).onDelete("cascade"),
 	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_proposals_company_id_fkey" }).onDelete("cascade"),
-	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text])`),
+	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text, 'memory'::text, 'quote_update'::text, 'quote_send'::text])`),
 	check("webo_proposals_status_check", sql`status = ANY (ARRAY['proposed'::text, 'done'::text, 'cancelled'::text, 'failed'::text])`),
+]);
+
+// Habitudes du traiteur retenues par Webo (« acompte toujours à 40 % ») : écrites seulement après validation d'une
+// proposition, redonnées aux spécialistes, visibles et effaçables dans Paramètres. 30 au plus par entreprise.
+export const webo_memories = pgTable("webo_memories", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	text: text().notNull(),
+	created_by: uuid(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_memories_company_id_fkey" }).onDelete("cascade"),
+	index("idx_webo_memories_company").using("btree", table.company_id.asc().nullsLast().op("uuid_ops")),
 ]);

@@ -274,6 +274,13 @@
       "when": 1792751380641,
       "tag": "0038_webo_busy",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792756022636,
+      "tag": "0039_webo_memory",
+      "breakpoints": true
     }
   ]
 }

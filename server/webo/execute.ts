@@ -2,7 +2,7 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { customers, prestations, profiles, prospect_requests, quotes, webo_proposals } from '@/db/schema';
+import { customers, prestations, profiles, prospect_requests, quotes, webo_memories, webo_proposals } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { sendMail } from '@/lib/mail';
 import { esc, renderEmail } from '@/lib/mail/layout';
@@ -12,6 +12,7 @@ import { createInvoiceDraft } from '../invoices';
 import { requireWriter } from '../session';
 import { companyIdFor } from '../weboWallet';
 import { isUuid } from './tools';
+import { MAX_MEMORIES, memoryCount } from './memoryStore';
 
 // Valider ou annuler une proposition de Webo. La proposition passe d'abord de « proposée » à « faite » ou « annulée »
 // par une mise à jour conditionnelle (une seule exécution, même sur un double clic), puis l'écriture est faite ici,
@@ -115,6 +116,12 @@ export async function decideProposal(id: string, decision: 'accept' | 'cancel'):
           .returning({ id: prestations.id });
         if (!row) throw new Error('Prestation introuvable.');
         result = { href: `/prestations/${row.id}`, label: 'Ouvrir la prestation' };
+        break;
+      }
+      case 'memory': {
+        if (await memoryCount(companyId) >= MAX_MEMORIES) throw new Error(`Webo retient ${MAX_MEMORIES} habitudes au plus : effacez-en une dans Paramètres.`);
+        await db.insert(webo_memories).values({ company_id: companyId, text: String(p.text), created_by: user.id });
+        result = { href: '/parametres#webo-title', label: 'Voir ce que Webo retient' };
         break;
       }
       case 'prospect_reply':

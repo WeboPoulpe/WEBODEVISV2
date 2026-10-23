@@ -47,6 +47,19 @@ test.describe('assistant Webo', () => {
     });
   });
 
+  test('Paramètres : ce que Webo retient, et l’oublier', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(120_000);
+    await withAccount(browser, 'webo-memoire', async (page, userId) => {
+      await sql(`insert into public.webo_memories (company_id, text) values ($1, 'Acompte toujours à 40 %')`, [userId]);
+      await page.goto('/parametres');
+      const list = page.getByRole('list', { name: 'Ce que Webo retient' });
+      await expect(list).toContainText('Acompte toujours à 40 %', { timeout: 30_000 });
+      await page.getByRole('button', { name: 'Oublier « Acompte toujours à 40 % »' }).click();
+      await expect(page.getByText('Rien pour l’instant.')).toBeVisible();
+      expect(await sql(`select 1 from public.webo_memories where company_id = $1`, [userId])).toHaveLength(0);
+    });
+  });
+
   test('téléphone : la bulle et le panneau plein écran, sans débordement', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     await withAccount(browser, 'webo-assistant-tel', async (page) => {

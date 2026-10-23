@@ -7,6 +7,7 @@ import { isPerGuestPrestation } from '@/lib/brochure';
 import { quoteTotalTTC, quoteVatBreakdown } from '@/lib/quoteTotals';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
+import { MAX_MEMORIES, MAX_MEMORY_TEXT, memoryCount } from './memoryStore';
 
 // Outils des spécialistes de Webo. Les lectures ne voient que les données de l'entreprise. Les « propositions »
 // vérifient tout (identifiants de l'entreprise, dates, nombres), reprennent les prix du catalogue, et n'écrivent qu'une
@@ -77,16 +78,19 @@ const TOOLS: Record<string, Anthropic.Tool> = {
   propose_prestation_update: tool('propose_prestation_update', 'Propose de changer le prix et/ou la description d’une prestation existante.', {
     prestation_id: { type: 'string' }, unit_price: nullableNum, description: nullableStr,
   }),
+  propose_memory: tool('propose_memory', 'Propose de retenir une habitude durable du traiteur (« acompte toujours à 40 % »), redonnée ensuite à chaque conversation. Une phrase courte.', {
+    text: { type: 'string' },
+  }),
   propose_prospect_reply: tool('propose_prospect_reply', 'Propose une réponse par email à une demande de prospect ; elle part quand le traiteur valide.', {
     prospect_id: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' },
   }),
 };
 
 const BY_AGENT: Record<AgentName, string[]> = {
-  devis: ['search_catalogue', 'search_customers', 'find_quotes', 'get_quote', 'propose_quote'],
-  factures: ['find_quotes', 'get_quote', 'propose_invoice'],
-  catalogue: ['search_catalogue', 'propose_prestation', 'propose_prestation_update'],
-  prospects: ['list_prospects', 'search_catalogue', 'propose_prospect_reply'],
+  devis: ['search_catalogue', 'search_customers', 'find_quotes', 'get_quote', 'propose_quote', 'propose_memory'],
+  factures: ['find_quotes', 'get_quote', 'propose_invoice', 'propose_memory'],
+  catalogue: ['search_catalogue', 'propose_prestation', 'propose_prestation_update', 'propose_memory'],
+  prospects: ['list_prospects', 'search_catalogue', 'propose_prospect_reply', 'propose_memory'],
   aide: [],
 };
 
@@ -147,7 +151,10 @@ const HANDLERS: Record<string, Handler> = {
     const q = str(i.query, 100);
     const rows = await db.select({ id: quotes.id, number: quotes.quote_number, client: quotes.client_name, event_date: quotes.event_date, event_type: quotes.event_type, guests: quotes.guest_count, status: quotes.status, total_amount: quotes.total_amount, vat_rate: quotes.vat_rate, services: quotes.services, formulas: quotes.formulas, chosen_formula_id: quotes.chosen_formula_id })
       .from(quotes)
-      .where(and(sql`${quotes.owner_user_id} in ${companyIdsOf(ctx.companyId)}`, q ? or(ilike(quotes.client_name, like(q)), ilike(quotes.quote_number, like(q))) : undefined))
+      .where(and(sql`${quotes.owner_user_id} in ${companyIdsOf(ctx.companyId)}`, q ? or(
+        ilike(quotes.client_name, like(q)), ilike(quotes.quote_number, like(q)), ilike(quotes.event_type, like(q)),
+        ...(/^\d{4}$/.test(q) ? [sql`to_char(${quotes.event_date}, 'YYYY') = ${q}`] : []),
+      ) : undefined))
       .orderBy(desc(quotes.created_at)).limit(8);
     return { results: rows.map(({ services, formulas, chosen_formula_id, vat_rate, total_amount, ...r }) => ({
       ...r, total_ttc: quoteTotalTTC({ total_amount, vat_rate, guest_count: r.guests, services, formulas, chosen_formula_id }),
@@ -201,6 +208,17 @@ const HANDLERS: Record<string, Handler> = {
     const rawLines = (Array.isArray(i.lines) ? i.lines : []).slice(0, 40) as Record<string, unknown>[];
     const ids = rawLines.map((l) => l.prestation_id).filter(isUuid);
     const catalogue = await catalogueById(ctx, ids);
+    // Ligne sans identifiant au nom exact d'une prestation (reprise d'un ancien devis) : c'est elle, au prix du catalogue.
+    const names = rawLines.filter((l) => !l.prestation_id).map((l) => str(l.name, 120).toLowerCase()).filter(Boolean);
+    const byName = new Map<string, typeof prestations.$inferSelect>();
+    if (names.length) {
+      const rows = await db.select().from(prestations).where(and(sql`${prestations.user_id} in ${companyIdsOf(ctx.companyId)}`, inArray(sql`lower(${prestations.name})`, names)));
+      for (const r of rows) byName.set(r.name.toLowerCase(), r);
+    }
+    for (const l of rawLines) {
+      const match = !l.prestation_id ? byName.get(str(l.name, 120).toLowerCase()) : undefined;
+      if (match) { l.prestation_id = match.id; catalogue.set(match.id, match); }
+    }
     const lines = rawLines.map((l) => {
       if (l.prestation_id) {
         const p = catalogue.get(String(l.prestation_id)) ?? fail(`Prestation « ${str(l.name, 80)} » introuvable dans votre catalogue.`);
@@ -287,6 +305,14 @@ const HANDLERS: Record<string, Handler> = {
         ...(description ? [{ label: 'Nouvelle description', value: description }] : []),
       ],
     });
+  },
+
+  async propose_memory(ctx, i) {
+    const text = str(i.text, 1000);
+    if (!text) fail('Habitude vide.');
+    if (text.length > MAX_MEMORY_TEXT) fail(`Une habitude tient en ${MAX_MEMORY_TEXT} caractères au plus.`);
+    if (await memoryCount(ctx.companyId) >= MAX_MEMORIES) fail(`Webo retient ${MAX_MEMORIES} habitudes au plus : le traiteur doit en effacer une dans Paramètres.`);
+    return propose(ctx, 'memory', { text }, { title: 'Retenir une habitude', fields: [{ label: 'Habitude', value: text }], note: 'Webo s’en souviendra dans vos prochaines conversations. Vous la retrouvez dans Paramètres.' });
   },
 
   async propose_prospect_reply(ctx, i) {

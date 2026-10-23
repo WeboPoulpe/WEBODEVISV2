@@ -3,14 +3,15 @@
 // Paramètres : le solde de WeboCoins (lien vers « Mes WeboCoins ») et le mode de traduction des prestations de
 // l'entreprise : gratuite (MyMemory) ou par Webo, 1 pièce la fiche.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFeedback } from '@/components/ui/Feedback';
 import WeboCoin from '@/components/webo/WeboCoin';
 import { useWallet } from '@/components/webo/WalletContext';
 import { setTranslationMode } from '@/server/weboWalletActions';
+import { deleteWeboMemory, listWeboMemories } from '@/server/webo/memory';
 
 const MODES = [
   { value: 'webo' as const, label: 'Webo', hint: '1 WeboCoin la fiche · fiche entière, mise en forme gardée, vocabulaire de cuisine' },
@@ -21,6 +22,13 @@ export default function WeboSection() {
   const { wallet, refresh } = useWallet();
   const { notify } = useFeedback();
   const [busy, setBusy] = useState(false);
+  const [memories, setMemories] = useState<{ id: string; text: string }[] | null>(null);
+  useEffect(() => { listWeboMemories().then(setMemories).catch(() => setMemories([])); }, []);
+  const forget = async (id: string) => {
+    const res = await deleteWeboMemory(id).catch(() => ({ error: 'Pas effacée. Réessayez.' }));
+    if (res.error) { notify(res.error, { tone: 'error' }); return; }
+    setMemories((m) => (m ?? []).filter((x) => x.id !== id));
+  };
 
   const choose = async (mode: 'webo' | 'free') => {
     if (!wallet || wallet.mode === mode) return;
@@ -67,6 +75,21 @@ export default function WeboSection() {
             })}
           </div>
           <p className="mt-2 text-xs text-gray-500">Vous pourrez toujours changer au moment de traduire. Sans assez de WeboCoins, la traduction se fait en gratuit.</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Ce que Webo retient</p>
+          {memories === null ? null : memories.length === 0 ? (
+            <p className="text-sm text-gray-500">Rien pour l’instant. Quand vous lui dites une habitude (« acompte toujours à 40 % »), Webo vous propose de la retenir.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200" aria-label="Ce que Webo retient">
+              {memories.map((m) => (
+                <li key={m.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1 text-gray-800">{m.text}</span>
+                  <button type="button" onClick={() => forget(m.id)} aria-label={`Oublier « ${m.text} »`} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </section>

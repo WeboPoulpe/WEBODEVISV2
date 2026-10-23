@@ -10,6 +10,7 @@ import { getWeboSettings } from '../settings';
 import { companyIdFor, debitCoins, recordUsage, settleDebit, walletOf } from '../weboWallet';
 import { routeMessage, runSpecialist, type CallUsage } from './agents';
 import { isUuid, runTool, type AgentName, type ProposalSummary } from './tools';
+import { memoriesText } from './memoryStore';
 
 // Un tour de discussion avec Webo : un message du traiteur → l'aiguilleur choisit le spécialiste → réponse (émise au
 // fil de l'eau) et propositions. Chaque réponse est payée au coût réel de ses appels × coefficient (au plus le solde).
@@ -123,7 +124,7 @@ async function turn(user: { id: string }, input: TurnInput, send: (e: WeboEvent)
     agent = routed.agent;
     usage.push(...routed.usage);
     send({ type: 'agent', agent });
-    const context = await pageContext(ctx, input.path);
+    const context = [await memoriesText(companyId), await pageContext(ctx, input.path)].filter(Boolean).join('\n\n');
     replyText = (await runSpecialist(agent, ctx, history, message, todayFr(), usage, Date.now() + 50_000, context,
       (delta) => send({ type: 'text', delta }))).text;
   } catch (e) {
