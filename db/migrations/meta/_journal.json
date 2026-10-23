@@ -253,6 +253,13 @@
       "when": 1792695625358,
       "tag": "0035_brochure_layout",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792743990668,
+      "tag": "0036_webocoins",
+      "breakpoints": true
     }
   ]
 }

@@ -2035,3 +2035,48 @@ export const extra_contracts = pgTable("extra_contracts", {
 	foreignKey({ columns: [table.owner_user_id], foreignColumns: [users.id], name: "extra_contracts_owner_user_id_fkey" }).onDelete("cascade"),
 	check("extra_contracts_status_check", sql`status = ANY (ARRAY['brouillon'::text, 'envoye'::text, 'signe'::text])`),
 ]);
+
+// WeboCoins (docs/superpowers/specs/2026-10-23-webocoins-traduction-webo-design.md) : le portefeuille d'une entreprise
+// (clé : le compte titulaire). Pièces du mois (remises au premier usage de chaque mois de Paris, `month_key`) et pièces
+// gardées (offertes, plus tard achetées), jamais négatives. `monthly_override` : allocation propre au compte (null :
+// valeur générale). `translation_mode` : traduction gratuite ou par Webo, réglage de l'entreprise.
+export const webo_wallets = pgTable("webo_wallets", {
+	company_id: uuid().primaryKey().notNull(),
+	month_key: text().default('').notNull(),
+	month_coins: integer().default(0).notNull(),
+	kept_coins: integer().default(0).notNull(),
+	monthly_override: integer(),
+	translation_mode: text().default('webo').notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_wallets_company_id_fkey" }).onDelete("cascade"),
+	check("webo_wallets_month_coins_check", sql`month_coins >= 0`),
+	check("webo_wallets_kept_coins_check", sql`kept_coins >= 0`),
+	check("webo_wallets_override_check", sql`monthly_override IS NULL OR monthly_override >= 0`),
+	check("webo_wallets_mode_check", sql`translation_mode = ANY (ARRAY['webo'::text, 'free'::text])`),
+]);
+
+// Journal des WeboCoins : chaque mouvement, immuable. `coins` signé (débit négatif) ; `from_month` / `from_kept` :
+// réserve d'où viennent les pièces d'un débit (rendues telles quelles en cas d'échec). Coût réel de l'appel à Claude
+// pour les comptes de l'admin. `idempotency_key` : un double envoi ne débite qu'une fois.
+export const webo_ledger = pgTable("webo_ledger", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	user_id: uuid(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	kind: text().notNull(),
+	coins: integer().notNull(),
+	from_month: integer().default(0).notNull(),
+	from_kept: integer().default(0).notNull(),
+	reason: text().notNull(),
+	idempotency_key: text(),
+	model: text(),
+	input_tokens: integer(),
+	output_tokens: integer(),
+	cost_usd: numeric({ precision: 12, scale: 6 }),
+}, (table) => [
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_ledger_company_id_fkey" }).onDelete("cascade"),
+	check("webo_ledger_kind_check", sql`kind = ANY (ARRAY['allocation'::text, 'debit'::text, 'refund'::text, 'gift'::text, 'purchase'::text])`),
+	uniqueIndex("webo_ledger_idempotency_key").using("btree", table.idempotency_key.asc().nullsLast().op("text_ops")).where(sql`(idempotency_key IS NOT NULL)`),
+	index("idx_webo_ledger_company").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
+]);
