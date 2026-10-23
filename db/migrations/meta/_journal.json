@@ -260,6 +260,13 @@
       "when": 1792743990668,
       "tag": "0036_webocoins",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792750026776,
+      "tag": "0037_webo_assistant",
+      "breakpoints": true
     }
   ]
 }

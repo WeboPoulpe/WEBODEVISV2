@@ -2080,3 +2080,40 @@ export const webo_ledger = pgTable("webo_ledger", {
 	uniqueIndex("webo_ledger_idempotency_key").using("btree", table.idempotency_key.asc().nullsLast().op("text_ops")).where(sql`(idempotency_key IS NOT NULL)`),
 	index("idx_webo_ledger_company").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
 ]);
+
+// Assistant Webo (docs/superpowers/specs/2026-10-23-assistant-webo-design.md) : une conversation d'un compte, avec son
+// historique lisible (questions, réponses, propositions, pièces dépensées).
+export const webo_conversations = pgTable("webo_conversations", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	user_id: uuid().notNull(),
+	title: text().default('').notNull(),
+	transcript: jsonb().default([]).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_conversations_company_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.user_id], foreignColumns: [users.id], name: "webo_conversations_user_id_fkey" }).onDelete("cascade"),
+	index("idx_webo_conversations_user").using("btree", table.user_id.asc().nullsLast().op("uuid_ops"), table.updated_at.desc().nullsFirst().op("timestamptz_ops")),
+]);
+
+// Une action proposée par Webo (devis, facture brouillon, prestation, réponse à un prospect) : rien n'est écrit tant
+// que le traiteur ne l'a pas validée ; elle ne s'exécute qu'une fois (proposed → done).
+export const webo_proposals = pgTable("webo_proposals", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	conversation_id: uuid().notNull(),
+	company_id: uuid().notNull(),
+	user_id: uuid().notNull(),
+	kind: text().notNull(),
+	payload: jsonb().notNull(),
+	summary: jsonb().notNull(),
+	status: text().default('proposed').notNull(),
+	result: jsonb(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	decided_at: timestamp({ withTimezone: true, mode: 'string' }),
+}, (table) => [
+	foreignKey({ columns: [table.conversation_id], foreignColumns: [webo_conversations.id], name: "webo_proposals_conversation_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_proposals_company_id_fkey" }).onDelete("cascade"),
+	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text])`),
+	check("webo_proposals_status_check", sql`status = ANY (ARRAY['proposed'::text, 'done'::text, 'cancelled'::text, 'failed'::text])`),
+]);
