@@ -1,7 +1,7 @@
 import 'server-only';
 import type Anthropic from '@anthropic-ai/sdk';
 import { HELP_GUIDES } from '@/lib/help';
-import { callClaude, weboFake } from '@/lib/webo/client';
+import { callClaude, callClaudeStream, weboFake } from '@/lib/webo/client';
 import { WEBO_MODELS } from '@/lib/webo/models';
 import { runTool, toolsFor, type AgentName, type ToolContext } from './tools';
 
@@ -73,28 +73,38 @@ Tiens compte de la conversation en cours. Réponds seulement avec le JSON demand
  * mesure (il reste payé si la suite échoue) ; passé `deadline` (horodatage), plus de nouvel appel : Webo répond avec
  * ce qu'il a déjà fait.
  */
-export async function runSpecialist(agent: AgentName, ctx: ToolContext, history: string, text: string, today: string, usage: CallUsage[], deadline: number): Promise<AgentReply> {
+export async function runSpecialist(
+  agent: AgentName, ctx: ToolContext, history: string, text: string, today: string, usage: CallUsage[], deadline: number,
+  /** Partie variable redonnée à chaque fois (page ouverte, habitudes) : dans le message, pour garder le cache. */
+  context = '',
+  /** Morceaux de texte, au fil de l'eau. */
+  onText?: (delta: string) => void,
+): Promise<AgentReply> {
   if (weboFake()) {
     const out = await fakeSpecialist(agent, ctx, text);
     usage.push(...out.usage);
+    if (onText) for (const w of out.text.split(/(?<= )/)) onText(w);
     return { text: out.text, usage };
   }
   const model = agent === 'aide' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
   const tools = toolsFor(agent);
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Aujourd'hui : ${today}.\n${history ? `\nConversation jusqu'ici :\n${history}\n` : ''}\nMessage du traiteur :\n${text}`,
+    content: `Aujourd'hui : ${today}.\n${context ? `\n${context}\n` : ''}${history ? `\nConversation jusqu'ici :\n${history}\n` : ''}\nMessage du traiteur :\n${text}`,
   }];
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     if (round > 0 && Date.now() > deadline) {
       return { text: 'Je n’ai pas eu le temps de tout faire. Voici où j’en suis : relancez-moi pour continuer.', usage };
     }
-    const res = await callClaude({
+    const params = {
       model, max_tokens: MAX_TOKENS, system: systemFor(agent), messages,
-      output_config: { effort: agent === 'aide' ? 'low' : 'medium' },
+      // Cache automatique : consignes, outils et tours précédents ne sont pas repayés plein tarif à chaque tour.
+      cache_control: { type: 'ephemeral' as const },
+      output_config: { effort: (agent === 'aide' ? 'low' : 'medium') as 'low' | 'medium' },
       ...(tools.length ? { tools } : {}),
       ...(model === WEBO_MODELS.specialist ? { fallbacks: 'default' as const } : {}),
-    });
+    };
+    const res = onText ? await callClaudeStream(params, onText) : await callClaude(params);
     usage.push(usageOf(res));
     if (res.stop_reason === 'refusal') return { text: 'Je ne peux pas vous aider sur ce point. Pouvez-vous reformuler votre demande ?', usage };
     if (res.stop_reason !== 'tool_use' || round === MAX_TOOL_ROUNDS) {

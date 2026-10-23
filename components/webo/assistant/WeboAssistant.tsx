@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils';
 import { useFeedback } from '@/components/ui/Feedback';
 import WeboCoin from '@/components/webo/WeboCoin';
 import { useWallet } from '@/components/webo/WalletContext';
-import { getWeboConversation, listWeboConversations, sendWeboMessage, type ProposalView, type TranscriptEntry } from '@/server/webo/chat';
+import { getWeboConversation, listWeboConversations, type ProposalView, type TranscriptEntry } from '@/server/webo/chat';
+import { streamWebo } from '@/lib/webo/stream';
 import ProposalCard from './ProposalCard';
 
 const AGENT_LABEL: Record<string, string> = { devis: 'Devis', factures: 'Factures', catalogue: 'Catalogue', prospects: 'Prospects', aide: 'Aide' };
@@ -29,6 +30,8 @@ export default function WeboAssistant() {
   const [proposals, setProposals] = useState<Record<string, ProposalView>>({});
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Réponse en cours, affichée au fil de l'eau.
+  const [live, setLive] = useState<{ agent?: string; text: string } | null>(null);
   const [history, setHistory] = useState<{ id: string; title: string; updated_at: string }[] | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -63,19 +66,35 @@ export default function WeboAssistant() {
     setText('');
     const now = new Date().toISOString();
     setEntries((e) => [...e, { role: 'user', text: msg, at: now }]);
-    const res = await sendWeboMessage(conversationId, msg).catch(() => ({ error: 'Webo n’a pas pu répondre. Vérifiez votre connexion.' } as Awaited<ReturnType<typeof sendWeboMessage>>));
+    setLive({ text: '' });
+    let finished = false;
+    await streamWebo({ conversationId, text: msg, path: window.location.pathname }, (ev) => {
+      if (ev.type === 'agent') setLive((l) => ({ text: l?.text ?? '', agent: ev.agent }));
+      else if (ev.type === 'text') setLive((l) => ({ agent: l?.agent, text: (l?.text ?? '') + ev.delta }));
+      else if (ev.type === 'done') {
+        finished = true;
+        const reply = ev.reply;
+        setConversationId(ev.conversationId);
+        try { localStorage.setItem(LAST_KEY, ev.conversationId); } catch { /* stockage indisponible */ }
+        setProposals((p) => ({ ...p, ...Object.fromEntries(reply.proposals.map((x) => [x.id, x])) }));
+        setEntries((e) => [...e, { role: 'assistant', text: reply.text, agent: reply.agent, proposalIds: reply.proposals.map((x) => x.id), coins: reply.coins, at: new Date().toISOString() }]);
+      } else if (ev.type === 'error') {
+        finished = true;
+        if (ev.conversationId) {
+          // Échange gardé côté serveur (réponse ratée mais payée) : on le recharge tel quel.
+          setConversationId(ev.conversationId);
+          void load(ev.conversationId);
+        } else {
+          setEntries((e) => e.slice(0, -1));
+          setText(msg);
+        }
+        notify(ev.error, { tone: 'error' });
+      }
+    }).catch(() => {
+      if (!finished) { setEntries((e) => e.slice(0, -1)); setText(msg); notify('Webo n’a pas pu répondre. Vérifiez votre connexion.', { tone: 'error' }); }
+    });
+    setLive(null);
     setSending(false);
-    if (res.error || !res.reply) {
-      setEntries((e) => e.slice(0, -1));
-      setText(msg);
-      notify(res.error ?? 'Webo n’a pas pu répondre.', { tone: 'error' });
-      return;
-    }
-    const reply = res.reply;
-    setConversationId(res.conversationId ?? null);
-    try { if (res.conversationId) localStorage.setItem(LAST_KEY, res.conversationId); } catch { /* stockage indisponible */ }
-    setProposals((p) => ({ ...p, ...Object.fromEntries(reply.proposals.map((x) => [x.id, x])) }));
-    setEntries((e) => [...e, { role: 'assistant', text: reply.text, agent: reply.agent, proposalIds: reply.proposals.map((x) => x.id), coins: reply.coins, at: new Date().toISOString() }]);
     void refresh();
   };
 
@@ -156,7 +175,16 @@ export default function WeboAssistant() {
                   </div>
                 </li>
               ))}
-              {sending && <li className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Webo réfléchit…</li>}
+              {sending && live?.text ? (
+                <li className="flex justify-start">
+                  <div className="w-full max-w-[92%] text-sm">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Webo{live.agent ? ` · ${AGENT_LABEL[live.agent] ?? live.agent}` : ''}</p>
+                    <p className="whitespace-pre-line break-words rounded-2xl rounded-bl-md bg-white px-3 py-2 text-gray-900 shadow-sm">{live.text}</p>
+                  </div>
+                </li>
+              ) : sending && (
+                <li className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Webo réfléchit…</li>
+              )}
             </ul>
             <div ref={bottom} />
           </div>

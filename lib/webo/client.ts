@@ -22,3 +22,20 @@ export async function callClaude(params: Anthropic.MessageCreateParamsNonStreami
   }
   return client.messages.create(params);
 }
+
+/** Comme callClaude, en flux : `onText` reçoit le texte au fil de l'eau ; renvoie le message complet. */
+export async function callClaudeStream(
+  params: Anthropic.MessageCreateParamsNonStreaming & { fallbacks?: 'default' },
+  onText: (delta: string) => void,
+): Promise<Anthropic.Message> {
+  client ??= new Anthropic({ timeout: 30_000, maxRetries: 1 });
+  if (params.fallbacks) {
+    const { fallbacks, ...rest } = params;
+    const stream = client.beta.messages.stream({ ...rest, betas: ['server-side-fallback-2026-07-01'], fallbacks } as never);
+    stream.on('text', (delta: string) => onText(delta));
+    return (await stream.finalMessage()) as unknown as Anthropic.Message;
+  }
+  const stream = client.messages.stream(params);
+  stream.on('text', (delta) => onText(delta));
+  return stream.finalMessage();
+}

@@ -29,6 +29,14 @@ const sentParams: Record<string, unknown>[] = [];
 vi.mock('@/lib/webo/client', () => ({
   weboAvailable: () => true,
   weboFake: () => false,
+  callClaudeStream: async (params: Record<string, unknown>) => {
+    sentParams.push(params);
+    const next = script.shift();
+    if (!next) throw new Error('script vide');
+    await new Promise((r) => setTimeout(r, 5));
+    if (next instanceof Error) throw next;
+    return next;
+  },
   callClaude: async (params: Record<string, unknown>) => {
     sentParams.push(params);
     const next = script.shift();
