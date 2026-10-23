@@ -9,6 +9,7 @@
 //  • avec une fiche (gastro_card_html, ou gastro_card_html_en pour un devis en anglais) : elle remplace le nom
 //    et la description ; c'est elle qu'on édite, entière.
 
+import { MENU_TERMS, MENU_TITLES } from './menuGlossary';
 import { generateQuoteHtml, type QuoteHtmlOptions } from './generateQuoteHtml';
 
 export type CardKind = 'description' | 'card';
@@ -84,31 +85,6 @@ export function isBlankHtml(html: string | null | undefined): boolean {
   return !html.replace(/<[^>]*>/g, '').replace(/&nbsp;|\s/g, '');
 }
 
-/**
- * Titres de carte traduits tels quels (le service gratuit les traduit mal : « Votre entrée » → « your entrance »).
- * Clés en minuscules, sans ponctuation finale.
- */
-const MENU_TITLES: Record<string, string> = {
-  'votre entrée': 'Starter', 'entrée': 'Starter', 'entrées': 'Starters', 'votre entrée au choix': 'Your choice of starter',
-  'votre plat': 'Main course', 'votre plat chaud': 'Main course', 'plat chaud': 'Main course', 'plats': 'Main courses',
-  'votre plat chaud et ses deux légumes': 'Main course with two vegetables', 'votre plat chaud et ses 2 légumes': 'Main course with two vegetables',
-  'fromage': 'Cheese', 'fromages': 'Cheese', 'votre dessert': 'Dessert', 'dessert': 'Dessert', 'desserts': 'Desserts',
-  'au choix': 'Your choice of', 'ou': 'or', 'pour finir': 'To finish', 'boissons': 'Drinks',
-  'les pièces cocktail': 'Cocktail canapés', 'pièces cocktail': 'Cocktail canapés', 'les pièces prestige': 'Premium canapés',
-  'vin d’honneur': 'Drinks reception', "vin d'honneur": 'Drinks reception',
-};
-
-/** Termes de cuisine remplacés avant traduction (le service les laisse ensuite tels quels). */
-const MENU_TERMS: [RegExp, string][] = [
-  [/gratin dauphinois/gi, 'dauphinoise potatoes'],
-  [/pièces? montées?(?: à choux)?/gi, 'croquembouche'],
-  [/cascade (?:à|de) champagne/gi, 'champagne tower'],
-  [/pièces? cocktail/gi, 'canapés'],
-  [/poêlée forestière/gi, 'pan-fried wild mushrooms'],
-  [/vin d[’']honneur/gi, 'drinks reception'],
-  [/mesclun/gi, 'mixed leaves'],
-  [/petits pains/gi, 'bread rolls'],
-];
 
 /**
  * Traduit un texte du français vers l'anglais (service gratuit MyMemory, après le glossaire de cuisine ci-dessus).
