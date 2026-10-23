@@ -6,7 +6,7 @@ import { customers, prestations, profiles, prospect_requests, quotes, webo_memor
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { sendMail } from '@/lib/mail';
 import { esc, renderEmail } from '@/lib/mail/layout';
-import { quoteVatBreakdown } from '@/lib/quoteTotals';
+import { quoteTotalTTC, quoteVatBreakdown } from '@/lib/quoteTotals';
 import { companyIdsOf } from '../companyScope';
 import { createInvoiceDraft } from '../invoices';
 import { sendQuoteToClient } from '../quotes';
@@ -130,10 +130,11 @@ export async function decideProposal(id: string, decision: 'accept' | 'cancel'):
         const [q] = await db.select().from(quotes).where(and(eq(quotes.id, spec.quoteId), sql`${quotes.owner_user_id} in ${companyIdsOf(companyId)}`)).limit(1);
         if (!q) throw new Error('Devis introuvable.');
         if (!EDITABLE_STATUSES.includes(q.status)) throw new Error('Ce devis a été validé, payé ou refusé entre-temps : il ne se modifie plus.');
-        const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count }, spec);
-        const total = quoteVatBreakdown(next.services as never[], Number(q.vat_rate ?? 20), next.guestCount, 0).ttc;
+        const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count, adults: q.guest_count_adults, children: q.guest_count_children }, spec);
+        // Même calcul que la liste des devis : formule retenue (à défaut la première), adultes et enfants.
+        const total = quoteTotalTTC({ ...q, total_amount: null, services: next.services, guest_count: next.guestCount, guest_count_adults: next.adults }) ?? 0;
         await db.update(quotes).set({
-          services: next.services, guest_count: next.guestCount, total_amount: String(total),
+          services: next.services, guest_count: next.guestCount, guest_count_adults: next.adults, total_amount: String(total),
           ...(spec.eventDate ? { event_date: spec.eventDate } : {}), ...(spec.eventLocation ? { event_location: spec.eventLocation } : {}),
           updated_at: new Date().toISOString(),
         }).where(eq(quotes.id, q.id));

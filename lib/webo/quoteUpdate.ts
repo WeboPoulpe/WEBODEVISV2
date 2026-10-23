@@ -17,8 +17,14 @@ export interface QuoteUpdateSpec {
 
 type Line = { id?: string; name?: string; quantity?: number } & Record<string, unknown>;
 
-/** Lignes et couverts après modification : lignes retirées, quantités « au couvert » suivant les couverts, ajouts. */
-export function applyQuoteUpdate(quote: { services: unknown; guestCount: number }, spec: QuoteUpdateSpec): { services: Line[]; guestCount: number } {
+/**
+ * Lignes et couverts après modification : lignes retirées, quantités « au couvert » suivant les couverts, ajouts.
+ * Les adultes (prix enfant) suivent aussi : nouveaux couverts moins les enfants.
+ */
+export function applyQuoteUpdate(
+  quote: { services: unknown; guestCount: number; adults?: number | null; children?: number | null },
+  spec: QuoteUpdateSpec,
+): { services: Line[]; guestCount: number; adults: number | null } {
   const remove = new Set(spec.remove.map((n) => n.toLowerCase()));
   const oldGuests = quote.guestCount;
   const guests = spec.guestCount ?? oldGuests;
@@ -27,5 +33,6 @@ export function applyQuoteUpdate(quote: { services: unknown; guestCount: number 
     // Comme l'éditeur : une ligne dont la quantité était le nombre de couverts suit le nouveau nombre.
     .map((l) => (spec.guestCount != null && l.quantity === oldGuests ? { ...l, quantity: guests } : l));
   const added = spec.add.map(({ fromCatalogue: _f, ...l }) => ({ id: crypto.randomUUID(), ...l }));
-  return { services: [...kept, ...added], guestCount: guests };
+  const adults = quote.adults == null ? null : spec.guestCount != null ? Math.max(0, guests - (quote.children ?? 0)) : quote.adults;
+  return { services: [...kept, ...added], guestCount: guests, adults };
 }

@@ -82,6 +82,23 @@ describe('modifier un devis', () => {
   });
 });
 
+describe('modifier un devis à formules et à prix enfant', () => {
+  it('total de la formule retenue (pas la somme des formules) ; adultes suivant les couverts', async () => {
+    const F = '00000000-0000-4000-8000-000000000631';
+    await pg.query(`insert into quotes (id, owner_user_id, user_id, client_name, event_date, event_type, guest_count, guest_count_adults, guest_count_children, status, vat_rate, formulas, services) values
+      ($1, $2, $2, 'Formules', '2027-07-01', 'Mariage', 50, 50, 0, 'devis_a_faire', 10, $3::jsonb, $4::jsonb)`, [F, CHEF,
+      JSON.stringify([{ id: 'fa', name: 'Formule A' }, { id: 'fb', name: 'Formule B' }]),
+      JSON.stringify([{ id: 'a', name: 'Menu A', quantity: 50, unitPrice: 60, formula: 'fa' }, { id: 'b', name: 'Menu B', quantity: 50, unitPrice: 80, formula: 'fb' }])]);
+    const r = await call('propose_quote_update', update({ quote_id: F, guest_count: 60 }));
+    // Formule A (la première, aucune retenue) : 60 × 60 × 1,10 = 3 960 €.
+    expect(JSON.stringify(r.summary)).toMatch(/3\s?960,00/);
+    expect((await decideProposal(r.proposal_id, 'accept')).error).toBeNull();
+    const [q] = (await pg.query<{ total_amount: string; guest_count_adults: number }>(`select total_amount, guest_count_adults from quotes where id = $1`, [F])).rows;
+    expect(Number(q.total_amount)).toBeCloseTo(3960, 2);
+    expect(q.guest_count_adults).toBe(60);
+  });
+});
+
 describe('envoyer et relancer', () => {
   it('envoi proposé puis validé : un seul envoi, au destinataire et avec le message', async () => {
     const r = await call('propose_quote_send', { quote_id: Q, to: 'lenoir@l.fr', message: 'Bonjour, voici votre devis.' });

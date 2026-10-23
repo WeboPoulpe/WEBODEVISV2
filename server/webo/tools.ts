@@ -348,10 +348,10 @@ const HANDLERS: Record<string, Handler> = {
     const add = await buildLines(ctx, i.add_lines, guests ?? q.guest_count);
     const spec: QuoteUpdateSpec = { quoteId: q.id, guestCount: guests, eventDate: date, eventLocation: str(i.event_location, 200) || null, add, remove };
     if (spec.guestCount == null && !spec.eventDate && !spec.eventLocation && !add.length && !remove.length) fail('Rien à changer.');
-    const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count }, spec);
-    const vat = Number(q.vat_rate ?? 20);
-    const before = quoteVatBreakdown((Array.isArray(q.services) ? q.services : []) as never[], vat, q.guest_count, 0).ttc;
-    const after = quoteVatBreakdown(next.services as never[], vat, next.guestCount, 0).ttc;
+    const next = applyQuoteUpdate({ services: q.services, guestCount: q.guest_count, adults: q.guest_count_adults, children: q.guest_count_children }, spec);
+    // Même calcul que la liste des devis : formule retenue (à défaut la première), adultes et enfants.
+    const before = quoteTotalTTC({ ...q, services: q.services }) ?? 0;
+    const after = quoteTotalTTC({ ...q, total_amount: null, services: next.services, guest_count: next.guestCount, guest_count_adults: next.adults }) ?? 0;
     return propose(ctx, 'quote_update', spec, {
       title: `Modifier le devis ${q.quote_number ?? ''}`.trim(),
       fields: [
