@@ -18,7 +18,10 @@ import { companyIdFor, debitCoins, recordUsage, refundDebit, walletOf } from './
 export type WeboFallback = 'balance' | 'cap' | 'error' | 'readonly' | 'demo' | 'off';
 export type WeboResult = { key: string; ok: true; name: string; html: string } | { key: string; ok: false; why: WeboFallback };
 
-const MAX_FICHES = 40;
+// Petits lots (le navigateur enchaîne les appels) : un appel coupé en route n'engage que quelques pièces.
+const MAX_FICHES = 8;
+// Au-delà, la traduction ne tiendrait pas dans la réponse : la fiche n'est ni débitée ni envoyée.
+const MAX_HTML = 20_000;
 const PARALLEL = 4;
 
 /** Début du mois de Paris en cours, en UTC (pour compter les traductions du mois). */
@@ -29,15 +32,13 @@ function monthStart(now: Date): string {
 }
 
 async function translationsThisMonth(companyId: string, now: Date): Promise<number> {
+  // Les essais comptent, réussis ou non : un appel raté a coûté lui aussi.
   const rows = await db.select({ created_at: webo_ledger.created_at }).from(webo_ledger).where(and(
     eq(webo_ledger.company_id, companyId), eq(webo_ledger.kind, 'debit'),
     sql`${webo_ledger.reason} like 'Traduction : %'`, gte(webo_ledger.created_at, monthStart(now)),
   ));
   const key = monthKeyParis(now);
-  const refunded = await db.select({ key: webo_ledger.idempotency_key }).from(webo_ledger).where(and(
-    eq(webo_ledger.company_id, companyId), eq(webo_ledger.kind, 'refund'), gte(webo_ledger.created_at, monthStart(now)),
-  ));
-  return rows.filter((r) => monthKeyParis(new Date(r.created_at)) === key).length - refunded.length;
+  return rows.filter((r) => monthKeyParis(new Date(r.created_at)) === key).length;
 }
 
 export async function translateWithWebo(
@@ -46,7 +47,7 @@ export async function translateWithWebo(
   const user = await requireUser();
   const list = (Array.isArray(fiches) ? fiches : []).slice(0, MAX_FICHES)
     .filter((f) => f && typeof f.key === 'string' && typeof f.requestId === 'string' && typeof f.html === 'string')
-    .map((f) => ({ key: f.key, requestId: f.requestId.slice(0, 100), name: String(f.name ?? '').slice(0, 200), html: f.html.slice(0, 60_000) }));
+    .map((f) => ({ key: f.key, requestId: f.requestId.slice(0, 100), name: String(f.name ?? '').slice(0, 200), html: f.html }));
   const companyId = await companyIdFor(user.id);
   const all = (why: WeboFallback) => list.map((f): WeboResult => ({ key: f.key, ok: false, why }));
   const finish = async (results: WeboResult[], spent: number) => ({ results, spent, balance: (await walletOf(companyId)).total });
@@ -64,12 +65,18 @@ export async function translateWithWebo(
   // Réservations dans l'ordre (le solde part sur les premières fiches), puis appels à Claude en parallèle.
   const reserved: { f: (typeof list)[number]; ledgerId: string }[] = [];
   const results = new Map<string, WeboResult>();
+  const seen = new Set<string>();
   for (const f of list) {
+    // Même demande deux fois dans la liste, ou fiche trop longue : pas de Webo pour elle.
+    if (seen.has(f.requestId) || f.html.length > MAX_HTML) { results.set(f.key, { key: f.key, ok: false, why: 'error' }); continue; }
+    seen.add(f.requestId);
     if (room <= 0) { results.set(f.key, { key: f.key, ok: false, why: 'cap' }); continue; }
     const debit = await debitCoins(companyId, {
       userId: user.id, amount: settings.translationPrice, reason: `Traduction : ${f.name || 'fiche'}`, idempotencyKey: `tr:${companyId}:${f.requestId}`,
     }, now);
     if (!debit.ok) { results.set(f.key, { key: f.key, ok: false, why: debit.reason === 'demo' ? 'demo' : 'balance' }); continue; }
+    // Demande rejouée : déjà traitée une fois, Claude n'est pas rappelé.
+    if (debit.replay) { results.set(f.key, { key: f.key, ok: false, why: 'error' }); continue; }
     room--;
     reserved.push({ f, ledgerId: debit.ledgerId });
   }
@@ -84,7 +91,10 @@ export async function translateWithWebo(
         const name = out.name.replace(/<[^>]*>/g, '').trim().slice(0, 200);
         results.set(f.key, { key: f.key, ok: true, name, html: sanitizeHtml(out.html) });
         spent += settings.translationPrice;
-      } catch {
+      } catch (e) {
+        // Appel raté mais facturé par Anthropic (réponse coupée…) : son coût est noté, la pièce est rendue.
+        const usage = (e as { usage?: { input: number; output: number; cacheWrite: number; cacheRead: number } }).usage;
+        if (usage) await recordUsage(ledgerId, { model: WEBO_MODEL, input: usage.input, output: usage.output, costUsd: haikuCostUsd(usage) });
         await refundDebit(ledgerId);
         results.set(f.key, { key: f.key, ok: false, why: 'error' });
       }

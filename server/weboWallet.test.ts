@@ -106,6 +106,16 @@ describe('portefeuille', () => {
     expect(await lines(OWNER, 'allocation')).toHaveLength(2);
   });
 
+  it('appel en retard (now du mois précédent) : le portefeuille ne recule jamais d’un mois', async () => {
+    await w.walletOf(OWNER, new Date('2026-11-01T08:00:00Z'));
+    await pg.query(`update webo_wallets set month_coins = 5 where company_id = $1`, [OWNER]);
+    const late = await w.walletOf(OWNER, new Date('2026-10-31T22:59:00Z'));
+    expect(late).toMatchObject({ monthKey: '2026-11', month: 5 });
+    expect(await w.debitCoins(OWNER, { userId: OWNER, amount: 1, reason: 'x', idempotencyKey: 'late' }, new Date('2026-10-31T22:59:00Z'))).toMatchObject({ ok: true });
+    expect(await balance(OWNER)).toEqual({ month_coins: 4, kept_coins: 0 });
+    expect(await lines(OWNER, 'allocation')).toHaveLength(1);
+  });
+
   it('démo : 0 pièce du mois, débit refusé (demo)', async () => {
     expect((await w.walletOf(DEMO_USER_ID, OCT)).month).toBe(0);
     expect(await w.debitCoins(DEMO_USER_ID, { userId: DEMO_USER_ID, amount: 1, reason: 'x', idempotencyKey: 'demo' }, OCT)).toEqual({ ok: false, reason: 'demo' });

@@ -29,6 +29,13 @@ describe('Webo : appel à Claude', () => {
     await expect(translateFicheFrToEn({ name: 'Menu', html: '<p>x</p>' })).rejects.toThrow();
   });
 
+  it('fiche vide renvoyée : rejet ; réponse coupée : l’erreur porte le coût', async () => {
+    reply = { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ name: 'Menu', html: '<p> </p>' }) }], usage };
+    await expect(translateFicheFrToEn({ name: 'Menu', html: '<p>x</p>' })).rejects.toThrow();
+    reply = { stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"name"' }], usage };
+    await expect(translateFicheFrToEn({ name: 'Menu', html: '<p>x</p>' })).rejects.toMatchObject({ usage: { input: 10, output: 5 } });
+  });
+
   it('texte non JSON : rejet', async () => {
     reply = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Voici la traduction' }], usage };
     await expect(translateFicheFrToEn({ name: 'Menu', html: '<p>x</p>' })).rejects.toThrow();

@@ -42,7 +42,8 @@ export async function translateFicheFrToEn(f: { name: string; html: string }): P
   if (fake()) {
     return { name: `EN ${f.name}`, html: f.html.replace(/>([^<]*\S[^<]*)</g, '>EN $1<'), usage: { input: 100, output: 50, cacheWrite: 0, cacheRead: 0 } };
   }
-  client ??= new Anthropic();
+  // Attente courte et un seul nouvel essai : une fiche bloquée ne retient pas l'action serveur.
+  client ??= new Anthropic({ timeout: 60_000, maxRetries: 1 });
   const res = await client.messages.create({
     model: WEBO_MODEL,
     max_tokens: 16000,
@@ -50,15 +51,16 @@ export async function translateFicheFrToEn(f: { name: string; html: string }): P
     output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: JSON.stringify({ name: f.name, html: f.html }) }],
   });
-  if (res.stop_reason !== 'end_turn') throw new Error(`Webo : réponse incomplète (${res.stop_reason}).`);
+  const u = res.usage;
+  const usage: WeboUsage = { input: u.input_tokens, output: u.output_tokens, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0 };
+  // Chaque échec porte le coût de l'appel, facturé quand même.
+  const fail = (message: string) => Object.assign(new Error(message), { usage });
+  if (res.stop_reason !== 'end_turn') throw fail(`Webo : réponse incomplète (${res.stop_reason}).`);
   const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
   let parsed: unknown;
-  try { parsed = JSON.parse(text); } catch { throw new Error('Webo : réponse illisible.'); }
+  try { parsed = JSON.parse(text); } catch { throw fail('Webo : réponse illisible.'); }
   const out = parsed as { name?: unknown; html?: unknown };
-  if (typeof out?.name !== 'string' || typeof out?.html !== 'string') throw new Error('Webo : réponse illisible.');
-  const u = res.usage;
-  return {
-    name: out.name, html: out.html,
-    usage: { input: u.input_tokens, output: u.output_tokens, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0 },
-  };
+  if (typeof out?.name !== 'string' || typeof out?.html !== 'string') throw fail('Webo : réponse illisible.');
+  if (!out.html.replace(/<[^>]*>/g, '').replace(/&nbsp;|\s/g, '')) throw fail('Webo : fiche vide.');
+  return { name: out.name, html: out.html, usage };
 }

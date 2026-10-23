@@ -49,6 +49,16 @@ describe('traduction au choix', () => {
     expect(r).toMatchObject({ webo: 0, free: 2 });
   });
 
+  it('par lots de 8 fiches ; clés courtes (pas le texte)', async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({ key: `k${i}`, name: `P${i}`, html: `<p>${i}</p>` }));
+    const sent: Sent[] = [];
+    const webo = async (l: Sent) => { sent.push(l); return { results: l.map((f) => ({ key: f.key, ok: true as const, name: f.name, html: f.html })), spent: l.length, balance: 0 }; };
+    const r = await translateFiches(many, 'webo', { webo, free });
+    expect(sent.map((b) => b.length)).toEqual([8, 8, 4]);
+    expect(sent[0][0].key.length).toBeLessThan(10);
+    expect(r.webo).toBe(20);
+  });
+
   it('countFiches dédoublonne', () => {
     expect(countFiches(fiches)).toBe(2);
     expect(countFiches([])).toBe(0);

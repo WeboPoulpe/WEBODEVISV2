@@ -21,12 +21,14 @@ vi.mock('@/db', () => ({
   get pool() { return null; },
 }));
 const fail = new Set<string>();
+const calls: string[] = [];
 let answer = (f: { name: string; html: string }) => ({ name: `EN ${f.name}`, html: f.html.replace('Bonjour', 'Hello') });
 vi.mock('@/lib/webo/claude', () => ({
   WEBO_MODEL: 'claude-haiku-5-5',
   weboAvailable: () => true,
   translateFicheFrToEn: async (f: { name: string; html: string }) => {
-    if (fail.has(f.name)) throw new Error('panne');
+    calls.push(f.name);
+    if (fail.has(f.name)) throw Object.assign(new Error('panne'), { usage: { input: 4000, output: 16000, cacheWrite: 0, cacheRead: 0 } });
     return { ...answer(f), usage: { input: 4000, output: 2000, cacheWrite: 0, cacheRead: 0 } };
   },
 }));
@@ -48,6 +50,7 @@ beforeEach(async () => {
   await pg.exec(`delete from webo_ledger; delete from webo_wallets; delete from app_settings where key like 'webo_%';`);
   current = OWNER;
   fail.clear();
+  calls.length = 0;
   answer = (f) => ({ name: `EN ${f.name}`, html: f.html.replace('Bonjour', 'Hello') });
 });
 
@@ -82,6 +85,37 @@ describe('traduction par Webo', () => {
     await t.translateWithWebo([f]);
     await t.translateWithWebo([f]);
     expect(await debits()).toBe(1);
+  });
+
+  it('requestId rejoué : Claude n’est pas rappelé, la fiche ne repart pas', async () => {
+    const f = fiche(1);
+    await t.translateWithWebo([f]);
+    calls.length = 0;
+    const r = await t.translateWithWebo([f]);
+    expect(r.results[0]).toMatchObject({ ok: false });
+    expect(calls).toHaveLength(0);
+    const dup = fiche(2);
+    const r2 = await t.translateWithWebo([dup, { ...dup, key: 'autre' }]);
+    expect(r2.results.map((x) => x.ok)).toEqual([true, false]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('fiche trop longue : ni débit ni appel', async () => {
+    const big = { ...fiche(1), html: `<p>${'x'.repeat(25_000)}</p>` };
+    const r = await t.translateWithWebo([big]);
+    expect(r.results[0]).toMatchObject({ ok: false, why: 'error' });
+    expect(calls).toHaveLength(0);
+    expect(await debits()).toBe(0);
+  });
+
+  it('appel raté : coût noté, et compte dans le plafond', async () => {
+    await pg.exec(`insert into app_settings (key, value) values ('webo_translation_cap', '1'::jsonb)`);
+    fail.add('Plat 1');
+    await t.translateWithWebo([fiche(1)]);
+    const [row] = (await pg.query<{ cost_usd: string | null }>(`select cost_usd from webo_ledger where kind = 'debit'`)).rows;
+    expect(Number(row.cost_usd)).toBeGreaterThan(0);
+    fail.clear();
+    expect((await t.translateWithWebo([fiche(2)])).results[0]).toMatchObject({ ok: false, why: 'cap' });
   });
 
   it('plafond du mois atteint : cap, rien débité', async () => {

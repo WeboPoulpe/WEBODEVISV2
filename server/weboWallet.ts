@@ -40,7 +40,8 @@ export async function walletOf(companyId: string, now: Date = new Date()): Promi
   const key = monthKeyParis(now);
   await db.insert(webo_wallets).values({ company_id: companyId }).onConflictDoNothing();
   let [row] = await db.select().from(webo_wallets).where(eq(webo_wallets.company_id, companyId)).limit(1);
-  if (row.month_key !== key) {
+  // Seulement vers un mois plus récent : un appel parti juste avant minuit ne ramène pas le portefeuille en arrière.
+  if (row.month_key < key) {
     const settings = await getWeboSettings();
     const coins = isDemoUser(companyId) ? 0 : (row.monthly_override ?? settings.monthlyCoins);
     // Conditionnel sur l'ancien mois : deux premiers usages simultanés ne donnent qu'une allocation.
@@ -69,10 +70,11 @@ export async function debitCoins(
   companyId: string,
   input: { userId: string; amount: number; reason: string; idempotencyKey: string },
   now: Date = new Date(),
-): Promise<{ ok: true; ledgerId: string } | { ok: false; reason: 'balance' | 'demo' }> {
+): Promise<{ ok: true; ledgerId: string; replay?: boolean } | { ok: false; reason: 'balance' | 'demo' }> {
   if (isDemoUser(companyId)) return { ok: false, reason: 'demo' };
   const already = await existingDebit(input.idempotencyKey);
-  if (already) return { ok: true, ledgerId: already.id };
+  // Clé déjà débitée : rien de plus n'est pris, et l'appelant sait que la demande a déjà été traitée.
+  if (already) return { ok: true, ledgerId: already.id, replay: true };
   for (let attempt = 0; attempt < 3; attempt++) {
     const wallet = await walletOf(companyId, now);
     const split = splitDebit(wallet.month, wallet.kept, input.amount);
@@ -95,7 +97,7 @@ export async function debitCoins(
       if (!line) throw new DuplicateDebit();
       return line.id;
     }).catch((e) => { if (e instanceof DuplicateDebit) return 'duplicate' as const; throw e; });
-    if (result === 'duplicate') return { ok: true, ledgerId: (await existingDebit(input.idempotencyKey))!.id };
+    if (result === 'duplicate') return { ok: true, ledgerId: (await existingDebit(input.idempotencyKey))!.id, replay: true };
     if (result) return { ok: true, ledgerId: result };
     // Le solde a bougé entre la lecture et la mise à jour : on relit.
   }

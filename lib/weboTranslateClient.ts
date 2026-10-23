@@ -22,7 +22,8 @@ interface Deps {
 }
 const DEFAULT_DEPS: Deps = { webo: translateWithWebo, free: { html: translateHtmlFrToEnDetailed, text: translateTextFrToEn } };
 
-const BATCH = 40;
+// Lots de 8, comme le serveur : un appel coupé en route n'engage que quelques pièces.
+const BATCH = 8;
 const identity = (f: Pick<Fiche, 'name' | 'html'>) => `${f.name}\u0000${f.html}`;
 
 /** Nombre de fiches distinctes : ce que coûte un passage par Webo, en pièces. */
@@ -55,12 +56,14 @@ export async function translateFiches(fiches: Fiche[], mode: TranslationMode, de
 
   if (mode === 'webo' && distinct.length > 0) {
     for (let i = 0; i < distinct.length; i += BATCH) {
-      const batch = distinct.slice(i, i + BATCH).map(({ fiche }) => ({
-        key: identity(fiche), requestId: crypto.randomUUID(), name: fiche.name, html: fiche.html,
+      // Clé courte (rang de la fiche distincte) : le texte ne part qu'une fois.
+      const ids = distinct.slice(i, i + BATCH).map(({ fiche }) => identity(fiche));
+      const batch = distinct.slice(i, i + BATCH).map(({ fiche }, j) => ({
+        key: String(i + j), requestId: crypto.randomUUID(), name: fiche.name, html: fiche.html,
       }));
       const res = await deps.webo(batch).catch(() => ({ results: batch.map((b) => ({ key: b.key, ok: false as const, why: 'error' as const })), spent: 0, balance: 0 }));
       for (const r of res.results) {
-        if (r.ok) { done.set(r.key, { name: r.name, html: r.html, by: 'webo' }); run.webo++; }
+        if (r.ok) { done.set(ids[Number(r.key) - i], { name: r.name, html: r.html, by: 'webo' }); run.webo++; }
         else run.fallbackWhy ??= r.why;
       }
     }

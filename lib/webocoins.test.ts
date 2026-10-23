@@ -41,5 +41,6 @@ describe('WeboCoins : base', () => {
     await pg.query(line, [U, null]);
     await pg.query(line, [U, null]);
     await expect(pg.query(`insert into webo_ledger (company_id, kind, coins, reason) values ($1, 'vol', 1, 'x')`, [U])).rejects.toThrow();
-  });
+    // La base en mémoire (schéma complet et migrations) se crée dans le test : plus long qu'un test ordinaire.
+  }, 30_000);
 });
