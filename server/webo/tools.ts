@@ -11,36 +11,19 @@ import { applyQuoteUpdate, EDITABLE_STATUSES, QUOTE_TEMPLATES, TEMPLATE_LABEL, t
 import { QUOTE_FONTS } from '@/lib/quoteOutput';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
+import {
+  eur, fail, isUuid, like, nullableNum, nullableStr, propose, str, tool, ToolError,
+  type AgentName, type Handler, type ProposalSummary, type ToolContext,
+} from './toolKit';
+import { MORE_BY_AGENT, MORE_HANDLERS, MORE_TOOLS } from './moreTools';
+
+export { isUuid, type AgentName, type ProposalSummary, type ToolContext } from './toolKit';
 import { getDashboard } from '../dashboard';
 import { MAX_MEMORIES, MAX_MEMORY_TEXT, memoryCount } from './memoryStore';
 
 // Outils des spécialistes de Webo. Les lectures ne voient que les données de l'entreprise. Les « propositions »
 // vérifient tout (identifiants de l'entreprise, dates, nombres), reprennent les prix du catalogue, et n'écrivent qu'une
 // ligne dans webo_proposals : l'écriture réelle n'a lieu qu'à la validation (server/webo/execute.ts).
-
-export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'evenements' | 'journee' | 'aide';
-export interface ToolContext { userId: string; companyId: string; conversationId: string; proposals: string[] }
-
-export interface ProposalSummary {
-  title: string;
-  fields: { label: string; value: string }[];
-  lines?: { label: string; detail: string; amount: string }[];
-  total?: string;
-  note?: string;
-}
-
-const eur = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
-const str = (v: unknown, max = 500) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
-// Champs facultatifs : forme anyOf, documentée pour les outils stricts.
-const nullableStr = { anyOf: [{ type: 'string' }, { type: 'null' }] } as const;
-const nullableNum = { anyOf: [{ type: 'number' }, { type: 'null' }] } as const;
-
-function tool(name: string, description: string, properties: Record<string, unknown>): Anthropic.Tool {
-  return {
-    name, description, strict: true,
-    input_schema: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
-  } as Anthropic.Tool;
-}
 
 const TOOLS: Record<string, Anthropic.Tool> = {
   search_catalogue: tool('search_catalogue', 'Cherche des prestations du catalogue du traiteur (nom ou catégorie). Requête vide : les premières.', {
@@ -150,7 +133,7 @@ const TOOLS: Record<string, Anthropic.Tool> = {
   }),
 };
 
-const BY_AGENT: Record<AgentName, string[]> = {
+const BY_AGENT: Partial<Record<AgentName, string[]>> = {
   devis: ['search_catalogue', 'search_customers', 'find_quotes', 'get_quote', 'stale_quotes', 'propose_quote', 'propose_quote_update', 'propose_quote_send', 'propose_memory'],
   factures: ['find_quotes', 'get_quote', 'propose_invoice', 'propose_memory'],
   catalogue: ['search_catalogue', 'propose_prestation', 'propose_prestation_update', 'propose_memory'],
@@ -160,12 +143,7 @@ const BY_AGENT: Record<AgentName, string[]> = {
   aide: [],
 };
 
-export const toolsFor = (agent: AgentName): Anthropic.Tool[] => BY_AGENT[agent].map((n) => TOOLS[n]);
-
-class ToolError extends Error {}
-const fail = (m: string): never => { throw new ToolError(m); };
-export const isUuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const like = (q: string) => `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+export const toolsFor = (agent: AgentName): Anthropic.Tool[] => [...(BY_AGENT[agent] ?? []), ...(MORE_BY_AGENT[agent] ?? [])].map((n) => TOOLS[n] ?? MORE_TOOLS[n]);
 
 async function catalogueById(ctx: ToolContext, ids: string[]) {
   if (ids.length === 0) return new Map<string, typeof prestations.$inferSelect>();
@@ -179,13 +157,6 @@ async function quoteOf(ctx: ToolContext, id: unknown) {
   return q ?? fail('Devis introuvable.');
 }
 
-async function propose(ctx: ToolContext, kind: string, payload: unknown, summary: ProposalSummary) {
-  const [row] = await db.insert(webo_proposals).values({
-    conversation_id: ctx.conversationId, company_id: ctx.companyId, user_id: ctx.userId, kind, payload, summary,
-  }).returning({ id: webo_proposals.id });
-  ctx.proposals.push(row.id);
-  return { proposal_id: row.id, summary, note: 'Proposition affichée au traiteur : elle ne sera faite que s’il la valide.' };
-}
 
 async function vatRateOf(companyId: string): Promise<number> {
   const [p] = await db.select({ v: profiles.default_vat_rate }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
@@ -231,7 +202,6 @@ async function buildLines(ctx: ToolContext, input: unknown, guests: number): Pro
   });
 }
 
-type Handler = (ctx: ToolContext, input: Record<string, unknown>) => Promise<unknown>;
 
 const HANDLERS: Record<string, Handler> = {
   async search_catalogue(ctx, i) {
@@ -589,7 +559,7 @@ const HANDLERS: Record<string, Handler> = {
 
 /** Exécute un outil ; le résultat est le texte (JSON) rendu au modèle. Une erreur attendue devient { error }. */
 export async function runTool(ctx: ToolContext, name: string, input: unknown): Promise<string> {
-  const handler = HANDLERS[name];
+  const handler = HANDLERS[name] ?? MORE_HANDLERS[name];
   if (!handler) return JSON.stringify({ error: `Outil inconnu : ${name}` });
   try {
     return JSON.stringify(await handler(ctx, (input && typeof input === 'object' ? input : {}) as Record<string, unknown>));

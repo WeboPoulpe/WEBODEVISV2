@@ -2116,7 +2116,7 @@ export const webo_proposals = pgTable("webo_proposals", {
 }, (table) => [
 	foreignKey({ columns: [table.conversation_id], foreignColumns: [webo_conversations.id], name: "webo_proposals_conversation_id_fkey" }).onDelete("cascade"),
 	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_proposals_company_id_fkey" }).onDelete("cascade"),
-	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text, 'memory'::text, 'quote_update'::text, 'quote_send'::text, 'event_update'::text, 'courses_recalc'::text])`),
+	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text, 'memory'::text, 'quote_update'::text, 'quote_send'::text, 'event_update'::text, 'courses_recalc'::text, 'customer_upsert'::text, 'prospect_status'::text, 'prospect_to_quote'::text, 'stock_movement'::text, 'supplier_order'::text, 'supplier_order_send'::text, 'supplier_order_receive'::text, 'event_orders'::text, 'brochure_send'::text, 'invoice_issue'::text, 'invoice_payment'::text])`),
 	check("webo_proposals_status_check", sql`status = ANY (ARRAY['proposed'::text, 'done'::text, 'cancelled'::text, 'failed'::text])`),
 ]);
 

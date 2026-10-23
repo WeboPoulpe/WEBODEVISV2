@@ -17,6 +17,7 @@ import { applyQuoteUpdate, EDITABLE_STATUSES, type QuoteUpdateSpec } from '@/lib
 import { requireWriter } from '../session';
 import { companyIdFor } from '../weboWallet';
 import { isUuid } from './tools';
+import { executeMore } from './executeMore';
 import { MAX_MEMORIES, memoryCount } from './memoryStore';
 
 // Valider ou annuler une proposition de Webo. La proposition passe d'abord de « proposée » à « faite » ou « annulée »
@@ -220,8 +221,11 @@ export async function decideProposal(id: string, decision: 'accept' | 'cancel'):
       case 'prospect_reply':
         result = await sendProspectReply(companyId, p as { prospectId: string; to: string; subject: string; body: string });
         break;
-      default:
-        throw new Error('Proposition inconnue.');
+      default: {
+        const more = await executeMore(taken.kind, p, user, companyId);
+        if (!more) throw new Error('Proposition inconnue.');
+        result = more;
+      }
     }
     await db.update(webo_proposals).set({ result }).where(eq(webo_proposals.id, id));
     return { error: null, result };
