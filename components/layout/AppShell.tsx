@@ -13,6 +13,7 @@ import { isDemoUser } from '@/lib/demo';
 import { signOut as endSession } from 'next-auth/react';
 import { FeedbackProvider } from '@/components/ui/Feedback';
 import { WalletProvider } from '@/components/webo/WalletContext';
+import WeboAssistant from '@/components/webo/assistant/WeboAssistant';
 
 // Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
@@ -78,6 +79,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <MobileTabBar badges={badges} onHelp={openHelp} />
+      {!isDemoUser(user?.id) && <WeboAssistant />}
       <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} page={helpTarget.page ?? null} guideId={helpTarget.guide ?? null} />
     </div>
     </WalletProvider>
