@@ -79,6 +79,25 @@ test.describe('assistant Webo', () => {
     });
   });
 
+  test('photo jointe : envoyée à Webo ; micro présent seulement si le navigateur sait dicter', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(120_000);
+    await withAccount(browser, 'webo-photo', async (page) => {
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Ouvrir Webo' }).click();
+      const panel = page.getByRole('dialog', { name: 'Webo' });
+      const canDictate = await page.evaluate(() => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+      await expect(panel.getByRole('button', { name: 'Dicter' })).toHaveCount(canDictate ? 1 : 0);
+      // Une petite image PNG (1 × 1 pixel).
+      const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+      await panel.getByLabel('Choisir une photo').setInputFiles({ name: 'menu.png', mimeType: 'image/png', buffer: png });
+      await expect(panel.getByAltText('Photo jointe')).toBeVisible();
+      await panel.getByRole('textbox', { name: 'Votre message à Webo' }).fill('Tire les prestations de ce menu');
+      await panel.getByRole('button', { name: 'Envoyer' }).click();
+      await expect(panel.getByText(/bien reçu la photo/)).toBeVisible({ timeout: 30_000 });
+      await expect(panel.getByText(/\[photo jointe\]/)).toBeVisible();
+    });
+  });
+
   test('Paramètres : ce que Webo retient, et l’oublier', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     await withAccount(browser, 'webo-memoire', async (page, userId) => {

@@ -83,18 +83,23 @@ export async function runSpecialist(
   context = '',
   /** Morceaux de texte, au fil de l'eau. */
   onText?: (delta: string) => void,
+  /** Photo jointe (menu, ancien devis) : lue par le spécialiste, non conservée. */
+  image?: { mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string } | null,
 ): Promise<AgentReply> {
   if (weboFake()) {
-    const out = await fakeSpecialist(agent, ctx, text);
+    const out = image ? { text: '(Webo simulé) J’ai bien reçu la photo : je vous propose les prestations que j’y lis.', usage: [{ model: WEBO_MODELS.specialist, input: 1500, output: 100, cacheWrite: 0, cacheRead: 0 }] } : await fakeSpecialist(agent, ctx, text);
     usage.push(...out.usage);
     if (onText) for (const w of out.text.split(/(?<= )/)) onText(w);
     return { text: out.text, usage };
   }
   const model = agent === 'aide' || agent === 'journee' ? WEBO_MODELS.help : WEBO_MODELS.specialist;
   const tools = toolsFor(agent);
+  const prompt = `Aujourd'hui : ${today}.\n${context ? `\n${context}\n` : ''}${history ? `\nConversation jusqu'ici :\n${history}\n` : ''}\nMessage du traiteur :\n${text}`;
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: `Aujourd'hui : ${today}.\n${context ? `\n${context}\n` : ''}${history ? `\nConversation jusqu'ici :\n${history}\n` : ''}\nMessage du traiteur :\n${text}`,
+    content: image
+      ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }, { type: 'text', text: prompt }]
+      : prompt,
   }];
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     if (round > 0 && Date.now() > deadline) {

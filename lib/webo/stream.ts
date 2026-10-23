@@ -3,7 +3,7 @@
 import type { WeboEvent } from '@/server/webo/turn';
 
 export async function streamWebo(
-  body: { conversationId: string | null; text: string; path: string },
+  body: { conversationId: string | null; text: string; path: string; image?: { mediaType: string; data: string } | null },
   onEvent: (e: WeboEvent) => void,
 ): Promise<void> {
   const res = await fetch('/api/webo/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

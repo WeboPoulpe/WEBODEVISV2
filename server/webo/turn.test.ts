@@ -97,6 +97,31 @@ describe('tour de discussion en flux', () => {
     expect(sent[1].cache_control).toEqual({ type: 'ephemeral' });
   });
 
+  it('photo trop lourde ou d’un autre type : refusée avant tout appel, sans pièce prise', async () => {
+    const big = 'A'.repeat(Math.ceil((5 * 1024 * 1024 + 10) / 3) * 4);
+    const events: { type: string; error?: string }[] = [];
+    await runWeboTurn(user, { conversationId: null, text: 'Regarde', image: { mediaType: 'image/jpeg', data: big } }, (e) => events.push(e as never));
+    expect(events.at(-1)).toMatchObject({ type: 'error' });
+    await runWeboTurn(user, { conversationId: null, text: 'Regarde', image: { mediaType: 'image/gif' as never, data: 'AAAA' } }, (e) => events.push(e as never));
+    expect(events.at(-1)?.error).toMatch(/format/i);
+    expect(sent).toHaveLength(0);
+    expect((await pg.query(`select 1 from webo_ledger`)).rows).toHaveLength(0);
+  });
+
+  it('photo jointe : transmise au spécialiste ; une demande « aide » avec photo va au Catalogue', async () => {
+    script = [route('aide'), say('Je vois une carte de restaurant.')];
+    const events = await (async () => {
+      const ev: { type: string; [k: string]: unknown }[] = [];
+      await runWeboTurn(user, { conversationId: null, text: 'Que vois-tu ?', image: { mediaType: 'image/png', data: 'iVBORw0KGgo=' } }, (e) => ev.push(e));
+      return ev;
+    })();
+    expect(events.find((e) => e.type === 'agent')).toMatchObject({ agent: 'catalogue' });
+    const content = (sent[1].messages as { content: unknown }[])[0].content as { type: string; source?: { media_type: string } }[];
+    expect(content[0]).toMatchObject({ type: 'image', source: { media_type: 'image/png' } });
+    const [conv] = (await pg.query<{ transcript: { text: string }[] }>(`select transcript from webo_conversations`)).rows;
+    expect(conv.transcript[0].text).toContain('photo jointe');
+  });
+
   it('le navigateur coupe le flux en route : la réponse est quand même payée et enregistrée', async () => {
     script = [route('aide'), say('Réponse complète')];
     let n = 0;

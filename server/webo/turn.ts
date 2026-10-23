@@ -51,7 +51,19 @@ export type WeboEvent =
   | { type: 'text'; delta: string }
   | { type: 'done'; conversationId: string; reply: WeboReply; balance: number }
   | { type: 'error'; error: string; conversationId?: string; balance?: number };
-export interface TurnInput { conversationId: string | null; text: string; path?: string }
+export type WeboImage = { mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+export interface TurnInput { conversationId: string | null; text: string; path?: string; image?: WeboImage | null }
+
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Photo jointe : JPEG, PNG ou WebP, 5 Mo au plus ; message d'erreur, ou null si elle convient (ou s'il n'y en a pas). */
+function imageError(image: TurnInput['image']): string | null {
+  if (!image) return null;
+  if (!IMAGE_TYPES.includes(image.mediaType) || typeof image.data !== 'string') return 'Format de photo non pris en charge : JPEG, PNG ou WebP.';
+  if (Math.floor(image.data.length * 3 / 4) > MAX_IMAGE_BYTES || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)) return 'Photo trop lourde (5 Mo au plus) ou illisible.';
+  return null;
+}
 export type TurnResult = { error: string | null; conversationId?: string; reply?: WeboReply; balance?: number };
 
 /** Le devis de la page ouverte (s'il est de l'entreprise), résumé pour le spécialiste. */
@@ -75,7 +87,10 @@ async function turn(user: { id: string }, input: TurnInput, send: (e: WeboEvent)
   const conversationId = input.conversationId;
   const text = input.text;
   if (isDemoUser(user.id)) return { error: 'Webo n’est pas disponible dans la démonstration.' };
-  const message = typeof text === 'string' ? text.trim() : '';
+  const image = input.image ?? null;
+  const photoProblem = imageError(image);
+  if (photoProblem) return { error: photoProblem };
+  const message = (typeof text === 'string' ? text.trim() : '') || (image ? 'Voici une photo : dis-moi ce que tu en tires.' : '');
   if (!message) return { error: 'Écrivez votre demande.' };
   if (message.length > MAX_TEXT) return { error: `Message trop long (${MAX_TEXT} caractères au plus).` };
   if (!weboAvailable()) return { error: 'Webo est indisponible pour le moment.' };
@@ -122,11 +137,13 @@ async function turn(user: { id: string }, input: TurnInput, send: (e: WeboEvent)
   try {
     const routed = await routeMessage(message, history);
     agent = routed.agent;
+    // Une photo se lit par le spécialiste Devis (menu, ancien devis) ou Catalogue (prestations).
+    if (image && agent !== 'devis' && agent !== 'catalogue') agent = 'catalogue';
     usage.push(...routed.usage);
     send({ type: 'agent', agent });
     const context = [await memoriesText(companyId), await pageContext(ctx, input.path)].filter(Boolean).join('\n\n');
     replyText = (await runSpecialist(agent, ctx, history, message, todayFr(), usage, Date.now() + 50_000, context,
-      (delta) => send({ type: 'text', delta }))).text;
+      (delta) => send({ type: 'text', delta }), image)).text;
   } catch (e) {
     console.error('[webo] réponse', e);
     failed = true;
@@ -149,7 +166,7 @@ async function turn(user: { id: string }, input: TurnInput, send: (e: WeboEvent)
   const now = new Date().toISOString();
   const next: TranscriptEntry[] = [
     ...transcript,
-    { role: 'user', text: message, at: now },
+    { role: 'user', text: image ? `${message} [photo jointe]` : message, at: now },
     { role: 'assistant', text: replyText, agent, proposalIds: ctx.proposals, coins, at: now },
   ];
   await db.update(webo_conversations).set({ transcript: next, updated_at: now, busy_until: null }).where(eq(webo_conversations.id, conv.id));
