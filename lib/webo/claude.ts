@@ -40,7 +40,7 @@ let client: Anthropic | null = null;
 /** Une fiche traduite par Claude. Lève une erreur si la réponse est coupée, refusée ou illisible. */
 export async function translateFicheFrToEn(f: { name: string; html: string }): Promise<{ name: string; html: string; usage: WeboUsage }> {
   if (fake()) {
-    return { name: `EN ${f.name}`, html: f.html.replace(/>([^<]+)</g, '>EN $1<'), usage: { input: 100, output: 50, cacheWrite: 0, cacheRead: 0 } };
+    return { name: `EN ${f.name}`, html: f.html.replace(/>([^<]*\S[^<]*)</g, '>EN $1<'), usage: { input: 100, output: 50, cacheWrite: 0, cacheRead: 0 } };
   }
   client ??= new Anthropic();
   const res = await client.messages.create({

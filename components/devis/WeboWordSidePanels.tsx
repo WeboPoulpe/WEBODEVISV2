@@ -16,7 +16,7 @@ import FormulasEditor from './FormulasEditor';
 import { effectiveLines, lineFormulaId, newFormulaId, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import { isPerGuestPrestation } from '@/lib/brochure';
-import { cardFromDescription, isBlankHtml, translateCarteToEnglish, translateHtmlFrToEnDetailed, translateTextFrToEn } from '@/lib/prestationCard';
+import { cardFromDescription, isBlankHtml, translateCarteToEnglish, translateTextFrToEn } from '@/lib/prestationCard';
 import { sanitizeHtml } from '@/lib/sanitize';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import RecipientPicker from '@/components/devis/RecipientPicker';
@@ -25,6 +25,8 @@ import type { CompanyResult } from '@/lib/companies';
 import { VAT_RATES, vatLabel } from '@/lib/vat';
 import VatRateSelect from '@/components/devis/VatRateSelect';
 import { useFeedback } from '@/components/ui/Feedback';
+import { useWallet } from '@/components/webo/WalletContext';
+import { countFiches, fallbackMessage, runSummary, translateFiches, type Fiche, type TranslationMode, type TranslationRun } from '@/lib/weboTranslateClient';
 
 type PanelKey = 'client' | 'services' | 'event' | 'style' | 'images' | 'cover' | 'photos';
 
@@ -69,7 +71,8 @@ interface Service { name: string; quantity: number; unitPrice: number; isFree?: 
 export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onApplied, getSheetHtml, getEditorSettings, menuWidth, onMenuWidthChange, coverConfig, onCoverChange, photosConfig, onPhotosChange, onFormulaChosen }: Props) {
   // Un seul client pour toute la vie du panneau : recréé à chaque rendu, il relançait les chargements en boucle.
   const supabase = useMemo(() => createClient(), []);
-  const { notify } = useFeedback();
+  const { notify, confirm } = useFeedback();
+  const { wallet, refresh: refreshWallet } = useWallet();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -422,7 +425,29 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
       .map((p) => [p.name, p.gastro_card_html_en as string]));
   };
 
-  const translateServicesToEnglish = async (known: Map<string, string>): Promise<{ missed: number; translated: string[] }> => {
+  /**
+   * Fiches qu'un passage en anglais va traduire (le prix annoncé en Webo) : les lignes sans version anglaise ni
+   * fiche du catalogue, puis les plats de la carte encore en français qui ne viennent pas d'une de ces lignes (ceux-là
+   * sont refaits depuis la ligne traduite). Un nom seul à traduire ne compte pas : il passe en gratuit.
+   */
+  const translationEstimate = (sheet: string, known: Map<string, string>): number => {
+    const lines = services.filter((s) => s.name?.trim() && !s.removed && !s.isPageBreak && !s.gastroCardHtmlEn && !known.get(s.name));
+    const lineNames = new Set(lines.map((s) => s.name));
+    const dishes = Array.from(new DOMParser().parseFromString(sheet, 'text/html').querySelectorAll<HTMLElement>('.gastro-menu > div'))
+      .filter((d) => d.getAttribute('data-webo-lang') !== 'en' && !isBlankHtml(d.innerHTML))
+      .filter((d) => { const n = d.getAttribute('data-webo-dish'); return !(n && (known.get(n) || lineNames.has(n))); });
+    return countFiches(lines.map((s) => ({ name: s.name, html: String(s.gastroCardHtml ?? s.description ?? '') })))
+      + countFiches(dishes.map((d) => ({ name: d.getAttribute('data-webo-dish') ?? '', html: d.innerHTML })));
+  };
+
+  /** Bilan des traductions d'un enregistrement (lignes du devis et plats de la carte), pour le message de fin. */
+  const addRun = (total: Pick<TranslationRun, 'webo' | 'free' | 'fallbackWhy'>, run: TranslationRun) => {
+    total.webo += run.webo; total.free += run.free; total.fallbackWhy ??= run.fallbackWhy;
+  };
+
+  const translateServicesToEnglish = async (
+    known: Map<string, string>, how: TranslationMode, total: Pick<TranslationRun, 'webo' | 'free' | 'fallbackWhy'>,
+  ): Promise<{ missed: number; translated: string[] }> => {
     // Le nom n'est traduit que si la fiche anglaise n'a pas de titre (h2, h3) où le tableau le lit.
     const titled = (html: unknown) => typeof html === 'string' && /<h[23][^>]*>[\s\S]*?[^\s<][\s\S]*?<\/h[23]>/i.test(html);
     const todo = services.filter((s) => s.name?.trim() && !s.removed && !s.isPageBreak && (!s.gastroCardHtmlEn || (!s.nameEn && !titled(s.gastroCardHtmlEn))));
@@ -438,17 +463,21 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const font = (q?.selected_font as string | null) ?? undefined;
     let missed = 0;
     const cards = new Map<string, string>();
-    for (const [i, s] of todo.entries()) {
-      setTranslating(`${i + 1} / ${todo.length}`);
-      if (!s.gastroCardHtmlEn) {
-        // (les fiches du catalogue ont déjà été reprises ci-dessus)
-        const fr = (s.gastroCardHtml as string | null | undefined)
-          || cardFromDescription({ name: s.name, description: s.description ?? '' }, { template: template as QuoteHtmlOptions['template'], font });
-        const res = await translateHtmlFrToEnDetailed(fr);
-        missed += res.missed;
-        // Rien de traduit : on ne garde pas une « version anglaise » qui serait en français.
-        if (!fr || res.html !== fr) { s.gastroCardHtmlEn = sanitizeHtml(res.html); cards.set(s.name, s.gastroCardHtmlEn as string); }
-      }
+    // Fiches à traduire (les fiches du catalogue ont déjà été reprises ci-dessus) : toutes d'un coup, Webo ou gratuit.
+    const frOf = (s: (typeof todo)[number]) => (s.gastroCardHtml as string | null | undefined)
+      || cardFromDescription({ name: s.name, description: s.description ?? '' }, { template: template as QuoteHtmlOptions['template'], font });
+    const fiches: Fiche[] = todo.filter((s) => !s.gastroCardHtmlEn).map((s, i) => ({ key: String(i), name: s.name, html: frOf(s), keepName: true }));
+    setTranslating(`${fiches.length} fiche${fiches.length > 1 ? 's' : ''}`);
+    const run = await translateFiches(fiches, how);
+    addRun(total, run);
+    missed += run.missed;
+    todo.filter((s) => !s.gastroCardHtmlEn).forEach((s, i) => {
+      const fr = fiches[i].html;
+      const out = run.byKey.get(String(i))?.html;
+      // Rien de traduit : on ne garde pas une « version anglaise » qui serait en français.
+      if (out && (!fr || out !== fr)) { s.gastroCardHtmlEn = sanitizeHtml(out); cards.set(s.name, s.gastroCardHtmlEn as string); }
+    });
+    for (const s of todo) {
       if (!s.nameEn && !titled(s.gastroCardHtmlEn)) {
         const nameEn = await translateTextFrToEn(s.name);
         if (nameEn) s.nameEn = nameEn; else missed++;
@@ -470,7 +499,21 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const known = language === 'en'
       ? await catalogueEnglish([...services.map((s) => s.name), ...Array.from(new DOMParser().parseFromString(sheetNow, 'text/html').querySelectorAll('[data-webo-dish]'), (d) => d.getAttribute('data-webo-dish') ?? '')])
       : new Map<string, string>();
-    const english = language === 'en' ? await translateServicesToEnglish(known) : { missed: 0, translated: [] };
+    // Mode de traduction : celui de l'entreprise ; en Webo, le nombre de pièces est annoncé avant de lancer.
+    const runTotal: Pick<TranslationRun, 'webo' | 'free' | 'fallbackWhy'> = { webo: 0, free: 0, fallbackWhy: null };
+    let how: TranslationMode = wallet?.mode ?? 'webo';
+    if (language === 'en' && how === 'webo') {
+      const pending = translationEstimate(sheetNow, known);
+      if (pending > 0) {
+        how = (await confirm({
+          title: `${pending} fiche${pending > 1 ? 's' : ''} à traduire · ${pending} W`,
+          message: 'Webo traduit chaque fiche entière, mise en forme et vocabulaire de cuisine compris. Sans assez de WeboCoins, le reste passe en traduction gratuite.',
+          confirmLabel: 'Traduire avec Webo',
+          cancelLabel: 'En gratuit cette fois',
+        })) ? 'webo' : 'free';
+      }
+    }
+    const english = language === 'en' ? await translateServicesToEnglish(known, how, runTotal) : { missed: 0, translated: [] };
     const newGuestTotal = (parseInt(guestAdults) || 0) + (parseInt(guestChildren) || 0) || parseInt(guestCount) || 0;
     const previousGuests = initialGuestTotal.current;
     if (syncQuantities && previousGuests > 0 && newGuestTotal > 0 && newGuestTotal !== previousGuests) {
@@ -641,7 +684,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // Devis en anglais : chaque plat de la carte encore en français est traduit sur place, qu'il soit une ligne du
     // devis ou non ; sa fiche anglaise va dans la prestation du même nom qui n'a pas encore d'anglais.
     if (language === 'en' && typeof updatePayload.content_html === 'string') {
-      const carte = await translateCarteToEnglish(updatePayload.content_html, (done, total) => setTranslating(`carte ${done} / ${total}`), known);
+      const carte = await translateCarteToEnglish(updatePayload.content_html, (done, total) => setTranslating(`carte ${done} / ${total}`), known,
+        async (fiches) => { const run = await translateFiches(fiches, how); addRun(runTotal, run); return run; });
       setTranslating(null);
       english.missed += carte.missed;
       if (carte.html !== updatePayload.content_html) updatePayload.content_html = carte.html;
@@ -651,6 +695,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     }
 
     const { error } = await supabase.from('quotes').update(updatePayload).eq('id', quoteId);
+    if (runTotal.webo) void refreshWallet();
 
     setSaving(false);
     if (error) { notify('Les modifications n’ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.', { tone: 'error' }); return; }
@@ -658,6 +703,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     const notes = [
       partiesChanged && parts.length
         ? `Client ou événement modifié : ${parts.join(' et ')}, réécrit${parts.length > 1 ? 's' : ''} à la main, n’${parts.length > 1 ? 'ont' : 'a'} pas été mis à jour. Relisez-l${parts.length > 1 ? 'es' : 'e'} dans le document.`
+        : null,
+      runTotal.webo + runTotal.free > 0
+        ? `Traduction : ${runSummary(runTotal)}.${how === 'webo' && runTotal.fallbackWhy ? ` ${fallbackMessage(runTotal.fallbackWhy)}.` : ''}`
         : null,
       english.missed > 0
         ? `Traduction en anglais incomplète : ${english.missed} passage${english.missed > 1 ? 's sont restés' : ' est resté'} en français (service de traduction indisponible ou limite du jour atteinte). Corrigez-les dans le document, ou réappliquez plus tard.`

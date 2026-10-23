@@ -40,4 +40,59 @@ test.describe('WeboCoins', () => {
       await page.screenshot({ path: 'e2e/screenshots/webocoins-page-mobile.png', fullPage: true });
     });
   });
+
+  // Serveur lancé avec WEBO_FAKE=1 : Webo « traduit » en préfixant « EN », sans appel payant. Le service gratuit est
+  // simulé dans le navigateur.
+  test('traduire une prestation avec Webo débite 1 pièce ; en gratuit, rien', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(150_000);
+    await withAccount(browser, 'webocoins-traduction', async (page, userId) => {
+      await page.route('**/api.mymemory.translated.net/**', (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ responseStatus: 200, responseData: { translatedText: 'Free cheese platter' } }),
+      }));
+      const [p] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Plateau de fromages', 9, 'dîner', '<p>Fromages affinés</p>') returning id`, [userId]);
+      await page.goto(`/prestations/${p.id}`);
+      await expect(page.getByLabel('Nom de la prestation')).toHaveValue('Plateau de fromages', { timeout: 30_000 });
+      await expect(page.getByLabel('Solde : 200 WeboCoins')).toBeVisible({ timeout: 20_000 });
+
+      await page.getByRole('tab', { name: 'Anglais' }).click();
+      await page.getByRole('button', { name: 'Traduire avec Webo · 1 W' }).click();
+      const english = page.getByRole('textbox', { name: 'Texte de la carte, en anglais' });
+      await expect(english).toContainText('EN ', { timeout: 20_000 });
+      await expect(page.getByLabel('Solde : 199 WeboCoins')).toBeVisible({ timeout: 15_000 });
+      await page.screenshot({ path: 'e2e/screenshots/webocoins-traduction-desktop.png' });
+
+      await page.getByRole('button', { name: 'Retraduire (gratuit)' }).click();
+      await page.getByRole('button', { name: 'Remplacer' }).click();
+      await expect(english).toContainText('Free cheese platter', { timeout: 20_000 });
+      await expect(page.getByLabel('Solde : 199 WeboCoins')).toBeVisible();
+      const [row] = await sql<{ n: string }>(`select count(*) n from public.webo_ledger where company_id = $1 and kind = 'debit'`, [userId]);
+      expect(Number(row.n)).toBe(1);
+    });
+  });
+
+  test('WeboWord en anglais : pièces annoncées, fiches traduites par Webo, solde débité', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(180_000);
+    await withAccount(browser, 'webocoins-weboword', async (page, userId) => {
+      const lines = [
+        { id: 'l1', name: 'Dîner trois plats', description: '<p>Entrée, plat, dessert</p>', quantity: 40, unitPrice: 50 },
+        { id: 'l2', name: 'Forfait boissons', description: '<p>Vins et softs</p>', quantity: 40, unitPrice: 10 },
+      ];
+      const [q] = await sql<{ id: string }>(
+        `insert into public.quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status, services, vat_rate)
+         values ($1, $1, 'Client Essai', current_date + 60, 'Mariage', 40, 'devis_a_faire', $2::jsonb, 10) returning id`, [userId, JSON.stringify(lines)]);
+      await page.goto(`/devis/${q.id}/modifier?mode=weboword`);
+      await expect(page.locator('#weboword-sheet [data-webo-intro]')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByLabel('Solde : 200 WeboCoins')).toBeVisible({ timeout: 20_000 });
+      await page.getByRole('link', { name: 'Style', exact: true }).first().click();
+      await page.getByRole('button', { name: 'English' }).click();
+      await page.getByRole('button', { name: 'Appliquer' }).first().click();
+      await expect(page.getByRole('dialog', { name: '2 fiches à traduire · 2 W' })).toBeVisible({ timeout: 20_000 });
+      await page.getByRole('button', { name: 'Traduire avec Webo' }).click();
+      await expect.poll(async () => (await sql<{ content_html: string | null }>(`select content_html from public.quotes where id = $1`, [q.id]))[0].content_html ?? '', { timeout: 60_000 })
+        .toContain('EN ');
+      await expect(page.getByText(/2 fiches traduites par Webo \(2 W\)/)).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByLabel('Solde : 198 WeboCoins')).toBeVisible({ timeout: 20_000 });
+      await page.screenshot({ path: 'e2e/screenshots/webocoins-weboword-desktop.png' });
+    });
+  });
 });

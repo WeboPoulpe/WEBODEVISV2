@@ -20,6 +20,8 @@ export interface ConfirmOptions {
   confirmLabel?: string;
   /** Action irréversible : bouton rouge, et le focus va sur « Annuler ». */
   danger?: boolean;
+  /** Texte du bouton qui refuse (« Annuler » par défaut), quand refuser est un autre choix (« En gratuit cette fois »). */
+  cancelLabel?: string;
 }
 
 export interface NotifyOptions {
@@ -124,7 +126,7 @@ export function FeedbackProvider({ children, aboveTabBar = true }: ProviderProps
 }
 
 function ConfirmDialog({ request, onDone }: { request: PendingConfirm; onDone: (ok: boolean) => void }) {
-  const { title, message, confirmLabel, danger } = request;
+  const { title, message, confirmLabel, danger, cancelLabel } = request;
   // Le focus revient où il était une fois la fenêtre fermée.
   const previous = useRef<Element | null>(typeof document === 'undefined' ? null : document.activeElement);
   const done = useRef(false);
@@ -141,7 +143,7 @@ function ConfirmDialog({ request, onDone }: { request: PendingConfirm; onDone: (
     <Modal title={title} onClose={cancel}
       footer={
         <>
-          <button type="button" onClick={cancel} autoFocus={!!danger} className={btnSecondary}>Annuler</button>
+          <button type="button" onClick={cancel} autoFocus={!!danger} className={btnSecondary}>{cancelLabel ?? 'Annuler'}</button>
           <button type="button" onClick={() => finish(true)} autoFocus={!danger}
             className={cn(btnPrimary, danger && 'bg-danger hover:bg-danger/90')}>
             {confirmLabel ?? (danger ? 'Supprimer' : 'Confirmer')}

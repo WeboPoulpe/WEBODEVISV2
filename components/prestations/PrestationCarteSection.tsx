@@ -6,7 +6,10 @@ import CarteBlockEditor from '@/components/prestations/CarteBlockEditor';
 import { btnGhost, btnSecondary } from '@/components/ui/kit';
 import { useFeedback } from '@/components/ui/Feedback';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
-import { cardFromDescription, translateHtmlFrToEn } from '@/lib/prestationCard';
+import { cardFromDescription } from '@/lib/prestationCard';
+import { fallbackMessage, runSummary, translateFiches, type TranslationMode } from '@/lib/weboTranslateClient';
+import { useWallet } from '@/components/webo/WalletContext';
+import WeboCoin from '@/components/webo/WeboCoin';
 import { cn } from '@/lib/utils';
 
 // Texte de la prestation dans la carte du menu, édité sur place (un seul endroit, une seule zone par langue) :
@@ -39,13 +42,17 @@ export default function PrestationCarteSection({
   // Remplacer le texte d'une zone (traduction, retour à la description) la recrée : elle part du nouveau texte.
   const [version, setVersion] = useState(0);
   const [translating, setTranslating] = useState(false);
+  const { wallet, refresh } = useWallet();
+  // Mode de l'entreprise (Paramètres) ; l'autre reste proposé à côté, pour cette fois.
+  const mode: TranslationMode = wallet?.mode ?? 'webo';
+  const other: TranslationMode = mode === 'webo' ? 'free' : 'webo';
 
   /** Le bloc français, tel qu'il figure dans la carte, comme point de départ de la version anglaise. */
   const frenchCard = () => cardFr ?? cardFromDescription({ name, description }, { template, font });
 
   const createEnglish = (html: string) => { onCardEn(html); setVersion((v) => v + 1); };
 
-  const translate = async () => {
+  const translate = async (how: TranslationMode) => {
     if (cardEn !== null && !(await confirm({
       title: 'Remplacer la version anglaise ?',
       message: 'Elle sera remplacée par une traduction automatique du texte français.',
@@ -54,7 +61,10 @@ export default function PrestationCarteSection({
     }))) return;
     setTranslating(true);
     try {
-      createEnglish(await translateHtmlFrToEn(frenchCard()));
+      const run = await translateFiches([{ key: 'card', name, html: frenchCard(), keepName: true }], how);
+      createEnglish(run.byKey.get('card')!.html);
+      if (run.webo) await refresh();
+      if (how === 'webo' && run.fallbackWhy) notify(`${fallbackMessage(run.fallbackWhy)} : ${runSummary(run)}.`);
     } catch {
       notify('La traduction n’a pas pu être faite. Vérifiez votre connexion et réessayez.', { tone: 'error' });
     } finally {
@@ -124,10 +134,7 @@ export default function PrestationCarteSection({
             <button type="button" onClick={() => createEnglish(frenchCard())} disabled={translating} className={btnSecondary}>
               <Plus className="h-4 w-4" />Écrire la version anglaise
             </button>
-            <button type="button" onClick={translate} disabled={translating} className={btnGhost}>
-              {translating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
-              {translating ? 'Traduction…' : 'Traduire automatiquement'}
-            </button>
+            <TranslateButtons verb="Traduire" mode={mode} other={other} busy={translating} onTranslate={translate} />
           </div>
         </div>
       ) : (
@@ -146,10 +153,7 @@ export default function PrestationCarteSection({
             placeholder="English description…"
           />
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={translate} disabled={translating} className={btnGhost}>
-              {translating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Languages className="h-4 w-4" />}
-              {translating ? 'Traduction…' : 'Retraduire depuis le français'}
-            </button>
+            <TranslateButtons verb="Retraduire" mode={mode} other={other} busy={translating} onTranslate={translate} />
             <button type="button" onClick={dropEnglish} disabled={translating} className={cn(btnGhost, 'text-danger hover:bg-danger/5')}>
               Supprimer la version anglaise
             </button>
@@ -157,5 +161,25 @@ export default function PrestationCarteSection({
         </>
       )}
     </div>
+  );
+}
+
+/** « Traduire avec Webo · 1 W » (ou en gratuit, selon le mode de l'entreprise), et l'autre façon pour cette fois. */
+function TranslateButtons({ verb, mode, other, busy, onTranslate }: {
+  verb: 'Traduire' | 'Retraduire'; mode: TranslationMode; other: TranslationMode; busy: boolean; onTranslate: (how: TranslationMode) => void;
+}) {
+  const label = (how: TranslationMode) => (how === 'webo' ? `${verb} avec Webo · 1 W` : `${verb} (gratuit)`);
+  return (
+    <>
+      <button type="button" onClick={() => onTranslate(mode)} disabled={busy} className={btnGhost}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'webo' ? <WeboCoin size={16} /> : <Languages className="h-4 w-4" />}
+        {busy ? 'Traduction…' : label(mode)}
+      </button>
+      {!busy && (
+        <button type="button" onClick={() => onTranslate(other)} className="px-2 text-sm text-gray-500 underline underline-offset-2 hover:text-gray-800">
+          {label(other)}
+        </button>
+      )}
+    </>
   );
 }

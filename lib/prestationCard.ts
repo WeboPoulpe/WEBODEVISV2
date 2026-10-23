@@ -157,11 +157,14 @@ export function dishCardHtml(el: HTMLElement): string {
  * qu'il corresponde à une ligne du devis ou non, et le marque comme anglais. Un plat dont la prestation a déjà sa
  * fiche anglaise (`known`, par nom) la reprend telle quelle ; les autres sont traduits. Navigateur seulement.
  * `cards` : fiche anglaise de chaque plat traduit et repéré (nom de sa prestation), à enregistrer dans la prestation.
+ * `translate` : traduit tous les plats d'un coup (Webo ou gratuit, lib/weboTranslateClient) ; sans lui, plat par plat
+ * en gratuit.
  */
 export async function translateCarteToEnglish(
   html: string,
   onProgress?: (done: number, total: number) => void,
   known: ReadonlyMap<string, string> = new Map(),
+  translate?: (fiches: { key: string; name: string; html: string; keepName: boolean }[]) => Promise<{ byKey: Map<string, { html: string }>; missed: number }>,
 ): Promise<{ html: string; missed: number; cards: [string, string][] }> {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const dishes = Array.from(doc.querySelectorAll<HTMLElement>('.gastro-menu > div'))
@@ -169,6 +172,26 @@ export async function translateCarteToEnglish(
   if (dishes.length === 0) return { html, missed: 0, cards: [] };
   let missed = 0;
   const cards: [string, string][] = [];
+  if (translate) {
+    const todo = dishes.filter((d) => !(d.getAttribute('data-webo-dish') && known.get(d.getAttribute('data-webo-dish')!)));
+    onProgress?.(0, todo.length);
+    const run = todo.length
+      ? await translate(todo.map((d, i) => ({ key: String(i), name: d.getAttribute('data-webo-dish') ?? '', html: d.innerHTML, keepName: true })))
+      : { byKey: new Map<string, { html: string }>(), missed: 0 };
+    missed += run.missed;
+    for (const d of dishes) {
+      const name = d.getAttribute('data-webo-dish');
+      const existing = name ? known.get(name) : undefined;
+      if (existing) { d.style.textAlign = ''; d.innerHTML = existing; d.setAttribute('data-webo-lang', 'en'); continue; }
+      const out = run.byKey.get(String(todo.indexOf(d)))?.html;
+      if (!out || out === d.innerHTML) continue;
+      d.innerHTML = out;
+      d.setAttribute('data-webo-lang', 'en');
+      if (name) cards.push([name, dishCardHtml(d)]);
+    }
+    onProgress?.(todo.length, todo.length);
+    return { html: doc.body.innerHTML, missed, cards };
+  }
   for (const [i, d] of dishes.entries()) {
     onProgress?.(i + 1, dishes.length);
     const name = d.getAttribute('data-webo-dish');
