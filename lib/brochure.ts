@@ -6,6 +6,7 @@
 // à la base, sert au serveur (lien public) comme à l'éditeur (aperçu) : les deux voient les mêmes pages.
 
 import { sanitizeHtml } from './sanitize';
+import { parsePhotoFrame, parsePlacement, type PhotoFrame, type PhotoPlacement } from './photoFrame';
 
 export type BrochureStyle = 'editorial' | 'carte' | 'magazine';
 export const BROCHURE_STYLES: BrochureStyle[] = ['editorial', 'carte', 'magazine'];
@@ -20,17 +21,21 @@ export interface BrochureItem {
   /** Photo propre à la brochure (sinon celle de la prestation). */
   photoUrl?: string | null;
   hidePrice?: boolean;
+  /** Place et taille de la photo (sinon celles du style). */
+  placement?: PhotoPlacement;
+  /** Cadrage de la photo (point gardé visible, zoom, photo entière). */
+  frame?: PhotoFrame;
 }
 
 export interface BrochureSection { id: string; title: string; items: BrochureItem[] }
 
 export interface BrochureContent {
-  about: { enabled: boolean; html: string; photoUrl?: string | null };
+  about: { enabled: boolean; html: string; photoUrl?: string | null; photoFrame?: PhotoFrame | null };
   contact: { enabled: boolean };
   sections: BrochureSection[];
 }
 
-export interface BrochureCover { title: string; subtitle?: string | null; photoUrl?: string | null }
+export interface BrochureCover { title: string; subtitle?: string | null; photoUrl?: string | null; photoFrame?: PhotoFrame | null }
 
 /** Ce qu'une brochure lit d'une prestation du catalogue. */
 export interface CatalogPrestation {
@@ -59,6 +64,9 @@ export interface ResolvedItem {
   childPrice: string | null;
   /** Prestation supprimée du catalogue (éditeur seulement). */
   missing: boolean;
+  /** Place et taille réglées pour cette brochure, ou null (celles du style). */
+  placement: PhotoPlacement | null;
+  frame: PhotoFrame | null;
 }
 
 export type BrochurePage =
@@ -91,18 +99,25 @@ export function parseBrochureContent(raw: unknown): BrochureContent {
       const it = (i && typeof i === 'object' ? i : {}) as Record<string, unknown>;
       const id = str(it.prestationId);
       if (!id) return [];
+      const placement = parsePlacement(it.placement);
+      const frame = parsePhotoFrame(it.frame);
       return [{
         prestationId: id,
         ...(str(it.html) ? { html: str(it.html) } : {}),
         ...(it.titled === true ? { titled: true } : {}),
         ...(str(it.photoUrl) ? { photoUrl: str(it.photoUrl) } : {}),
         ...(it.hidePrice === true ? { hidePrice: true } : {}),
+        ...(placement ? { placement } : {}),
+        ...(frame ? { frame } : {}),
       }];
     });
     return [{ id: str(sec.id) ?? `s${Math.random().toString(36).slice(2, 8)}`, title: str(sec.title) ?? '', items }];
   });
   return {
-    about: { enabled: about.enabled !== false, html: str(about.html) ?? '', ...(str(about.photoUrl) ? { photoUrl: str(about.photoUrl) } : {}) },
+    about: {
+      enabled: about.enabled !== false, html: str(about.html) ?? '', ...(str(about.photoUrl) ? { photoUrl: str(about.photoUrl) } : {}),
+      ...(parsePhotoFrame(about.photoFrame) ? { photoFrame: parsePhotoFrame(about.photoFrame) } : {}),
+    },
     contact: { enabled: contact.enabled !== false },
     sections,
   };
@@ -150,7 +165,7 @@ export function resolveItems(
     const key = String(offset + i);
     if (!p) {
       return o.forEditor
-        ? [{ key, name: '', html: '', titled: false, photoUrl: null, price: null, childPrice: null, missing: true }]
+        ? [{ key, name: '', html: '', titled: false, photoUrl: null, price: null, childPrice: null, missing: true, placement: null, frame: null }]
         : [];
     }
     const card = (o.language === 'en' && p.gastro_card_html_en) || p.gastro_card_html;
@@ -160,6 +175,7 @@ export function resolveItems(
       // Retouche : titrée si elle part d'une fiche ; sinon (texte du catalogue) titrée s'il y a une fiche.
       key, name: p.name, html: sanitizeHtml(html), titled: item.html ? item.titled === true : !!card,
       photoUrl: item.photoUrl ?? p.photo_url ?? null, ...prices, missing: false,
+      placement: item.placement ?? null, frame: item.frame ?? null,
     }];
   });
 }

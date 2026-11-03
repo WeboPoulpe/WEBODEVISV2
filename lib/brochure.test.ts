@@ -73,3 +73,29 @@ describe('brochure : pages', () => {
     expect(c.sections[0].items).toEqual([{ prestationId: 'p1' }]);
   });
 });
+
+describe('brochure : réglages de photo', () => {
+  it('place, taille et cadrage d’une prestation gardés (bornés) ; cadrage de « qui sommes-nous »', () => {
+    const c = parseBrochureContent({
+      about: { html: '', photoUrl: 'https://x/a.webp', photoFrame: { x: 10, y: 200, zoom: 120 } },
+      sections: [{ id: 's', title: 'T', items: [
+        { prestationId: 'p1', placement: { pos: 'left', size: 99 }, frame: { x: 30, y: 70, zoom: 150, fit: 'cover' } },
+        { prestationId: 'p2', placement: { pos: 'nulle-part' }, frame: 'n’importe quoi' },
+      ] }],
+    });
+    expect(c.about.photoFrame).toEqual({ x: 10, y: 100, zoom: 120, fit: 'cover' });
+    expect(c.sections[0].items[0]).toEqual({ prestationId: 'p1', placement: { pos: 'left', size: 60 }, frame: { x: 30, y: 70, zoom: 150, fit: 'cover' } });
+    expect(c.sections[0].items[1]).toEqual({ prestationId: 'p2' });
+  });
+
+  it('prestation prête à afficher : place et cadrage (null quand rien n’est réglé)', () => {
+    const catalog = new Map([['p1', prestation({ photo_url: 'https://x/p.webp' })]]);
+    const content: BrochureContent = { ...parseBrochureContent(null), sections: [{ id: 's', title: '', items: [
+      { prestationId: 'p1', placement: { pos: 'none', size: 0 } },
+    ] }] };
+    const pages = paginateBrochure(content, catalog, 'editorial', { ...TTC10, forEditor: false });
+    const item = pages.flatMap((p) => (p.kind === 'items' ? p.items : []))[0];
+    expect(item.placement).toEqual({ pos: 'none', size: 0 });
+    expect(item.frame).toBeNull();
+  });
+});

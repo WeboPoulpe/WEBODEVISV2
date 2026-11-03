@@ -166,6 +166,18 @@ describe('brochures : serveur', () => {
   });
 });
 
+describe('brochures : photos', () => {
+  it('cadrage de la couverture gardé et borné, jusqu’au lien public', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Cadrage' });
+    await br.saveBrochure(id!, { cover: { title: 'Cadrage', photoUrl: 'https://x/c.webp', photoFrame: { x: 15, y: -4, zoom: 180 } } });
+    const row = await br.getBrochure(id!);
+    expect((row!.cover as { photoFrame?: unknown }).photoFrame).toEqual({ x: 15, y: 0, zoom: 180, fit: 'cover' });
+    const pub = await br.getPublicBrochure(row!.share_token);
+    expect(pub!.cover.photoFrame).toEqual({ x: 15, y: 0, zoom: 180, fit: 'cover' });
+  });
+});
+
 describe('brochures : formulaire de fin', () => {
   const fields = { first_name: 'Camille', last_name: 'Martin', email: 'camille@exemple.fr', event_type: 'Mariage', guest_count: 80, message: 'Bonjour' };
   const tokenOf = async (id: string) => (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;

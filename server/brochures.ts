@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { brochures, prestations, profiles, prospect_requests } from '@/db/schema';
+import { parsePhotoFrame, type PhotoFrame } from '@/lib/photoFrame';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { defaultVatRate } from '@/lib/vat';
 import {
@@ -45,7 +46,7 @@ export interface PublicBrochure {
   language: 'fr' | 'en';
   cover: BrochureCover;
   /** Page « qui sommes-nous » (vide si elle est désactivée). */
-  about: { html: string; photoUrl: string | null };
+  about: { html: string; photoUrl: string | null; photoFrame?: PhotoFrame | null };
   /** Pages de l'éditeur simple, ou pages de la mise en page avancée (pages à blocs déjà résolues). */
   pages: PublicPage[];
   /** Feuille Google Fonts des polices choisies dans les blocs (éditeur avancé), ou null. */
@@ -65,7 +66,8 @@ function parseCover(raw: unknown, fallbackTitle: string): BrochureCover {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
   const photo = typeof r.photoUrl === 'string' && /^https?:\/\//.test(r.photoUrl) ? r.photoUrl : null;
-  return { title: text(r.title, 120) || fallbackTitle, subtitle: text(r.subtitle, 200) || null, photoUrl: photo };
+  const frame = parsePhotoFrame(r.photoFrame);
+  return { title: text(r.title, 120) || fallbackTitle, subtitle: text(r.subtitle, 200) || null, photoUrl: photo, ...(frame ? { photoFrame: frame } : {}) };
 }
 
 /** Contenu nettoyé avant d'être enregistré : textes riches passés au nettoyage HTML. */
@@ -286,7 +288,7 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
   return {
     name: row.name, style, language,
     cover: parseCover(row.cover, row.name),
-    about: content.about.enabled ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null } : { html: '', photoUrl: null },
+    about: content.about.enabled ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null, photoFrame: content.about.photoFrame ?? null } : { html: '', photoUrl: null },
     pages: publicPages(row, content, catalog, { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language }),
     fontsHref: row.editor_mode === 'advanced' ? googleFontsHref(layoutFonts(parseLayout(row.layout))) : null,
     company: {

@@ -138,3 +138,35 @@ describe('mise en page : affichage', () => {
     expect(ed[0].blocks.flatMap((b) => (b.type === 'prestation' ? [b.item.missing] : []))).toEqual([false, true, false]);
   });
 });
+
+describe('mise en page : réglages de photo', () => {
+  it('bloc Prestation : photo en bas, taille bornée, cadrage ; bloc Image : cadrage', () => {
+    const l = parseLayout({ pages: [{ id: 'p', kind: 'blocks', blocks: [
+      { id: 'a', type: 'prestation', prestationId: 'p1', photo: 'bottom', photoSize: 5, frame: { x: 20, y: 30, zoom: 400 } },
+      { id: 'b', type: 'image', url: 'https://x/i.webp', height: 200, fit: 'cover', frame: { x: 80 } },
+    ] }, { id: 'f', kind: 'form', blocks: [] }] })!;
+    const [a, b] = l.pages[0].blocks as [Extract<Block, { type: 'prestation' }>, Extract<Block, { type: 'image' }>];
+    expect(a.photo).toBe('bottom');
+    expect(a.photoSize).toBe(30);
+    expect(a.frame).toEqual({ x: 20, y: 30, zoom: 300, fit: 'cover' });
+    expect(b.frame).toEqual({ x: 80, y: 50, zoom: 100, fit: 'cover' });
+  });
+
+  it('conversions : place, taille et cadrage d’une prestation suivent dans les deux sens', () => {
+    const frame = { x: 10, y: 90, zoom: 130, fit: 'cover' as const };
+    const c = content({ sections: [{ id: 's1', title: 'Menus', items: [{ prestationId: 'p1', placement: { pos: 'right', size: 50 }, frame }] }] });
+    const l = layoutFromSimple(c, 'editorial', catalog);
+    const block = blocksOf(l).find((b) => b.type === 'prestation') as Extract<Block, { type: 'prestation' }>;
+    expect(block).toMatchObject({ photo: 'right', photoSize: 50, frame });
+    expect(sectionsFromLayout(l)[0].items[0]).toEqual({ prestationId: 'p1', placement: { pos: 'right', size: 50 }, frame });
+  });
+});
+
+describe('mise en page : place du style', () => {
+  it('Carte → avancé → simple : « sans photo » du style ne se fige pas ; choisie à la main, elle suit', () => {
+    const l = layoutFromSimple(content(), 'carte', catalog);
+    expect(sectionsFromLayout(l)[0].items[0].placement).toBeUndefined();
+    const chosen = parseLayout({ pages: [{ id: 'p', kind: 'blocks', blocks: [{ id: 'a', type: 'prestation', prestationId: 'p1', photo: 'none', photoSize: 0 }] }, { id: 'f', kind: 'form', blocks: [] }] })!;
+    expect(sectionsFromLayout(chosen)[0].items[0].placement).toEqual({ pos: 'none', size: 0 });
+  });
+});

@@ -12,6 +12,7 @@ import {
   type BrochureContent, type BrochureItem, type BrochurePage, type BrochureSection, type BrochureStyle, type CatalogPrestation,
   type PriceOptions, type ResolvedItem,
 } from './brochure';
+import { parsePhotoFrame, placementSize, type PhotoFrame } from './photoFrame';
 
 export const PALETTE = ['#1C2621', '#2F4A3A', '#B4502D', '#5b5b55', '#FBF7F0', '#EDE6DA', '#E6DFD3', '#FFFFFF'];
 export const BLOCK_FONTS = ['Georgia', 'Playfair Display', 'Lora', 'Montserrat', 'Inter'];
@@ -25,10 +26,10 @@ export type Align = 'left' | 'center' | 'right';
 export interface BlockStyle { padding?: number; background?: string | null; font?: string | null; titleSize?: number | null; titleColor?: string | null; align?: Align }
 
 export type Block =
-  | { id: string; type: 'prestation'; prestationId: string; photo: 'top' | 'left' | 'right' | 'none'; show: { name: boolean; text: boolean; price: boolean }; text: 'full' | 'short'; html?: string; titled?: boolean; photoUrl?: string; hidePrice?: boolean; style?: BlockStyle }
+  | { id: string; type: 'prestation'; prestationId: string; photo: 'top' | 'bottom' | 'left' | 'right' | 'none'; photoSize?: number; frame?: PhotoFrame; show: { name: boolean; text: boolean; price: boolean }; text: 'full' | 'short'; html?: string; titled?: boolean; photoUrl?: string; hidePrice?: boolean; style?: BlockStyle }
   | { id: string; type: 'title'; text: string; level: 'l' | 'm' | 's'; style?: BlockStyle }
   | { id: string; type: 'text'; html: string; style?: BlockStyle }
-  | { id: string; type: 'image'; url: string | null; height: number; fit: 'cover' | 'contain'; style?: BlockStyle }
+  | { id: string; type: 'image'; url: string | null; height: number; fit: 'cover' | 'contain'; frame?: PhotoFrame; style?: BlockStyle }
   | { id: string; type: 'columns'; count: 2 | 3; gap: number; cols: Block[][]; style?: BlockStyle }
   | { id: string; type: 'separator'; color: string; width: number; style?: BlockStyle }
   | { id: string; type: 'spacer'; height: number };
@@ -105,9 +106,12 @@ function parseBlock(raw: unknown, nested: boolean): Block | null {
       const prestationId = str(r.prestationId, 60);
       if (!prestationId) return null;
       const show = (r.show && typeof r.show === 'object' ? r.show : {}) as Record<string, unknown>;
+      const photo = pick(r.photo, ['top', 'bottom', 'left', 'right', 'none'] as const, 'top');
+      const frame = parsePhotoFrame(r.frame);
       return withStyle({
-        id, type: 'prestation' as const, prestationId,
-        photo: pick(r.photo, ['top', 'left', 'right', 'none'] as const, 'top'),
+        id, type: 'prestation' as const, prestationId, photo,
+        ...(r.photoSize != null ? { photoSize: placementSize(photo, r.photoSize) } : {}),
+        ...(frame ? { frame } : {}),
         show: { name: show.name !== false, text: show.text !== false, price: show.price !== false },
         text: pick(r.text, ['full', 'short'] as const, 'full'),
         ...(str(r.html) ? { html: str(r.html, 20000)! } : {}),
@@ -118,10 +122,13 @@ function parseBlock(raw: unknown, nested: boolean): Block | null {
     }
     case 'title': return withStyle({ id, type: 'title' as const, text: str(r.text, 200) ?? '', level: pick(r.level, ['l', 'm', 's'] as const, 'm') });
     case 'text': return withStyle({ id, type: 'text' as const, html: str(r.html, 20000) ?? '' });
-    case 'image': return withStyle({
-      id, type: 'image' as const, url: typeof r.url === 'string' && /^https?:\/\//.test(r.url) ? r.url : null,
-      height: num(r.height, 40, 900, 180), fit: pick(r.fit, ['cover', 'contain'] as const, 'cover'),
-    });
+    case 'image': {
+      const frame = parsePhotoFrame(r.frame);
+      return withStyle({
+        id, type: 'image' as const, url: typeof r.url === 'string' && /^https?:\/\//.test(r.url) ? r.url : null,
+        height: num(r.height, 40, 900, 180), fit: pick(r.fit, ['cover', 'contain'] as const, 'cover'), ...(frame ? { frame } : {}),
+      });
+    }
     case 'columns': {
       // Pas de colonnes dans des colonnes.
       if (nested) return null;
@@ -293,7 +300,10 @@ export function newBlock(type: Block['type'], prestationId?: string): Block {
 // ── Conversions entre les éditeurs ───────────────────────────────────────────
 
 const prestationBlock = (item: BrochureItem, photo: Prestation['photo'], text: Prestation['text']): Block => ({
-  ...(newBlock('prestation', item.prestationId) as Prestation), photo, text,
+  ...(newBlock('prestation', item.prestationId) as Prestation), text,
+  // Place réglée dans l'éditeur simple : elle l'emporte sur celle du style.
+  photo: item.placement?.pos ?? photo, ...(item.placement ? { photoSize: item.placement.size } : {}),
+  ...(item.frame ? { frame: item.frame } : {}),
   ...(item.html ? { html: item.html } : {}), ...(item.titled ? { titled: true } : {}),
   ...(item.photoUrl ? { photoUrl: item.photoUrl } : {}), ...(item.hidePrice ? { hidePrice: true } : {}),
 });
@@ -362,6 +372,9 @@ export function sectionsFromLayout(l: BrochureLayout): BrochureSection[] {
     current.items.push({
       prestationId: b.prestationId, ...(b.html ? { html: b.html } : {}), ...(b.titled ? { titled: true } : {}),
       ...(b.photoUrl ? { photoUrl: b.photoUrl } : {}), ...(b.hidePrice ? { hidePrice: true } : {}),
+      // Taille réglée = place choisie à la main : elle suit dans l'éditeur simple.
+      ...(b.photoSize != null ? { placement: { pos: b.photo, size: placementSize(b.photo, b.photoSize) } } : {}),
+      ...(b.frame ? { frame: b.frame } : {}),
     });
   }
   return sections.filter((s) => s.items.length > 0);
