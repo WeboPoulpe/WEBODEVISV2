@@ -23,7 +23,8 @@ import { parseLayout, type BrochureLayout } from '@/lib/brochureLayout';
 import { renewBrochureLink, saveBrochure, switchBrochureEditor, type BrochureRow, type PublicBrochure } from '@/server/brochures';
 import AdvancedEditor from './advanced/AdvancedEditor';
 import { Flipbook } from './Flipbook';
-import { BrochurePageView } from './BrochurePages';
+import { BrochurePageView, pageFlow } from './BrochurePages';
+import { expandPages, useFlowBreaks } from './flow';
 import PrestationPicker, { categoryLabel } from './PrestationPicker';
 import ItemRetouch from './ItemRetouch';
 import PhotoField from './PhotoField';
@@ -192,6 +193,10 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   const pages = useMemo(() => paginateBrochure(draft.content, byId, draft.style, {
     show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: true,
   }), [draft, byId]);
+  const flows = useMemo(() => pages.map((page) => pageFlow({ page, style: draft.style, language: draft.language, about: draft.content.about })),
+    [pages, draft.style, draft.language, draft.content.about]);
+  const { breaks, measurer } = useFlowBreaks(flows);
+  const shownPages = expandPages(pages, flows, breaks);
 
   const link = typeof window === 'undefined' ? '' : `${window.location.origin}/b/${token}`;
   const copyLink = async () => {
@@ -379,12 +384,13 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
             ariaLabel="Aperçu de la brochure"
             allowDouble={false}
             reserved={180}
-            pages={pages.map((page, i) => (
-              <BrochurePageView key={i} page={page} style={draft.style} cover={draft.cover} company={company} language={draft.language}
+            pages={shownPages.map(({ page, slice }, i) => (
+              <BrochurePageView key={i} page={page} slice={slice} style={draft.style} cover={draft.cover} company={company} language={draft.language}
                 about={draft.content.about}
                 formSlot={<p className="text-sm text-gray-500">Le formulaire de demande s’affiche ici pour le lecteur.</p>} />
             ))}
           />
+          {measurer}
         </div>
         )}
       </div>

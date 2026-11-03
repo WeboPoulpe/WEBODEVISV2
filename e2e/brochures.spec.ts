@@ -290,7 +290,9 @@ test.describe('brochures', () => {
       await expect(canvas.getByRole('heading', { name: 'Titre', exact: true })).toBeVisible();
 
       for (let i = 0; i < 25; i++) await page.getByRole('button', { name: 'Ajouter : Espace' }).click();
-      await expect(page.getByText('Page trop pleine').first()).toBeVisible();
+      // Page trop pleine : la suite passera sur une page de plus, les coupures sont montrées.
+      await expect(page.getByText('ne tient pas sur une feuille').first()).toBeVisible();
+      await expect(page.getByText('page suivante', { exact: true }).first()).toBeVisible();
       await page.screenshot({ path: 'e2e/screenshots/brochure-avance-desktop.png' });
       // Au-delà de 30 blocs sur la page : ajout refusé avec un message, l'enregistrement continue de marcher.
       for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Ajouter : Espace' }).click();
@@ -329,7 +331,8 @@ test.describe('brochures', () => {
 
       await canvas.getByRole('heading', { name: 'Menu Tentation' }).click();
       await settings.getByRole('group', { name: 'Photo' }).getByRole('button', { name: 'Gauche' }).click();
-      const photo = await canvas.locator('[data-photo]').boundingBox();
+      // Sans photo au catalogue : le repère « Ajouter une photo » tient sa place dans l'éditeur.
+      const photo = await canvas.locator('[data-photo-hint]').boundingBox();
       const name = await canvas.getByRole('heading', { name: 'Menu Tentation' }).boundingBox();
       expect(photo!.x).toBeLessThan(name!.x);
 
@@ -361,5 +364,64 @@ test.describe('brochures', () => {
 
       expect(await sql(`select name, description, unit_price, photo_url from public.prestations where id = $1`, [a.id])).toEqual(before);
     });
+  });
+
+  test('suite de page : une prestation trop longue continue sur une page ajoutée, sans défilement', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(180_000);
+    await withAccount(browser, 'brochure-suite', async (page, userId) => {
+      const long = Array.from({ length: 14 }, (_, i) => `<p>Paragraphe ${i + 1} : ${'légumes du potager, herbes fraîches, jus corsé et pain maison. '.repeat(3)}</p>`).join('');
+      const [a] = await sql<{ id: string }>(`insert into public.prestations (user_id, name, unit_price, category, description) values ($1, 'Grand menu', 76, 'dîner', $2) returning id`, [userId, long]);
+      const token = `jeton-e2e-suite-${Date.now()}`;
+      const [b] = await sql<{ id: string }>(`insert into public.brochures (owner_user_id, user_id, name, share_token, style, cover, content) values ($1, $1, 'Suite', $2, 'editorial', '{"title":"Suite"}'::jsonb, $3::jsonb) returning id`,
+        [userId, token, JSON.stringify({ about: { enabled: false, html: '' }, contact: { enabled: true }, sections: [{ id: 's1', title: 'Nos menus', items: [{ prestationId: a.id }] }] })]);
+
+      // Aperçu de l'éditeur : couverture, prestation sur plusieurs pages, contact, formulaire.
+      await page.goto(`/brochures/${b.id}`);
+      await expect(page.getByText(/^1 \/ ([6-9]|\d\d)$/)).toBeVisible({ timeout: 20_000 });
+
+      // Lien public : chaque page de la prestation montre une tranche, rien ne défile ; dernier paragraphe atteint.
+      const reader = await page.context().newPage();
+      await reader.setViewportSize({ width: 600, height: 900 });
+      await reader.goto(`/b/${token}`);
+      const counter = reader.getByText(/^1 \/ \d+$/);
+      await expect(counter).toHaveText(/^1 \/ ([6-9]|\d\d)$/, { timeout: 20_000 });
+      const total = Number((await counter.textContent())!.split('/')[1]);
+      await reader.keyboard.press('ArrowRight');
+      await reader.waitForTimeout(750);
+      await expect(reader.locator('[data-page-slice]').first()).toBeVisible();
+      // Une ligne est dans la tranche montrée si sa boîte coupe celle de la tranche.
+      const shown = async (text: RegExp) => {
+        const slice = await reader.locator('[data-page-slice]').first().boundingBox();
+        const line = await reader.getByText(text).boundingBox();
+        return !!slice && !!line && line.y < slice.y + slice.height && line.y + line.height > slice.y;
+      };
+      expect(await shown(/^Paragraphe 1 :/)).toBe(true);
+      expect(await shown(/^Paragraphe 14 :/)).toBe(false);
+      for (let i = 2; i < total - 2; i++) { await reader.keyboard.press('ArrowRight'); await reader.waitForTimeout(750); }
+      expect(await shown(/^Paragraphe 14 :/)).toBe(true);
+      await reader.screenshot({ path: 'e2e/screenshots/brochure-suite.png' });
+      await reader.close();
+    });
+  });
+
+  test('prestation sans photo : aucun cadre, le texte prend la largeur', async ({ browser }: { browser: Browser }) => {
+    const t = await brochureAccount('brochure-sans-photo');
+    try {
+      await sql(`update public.brochures set style = 'magazine' where id = $1`, [t.brochureId]);
+      const context = await browser.newContext({ viewport: { width: 600, height: 900 }, storageState: { cookies: [], origins: [] } });
+      const reader = await context.newPage();
+      await reader.goto(`/b/${t.token}`);
+      await reader.keyboard.press('ArrowRight');
+      await reader.waitForTimeout(750);
+      const name = reader.getByRole('heading', { name: 'Menu Tentation' });
+      await expect(name).toBeVisible({ timeout: 20_000 });
+      const sheet = await reader.locator('.wb-sheet').filter({ has: name }).boundingBox();
+      const box = await name.boundingBox();
+      expect(box!.x - sheet!.x).toBeLessThan(sheet!.width * 0.2);
+      await expect(reader.locator('.wb-sheet [data-photo], .wb-sheet [data-photo-hint]')).toHaveCount(0);
+      await context.close();
+    } finally {
+      await deleteAccount(t.user.id);
+    }
   });
 });

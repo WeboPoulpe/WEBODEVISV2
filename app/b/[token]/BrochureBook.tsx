@@ -2,11 +2,12 @@
 
 // Le livre du lien public : les pages de la brochure dans le feuilletage.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Flipbook } from '@/components/brochures/Flipbook';
 import FormSheet from '@/components/brochures/FormSheet';
 import BrochureRequestForm, { useBrochureForm } from '@/components/brochures/BrochureRequestForm';
-import { BrochurePageView } from '@/components/brochures/BrochurePages';
+import { BrochurePageView, pageFlow } from '@/components/brochures/BrochurePages';
+import { expandPages, useFlowBreaks } from '@/components/brochures/flow';
 import type { PublicBrochure } from '@/server/brochures';
 
 export default function BrochureBook({ brochure, token }: { brochure: PublicBrochure; token: string }) {
@@ -23,7 +24,11 @@ export default function BrochureBook({ brochure, token }: { brochure: PublicBroc
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
-  const formIndex = brochure.pages.findIndex((p) => p.kind === 'form');
+  // Pages trop pleines : la suite passe sur des pages ajoutées.
+  const flows = useMemo(() => brochure.pages.map((page) => pageFlow({ page, style: brochure.style, language: brochure.language, about: brochure.about })), [brochure]);
+  const { breaks, measurer } = useFlowBreaks(flows);
+  const pages = expandPages(brochure.pages, flows, breaks);
+  const formIndex = pages.findIndex((p) => p.page.kind === 'form');
   const [onForm, setOnForm] = useState(false);
   const [sheet, setSheet] = useState(false);
   useEffect(() => { setSheet(phone && onForm); }, [phone, onForm]);
@@ -41,11 +46,12 @@ export default function BrochureBook({ brochure, token }: { brochure: PublicBroc
       onPageChange={(visible) => setOnForm(visible.includes(formIndex))}
       ariaLabel={brochure.name}
       labels={en ? { prev: 'Previous page', next: 'Next page' } : { prev: 'Page précédente', next: 'Page suivante' }}
-      pages={brochure.pages.map((page, i) => (
-        <BrochurePageView key={i} page={page} style={brochure.style} cover={brochure.cover} company={brochure.company}
+      pages={pages.map(({ page, slice }, i) => (
+        <BrochurePageView key={i} page={page} slice={slice} style={brochure.style} cover={brochure.cover} company={brochure.company}
           language={brochure.language} about={brochure.about} formSlot={formSlot} />
       ))}
     />
+    {measurer}
     <FormSheet open={sheet} onClose={() => setSheet(false)} title={formTitle} language={brochure.language}>
       <BrochureRequestForm token={token} language={brochure.language} form={form} />
     </FormSheet>

@@ -5,6 +5,8 @@
 import type { CSSProperties, DragEvent, ReactNode } from 'react';
 import type { BrochureStyle } from '@/lib/brochure';
 import type { BlockStyle, BlockTarget, ResolvedBlock } from '@/lib/brochureLayout';
+import { FlowFrame, type Flow, type PageSlice } from './flow';
+import { FramedPhoto, PhotoText } from './PhotoText';
 
 const INK = '#1C2621';
 const ACCENT = '#B4502D';
@@ -38,13 +40,7 @@ const titleStyle = (s: BlockStyle | undefined, base: number): CSSProperties => (
   margin: 0, fontSize: px(s?.titleSize ?? base), lineHeight: 1.2, fontWeight: 600, color: s?.titleColor ?? INK,
 });
 
-function Photo({ url, style }: { url: string | null; style?: CSSProperties }) {
-  if (!url) return <div data-photo="" style={{ background: 'linear-gradient(135deg,#d9c8ad,#9c8a6c)', ...style }} />;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img data-photo="" src={url} alt="" style={{ objectFit: 'cover', display: 'block', width: '100%', ...style }} />;
-}
-
-function Prestation({ b }: { b: Extract<ResolvedBlock, { type: 'prestation' }> }) {
+function Prestation({ b, hint }: { b: Extract<ResolvedBlock, { type: 'prestation' }>; hint: boolean }) {
   const { item } = b;
   if (item.missing) return <p style={{ fontSize: cq(3.2), color: '#b91c1c', textDecoration: 'line-through', margin: 0 }}>Supprimée du catalogue</p>;
   // Le nom n'est pas répété sous une fiche qui le porte déjà, sauf en texte court (sans mise en forme).
@@ -62,26 +58,18 @@ function Prestation({ b }: { b: Extract<ResolvedBlock, { type: 'prestation' }> }
       )}
     </div>
   );
-  if (b.photo === 'none') return body;
-  if (b.photo === 'top') return <div><Photo url={item.photoUrl} style={{ aspectRatio: '3 / 2', marginBottom: cq(2) }} />{body}</div>;
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: b.photo === 'left' ? '40% 1fr' : '1fr 40%', gap: cq(3), alignItems: 'start' }}>
-      {b.photo === 'left' && <Photo url={item.photoUrl} style={{ aspectRatio: '1 / 1' }} />}
-      {body}
-      {b.photo === 'right' && <Photo url={item.photoUrl} style={{ aspectRatio: '1 / 1' }} />}
-    </div>
-  );
+  return <PhotoText url={item.photoUrl} frame={b.frame} pos={b.photo} size={b.photoSize ?? (b.photo === 'top' || b.photo === 'bottom' ? 66 : 40)} gap={2.5} hint={hint}>{body}</PhotoText>;
 }
 
 function BlockView({ b, editing, renderList }: { b: ResolvedBlock; editing?: BlockEditing; renderList: (blocks: ResolvedBlock[], at: Omit<BlockTarget, 'index'>) => ReactNode }) {
   switch (b.type) {
-    case 'prestation': return <Prestation b={b} />;
+    case 'prestation': return <Prestation b={b} hint={!!editing} />;
     case 'title': {
       const Tag = b.level === 'l' ? 'h2' : 'h3';
       return <Tag style={titleStyle(b.style, LEVEL[b.level])}>{b.text}</Tag>;
     }
     case 'text': return <div style={{ fontSize: cq(3.3), lineHeight: 1.55, color: INK }} dangerouslySetInnerHTML={{ __html: b.html }} />;
-    case 'image': return <Photo url={b.url} style={{ height: px(b.height), objectFit: b.fit }} />;
+    case 'image': return <FramedPhoto url={b.url} frame={{ x: 50, y: 50, zoom: 100, ...b.frame, fit: b.fit }} height={px(b.height)} hint={!!editing} />;
     case 'separator': return <div style={{ height: 1, background: b.color, width: `${b.width}%`, margin: `${cq(1)} auto` }} />;
     case 'spacer': return <div style={{ height: px(b.height) }} />;
     case 'columns':
@@ -93,11 +81,10 @@ function BlockView({ b, editing, renderList }: { b: ResolvedBlock; editing?: Blo
   }
 }
 
-export default function BlockPage({ page, theme, editing }: {
-  page: { background: string | null; font: string | null; blocks: ResolvedBlock[] };
-  theme: BrochureStyle;
-  editing?: BlockEditing;
-}) {
+type PageContent = { background: string | null; font: string | null; blocks: ResolvedBlock[] };
+
+/** Le contenu d'une page à blocs, prêt pour la suite de page ; en `editing`, blocs sélectionnables et déplaçables. */
+export function blockFlow(page: PageContent, theme: BrochureStyle, editing?: BlockEditing): Flow {
   const dropProps = (at: BlockTarget) => editing ? {
     onDragOver: (e: DragEvent) => { if (e.dataTransfer.types.includes(DRAG_TYPE)) { e.preventDefault(); e.stopPropagation(); } },
     onDrop: (e: DragEvent) => { const p = e.dataTransfer.getData(DRAG_TYPE); if (p) { e.preventDefault(); e.stopPropagation(); editing.onDrop(at, p); } },
@@ -130,14 +117,24 @@ export default function BlockPage({ page, theme, editing }: {
     </>
   );
 
-  return (
-    <div data-page-scroll="" style={{
-      position: 'absolute', inset: 0, overflowY: 'auto', padding: cq(7), color: INK,
-      background: page.background ?? undefined,
+  return {
+    pad: 7,
+    style: {
+      color: INK, background: page.background ?? undefined,
       fontFamily: page.font ? `'${page.font}', Georgia, serif` : undefined,
       textAlign: theme === 'carte' ? 'left' : 'center',
-    }}>
-      {renderList(page.blocks, {})}
-    </div>
-  );
+    },
+    content: renderList(page.blocks, {}),
+  };
+}
+
+export default function BlockPage({ page, theme, editing, slice, markers }: {
+  page: PageContent;
+  theme: BrochureStyle;
+  editing?: BlockEditing;
+  slice?: PageSlice | null;
+  /** Où la page sera coupée (éditeur), en cqw depuis le haut du contenu. */
+  markers?: number[];
+}) {
+  return <FlowFrame flow={blockFlow(page, theme, editing)} slice={slice} markers={markers} />;
 }

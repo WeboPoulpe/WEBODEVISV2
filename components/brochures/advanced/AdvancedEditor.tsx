@@ -14,12 +14,13 @@ import {
   resolveLayout, updateBlock, updatePage, type Block, type BlockTarget, type BrochureLayout, type LayoutPage,
 } from '@/lib/brochureLayout';
 import BlockPage from '../BlockPage';
-import { BrochurePageView, type BrochureCompany } from '../BrochurePages';
+import { BrochurePageView, pageFlow, type BrochureCompany } from '../BrochurePages';
+import { useFlowBreaks } from '../flow';
 import PrestationPicker from '../PrestationPicker';
 import BlockPalette, { type PaletteItem } from './BlockPalette';
 import BlockSettings from './BlockSettings';
 import PageSettings from './PageSettings';
-import PagesStrip, { useOverflow } from './PagesStrip';
+import PagesStrip from './PagesStrip';
 
 export interface AdvancedSettings {
   style: BrochureStyle;
@@ -74,12 +75,20 @@ export default function AdvancedEditor({ layout, onChange: commit, catalog, comp
     [layout, byId, settings.prices, settings.language],
   );
   const resolvedOf = (p: LayoutPage) => resolved[layout.pages.indexOf(p)];
+  const publicOf = (p: LayoutPage) => {
+    const r = resolvedOf(p);
+    return p.kind === 'blocks' ? { kind: 'blocks' as const, background: r.background, font: r.font, blocks: r.blocks } : { kind: p.kind };
+  };
+  // Où chaque page sera coupée pour le lecteur (la mise en page enregistrée ne change pas).
+  const flows = useMemo(() => layout.pages.map((p, i) => (resolved[i] && p.kind === 'blocks'
+    ? pageFlow({ page: { kind: 'blocks', background: resolved[i].background, font: resolved[i].font, blocks: resolved[i].blocks }, style: settings.style, language: settings.language, about: settings.about })
+    : null)), [layout.pages, resolved, settings.style, settings.language, settings.about]);
+  const { breaks, measurer } = useFlowBreaks(flows);
+  const breaksOf = (p: LayoutPage) => breaks[layout.pages.indexOf(p)] ?? [0];
 
   const renderPage = (p: LayoutPage): ReactNode => {
-    const r = resolvedOf(p);
-    if (!r) return null;
-    const pub = p.kind === 'blocks' ? { kind: 'blocks' as const, background: r.background, font: r.font, blocks: r.blocks } : { kind: p.kind };
-    return <BrochurePageView page={pub} style={settings.style} cover={settings.cover} company={company} language={settings.language} about={settings.about}
+    if (!resolvedOf(p)) return null;
+    return <BrochurePageView page={publicOf(p)} style={settings.style} cover={settings.cover} company={company} language={settings.language} about={settings.about}
       formSlot={<p style={{ fontSize: '4cqw', color: '#5b5b55' }}>Formulaire de demande</p>} />;
   };
 
@@ -138,7 +147,7 @@ export default function AdvancedEditor({ layout, onChange: commit, catalog, comp
     onChange({ pages });
   };
 
-  const { ref: canvasRef, over } = useOverflow([layout, pageId]);
+  const extra = page ? breaksOf(page).length - 1 : 0;
   const selectedResolved = page ? resolvedOf(page) : null;
   const selectedBlock = page ? findBlock(page.blocks, blockId) : null;
   const fontsHref = googleFontsHref(layoutFonts(layout));
@@ -146,7 +155,8 @@ export default function AdvancedEditor({ layout, onChange: commit, catalog, comp
   return (
     <div className="space-y-3">
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}
-      <PagesStrip pages={layout.pages} selectedId={pageId} onSelect={(id) => { setPageId(id); setBlockId(null); }} renderPage={renderPage}
+      {measurer}
+      <PagesStrip pages={layout.pages} extraOf={(p) => breaksOf(p).length - 1} selectedId={pageId} onSelect={(id) => { setPageId(id); setBlockId(null); }} renderPage={renderPage}
         onAdd={addPageAfter} onMove={(dir) => page && onChange(movePage(layout, page.id, dir))}
         onDuplicate={() => page && onChange(duplicatePage(layout, page.id))} onRemove={removeSelected} onReorder={reorder} />
 
@@ -164,13 +174,17 @@ export default function AdvancedEditor({ layout, onChange: commit, catalog, comp
         </div>
 
         <div className="order-1 lg:order-2 min-w-0" role="region" aria-label="Page en cours">
-          {over && <p role="status" className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">Page trop pleine : le lecteur devra faire défiler cette page. Retirez des blocs ou ajoutez une page.</p>}
+          {extra > 0 && (
+            <p role="status" className="mb-2 rounded-lg bg-[#F6E9E2] px-3 py-2 text-sm text-[#8a3b20]">
+              Cette page ne tient pas sur une feuille : la suite passera sur {extra === 1 ? 'une page' : `${extra} pages`} de plus. Les pointillés montrent où elle sera coupée.
+            </p>
+          )}
           <div className="flex justify-center rounded-2xl bg-[#EDE6DA] p-4" onClick={() => setBlockId(null)}>
-            <div ref={canvasRef} className="relative w-full max-w-[420px] overflow-hidden bg-[#FBF7F0] shadow-xl"
+            <div className="relative w-full max-w-[420px] overflow-hidden bg-[#FBF7F0] shadow-xl"
               style={{ aspectRatio: '210 / 297', containerType: 'inline-size', fontFamily: 'Georgia, "Times New Roman", serif' }}>
               {page && selectedResolved && (page.kind === 'blocks'
                 ? <BlockPage theme={settings.style} page={{ background: selectedResolved.background, font: selectedResolved.font, blocks: selectedResolved.blocks }}
-                    editing={{ selectedId: blockId, onSelect: setBlockId, onDrop, controls }} />
+                    editing={{ selectedId: blockId, onSelect: setBlockId, onDrop, controls }} markers={breaksOf(page).slice(1)} />
                 : renderPage(page))}
             </div>
           </div>
