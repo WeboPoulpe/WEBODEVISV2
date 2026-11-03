@@ -299,7 +299,9 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
               <span className={labelCls}>Sous-titre</span>
               <input value={draft.cover.subtitle ?? ''} onChange={(e) => set('cover', { ...draft.cover, subtitle: e.target.value })} maxLength={200} placeholder="Saison 2027" className={inputCls} />
             </label>
-            <PhotoField label="Ajouter une photo" url={draft.cover.photoUrl} onChange={(url) => set('cover', { ...draft.cover, photoUrl: url })} />
+            <PhotoField label="Ajouter une photo" url={draft.cover.photoUrl} ratio={141}
+              onChange={(url) => set('cover', { ...draft.cover, photoUrl: url, photoFrame: null })}
+              frame={draft.cover.photoFrame} onFrame={(photoFrame) => set('cover', { ...draft.cover, photoFrame })} />
           </Section>
 
           {!advanced && <>
@@ -313,7 +315,8 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
               <>
                 <RichTextEditor initialValue={draft.content.about.html} onChange={(html) => setContent((c) => ({ ...c, about: { ...c.about, html } }))}
                   ariaLabel="Texte de la page qui sommes-nous" placeholder="Votre histoire, votre cuisine, votre équipe…" minHeight="100px" />
-                <PhotoField label="Ajouter une photo" url={draft.content.about.photoUrl}
+                <PhotoField label="Ajouter une photo" url={draft.content.about.photoUrl} ratio={75}
+                  frame={draft.content.about.photoFrame} onFrame={(photoFrame) => setContent((c) => ({ ...c, about: { ...c.about, photoFrame } }))}
                   onChange={(url) => setContent((c) => ({ ...c, about: { ...c.about, photoUrl: url } }))} />
               </>
             )}

@@ -424,4 +424,51 @@ test.describe('brochures', () => {
       await deleteAccount(t.user.id);
     }
   });
+
+  test('photos : choisir dans la galerie, placer à gauche, régler la taille, cadrer', async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(180_000);
+    await withAccount(browser, 'brochure-photos', async (page, userId) => {
+      const origin = new URL(page.url() === 'about:blank' ? 'http://localhost:3005' : page.url()).origin;
+      const catalogue = `${origin}/icons/192`;
+      const couverture = `${origin}/icons/512`;
+      await sql(`insert into public.prestations (user_id, name, unit_price, category, description, photo_url) values ($1, 'Menu Tentation', 76, 'dîner', '<p>Entrée, plat, dessert</p>', $2)`, [userId, catalogue]);
+      const [p] = await sql<{ id: string }>(`select id from public.prestations where user_id = $1`, [userId]);
+      const [b] = await sql<{ id: string }>(`insert into public.brochures (owner_user_id, user_id, name, share_token, style, cover, content) values ($1, $1, 'Photos', $2, 'editorial', $3::jsonb, $4::jsonb) returning id`,
+        [userId, `jeton-e2e-photos-${Date.now()}`, JSON.stringify({ title: 'Photos', photoUrl: couverture }),
+          JSON.stringify({ about: { enabled: false, html: '' }, contact: { enabled: false }, sections: [{ id: 's1', title: 'Menus', items: [{ prestationId: p.id }] }] })]);
+      await page.goto(`/brochures/${b.id}`);
+      const composition = page.getByRole('region', { name: 'Composition' });
+      await composition.getByRole('button', { name: 'Retoucher « Menu Tentation »' }).click({ timeout: 20_000 });
+
+      // Galerie : la photo de couverture et celle du catalogue y sont ; on prend celle de la couverture.
+      const retouch = page.getByRole('dialog', { name: 'Retoucher « Menu Tentation »' });
+      await retouch.getByRole('button', { name: 'Changer' }).click();
+      const gallery = page.getByRole('list', { name: 'Photos disponibles' });
+      await expect(gallery.getByRole('button')).toHaveCount(2);
+      await gallery.getByRole('button', { name: 'Photos' }).click();
+
+      await retouch.getByRole('group', { name: 'Place de la photo' }).getByRole('button', { name: 'À gauche' }).click();
+      await retouch.getByRole('slider', { name: 'Taille de la photo' }).fill('50');
+      await retouch.getByRole('button', { name: 'Cadrer' }).click();
+      const framer = retouch.getByRole('button', { name: 'Cliquer sur le point de la photo à garder visible' });
+      await framer.click({ position: { x: 10, y: 10 } });
+      await retouch.getByRole('slider', { name: 'Zoom' }).fill('150');
+      await retouch.getByRole('button', { name: 'Valider' }).click();
+
+      await expect.poll(async () => (await sql<{ content: { sections: { items: Record<string, unknown>[] }[] } }>(`select content from public.brochures where id = $1`, [b.id]))[0].content.sections[0].items[0], { timeout: 10_000 })
+        .toMatchObject({ photoUrl: couverture, placement: { pos: 'left', size: 50 }, frame: { zoom: 150, fit: 'cover' } });
+      const preview = page.getByRole('region', { name: 'Aperçu de la brochure' });
+      await preview.getByRole('button', { name: 'Page suivante' }).click();
+      await page.waitForTimeout(800);
+      const img = preview.locator('[data-photo] img').first();
+      await expect(img).toHaveAttribute('src', couverture);
+      const style = await img.evaluate((el) => ({ pos: getComputedStyle(el).objectPosition, transform: el.style.transform }));
+      expect(style.pos).not.toBe('50% 50%');
+      expect(style.transform).toBe('scale(1.5)');
+      const photo = await preview.locator('[data-photo]').first().boundingBox();
+      const name = await preview.getByRole('heading', { name: 'Menu Tentation' }).boundingBox();
+      expect(photo!.x).toBeLessThan(name!.x);
+      await page.screenshot({ path: 'e2e/screenshots/brochure-photos.png' });
+    });
+  });
 });

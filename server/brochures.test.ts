@@ -178,6 +178,38 @@ describe('brochures : photos', () => {
   });
 });
 
+describe('brochures : galerie de photos', () => {
+  it('photos déjà envoyées dans les brochures de l’entreprise et du catalogue, sans doublon ; rien d’un autre compte', async () => {
+    current = OWNER;
+    await pg.query(`update prestations set photo_url = 'https://x/catalogue.webp' where id = $1`, [PRESTATION]);
+    const { id } = await br.createBrochure({ name: 'Galerie' });
+    await br.saveBrochure(id!, {
+      cover: { title: 'Galerie', photoUrl: 'https://x/couverture.webp' },
+      content: { about: { enabled: true, html: '', photoUrl: 'https://x/apropos.webp' }, sections: [{ id: 's', title: 'T', items: [
+        { prestationId: PRESTATION, photoUrl: 'https://x/retouche.webp' }, { prestationId: PRESTATION, photoUrl: 'https://x/couverture.webp' },
+      ] }] },
+    });
+    await pg.query(`update brochures set layout = $2::jsonb where id = $1`, [id, JSON.stringify({ pages: [
+      { id: 'p', kind: 'blocks', blocks: [{ id: 'i', type: 'image', url: 'https://x/bloc.webp', height: 200, fit: 'cover' },
+        { id: 'c', type: 'columns', count: 2, gap: 12, cols: [[{ id: 'j', type: 'image', url: 'https://x/colonne.webp', height: 100, fit: 'cover' }], []] }] },
+      { id: 'f', kind: 'form', blocks: [] },
+    ] })]);
+    current = STRANGER;
+    const theirs = await br.createBrochure({ name: 'Autre' });
+    await br.saveBrochure(theirs.id!, { cover: { title: 'Autre', photoUrl: 'https://x/autre-compte.webp' } });
+    current = OWNER;
+
+    const photos = await br.listBrochurePhotos();
+    const urls = photos.map((p) => p.url);
+    expect(urls).toEqual(expect.arrayContaining([
+      'https://x/catalogue.webp', 'https://x/couverture.webp', 'https://x/apropos.webp', 'https://x/retouche.webp', 'https://x/bloc.webp', 'https://x/colonne.webp',
+    ]));
+    expect(urls).not.toContain('https://x/autre-compte.webp');
+    expect(new Set(urls).size).toBe(urls.length);
+    expect(photos.find((p) => p.url === 'https://x/catalogue.webp')!.label).toBe('Menu Tentation');
+  });
+});
+
 describe('brochures : formulaire de fin', () => {
   const fields = { first_name: 'Camille', last_name: 'Martin', email: 'camille@exemple.fr', event_type: 'Mariage', guest_count: 80, message: 'Bonjour' };
   const tokenOf = async (id: string) => (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;

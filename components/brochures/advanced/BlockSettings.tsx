@@ -11,6 +11,7 @@ import { btnSecondary, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import type { CatalogPrestation } from '@/lib/brochure';
 import { BLOCK_FONTS, PALETTE, TITLE_SIZES, type Align, type Block, type BlockStyle } from '@/lib/brochureLayout';
+import { placementSize, SIZE_BOUNDS } from '@/lib/photoFrame';
 import ItemRetouch from '../ItemRetouch';
 import PhotoField from '../PhotoField';
 
@@ -104,8 +105,24 @@ export default function BlockSettings({ block, catalog, language, onChange }: {
         return (
           <>
             <p className="text-sm font-medium text-gray-900">{p ? p.name : 'Supprimée du catalogue'}</p>
-            <Choice label="Photo" value={block.photo} onChange={(photo) => set({ photo })}
-              options={[{ value: 'top', label: 'Haut' }, { value: 'left', label: 'Gauche' }, { value: 'right', label: 'Droite' }, { value: 'none', label: 'Aucune' }]} />
+            {/* Place choisie : sa taille est gardée (elle suit aussi dans l'éditeur simple). */}
+            <Choice label="Photo" value={block.photo} onChange={(photo) => set({ photo, photoSize: placementSize(photo, block.photoSize) })}
+              options={[{ value: 'top', label: 'Haut' }, { value: 'bottom', label: 'Bas' }, { value: 'left', label: 'Gauche' }, { value: 'right', label: 'Droite' }, { value: 'none', label: 'Aucune' }]} />
+            {block.photo !== 'none' && (() => {
+              const side = block.photo === 'left' || block.photo === 'right';
+              const b = SIZE_BOUNDS[side ? 'side' : 'stack'];
+              const size = placementSize(block.photo, block.photoSize);
+              return (
+                <>
+                  <Range label={side ? 'Largeur de la photo (%)' : 'Hauteur de la photo (%)'} value={size} min={b.min} max={b.max} onChange={(photoSize) => set({ photoSize })} />
+                  {p && (
+                    <PhotoField label={p.photo_url ? 'Remplacer la photo du catalogue' : 'Ajouter une photo'} url={block.photoUrl ?? p.photo_url} ratio={side ? 100 : size}
+                      onChange={(url) => set({ photoUrl: url ?? undefined, frame: undefined })}
+                      frame={block.frame} onFrame={(frame) => set({ frame: frame ?? undefined })} />
+                  )}
+                </>
+              );
+            })()}
             <div>
               <span className={labelCls}>Afficher</span>
               <div className="flex flex-wrap gap-3">
@@ -120,9 +137,9 @@ export default function BlockSettings({ block, catalog, language, onChange }: {
             <Choice label="Texte" value={block.text} onChange={(text) => set({ text })} options={[{ value: 'full', label: 'Complet' }, { value: 'short', label: 'Court' }]} />
             {p && <button type="button" onClick={() => setRetouching(true)} className={cn(btnSecondary, 'h-10 w-full')}><Pencil className="h-4 w-4" /> Retoucher pour cette brochure</button>}
             {retouching && p && (
-              <ItemRetouch prestation={p} language={language} onClose={() => setRetouching(false)}
+              <ItemRetouch prestation={p} language={language} onClose={() => setRetouching(false)} photo={false}
                 item={{ prestationId: block.prestationId, html: block.html, titled: block.titled, photoUrl: block.photoUrl, hidePrice: block.hidePrice }}
-                onSave={(item) => { set({ html: item.html ?? undefined, titled: item.titled, photoUrl: item.photoUrl ?? undefined, hidePrice: item.hidePrice }); setRetouching(false); }} />
+                onSave={(item) => { set({ html: item.html ?? undefined, titled: item.titled, hidePrice: item.hidePrice }); setRetouching(false); }} />
             )}
           </>
         );
@@ -139,9 +156,11 @@ export default function BlockSettings({ block, catalog, language, onChange }: {
       case 'image':
         return (
           <>
-            <PhotoField label="Choisir une image" url={block.url} onChange={(url) => set({ url })} />
+            {/* « Photo entière » du cadrage = « Contenir ». */}
+            <PhotoField label="Choisir une image" url={block.url} onChange={(url) => set({ url, frame: undefined })} ratio={Math.round((block.height / 420) * 100)}
+              frame={block.frame ? { ...block.frame, fit: block.fit } : block.fit === 'contain' ? { x: 50, y: 50, zoom: 100, fit: 'contain' } : null}
+              onFrame={(frame) => set({ frame: frame ?? undefined, fit: frame?.fit ?? 'cover' })} />
             <Range label="Hauteur" value={block.height} min={40} max={600} step={10} onChange={(height) => set({ height })} />
-            <Choice label="Cadrage" value={block.fit} onChange={(fit) => set({ fit })} options={[{ value: 'cover', label: 'Remplir' }, { value: 'contain', label: 'Contenir' }]} />
           </>
         );
       case 'columns':

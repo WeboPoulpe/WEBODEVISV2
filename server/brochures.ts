@@ -238,6 +238,33 @@ export async function getBrochureEditorData(id: string): Promise<{ brochure: Bro
   };
 }
 
+/** Photos à reprendre dans une brochure : celles déjà mises dans les brochures de l'entreprise, puis celles du catalogue. */
+export async function listBrochurePhotos(): Promise<{ url: string; label: string }[]> {
+  const user = await requireUser();
+  const [rows, catalog] = await Promise.all([
+    db.select({ name: brochures.name, cover: brochures.cover, content: brochures.content, layout: brochures.layout })
+      .from(brochures).where(mine(user.id)).orderBy(desc(brochures.updated_at)).limit(100),
+    db.select({ name: prestations.name, url: prestations.photo_url }).from(prestations)
+      .where(and(sql`${prestations.user_id} in ${companyIdsOf(user.id)}`, sql`${prestations.photo_url} is not null`)).orderBy(prestations.name),
+  ]);
+  const found = new Map<string, string>();
+  const add = (url: unknown, label: string) => {
+    if (typeof url === 'string' && /^https?:\/\//.test(url) && !found.has(url)) found.set(url, label);
+  };
+  for (const b of rows) {
+    add(parseCover(b.cover, b.name).photoUrl, b.name);
+    const content = parseBrochureContent(b.content);
+    add(content.about.photoUrl, b.name);
+    content.sections.forEach((s) => s.items.forEach((i) => add(i.photoUrl, b.name)));
+    parseLayout(b.layout)?.pages.forEach((p) => p.blocks.flatMap((x) => (x.type === 'columns' ? x.cols.flat() : [x])).forEach((x) => {
+      if (x.type === 'image') add(x.url, b.name);
+      if (x.type === 'prestation') add(x.photoUrl, b.name);
+    }));
+  }
+  for (const c of catalog) add(c.url, c.name);
+  return [...found].slice(0, 300).map(([url, label]) => ({ url, label }));
+}
+
 /** Pages du lien public : mise en page avancée (pages à blocs résolues) ou pagination de l'éditeur simple. */
 function publicPages(row: BrochureRow, content: BrochureContent, catalog: Map<string, CatalogPrestation>, o: Omit<PriceOptions, 'forEditor'>): PublicPage[] {
   const layout = row.editor_mode === 'advanced' ? parseLayout(row.layout) : null;

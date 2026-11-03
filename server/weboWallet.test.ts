@@ -88,9 +88,11 @@ describe('portefeuille', () => {
   });
 
   it('remboursement : rendu une seule fois', async () => {
-    await w.walletOf(OWNER, OCT);
+    // Le débit est daté du jour (journal) : le portefeuille doit être sur le mois en cours.
+    const now = new Date();
+    await w.walletOf(OWNER, now);
     await pg.query(`update webo_wallets set month_coins = 1, kept_coins = 5 where company_id = $1`, [OWNER]);
-    const r = await w.debitCoins(OWNER, { userId: OWNER, amount: 3, reason: 'Test', idempotencyKey: 'r1' }, OCT);
+    const r = await w.debitCoins(OWNER, { userId: OWNER, amount: 3, reason: 'Test', idempotencyKey: 'r1' }, now);
     if (!r.ok) throw new Error('débit refusé');
     await w.refundDebit(r.ledgerId);
     await w.refundDebit(r.ledgerId);
