@@ -86,7 +86,7 @@ export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente
   const startX = useRef<number | null>(null);
   const page = (i: number) => (i >= 0 && i <= last ? pages[i] : null);
   const sheet = (content: ReactNode, side: 'left' | 'right' | 'single') => (
-    <div className="wb-sheet absolute inset-0 overflow-hidden bg-[#FBF7F0]" style={{
+    <div data-flow-sheet="" className="wb-sheet absolute inset-0 overflow-hidden bg-[#FBF7F0]" style={{
       boxShadow: side === 'left' ? 'inset -14px 0 18px -16px rgba(0,0,0,.45)' : side === 'right' ? 'inset 14px 0 18px -16px rgba(0,0,0,.45)' : undefined,
       containerType: 'inline-size',
     }}>{content}</div>

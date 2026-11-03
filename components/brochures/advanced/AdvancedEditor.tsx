@@ -180,7 +180,7 @@ export default function AdvancedEditor({ layout, onChange: commit, catalog, comp
             </p>
           )}
           <div className="flex justify-center rounded-2xl bg-[#EDE6DA] p-4" onClick={() => setBlockId(null)}>
-            <div className="relative w-full max-w-[420px] overflow-hidden bg-[#FBF7F0] shadow-xl"
+            <div data-flow-sheet="" className="relative w-full max-w-[420px] overflow-hidden bg-[#FBF7F0] shadow-xl"
               style={{ aspectRatio: '210 / 297', containerType: 'inline-size', fontFamily: 'Georgia, "Times New Roman", serif' }}>
               {page && selectedResolved && (page.kind === 'blocks'
                 ? <BlockPage theme={settings.style} page={{ background: selectedResolved.background, font: selectedResolved.font, blocks: selectedResolved.blocks }}

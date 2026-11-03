@@ -7,7 +7,8 @@ export interface FlowUnit {
   bottom: number;
   /** line : texte coupable entre deux lignes ; block : insécable (photo, cadre) ; heading : titre, jamais seul en bas. */
   kind: 'line' | 'block' | 'heading';
-  lineHeight?: number;
+  /** Les lignes réelles d'un texte (kind line), de haut en bas. */
+  lines?: { top: number; bottom: number }[];
 }
 
 const EPS = 0.5;
@@ -21,15 +22,13 @@ export function computeBreaks(units: FlowUnit[], pageHeight: number, total: numb
   for (const u of sorted) {
     candidates.add(u.top);
     candidates.add(u.bottom);
-    if (u.kind === 'line' && u.lineHeight && u.lineHeight > 0) {
-      for (let y = u.top + u.lineHeight; y < u.bottom - EPS; y += u.lineHeight) candidates.add(y);
-    }
+    for (const l of u.lines ?? []) { candidates.add(l.top); candidates.add(l.bottom); }
   }
   const valid = (b: number) => sorted.every((u, i) => {
     if (u.top < b - EPS && u.bottom > b + EPS) {
-      if (u.kind !== 'line' || !u.lineHeight) return false;
-      const k = (b - u.top) / u.lineHeight;
-      return Math.abs(k - Math.round(k)) < 0.01;
+      // Texte à cheval : la coupure passe entre deux lignes, jamais à travers l'une d'elles.
+      if (u.kind !== 'line' || !u.lines?.length) return false;
+      return u.lines.every((l) => !(l.top < b - EPS && l.bottom > b + EPS));
     }
     // Titre au-dessus de la coupure, et rien d'autre entre lui et elle : le titre resterait seul.
     if (u.kind === 'heading' && u.bottom <= b + EPS) {

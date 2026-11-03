@@ -16,8 +16,8 @@ export interface PageSlice { from: number; to: number }
 
 /** Hauteur d'une page A4 en centièmes de sa largeur. */
 export const PAGE_HEIGHT = (297 / 210) * 100;
-const WIDTH = 420;
-const SCALE = 100 / WIDTH;
+/** Largeur de mesure tant qu'aucune page n'est affichée. */
+const DEFAULT_WIDTH = 420;
 
 /** Le cadre d'une page : sa tranche du contenu, ou (sans tranche) tout le contenu, qui défile si besoin. */
 export function FlowFrame({ flow, slice, markers }: { flow: Flow; slice?: PageSlice | null; markers?: number[] }) {
@@ -51,26 +51,44 @@ const isBlockDisplay = (el: Element) => {
   return d !== 'none' && d !== 'contents' && !d.startsWith('inline');
 };
 
-/** Les boîtes du contenu, en cqw depuis son haut : feuilles de texte, titres, et blocs insécables. */
-function collect(root: HTMLElement): FlowUnit[] {
+/** Les lignes réelles d'un texte : boîtes de ses caractères, regroupées par ligne. */
+function lineBoxes(el: HTMLElement): { top: number; bottom: number }[] {
+  const rects: DOMRect[] = [];
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!n.textContent?.trim()) continue;
+    range.selectNodeContents(n);
+    rects.push(...Array.from(range.getClientRects()).filter((r) => r.height > 0));
+  }
+  // Images et autres éléments en ligne comptent aussi dans la hauteur de leur ligne.
+  el.querySelectorAll('img, svg, br').forEach((x) => { const r = x.getBoundingClientRect(); if (r.height > 0) rects.push(r); });
+  rects.sort((a, b) => a.top - b.top);
+  const lines: { top: number; bottom: number }[] = [];
+  for (const r of rects) {
+    const last = lines[lines.length - 1];
+    if (last && r.top < last.bottom - 1) last.bottom = Math.max(last.bottom, r.bottom);
+    else lines.push({ top: r.top, bottom: r.bottom });
+  }
+  return lines;
+}
+
+/** Les boîtes du contenu, en cqw depuis son haut : feuilles de texte (avec leurs lignes), titres, blocs insécables. */
+function collect(root: HTMLElement, scale: number): FlowUnit[] {
   const origin = root.getBoundingClientRect().top;
+  const at = (y: number) => (y - origin) * scale;
   const units: FlowUnit[] = [];
   const walk = (el: Element) => {
     for (const child of Array.from(el.children)) {
       const c = child as HTMLElement;
       const r = c.getBoundingClientRect();
       if (r.height < 0.5) continue;
-      const top = (r.top - origin) * SCALE;
-      const bottom = (r.bottom - origin) * SCALE;
+      const top = at(r.top);
+      const bottom = at(r.bottom);
       if (c.hasAttribute('data-flow-block') || /^(IMG|TABLE|SVG|VIDEO|IFRAME|HR)$/i.test(c.tagName)) { units.push({ top, bottom, kind: 'block' }); continue; }
       if (/^H[1-6]$/.test(c.tagName) || c.hasAttribute('data-flow-heading')) { units.push({ top, bottom, kind: 'heading' }); continue; }
       if (Array.from(c.children).some(isBlockDisplay)) { walk(c); continue; }
-      const cs = getComputedStyle(c);
-      const fontSize = parseFloat(cs.fontSize) || 16;
-      const lh = cs.lineHeight === 'normal' ? fontSize * 1.2 : parseFloat(cs.lineHeight) || fontSize * 1.2;
-      const inset = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.borderTopWidth) || 0);
-      const insetBottom = (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-      units.push({ top: top + inset * SCALE, bottom: bottom - insetBottom * SCALE, kind: 'line', lineHeight: lh * SCALE });
+      units.push({ top, bottom, kind: 'line', lines: lineBoxes(c).map((l) => ({ top: at(l.top), bottom: at(l.bottom) })) });
     }
   };
   walk(root);
@@ -87,6 +105,8 @@ export function useFlowBreaks(flows: (Flow | null)[]): { breaks: (number[] | nul
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
   const [breaks, setBreaks] = useState<(number[] | null)[]>(() => flows.map(() => null));
+  // Mesure à la largeur réelle des pages : les fiches écrivent leurs tailles en pixels, le texte ne suit pas la page.
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
   const flowsRef = useRef(flows);
   flowsRef.current = flows;
 
@@ -113,18 +133,24 @@ export function useFlowBreaks(flows: (Flow | null)[]): { breaks: (number[] | nul
 
   useLayoutEffect(() => {
     if (!mount) return;
+    const sheetOf = () => Array.from(document.querySelectorAll<HTMLElement>('[data-flow-sheet]')).find((e) => e.getBoundingClientRect().width > 120);
     const measure = () => {
+      const shown = sheetOf()?.getBoundingClientRect().width;
+      if (shown && Math.abs(shown - width) > 1) { setWidth(shown); return; }
+      const scale = 100 / width;
       const next = flowsRef.current.map((f, i) => {
         const root = f && mount.querySelector<HTMLElement>(`[data-flow-i="${i}"] [data-flow-root]`);
         if (!f || !root) return null;
-        const total = root.getBoundingClientRect().height * SCALE;
-        return computeBreaks(collect(root), PAGE_HEIGHT - 2 * f.pad, total);
+        const total = root.getBoundingClientRect().height * scale;
+        return computeBreaks(collect(root, scale), PAGE_HEIGHT - 2 * f.pad, total);
       });
       setBreaks((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
     measure();
     const ro = new ResizeObserver(measure);
     mount.querySelectorAll('[data-flow-root]').forEach((r) => ro.observe(r));
+    const sheet = sheetOf();
+    if (sheet) ro.observe(sheet);
     let alive = true;
     document.fonts?.ready.then(() => { if (alive) measure(); });
     return () => { alive = false; ro.disconnect(); };
@@ -133,7 +159,7 @@ export function useFlowBreaks(flows: (Flow | null)[]): { breaks: (number[] | nul
   const content = (
     <>
       {flows.map((f, i) => f && (
-        <div key={i} data-flow-i={i} className="wb-sheet" style={{ width: WIDTH, containerType: 'inline-size', fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <div key={i} data-flow-i={i} className="wb-sheet" style={{ width, containerType: 'inline-size', fontFamily: 'Georgia, "Times New Roman", serif' }}>
           <div style={{ padding: `0 ${f.pad}cqw`, ...f.style }}>
             <div data-flow-root="" style={{ display: 'flow-root' }}>{f.content}</div>
           </div>
@@ -156,6 +182,6 @@ export function expandPages<T>(pages: T[], flows: (Flow | null)[], breaks: (numb
     const f = flows[i];
     if (!f || !b || b.length < 2) return [{ page, slice: null, source: i }];
     const height = PAGE_HEIGHT - 2 * f.pad;
-    return b.map((from, k) => ({ page, slice: { from, to: Math.min(b[k + 1] ?? from + height, from + height) }, source: i }));
+    return b.map((from, k) => ({ page, slice: { from, to: b[k + 1] ?? from + height }, source: i }));
   });
 }
