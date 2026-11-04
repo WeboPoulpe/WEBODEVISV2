@@ -38,14 +38,18 @@ export function computeBreaks(units: FlowUnit[], pageHeight: number, total: numb
     return true;
   });
   const list = [...candidates].sort((a, b) => a - b);
+  // Fin du contenu visible : la marge du bas du dernier élément ne fait pas une page de plus.
+  const end = sorted.length ? Math.min(total, Math.max(...sorted.map((u) => u.bottom))) : total;
+  // Une page doit commencer au moins un élément : sinon elle ne montrerait qu'un interstice.
+  const startsSomething = (from: number, to: number) => sorted.some((u) => u.top >= from - EPS && u.top < to - EPS);
   let start = 0;
-  while (total - start > pageHeight + EPS) {
+  while (end - start > pageHeight + EPS) {
     const limit = start + pageHeight;
     let best = -1;
     for (const c of list) {
       if (c <= start + EPS) continue;
       if (c > limit + EPS) break;
-      if (valid(c)) best = c;
+      if (valid(c) && startsSomething(start, c)) best = c;
     }
     start = best > 0 ? best : limit;
     breaks.push(start);

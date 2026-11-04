@@ -45,4 +45,14 @@ describe('suite de page : coupures', () => {
     const units = Array.from({ length: 10 }, (_, i) => block(i * 30, i * 30 + 25));
     expect(computeBreaks(units, 100, 295)).toEqual([0, 90, 180, 270]);
   });
+
+  it('pas de page presque vide : marge du bas après le dernier élément, ni page qui ne montre qu’un interstice', () => {
+    // Le contenu mesuré déborde de 8 par la seule marge du bas : rien à montrer après.
+    expect(computeBreaks([block(0, 95)], 100, 108)).toEqual([0]);
+    // Une photo plus haute qu'une page commence juste après une coupure : elle est coupée, pas précédée d'une page vide.
+    const b = computeBreaks([block(0, 99), block(101, 400)], 100, 400);
+    expect(b[1]).toBe(99);
+    // Avant : page 2 = 99 → 101, un interstice vide. Maintenant la page 2 montre le haut de la photo.
+    expect(b[2] - b[1]).toBeGreaterThan(50);
+  });
 });

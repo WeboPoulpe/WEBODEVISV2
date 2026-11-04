@@ -112,7 +112,7 @@ export function useFlowBreaks(flows: (Flow | null)[]): { breaks: (number[] | nul
 
   useLayoutEffect(() => {
     const el = host.current;
-    if (!el || mount) return;
+    if (!el) return;
     // Rejoué deux fois en développement (StrictMode) : le DOM fantôme n'est créé qu'une fois.
     const shadow = shadowRef.current ?? el.attachShadow({ mode: 'closed' });
     shadowRef.current = shadow;
@@ -128,8 +128,9 @@ export function useFlowBreaks(flows: (Flow | null)[]): { breaks: (number[] | nul
     const div = document.createElement('div');
     shadow.appendChild(div);
     setMount(div);
+    // Créé une seule fois (deux en StrictMode) : l'observateur des styles vit autant que le mesureur.
     return () => mo.disconnect();
-  }, [mount]);
+  }, []);
 
   useLayoutEffect(() => {
     if (!mount) return;
@@ -154,7 +155,8 @@ export function useFlowBreaks(flows: (Flow | null)[]): { breaks: (number[] | nul
     let alive = true;
     document.fonts?.ready.then(() => { if (alive) measure(); });
     return () => { alive = false; ro.disconnect(); };
-  });
+    // Pas à chaque rendu (une frappe dans le formulaire du lien public) : images et polices passent par les observateurs.
+  }, [mount, width, flows]);
 
   const content = (
     <>
