@@ -22,6 +22,8 @@ export interface Profile {
   cgv: string | null;
   subscription_type: string | null;
   parent_user_id: string | null;
+  /** Rôle dans l'entreprise (gérant, commercial…), pour un collaborateur. */
+  company_role?: string | null;
   /** Comptes de l'entreprise (titulaire et collaborateurs), lui compris. */
   company_ids?: string[];
   can_view_all_company_data: boolean;

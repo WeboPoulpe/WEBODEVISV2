@@ -1,8 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Mail, Phone, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { ExternalLink, Loader2, Mail, Phone, Trash2 } from 'lucide-react';
 import { deleteSiteRequest, listSiteRequests, updateSiteRequest, type AdminSiteRequest, type SiteRequestStatus } from '@/server/admin';
+import { getSiteWebCatalogAdmin } from '@/server/siteWeb';
+import { answerSections, type SiteAnswers, type SiteCatalog } from '@/lib/siteWeb';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
@@ -25,8 +28,12 @@ export default function AdminRequestsPage() {
   const [filter, setFilter] = useState<Filter>('a_traiter');
   const [openId, setOpenId] = useState<string | null>(null);
 
+  const [catalog, setCatalog] = useState<SiteCatalog | null>(null);
+
   const load = useCallback(async () => setRequests(await listSiteRequests()), []);
   useEffect(() => { load(); }, [load]);
+  // Pour lire les réponses d'une demande « Site web » (noms des packs et des options).
+  useEffect(() => { getSiteWebCatalogAdmin().then(setCatalog).catch(() => {}); }, []);
 
   const filtered = useMemo(() => (requests ?? []).filter((r) =>
     filter === 'toutes' || (filter === 'traitees' ? r.status === 'traitee' : r.status !== 'traitee')), [requests, filter]);
@@ -81,18 +88,20 @@ export default function AdminRequestsPage() {
         </ul>
       )}
 
-      {open && <RequestDialog key={open.id} request={open} onClose={() => setOpenId(null)} onChanged={load} />}
+      {open && <RequestDialog key={open.id} request={open} catalog={catalog} onClose={() => setOpenId(null)} onChanged={load} />}
     </div>
   );
 }
 
-function RequestDialog({ request, onClose, onChanged }: { request: AdminSiteRequest; onClose: () => void; onChanged: () => Promise<void> }) {
+function RequestDialog({ request, catalog, onClose, onChanged }: { request: AdminSiteRequest; catalog: SiteCatalog | null; onClose: () => void; onChanged: () => Promise<void> }) {
   const { confirm } = useFeedback();
   const [status, setStatus] = useState(request.status as SiteRequestStatus);
   const [notes, setNotes] = useState(request.admin_notes ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const subject = encodeURIComponent(request.kind === 'devis' ? 'Votre demande de devis WeboDevis' : 'Votre message à WeboDevis');
+  const subject = encodeURIComponent(request.kind === 'devis' ? 'Votre demande de devis WeboDevis' : request.kind === 'service' ? 'Votre projet avec Webomax' : 'Votre message à WeboDevis');
+  // Demande « Site web » : les réponses du questionnaire, rangées par étape.
+  const sections = request.kind === 'service' && request.answers && catalog ? answerSections(request.answers as SiteAnswers, catalog) : null;
 
   const save = async () => {
     setBusy(true); setError(null);
@@ -127,10 +136,29 @@ function RequestDialog({ request, onClose, onChanged }: { request: AdminSiteRequ
             {[request.company, request.team_size].filter(Boolean).join(', ')}{request.company || request.team_size ? '. ' : ''}Reçue le {when(request.created_at)}.
           </p>
         </div>
-        <p className="text-[15px] text-gray-800 whitespace-pre-wrap rounded-2xl bg-gray-50 p-4">{request.message}</p>
+        {sections ? (
+          <div className="space-y-3">
+            {sections.map((s) => (
+              <section key={s.title} className="rounded-2xl bg-gray-50 p-4">
+                <h3 className="text-sm font-semibold text-gray-900">{s.title}</h3>
+                <dl className="mt-2 space-y-1.5">
+                  {s.rows.map(([k, v]) => (
+                    <div key={k} className="grid gap-1 sm:grid-cols-[9rem_minmax(0,1fr)]">
+                      <dt className="text-sm text-gray-500">{k}</dt>
+                      <dd className="text-[15px] text-gray-900 whitespace-pre-wrap break-words">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[15px] text-gray-800 whitespace-pre-wrap rounded-2xl bg-gray-50 p-4">{request.message}</p>
+        )}
         <div className="flex flex-wrap gap-2">
           <a href={`mailto:${request.email}?subject=${subject}`} className={btnSecondary}><Mail className="h-4 w-4" />Répondre à {request.email}</a>
           {request.phone && <a href={`tel:${request.phone.replace(/\s/g, '')}`} className={btnSecondary}><Phone className="h-4 w-4" />{request.phone}</a>}
+          {request.user_id && <Link href={`/admin/comptes?compte=${request.user_id}`} className={btnSecondary}><ExternalLink className="h-4 w-4" />Voir le compte</Link>}
         </div>
         <div>
           <p className={labelCls}>Suivi</p>

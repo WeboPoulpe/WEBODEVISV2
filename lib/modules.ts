@@ -43,6 +43,13 @@ export const MODULES: AppModule[] = [
     standard: true,
   },
   {
+    key: 'siteweb',
+    label: 'Site web Webomax',
+    description: 'Onglet « Site web » : les sites et logiciels Webomax, demande de rappel. À couper chez un client qui a déjà son site.',
+    routes: ['/site-web'],
+    standard: true,
+  },
+  {
     key: 'assistant',
     label: 'Assistant Claude',
     description: 'Création de devis et gestion par l’assistant. Pas encore disponible.',

@@ -1,7 +1,7 @@
 import {
   FilePlus2, Library, UploadCloud, Send, UserPlus, Search, Link2, Inbox, CalendarPlus, CalendarRange, History,
   Printer, Plus, ShoppingBasket, Boxes, AlertTriangle, Percent, Carrot, CalendarDays, Truck, ListChecks, Wrench,
-  PackageOpen, LayoutTemplate, FolderTree, Bell, Building2, Users, ClipboardList, Settings, FileText, Wallet, BookOpen,
+  PackageOpen, LayoutTemplate, FolderTree, Bell, Building2, Users, ClipboardList, Settings, FileText, Wallet, BookOpen, Globe, PhoneCall,
 } from 'lucide-react';
 
 // Mégamenu de la barre latérale : une entrée par page du menu (même `href` que dans components/layout/nav.ts).
@@ -81,6 +81,13 @@ export const NAV_MEGA: Record<string, NavMegaEntry> = {
     summary: 'Vos prestations présentées comme un livre qu’on feuillette, envoyé par lien. La dernière page est un formulaire de demande.',
     actions: [
       { label: 'Nouvelle brochure', hint: 'Mariages, entreprises, cocktails…', href: '/brochures?action=nouvelle', icon: BookOpen },
+    ],
+  },
+  '/site-web': {
+    summary: 'Un site conçu par Webomax, relié à vos devis : les demandes de vos visiteurs arrivent directement dans vos Prospects.',
+    actions: [
+      { label: 'Voir les réalisations et les formules', hint: 'Sites de traiteurs, packs et options', href: '/site-web', icon: Globe },
+      { label: 'Être rappelé par Webomax', hint: 'Quelques questions, puis un appel', href: '/site-web?action=rappel', icon: PhoneCall },
     ],
   },
   '/journee': {

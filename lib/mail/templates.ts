@@ -1,4 +1,5 @@
 import { esc, renderEmail } from './layout';
+import { answerSections, projectLabel, type SiteAnswers, type SiteCatalog } from '../siteWeb';
 
 // Un email = un objet et un corps. Les textes saisis par les utilisateurs sont toujours échappés.
 
@@ -330,6 +331,41 @@ export function siteRequestAckEmail({ request }: { request: SiteRequestDetails }
         `« ${multiline(request.message)} »`,
       ],
       note: 'Pour compléter votre demande, répondez simplement à cet email.',
+    }),
+  };
+}
+
+// ── Onglet « Site web » : demande de rappel d'un traiteur ─────────────────────
+
+/** À Webomax : la demande, rangée par étape du questionnaire. */
+export function siteServiceNotificationEmail({ answers, catalog, company, appUrl }: { answers: SiteAnswers; catalog: SiteCatalog; company: string | null; appUrl: string }): Email {
+  const project = projectLabel(answers.project, catalog);
+  return {
+    subject: `Site web : ${project}, ${company ?? answers.name}`,
+    html: renderEmail({
+      preheader: `${answers.name}${company ? `, ${company}` : ''} souhaite être rappelé pour un projet.`,
+      title: 'Demande de rappel depuis WeboDevis',
+      paragraphs: [`${esc(answers.name)}${company ? `, de ${esc(company)},` : ''} demande à être rappelé pour : <strong>${esc(project)}</strong>.`],
+      facts: answerSections(answers, catalog).flatMap((s) => s.rows),
+      button: { label: 'Ouvrir dans l’administration', url: `${appUrl}/admin/demandes` },
+      note: 'Répondre à cet email écrit directement au traiteur.',
+    }),
+  };
+}
+
+/** Au traiteur : accusé de réception. Aucun délai promis. */
+export function siteServiceAckEmail({ answers, catalog }: { answers: SiteAnswers; catalog: SiteCatalog }): Email {
+  return {
+    subject: 'Votre demande à Webomax est bien reçue',
+    html: renderEmail({
+      preheader: 'Webomax vous rappelle pour parler de votre projet.',
+      title: `Merci ${answers.name.split(/\s+/)[0]}`,
+      paragraphs: [
+        `Votre demande pour <strong>${esc(projectLabel(answers.project, catalog))}</strong> est bien arrivée. Webomax vous rappelle pour parler de votre projet.`,
+        'Pour mémoire, voici vos réponses :',
+      ],
+      facts: answerSections(answers, catalog).flatMap((s) => s.rows),
+      note: 'Pour ajouter une précision, répondez simplement à cet email.',
     }),
   };
 }

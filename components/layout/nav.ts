@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, Users, CalendarDays, CalendarRange, Package, Carrot, LayoutTemplate,
-  UserCheck, Users2, BookOpen, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun, Sparkles,
+  UserCheck, Users2, BookOpen, ShoppingBasket, Truck, Boxes, Wrench, Shield, FolderTree, Building2, PackageOpen, Box, Receipt, Sun, Sparkles, Globe,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -39,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/clients', icon: Users, label: 'Clients', exact: false },
       { href: '/prospects', icon: UserCheck, label: 'Prospects', exact: false, badge: 'newProspects' },
       { href: '/brochures', icon: BookOpen, label: 'Brochures', exact: false },
+      { href: '/site-web', icon: Globe, label: 'Site web', exact: false },
     ],
   },
   {
@@ -88,8 +89,10 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 /** Groupes de navigation, avec l'espace admin pour les administrateurs. */
 export function useNavGroups(): NavGroup[] {
   const { profile } = useAuth();
-  // Les pages des options non activées pour ce compte disparaissent du menu.
-  const hidden = hiddenRoutes(profile?.modules);
+  // Les pages des options non activées pour ce compte disparaissent du menu. « Site web » est réservé au
+  // titulaire et aux gérants : un employé ne le voit pas.
+  const employee = !!profile?.parent_user_id && profile.company_role !== 'gerant';
+  const hidden = [...hiddenRoutes(profile?.modules), ...(employee ? ['/site-web'] : [])];
   return NAV_GROUPS
     .map((g) => ({ ...g, items: g.items.filter((i) => !hidden.includes(i.href)) }))
     .map((g) => (g.title === 'Paramètres' && profile?.role === 'admin' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g))

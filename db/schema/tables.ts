@@ -1860,11 +1860,16 @@ export const site_requests = pgTable("site_requests", {
 	admin_notes: text(),
 	// Empreinte de l'adresse IP, pour limiter les envois en rafale ; l'adresse elle-même n'est pas gardée.
 	ip_hash: text(),
+	// Demande « Site web » faite depuis l'app (kind = 'service') : l'entreprise (compte principal) et les réponses
+	// du questionnaire (lib/siteWeb.ts). Nuls pour les demandes du site public.
+	user_id: uuid(),
+	answers: jsonb(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	handled_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("idx_site_requests_created_at").using("btree", table.created_at.desc().nullsFirst()),
-	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text, 'demo'::text])`),
+	index("idx_site_requests_user").using("btree", table.user_id.asc().nullsLast()).where(sql`(user_id IS NOT NULL)`),
+	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text, 'demo'::text, 'service'::text])`),
 	check("site_requests_status_check", sql`status = ANY (ARRAY['nouvelle'::text, 'en_cours'::text, 'traitee'::text])`),
 ]);
 
