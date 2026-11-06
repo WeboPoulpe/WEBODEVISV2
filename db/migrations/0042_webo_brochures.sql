@@ -1,0 +1,4 @@
+-- Webo : proposition de modifier une brochure (textes, pages, blocs, sections, réglages).
+-- La contrainte est retirée puis remise : rejouable sans erreur.
+ALTER TABLE "webo_proposals" DROP CONSTRAINT IF EXISTS "webo_proposals_kind_check";--> statement-breakpoint
+ALTER TABLE "webo_proposals" ADD CONSTRAINT "webo_proposals_kind_check" CHECK (kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text, 'memory'::text, 'quote_update'::text, 'quote_send'::text, 'event_update'::text, 'courses_recalc'::text, 'customer_upsert'::text, 'prospect_status'::text, 'prospect_to_quote'::text, 'stock_movement'::text, 'supplier_order'::text, 'supplier_order_send'::text, 'supplier_order_receive'::text, 'event_orders'::text, 'brochure_send'::text, 'brochure_update'::text, 'invoice_issue'::text, 'invoice_payment'::text]));

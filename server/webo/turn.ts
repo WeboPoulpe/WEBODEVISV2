@@ -66,8 +66,15 @@ function imageError(image: TurnInput['image']): string | null {
 }
 export type TurnResult = { error: string | null; conversationId?: string; reply?: WeboReply; balance?: number };
 
-/** Le devis de la page ouverte (s'il est de l'entreprise), résumé pour le spécialiste. */
-async function pageContext(ctx: { userId: string; companyId: string; conversationId: string; proposals: string[] }, path: string | undefined): Promise<string> {
+/** Le devis ou la brochure de la page ouverte (s'il est de l'entreprise), résumé pour le spécialiste. */
+async function pageContext(ctx: { userId: string; companyId: string; conversationId: string; proposals: string[] }, path: string | undefined, agent: AgentName): Promise<string> {
+  // Une brochure se lit en entier : seulement pour le spécialiste qui la modifie.
+  const brochureId = /^\/brochures\/([0-9a-f-]{36})(?:\/|$|\?)/i.exec(path ?? '')?.[1];
+  if (brochureId) {
+    if (agent !== 'brochures' || !isUuid(brochureId)) return '';
+    const out = JSON.parse(await runTool(ctx, 'get_brochure', { brochure_id: brochureId })) as { error?: string };
+    return out.error ? '' : `Page ouverte : le traiteur regarde cette brochure (« cette brochure » désigne celle-ci).\n${JSON.stringify(out)}`;
+  }
   const id = /^\/(?:devis|evenements)\/([0-9a-f-]{36})(?:\/|$|\?)/i.exec(path ?? '')?.[1];
   if (!id || !isUuid(id)) return '';
   const out = JSON.parse(await runTool(ctx, 'get_quote', { quote_id: id })) as { error?: string };
@@ -141,7 +148,7 @@ async function turn(user: { id: string }, input: TurnInput, send: (e: WeboEvent)
     if (image && agent !== 'devis' && agent !== 'catalogue') agent = 'catalogue';
     usage.push(...routed.usage);
     send({ type: 'agent', agent });
-    const context = [await memoriesText(companyId), await pageContext(ctx, input.path)].filter(Boolean).join('\n\n');
+    const context = [await memoriesText(companyId), await pageContext(ctx, input.path, agent)].filter(Boolean).join('\n\n');
     replyText = (await runSpecialist(agent, ctx, history, message, todayFr(), usage, Date.now() + 50_000, context,
       (delta) => send({ type: 'text', delta }), image)).text;
   } catch (e) {

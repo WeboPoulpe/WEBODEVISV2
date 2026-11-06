@@ -15,6 +15,12 @@ export default function BrochureEditorPage() {
     getBrochureEditorData(id).then(setData).catch(() => setData(null));
   }, [id]);
   useEffect(load, [load]);
+  // Brochure modifiée par Webo : l'éditeur repart de ce qui est enregistré (sinon il écraserait le changement).
+  useEffect(() => {
+    const onChanged = (e: Event) => { if ((e as CustomEvent<string>).detail === id) load(); };
+    window.addEventListener('webo:brochure-changed', onChanged);
+    return () => window.removeEventListener('webo:brochure-changed', onChanged);
+  }, [id, load]);
 
   if (data === undefined) return <div className="flex justify-center py-20 text-gray-400"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (data === null) return <p className="px-6 py-10 text-gray-600">Cette brochure est introuvable.</p>;

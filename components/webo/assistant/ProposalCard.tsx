@@ -42,6 +42,8 @@ export default function ProposalCard({ proposal, onModify, onChange }: {
     // Les pages ouvertes sur ce devis ou cet événement se rechargent (sinon elles écraseraient le changement).
     const changed = /\/(?:devis|evenements)\/([0-9a-f-]{36})/i.exec(result?.href ?? '')?.[1];
     if (decision === 'accept' && changed) window.dispatchEvent(new CustomEvent('webo:quote-changed', { detail: changed }));
+    const brochure = /\/brochures\/([0-9a-f-]{36})/i.exec(result?.href ?? '')?.[1];
+    if (decision === 'accept' && brochure) window.dispatchEvent(new CustomEvent('webo:brochure-changed', { detail: brochure }));
     onChange({ ...proposal, status: decision === 'accept' ? 'done' : 'cancelled', result });
     if (decision === 'accept') void refresh();
   };

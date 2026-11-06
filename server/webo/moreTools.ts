@@ -6,6 +6,7 @@ import { brochures, customer_invoice_payments, customer_invoices, customers, ing
 import { PAYMENT_METHODS } from '@/lib/invoices';
 import { companyIdsOf } from '../companyScope';
 import { eur, fail, isUuid, like, nullableStr, propose, str, tool, type AgentName, type Handler, type ToolContext } from './toolKit';
+import { BROCHURE_HANDLERS, BROCHURE_TOOLS } from './brochureTools';
 
 // Outils de Webo pour le reste du logiciel : clients et prospects, stock et commandes fournisseurs, factures émises
 // et paiements, brochures. Même règle : lire, ou proposer (une carte que le traiteur valide).
@@ -76,12 +77,14 @@ export const MORE_TOOLS: Record<string, Anthropic.Tool> = {
   propose_prospect_to_quote: tool('propose_prospect_to_quote', 'Propose de transformer la demande d’un prospect en devis (client retrouvé par email ou créé, devis « à faire » avec l’événement de la demande).', {
     prospect_id: { type: 'string' },
   }),
+  ...BROCHURE_TOOLS,
 };
 
 export const MORE_BY_AGENT: Partial<Record<AgentName, string[]>> = {
   stock: ['stock_levels', 'propose_stock_movement', 'list_suppliers', 'list_supplier_orders', 'propose_supplier_order', 'propose_supplier_order_send', 'propose_supplier_order_receive', 'propose_event_orders', 'list_events', 'propose_memory'],
   factures: ['list_invoices', 'propose_invoice_issue', 'propose_invoice_payment'],
   prospects: ['list_brochures', 'propose_brochure_send', 'propose_prospect_status', 'propose_prospect_to_quote'],
+  brochures: ['list_brochures', 'get_brochure', 'search_catalogue', 'propose_brochure_update', 'propose_brochure_send', 'propose_memory'],
   clients: ['search_customers', 'get_customer', 'propose_customer', 'list_prospects', 'propose_prospect_status', 'propose_prospect_to_quote', 'propose_memory'],
 };
 
@@ -167,6 +170,7 @@ async function invoiceOf(ctx: ToolContext, id: unknown) {
 const buyerName = (b: unknown) => (b && typeof b === 'object' && 'name' in b ? String((b as { name: unknown }).name ?? '') : '');
 
 export const MORE_HANDLERS: Record<string, Handler> = {
+  ...BROCHURE_HANDLERS,
   async get_customer(ctx, i) {
     const c = await customerOf(ctx, i.customer_id);
     const qs = await db.select({ id: quotes.id, number: quotes.quote_number, date: quotes.event_date, type: quotes.event_type, status: quotes.status, total: quotes.total_amount })

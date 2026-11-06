@@ -295,6 +295,13 @@
       "when": 1792766673739,
       "tag": "0041_webo_more",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793969926226,
+      "tag": "0042_webo_brochures",
+      "breakpoints": true
     }
   ]
 }

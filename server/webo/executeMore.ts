@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { customers, ingredient_stocks, profiles, prospect_requests, quotes, stock_movements, supplier_order_items, supplier_orders } from '@/db/schema';
+import { brochures, customers, ingredient_stocks, profiles, prospect_requests, quotes, stock_movements, supplier_order_items, supplier_orders } from '@/db/schema';
 import { createSupplierOrders } from '../events';
 import { sendSupplierOrder } from '../supplierOrders';
 import { issueInvoice, recordPayment } from '../invoices';
@@ -10,6 +10,8 @@ import type { PaymentMethod } from '@/lib/invoices';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
 import { customerDuplicate, invoiceRemaining, prospectStatusProblem } from './moreTools';
+import { idsOf, opsOf, prestationNames, settingsOf, stateOf } from './brochureTools';
+import { applyBrochureUpdate, type BrochureSettings } from '@/lib/webo/brochureUpdate';
 
 // Exécution des propositions « du reste du logiciel » (clients, prospects, stock, commandes, brochures, factures),
 // une fois validées par le traiteur. Tout est revérifié ici, dans l'entreprise.
@@ -159,6 +161,24 @@ async function receiveOrder(user: User, companyId: string, p: Record<string, unk
   return { href: '/stock', label: 'Voir le stock' };
 }
 
+async function updateBrochure(companyId: string, p: Record<string, unknown>): Promise<MoreResult> {
+  const id = String(p.brochureId);
+  const s = (p.settings ?? {}) as BrochureSettings;
+  // Mêmes champs que la proposition : relus par les mêmes fonctions que l'outil.
+  const settings = settingsOf({ name: s.name, language: s.language, show_prices: s.showPrices, cover_title: s.coverTitle, cover_subtitle: s.coverSubtitle });
+  const ops = opsOf(p.ops);
+  await db.transaction(async (tx) => {
+    // Brochure verrouillée : les changements s'appliquent à ce qu'elle est maintenant, pas à ce qu'elle était.
+    const [b] = await tx.select().from(brochures).where(and(eq(brochures.id, id), sql`${brochures.owner_user_id} in ${companyIdsOf(companyId)}`)).for('update').limit(1);
+    if (!b) throw new Error('Brochure introuvable.');
+    const state = stateOf(b);
+    const names = await prestationNames(companyId, idsOf(state, ops), tx);
+    const { patch } = applyBrochureUpdate(state, settings, ops, names);
+    await tx.update(brochures).set({ ...patch, updated_at: new Date().toISOString() }).where(eq(brochures.id, b.id));
+  });
+  return { href: `/brochures/${id}`, label: 'Ouvrir la brochure' };
+}
+
 /** Exécute une proposition de ces modules ; null si la sorte n'en fait pas partie. */
 export async function executeMore(kind: string, p: Record<string, unknown>, user: User, companyId: string): Promise<MoreResult | null> {
   switch (kind) {
@@ -186,6 +206,7 @@ export async function executeMore(kind: string, p: Record<string, unknown>, user
       if (r.error !== null) throw new Error(r.error);
       return { href: '/factures', label: 'Voir les factures' };
     }
+    case 'brochure_update': return updateBrochure(companyId, p);
     case 'brochure_send': {
       const r = await sendBrochure({ brochureId: String(p.brochureId), to: String(p.to), ...(p.message ? { message: String(p.message) } : {}), ...(p.prospectId ? { prospectId: String(p.prospectId) } : {}) });
       if (r.error) throw new Error(r.error);

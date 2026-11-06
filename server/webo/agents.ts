@@ -39,6 +39,7 @@ const ROLES: Record<AgentName, string> = {
   clients: `Ton rôle : les clients et les prospects. Retrouve un client (search_customers, get_customer) avant de proposer une fiche (propose_customer : particulier = prénom et nom ; entreprise = raison sociale et contact ; l'email est obligatoire). Une note s'ajoute à la suite des notes existantes. Pour un prospect : change son statut (propose_prospect_status) ou transforme sa demande en devis (propose_prospect_to_quote).`,
   stock: `Ton rôle : le stock et les commandes fournisseurs. Lis le stock (stock_levels, low_only pour ce qui est bas) ; propose des entrées, sorties ou inventaires (propose_stock_movement ; une sortie ne dépasse jamais le stock). Pour commander : list_suppliers, puis propose_supplier_order (brouillon), propose_supplier_order_send (envoi par email au fournisseur), propose_supplier_order_receive (marchandise reçue : entre en stock). Pour un événement : propose_event_orders crée les commandes depuis ses besoins.`,
   evenements: `Ton rôle : la gestion des événements confirmés (devis validés). Trouve l'événement (list_events, ou celui de la page ouverte), lis-le (get_event), puis propose les changements avec propose_event_update : check-list (ajouter, cocher), matériel à emporter (quantités adaptées aux couverts), déroulé de la journée (heures et étapes), heure d'arrivée de l'équipe, contact sur place, extras (list_extras avec la date pour éviter ceux déjà pris ou indisponibles ; n'invite par email que si le traiteur le demande). Pour la liste de courses : propose_courses_recalc.`,
+  brochures: `Ton rôle : les brochures (catalogues feuilletables envoyés par lien). Retrouve la brochure (list_brochures ; sur la page d'une brochure, « cette brochure » est celle de la page), lis-la (get_brochure), puis propose les changements avec propose_brochure_update, en reprenant exactement les identifiants lus. Une brochure est en éditeur avancé (pages à blocs : titres, textes, prestations…) ou simple (présentation et sections de prestations) : utilise les opérations de son éditeur. Pour traduire : réécris chaque titre et chaque texte dans la langue voulue, sans rien inventer, et règle la langue de la brochure. Une longue brochure se modifie en plusieurs cartes (quelques pages par carte) plutôt qu'en une seule énorme. Pour une prestation à ajouter : search_catalogue. Les photos se changent dans l'éditeur, pas par toi. Pour l'envoyer par email : propose_brochure_send.`,
   journee: `Ton rôle : résumer la journée du traiteur avec day_overview : d'abord l'urgent (aujourd'hui, en retard), puis les événements des prochains jours et ce qui leur manque, en quelques lignes. Termine par la priorité du moment.`,
   aide: `Ton rôle : expliquer comment utiliser WeboDevis, à partir des guides ci-dessous uniquement. Donne les étapes courtes à suivre et le nom des boutons. Si les guides ne couvrent pas la question, dis-le simplement.`,
 };
@@ -50,7 +51,7 @@ function systemFor(agent: AgentName): Anthropic.TextBlockParam[] {
   return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
-const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'clients', 'stock', 'evenements', 'journee', 'aide'];
+const AGENTS: AgentName[] = ['devis', 'factures', 'catalogue', 'prospects', 'clients', 'stock', 'evenements', 'brochures', 'journee', 'aide'];
 
 /** Choisit le spécialiste d'un message. */
 export async function routeMessage(text: string, history: string): Promise<{ agent: AgentName; usage: CallUsage[] }> {
@@ -66,6 +67,7 @@ export async function routeMessage(text: string, history: string): Promise<{ age
 - clients : créer ou modifier une fiche client, ajouter une note, changer le statut d'un prospect, transformer une demande en devis ;
 - stock : niveaux de stock, entrées, sorties, inventaire, fournisseurs, commandes fournisseurs (créer, envoyer, réceptionner) ;
 - evenements : préparer un événement confirmé (check-list, matériel, déroulé, heure d'arrivée, extras, courses) ;
+- brochures : modifier une brochure (textes, pages, blocs, sections, prestations, couverture), la traduire, l'envoyer par email ;
 - journee : résumer la journée, ce qu'il y a à faire, les événements à venir ;
 - aide : comment utiliser le logiciel, ou tout le reste.
 Un message de client collé (mail, SMS) qui demande une prestation va à devis.
@@ -142,6 +144,7 @@ export async function runSpecialist(
 
 function fakeRoute(text: string): AgentName {
   const t = text.toLowerCase();
+  if (/brochure/.test(t) && !/prospect/.test(t)) return 'brochures';
   if (/devis/.test(t)) return 'devis';
   if (/factur|acompte|solde/.test(t)) return 'factures';
   if (/prestation|prix|catalogue/.test(t)) return 'catalogue';

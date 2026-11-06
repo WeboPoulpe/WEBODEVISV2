@@ -6,7 +6,7 @@ import { webo_proposals } from '@/db/schema';
 // Briques communes aux outils de Webo : types, définition d'un outil strict, erreurs attendues, création d'une
 // proposition (la seule écriture que fait un outil).
 
-export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'clients' | 'stock' | 'evenements' | 'journee' | 'aide';
+export type AgentName = 'devis' | 'factures' | 'catalogue' | 'prospects' | 'clients' | 'stock' | 'evenements' | 'brochures' | 'journee' | 'aide';
 export interface ToolContext { userId: string; companyId: string; conversationId: string; proposals: string[] }
 
 export interface ProposalSummary {
