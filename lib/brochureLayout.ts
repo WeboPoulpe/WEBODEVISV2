@@ -48,10 +48,21 @@ export interface ResolvedPage { kind: PageKind; background: string | null; font:
 /** Une page du lien public : celles de l'éditeur simple, ou une page à blocs de l'éditeur avancé. */
 export type PublicPage = BrochurePage | { kind: 'blocks'; background: string | null; font: string | null; blocks: ResolvedBlock[] };
 
-/** Polices choisies dans une mise en page (pages et blocs), pour les charger. */
+/** Polices de la liste citées dans le HTML d'un texte (police choisie sur une partie du texte). */
+function htmlFonts(html: string | undefined): string[] {
+  const decls = (html ?? '').replace(/&quot;|&#39;/g, "'").match(/font-family\s*:[^;"<>]*/gi) ?? [];
+  return BLOCK_FONTS.filter((f) => decls.some((d) => d.includes(f)));
+}
+
+/** Polices choisies dans une mise en page (pages, blocs et textes), pour les charger. */
 export function layoutFonts(l: BrochureLayout | null): string[] {
   if (!l) return [];
-  const fonts = l.pages.flatMap((p) => [p.font, ...p.blocks.flatMap((b) => [b.type !== 'spacer' ? b.style?.font : null, ...(b.type === 'columns' ? b.cols.flat().map((c) => (c.type !== 'spacer' ? c.style?.font : null)) : [])])]);
+  const ofBlock = (b: Block): (string | null | undefined)[] => [
+    b.type !== 'spacer' ? b.style?.font : null,
+    ...(b.type === 'text' || b.type === 'prestation' ? htmlFonts(b.html) : []),
+    ...(b.type === 'columns' ? b.cols.flat().flatMap(ofBlock) : []),
+  ];
+  const fonts = l.pages.flatMap((p) => [p.font, ...p.blocks.flatMap(ofBlock)]);
   return [...new Set(fonts.filter((f): f is string => !!f))];
 }
 

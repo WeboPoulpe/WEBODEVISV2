@@ -184,7 +184,7 @@ export default function AdvancedEditor({ layout, onChange: commit, catalog, comp
               style={{ aspectRatio: '210 / 297', containerType: 'inline-size', fontFamily: 'Georgia, "Times New Roman", serif' }}>
               {page && selectedResolved && (page.kind === 'blocks'
                 ? <BlockPage theme={settings.style} page={{ background: selectedResolved.background, font: selectedResolved.font, blocks: selectedResolved.blocks }}
-                    editing={{ selectedId: blockId, onSelect: setBlockId, onDrop, controls }} markers={breaksOf(page).slice(1)} />
+                    editing={{ selectedId: blockId, onSelect: setBlockId, onDrop, controls, onText: (id, html) => onChange(updateBlock(layout, id, { html })) }} markers={breaksOf(page).slice(1)} />
                 : renderPage(page))}
             </div>
           </div>

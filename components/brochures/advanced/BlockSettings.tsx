@@ -6,7 +6,6 @@
 
 import { useState, type ReactNode } from 'react';
 import { Pencil } from 'lucide-react';
-import RichTextEditor from '@/components/ui/RichTextEditor';
 import { btnSecondary, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import type { CatalogPrestation } from '@/lib/brochure';
@@ -14,6 +13,7 @@ import { BLOCK_FONTS, PALETTE, TITLE_SIZES, type Align, type Block, type BlockSt
 import { placementSize, SIZE_BOUNDS } from '@/lib/photoFrame';
 import ItemRetouch from '../ItemRetouch';
 import PhotoField from '../PhotoField';
+import TextToolbar from './TextToolbar';
 
 export const COLOR_NAMES: Record<string, string> = {
   '#1C2621': 'Sapin profond', '#2F4A3A': 'Vert sapin', '#B4502D': 'Terracotta', '#5b5b55': 'Gris',
@@ -152,7 +152,7 @@ export default function BlockSettings({ block, catalog, language, onChange }: {
           </>
         );
       case 'text':
-        return <RichTextEditor key={block.id} initialValue={block.html} onChange={(html) => set({ html })} ariaLabel="Texte du bloc" minHeight="120px" maxHeight="40vh" />;
+        return <TextToolbar />;
       case 'image':
         return (
           <>

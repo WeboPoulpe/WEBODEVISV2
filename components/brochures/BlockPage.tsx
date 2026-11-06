@@ -7,6 +7,7 @@ import type { BrochureStyle } from '@/lib/brochure';
 import type { BlockStyle, BlockTarget, ResolvedBlock } from '@/lib/brochureLayout';
 import { FlowFrame, type Flow, type PageSlice } from './flow';
 import { FramedPhoto, PhotoText } from './PhotoText';
+import EditableText from './EditableText';
 
 const INK = '#1C2621';
 const ACCENT = '#B4502D';
@@ -23,7 +24,12 @@ export interface BlockEditing {
   onDrop: (at: BlockTarget, payload: string) => void;
   /** Rendu des commandes du bloc sélectionné (monter, descendre, dupliquer, supprimer). */
   controls: (id: string) => ReactNode;
+  /** Texte tapé dans la page : le bloc Texte sélectionné devient modifiable sur place. */
+  onText?: (id: string, html: string) => void;
 }
+
+/** Le bloc sélectionné est un bloc Texte qu'on écrit sur place. */
+const writing = (b: ResolvedBlock, editing?: BlockEditing) => b.type === 'text' && !!editing?.onText && editing.selectedId === b.id;
 
 const DRAG_TYPE = 'text/x-webo-block';
 
@@ -68,7 +74,11 @@ function BlockView({ b, editing, renderList }: { b: ResolvedBlock; editing?: Blo
       const Tag = b.level === 'l' ? 'h2' : 'h3';
       return <Tag style={titleStyle(b.style, LEVEL[b.level])}>{b.text}</Tag>;
     }
-    case 'text': return <div style={{ fontSize: cq(3.3), lineHeight: 1.55, color: INK }} dangerouslySetInnerHTML={{ __html: b.html }} />;
+    case 'text': {
+      const style = { fontSize: cq(3.3), lineHeight: 1.55, color: INK };
+      if (writing(b, editing)) return <EditableText html={b.html} style={style} onChange={(html) => editing!.onText!(b.id, html)} />;
+      return <div style={style} dangerouslySetInnerHTML={{ __html: b.html }} />;
+    }
     case 'image': return <FramedPhoto url={b.url} frame={{ x: 50, y: 50, zoom: 100, ...b.frame, fit: b.fit }} height={px(b.height)} hint={!!editing} />;
     case 'separator': return <div style={{ height: 1, background: b.color, width: `${b.width}%`, margin: `${cq(1)} auto` }} />;
     case 'spacer': return <div style={{ height: px(b.height) }} />;
@@ -97,18 +107,21 @@ export function blockFlow(page: PageContent, theme: BrochureStyle, editing?: Blo
         const spacing = b.type === 'spacer' || b.type === 'separator' ? 0 : cq(3);
         if (!editing) return <div key={b.id} style={{ ...boxStyle('style' in b ? b.style : undefined), marginBottom: spacing }}>{view}</div>;
         const selected = editing.selectedId === b.id;
+        // Un texte qu'on écrit ne se déplace pas à la souris : la souris sélectionne le texte.
+        const typing = writing(b, editing);
         return (
           <div key={b.id} data-block-id={b.id}
-            draggable
+            draggable={!typing}
             onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData(DRAG_TYPE, `move:${b.id}`); }}
             onClick={(e) => { e.stopPropagation(); editing.onSelect(b.id); }}
             {...dropProps({ ...at, index })}
             style={{
-              ...boxStyle('style' in b ? b.style : undefined), marginBottom: spacing, position: 'relative', cursor: 'pointer',
+              ...boxStyle('style' in b ? b.style : undefined), marginBottom: spacing, position: 'relative', cursor: typing ? 'text' : 'pointer',
               outline: selected ? `2px solid ${ACCENT}` : '1px dashed rgba(0,0,0,.18)', outlineOffset: 2,
             }}>
             {view}
-            {selected && <div style={{ position: 'absolute', top: -14, right: 0, zIndex: 2 }} onClick={(e) => e.stopPropagation()}>{editing.controls(b.id)}</div>}
+            {/* Pendant l'écriture, les commandes passent au-dessus du bloc : elles ne cachent pas la première ligne. */}
+            {selected && <div style={{ position: 'absolute', top: typing ? -36 : -14, right: 0, zIndex: 2 }} onClick={(e) => e.stopPropagation()}>{editing.controls(b.id)}</div>}
           </div>
         );
       })}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseBrochureContent, type BrochureContent, type CatalogPrestation, type PriceOptions } from './brochure';
 import {
-  addBlock, addPage, duplicateBlock, layoutError, layoutFromSimple, mergeLayout, moveBlock, newBlock, parseLayout,
+  addBlock, addPage, duplicateBlock, layoutError, layoutFonts, layoutFromSimple, mergeLayout, moveBlock, newBlock, parseLayout,
   placeBlock, removePage, resolveLayout, sectionsFromLayout,
   type Block, type BrochureLayout,
 } from './brochureLayout';
@@ -168,5 +168,16 @@ describe('mise en page : place du style', () => {
     expect(sectionsFromLayout(l)[0].items[0].placement).toBeUndefined();
     const chosen = parseLayout({ pages: [{ id: 'p', kind: 'blocks', blocks: [{ id: 'a', type: 'prestation', prestationId: 'p1', photo: 'none', photoSize: 0 }] }, { id: 'f', kind: 'form', blocks: [] }] })!;
     expect(sectionsFromLayout(chosen)[0].items[0].placement).toEqual({ pos: 'none', size: 0 });
+  });
+});
+
+describe('polices à charger', () => {
+  it('celles des pages, des blocs, et celles choisies sur une partie d’un texte', () => {
+    const l: BrochureLayout = { pages: [{ id: 'p', kind: 'blocks', font: 'Inter', blocks: [
+      { id: 't', type: 'text', html: '<p>Bonjour <span style="font-family: &quot;Playfair Display&quot;">à vous</span></p>', style: { font: 'Lora' } },
+      { id: 'c', type: 'columns', count: 2, gap: 12, cols: [[{ id: 'u', type: 'text', html: '<p style="font-family:Montserrat, sans-serif">Interdit de rêver ?</p>' }], []] },
+    ] }] };
+    expect(layoutFonts(l).sort()).toEqual(['Inter', 'Lora', 'Montserrat', 'Playfair Display']);
+    expect(layoutFonts({ pages: [{ id: 'p', kind: 'blocks', blocks: [{ id: 't', type: 'text', html: '<p>Intérieur, Lora</p>' }] }] })).toEqual([]);
   });
 });
