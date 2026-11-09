@@ -95,3 +95,58 @@ describe('Webo modifie une brochure', () => {
     expect(content.sections[0].items).toEqual([{ prestationId: MENU }]);
   });
 });
+
+describe('Webo et le Studio', () => {
+  const STUDIO = '00000000-0000-4000-8000-000000000324';
+  const studioOf = async (id: string) => (await pg.query<{ studio: { pages: { id: string; form?: boolean; els: { id: string; type: string; html?: string; prestationId?: string }[] }[] } }>(`select studio from brochures where id = $1`, [id])).rows[0].studio;
+
+  beforeAll(async () => {
+    const doc = { pages: [
+      { id: 's1', bg: '#ffffff', els: [{ id: 't1', type: 'text', html: '<p>Bonjour</p>', x: 5, y: 5, w: 80 }] },
+      { id: 'sf', form: true, bg: '#ffffff', els: [{ id: 'f', type: 'form', x: 10, y: 20, w: 80, h: 100 }] },
+    ] };
+    await pg.query(`insert into brochures (id, owner_user_id, user_id, name, share_token, cover, content, editor_mode, studio) values ($1, $2, $2, 'Studio', 't4', '{}', '{}', 'studio', $3)`,
+      [STUDIO, CHEF, JSON.stringify(doc)]);
+  });
+
+  it('lit les pages et leurs éléments', async () => {
+    expect(await call('get_brochure', { brochure_id: STUDIO })).toMatchObject({ editor: 'studio', pages: [{ id: 's1', elements: [{ id: 't1', type: 'text', html: '<p>Bonjour</p>' }] }, { id: 'sf', form_page: true }] });
+  });
+
+  it('change un texte, ajoute une prestation et une page, puis applique à la validation', async () => {
+    const out = await update(STUDIO, [
+      op({ op: 'set_text', target: 't1', text: 'Hello' }),
+      op({ op: 'add_block', where: 's1', block_type: 'prestation', prestation_id: MENU }),
+      op({ op: 'add_page', text: 'quote', ref: 'citation' }),
+      op({ op: 'add_block', where: 'citation', block_type: 'title', text: 'Merci', level: 'l' }),
+    ]);
+    expect(out.summary.lines).toHaveLength(4);
+    expect((await studioOf(STUDIO)).pages[0].els[0].html).toBe('<p>Bonjour</p>');
+    expect((await decideProposal(out.proposal_id, 'accept')).error).toBeNull();
+    const doc = await studioOf(STUDIO);
+    expect(doc.pages).toHaveLength(3);
+    expect(doc.pages[0].els.map((e) => e.type)).toEqual(['text', 'prestation']);
+    expect(doc.pages[0].els[0].html).toBe('<p>Hello</p>');
+    expect(doc.pages[1].els.at(-1)).toMatchObject({ type: 'text', html: '<p>Merci</p>' });
+    expect(doc.pages.at(-1)!.form).toBe(true);
+  });
+
+  it('refuse ce qui ne se fait pas dans le Studio', async () => {
+    expect((await update(STUDIO, [op({ op: 'move_block', target: 't1', where: 's1' })])).error).toMatch(/Studio/);
+    expect((await update(STUDIO, [op({ op: 'remove_block', target: 'f' })])).error).toMatch(/formulaire/);
+    expect((await update(STUDIO, [op({ op: 'remove_page', target: 'sf' })])).error).toMatch(/formulaire/);
+  });
+
+  it('crée une brochure complète du Studio, avec les seules prestations de l’entreprise', async () => {
+    expect(toolsFor('brochures').map((t) => t.name)).toContain('propose_brochure_create');
+    const out = await call('propose_brochure_create', { name: 'Mariages 2028', kind: 'mariage', prestation_ids: [MENU, FOREIGN], language: 'fr' });
+    expect(out.summary.lines).toHaveLength(1);
+    const r = await decideProposal(out.proposal_id, 'accept');
+    expect(r.error).toBeNull();
+    const id = (r.result as { href: string }).href.split('/').pop()!;
+    const row = (await pg.query<{ editor_mode: string; owner_user_id: string; studio: { pages: { els: { prestationId?: string }[] }[] } }>(`select editor_mode, owner_user_id, studio from brochures where id = $1`, [id])).rows[0];
+    expect(row).toMatchObject({ editor_mode: 'studio', owner_user_id: CHEF });
+    const ids = row.studio.pages.flatMap((p) => p.els.flatMap((e) => (e.prestationId ? [e.prestationId] : [])));
+    expect(ids).toEqual([MENU]);
+  });
+});

@@ -11,6 +11,7 @@ import { useFeedback } from '@/components/ui/Feedback';
 import { cn } from '@/lib/utils';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { STYLE_LABELS } from '@/lib/brochure';
+import { BROCHURE_KINDS, type BrochureKind } from '@/lib/brochureStudio';
 import { createBrochure, deleteBrochure, duplicateBrochure, listBrochures, type BrochureSummary } from '@/server/brochures';
 
 // Brochures : le catalogue des prestations présenté comme un livre, envoyé par lien. Plusieurs brochures par
@@ -27,6 +28,7 @@ export default function BrochuresPage() {
   const [busy, setBusy] = useState(false);
   // Éditeur de départ : la brochure actuelle (simple) ou le Studio (v2, pages composées librement).
   const [startIn, setStartIn] = useState<'simple' | 'studio'>('simple');
+  const [kind, setKind] = useState<BrochureKind | ''>('');
   const [sending, setSending] = useState<string | null>(null);
 
   // Raccourci du menu : « Nouvelle brochure ».
@@ -40,7 +42,7 @@ export default function BrochuresPage() {
   const create = async () => {
     if (!creating?.trim()) return;
     setBusy(true);
-    const res = await createBrochure({ name: creating, editor: startIn }).catch(() => ({ error: 'La brochure n’a pas pu être créée. Réessayez.', id: undefined }));
+    const res = await createBrochure({ name: creating, editor: startIn, ...(startIn === 'studio' && kind ? { kind } : {}) }).catch(() => ({ error: 'La brochure n’a pas pu être créée. Réessayez.', id: undefined }));
     setBusy(false);
     if (res.error || !res.id) { notify(res.error ?? 'La brochure n’a pas pu être créée.', { tone: 'error' }); return; }
     router.push(`/brochures/${res.id}`);
@@ -155,6 +157,15 @@ export default function BrochuresPage() {
               ))}
             </div>
           </fieldset>
+          {startIn === 'studio' && (
+            <label className="mt-3 block">
+              <span className={labelCls}>Partir de</span>
+              <select value={kind} onChange={(e) => setKind(e.target.value as BrochureKind | '')} className={inputCls}>
+                <option value="">Pages de départ (couverture, présentation, contact)</option>
+                {BROCHURE_KINDS.map((k) => <option key={k.id} value={k.id}>Brochure {k.label.toLowerCase()} complète, avec vos prestations</option>)}
+              </select>
+            </label>
+          )}
         </Modal>
       )}
     </div>

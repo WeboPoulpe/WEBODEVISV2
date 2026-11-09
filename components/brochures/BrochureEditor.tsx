@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown } from 'lucide-react';
 import SendBrochureModal from './SendBrochureModal';
 import Modal from '@/components/ui/Modal';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -24,6 +24,7 @@ import { parseStudio, type StudioDoc } from '@/lib/brochureStudio';
 import { renewBrochureLink, saveBrochure, switchBrochureEditor, type BrochureRow, type EditorMode, type PublicBrochure } from '@/server/brochures';
 import AdvancedEditor from './advanced/AdvancedEditor';
 import StudioEditor from './studio/StudioEditor';
+import StudioStats from './studio/StudioStats';
 import { Flipbook } from './Flipbook';
 import { BrochurePageView, pageFlow } from './BrochurePages';
 import { expandPages, useFlowBreaks } from './flow';
@@ -94,6 +95,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   const studio = mode === 'studio';
   const [studioDoc, setStudioDoc] = useState<StudioDoc>(() => parseStudio(brochure.studio) ?? { pages: [] });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [layout, setLayout] = useState<BrochureLayout>(() => parseLayout(brochure.layout) ?? { pages: [] });
   const [switching, setSwitching] = useState(false);
   const [choosing, setChoosing] = useState(false);
@@ -338,6 +340,9 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
             <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
             <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
             <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
+            <a href={`/b/${token}/pdf`} target="_blank" rel="noreferrer" className={cn(btnSecondary, !draft.is_active && 'pointer-events-none opacity-50')}
+              title={draft.is_active ? 'Imprimer ou enregistrer en PDF' : 'Activez le lien pour exporter'}><FileDown className="h-4 w-4" /> PDF</a>
+            <button type="button" onClick={() => setStatsOpen(true)} className={btnSecondary}><BarChart3 className="h-4 w-4" /> Lecture</button>
             <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className={btnSecondary}>
               <Settings2 className="h-4 w-4" /> Réglages de la brochure
             </button>
@@ -489,6 +494,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
           <p className="text-sm text-gray-700">Cette brochure a déjà une mise en page avancée. Vous pouvez la reprendre telle que vous l’aviez laissée (les prestations ajoutées entre-temps sont mises à la suite), ou repartir de la composition simple actuelle.</p>
         </Modal>
       )}
+      {statsOpen && <StudioStats brochureId={brochure.id} pageCount={studioDoc.pages.length} onClose={() => setStatsOpen(false)} />}
       {sending && <SendBrochureModal brochureId={brochure.id} onClose={() => setSending(false)} />}
       {picking && <PrestationPicker catalog={catalog} already={inBrochure} onAdd={addPrestations} onClose={() => setPicking(false)} />}
       {retouch && retouched && retouchedPrestation && (

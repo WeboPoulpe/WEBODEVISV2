@@ -35,3 +35,40 @@ brochure (simple / avancé / Studio), l'existant restant le choix par défaut.
 - Une seule sélection à la fois (pas de sélection multiple ni de groupes).
 - Le texte d'une prestation trop long pour son cadre est coupé (signalé « Texte coupé » dans l'éditeur).
 - Éditeur utilisable sur téléphone (toucher, glisser, panneaux sous la page) mais pensé pour l'ordinateur.
+
+## Lot 2 (2026-11-09) : « fais tout »
+
+Demandé par Maxence après la liste d'améliorations proposée : tout est fait.
+
+- **Sélection multiple et groupes** : Maj+clic, cadre de sélection tiré sur la page, Ctrl+A ; déplacer ensemble,
+  aligner (bords, milieux), répartir, grouper / dégrouper (Ctrl+G, Ctrl+Maj+G), calques, dupliquer et supprimer
+  pour tous. Un clic sur un élément groupé prend le groupe ; double-clic, l'élément seul.
+- **Texte de prestation qui tient** : réduit automatiquement (jusqu'à 55 %), mesuré dans le navigateur ; bouton
+  « Agrandir le cadre pour tout afficher ».
+- **Thème et styles** (à la WeboWord) : 5 thèmes (Sapin et terracotta, Noir et or, Champêtre, Poudré, Épuré) qui
+  habillent toute la brochure ; styles Titre 1, Titre 2, Sur-titre, Paragraphe modifiables une fois pour toute la
+  brochure ; un texte relié à un style le suit, le mettre en forme à la main l'en détache. Les couleurs du thème
+  passent en tête des nuanciers. Les pages avec photo de fond ou photo pleine page gardent leurs couleurs.
+- **Logo** de l'entreprise : dans « Photos », repris par les couvertures et la page contact.
+- **Glisser-déposer** depuis le panneau (ordinateur) ; une photo lâchée sur une photo la remplace.
+- **Brochures complètes** Mariage, Entreprise, Cocktail (thème, textes types, prestations) : dans « Modèles »,
+  à la création d'une brochure, et par Webo.
+- **Déco** : ornements groupés (filet et motif, double filet, pointillés, coins), 70 pictogrammes au trait ;
+  forme Arche ; traits pleins, tirets, points, doubles ; ensembles de textes (sur-titre + titre + filet…).
+- **Effets photo** : filtres (N&B, sépia, chaud, froid, doux), photo ronde ou en arche ; ombre portée sur tout élément.
+- **Grille (5 mm) et règles** en millimètres, avec aimantation à la grille ; **zoom** 50 à 250 %.
+- **Liens** dans les textes (site, email, téléphone), ouverts dans un nouvel onglet sur le lien public.
+- **Webo dans le texte** : corriger, reformuler, raccourcir, plus chaleureux, plus élégant, traduire en anglais ;
+  1 WeboCoin par texte (prix d'une traduction de fiche), rendu si l'appel échoue. Correcteur du navigateur pendant
+  la saisie.
+- **Lecture page par page** (table `brochure_page_stats`, migration 0045) : vues, temps moyen, atteinte par page,
+  envoyées par le lecteur (`/api/b/<jeton>/stats`), sans compter l'entreprise ; remise à zéro possible.
+- **Boutons Appeler et WhatsApp** sur le lien (numéro de l'entreprise), au choix.
+- **Export PDF** : `/b/<jeton>/pdf`, une feuille A4 par page (sans le formulaire), impression ouverte seule.
+- **Apparition en douceur** des éléments à l'affichage d'une page (désactivable ; respecte « moins d'animations »).
+- **Webo** lit les pages du Studio, y change des textes, ajoute titres, textes, prestations et pages (modèles),
+  en retire ; et crée une brochure complète (`propose_brochure_create`).
+
+Limites : le PDF passe par la fenêtre d'impression du navigateur (« Enregistrer en PDF ») ; la lecture page par page
+suit l'ordre actuel des pages (remettre à zéro après les avoir réorganisées) ; Webo réécrit un texte entier, pas une
+partie sélectionnée.

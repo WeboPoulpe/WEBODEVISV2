@@ -316,6 +316,13 @@
       "when": 1794210169660,
       "tag": "0044_brochure_studio",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794211990681,
+      "tag": "0045_brochure_studio_stats",
+      "breakpoints": true
     }
   ]
 }

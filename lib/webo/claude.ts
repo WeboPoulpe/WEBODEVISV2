@@ -65,3 +65,40 @@ export async function translateFicheFrToEn(f: { name: string; html: string }): P
   if (!out.html.replace(/<[^>]*>/g, '').replace(/&nbsp;|\s/g, '')) throw fail('Webo : fiche vide.');
   return { name: out.name, html: out.html, usage };
 }
+
+// ── Réécriture d'un texte de brochure (Studio) ──────────────────────────────
+
+export type RewriteMode = 'fix' | 'rephrase' | 'shorten' | 'warmer' | 'elegant' | 'english';
+export const REWRITE_MODES: Record<RewriteMode, { label: string; instruction: string }> = {
+  fix: { label: 'Corriger l’orthographe', instruction: 'Correct spelling, grammar, punctuation and typography (French rules: non-breaking spaces before : ; ! ?, « » quotes) without changing the wording otherwise.' },
+  rephrase: { label: 'Reformuler', instruction: 'Rephrase in fluent, natural French for a caterer\'s brochure, keeping the meaning and roughly the same length.' },
+  shorten: { label: 'Raccourcir', instruction: 'Make it about 40 % shorter, keeping the essential information.' },
+  warmer: { label: 'Plus chaleureux', instruction: 'Make the tone warmer and more welcoming, as a caterer speaking to future guests, same language, similar length.' },
+  elegant: { label: 'Plus élégant', instruction: 'Make the wording more refined and elegant (high-end catering), same language, similar length.' },
+  english: { label: 'Traduire en anglais', instruction: 'Translate into natural English as found on a restaurant or wedding brochure.' },
+};
+
+const REWRITE_SYSTEM = `You edit short texts from a French caterer's brochure.
+The "html" field is an HTML fragment. Return it with the same structure (same tags and attributes, in the same order); change only the visible text as asked. Never invent prices, dates, names, or facts. No explanations.
+Answer only with the JSON object.`;
+
+/** Un texte de brochure réécrit par Claude (correction, reformulation…). Lève une erreur (avec son coût) si la réponse est inutilisable. */
+export async function rewriteBrochureText(html: string, mode: RewriteMode): Promise<{ html: string; usage: WeboUsage }> {
+  if (fake()) return { html: html.replace(/>([^<]*\S[^<]*)</g, `>[${mode}] $1<`), usage: { input: 80, output: 40, cacheWrite: 0, cacheRead: 0 } };
+  client ??= new Anthropic({ apiKey: anthropicKey(), timeout: 60_000, maxRetries: 1 });
+  const res = await client.messages.create({
+    model: WEBO_MODEL,
+    max_tokens: 8000,
+    system: [{ type: 'text', text: REWRITE_SYSTEM, cache_control: { type: 'ephemeral' } }],
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', properties: { html: { type: 'string' } }, required: ['html'], additionalProperties: false } } },
+    messages: [{ role: 'user', content: JSON.stringify({ task: REWRITE_MODES[mode].instruction, html }) }],
+  });
+  const u = res.usage;
+  const usage: WeboUsage = { input: u.input_tokens, output: u.output_tokens, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0 };
+  const fail = (message: string) => Object.assign(new Error(message), { usage });
+  if (res.stop_reason !== 'end_turn') throw fail('Webo : réponse incomplète.');
+  let out: { html?: unknown };
+  try { out = JSON.parse(res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')); } catch { throw fail('Webo : réponse illisible.'); }
+  if (typeof out?.html !== 'string' || !out.html.replace(/<[^>]*>|&nbsp;|\s/g, '')) throw fail('Webo : réponse vide.');
+  return { html: out.html, usage };
+}

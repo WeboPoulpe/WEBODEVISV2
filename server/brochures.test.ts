@@ -424,3 +424,39 @@ describe('brochures : Studio (v2)', () => {
     expect(saved.pages.at(-1)!.form).toBe(true);
   });
 });
+
+describe('brochures : lecture page par page (Studio)', () => {
+  const statsOf = async (id: string) => (await pg.query<{ page: number; views: number; ms: string }>(`select page, views, ms from brochure_page_stats where brochure_id = $1 order by page`, [id])).rows;
+  it('compte vues et temps par page, borné, sans les visites de l’entreprise', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Lue', editor: 'studio' });
+    const token = (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;
+    session = null;
+    await br.recordStudioPages(token, [{ page: 0, views: 1, ms: 4000 }, { page: 1, views: 1, ms: 99_000_000 }, { page: -1, views: 1 }, { page: 0, views: 1, ms: 1000 }]);
+    await br.recordStudioPages(token, [{ page: 0, views: 1, ms: 500 }]);
+    expect((await statsOf(id!)).map((r) => ({ ...r, ms: Number(r.ms) }))).toEqual([{ page: 0, views: 3, ms: 5500 }, { page: 1, views: 1, ms: 600_000 }]);
+    // Quelqu'un de l'entreprise : rien n'est compté.
+    session = { id: OWNER, email: 'chef@b.fr' };
+    await br.recordStudioPages(token, [{ page: 0, views: 1, ms: 1000 }]);
+    session = null;
+    expect((await br.getBrochurePageStats(id!))[0]).toEqual({ page: 0, views: 3, ms: 5500 });
+    expect((await br.resetBrochurePageStats(id!)).error).toBeNull();
+    expect(await br.getBrochurePageStats(id!)).toEqual([]);
+    // Pas de lecture comptée hors Studio, ni avec un jeton inconnu.
+    const simple = await br.createBrochure({ name: 'Simple' });
+    const t2 = (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [simple.id])).rows[0].share_token;
+    await br.recordStudioPages(t2, [{ page: 0, views: 1, ms: 1000 }]);
+    await br.recordStudioPages('jeton-inconnu-000000000', [{ page: 0, views: 1, ms: 1000 }]);
+    expect(await statsOf(simple.id!)).toEqual([]);
+  });
+
+  it('création dans le Studio avec une brochure complète et ses options publiques', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Cocktails', editor: 'studio', kind: 'cocktail' });
+    const row = (await pg.query<{ studio: { theme: { name: string }; pages: { els: { prestationId?: string }[] }[] }; share_token: string }>(`select studio, share_token from brochures where id = $1`, [id])).rows[0];
+    expect(row.studio.theme.name).toBe('Noir et or');
+    expect(row.studio.pages.flatMap((p) => p.els).some((e) => e.prestationId === PRESTATION)).toBe(true);
+    const pub = (await br.getPublicBrochure(row.share_token))!;
+    expect(pub.studioOptions).toEqual({ animate: true, call: false, whatsapp: false });
+  });
+});

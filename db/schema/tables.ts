@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, unique, foreignKey, check, boolean, jsonb, index, date, integer, numeric, time, varchar, uniqueIndex, pgEnum, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, uuid, text, timestamp, unique, foreignKey, check, boolean, jsonb, index, date, integer, numeric, time, varchar, uniqueIndex, pgEnum, primaryKey, bigint } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const customer_type = pgEnum("customer_type", ['particulier', 'entreprise'])
@@ -371,6 +371,22 @@ export const devis_templates = pgTable("devis_templates", {
 			columns: [table.user_id],
 			foreignColumns: [users.id],
 			name: "devis_templates_user_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+// Lecture des brochures du Studio, page par page : ouvertures et temps passé (lien public, hors entreprise).
+export const brochure_page_stats = pgTable("brochure_page_stats", {
+	brochure_id: uuid().notNull(),
+	page: integer().notNull(),
+	views: integer().default(0).notNull(),
+	ms: bigint({ mode: 'number' }).default(0).notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.brochure_id, table.page], name: "brochure_page_stats_pkey" }),
+	foreignKey({
+			columns: [table.brochure_id],
+			foreignColumns: [brochures.id],
+			name: "brochure_page_stats_brochure_id_fkey"
 		}).onDelete("cascade"),
 ]);
 
@@ -2123,7 +2139,7 @@ export const webo_proposals = pgTable("webo_proposals", {
 }, (table) => [
 	foreignKey({ columns: [table.conversation_id], foreignColumns: [webo_conversations.id], name: "webo_proposals_conversation_id_fkey" }).onDelete("cascade"),
 	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "webo_proposals_company_id_fkey" }).onDelete("cascade"),
-	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text, 'memory'::text, 'quote_update'::text, 'quote_send'::text, 'event_update'::text, 'courses_recalc'::text, 'customer_upsert'::text, 'prospect_status'::text, 'prospect_to_quote'::text, 'stock_movement'::text, 'supplier_order'::text, 'supplier_order_send'::text, 'supplier_order_receive'::text, 'event_orders'::text, 'brochure_send'::text, 'brochure_update'::text, 'invoice_issue'::text, 'invoice_payment'::text])`),
+	check("webo_proposals_kind_check", sql`kind = ANY (ARRAY['quote'::text, 'invoice'::text, 'prestation'::text, 'prestation_update'::text, 'prospect_reply'::text, 'memory'::text, 'quote_update'::text, 'quote_send'::text, 'event_update'::text, 'courses_recalc'::text, 'customer_upsert'::text, 'prospect_status'::text, 'prospect_to_quote'::text, 'stock_movement'::text, 'supplier_order'::text, 'supplier_order_send'::text, 'supplier_order_receive'::text, 'event_orders'::text, 'brochure_send'::text, 'brochure_update'::text, 'brochure_create'::text, 'invoice_issue'::text, 'invoice_payment'::text])`),
 	check("webo_proposals_status_check", sql`status = ANY (ARRAY['proposed'::text, 'done'::text, 'cancelled'::text, 'failed'::text])`),
 ]);
 

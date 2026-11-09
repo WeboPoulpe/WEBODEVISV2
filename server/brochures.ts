@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { brochures, prestations, profiles, prospect_requests } from '@/db/schema';
+import { brochure_page_stats, brochures, prestations, profiles, prospect_requests } from '@/db/schema';
 import { parsePhotoFrame, type PhotoFrame } from '@/lib/photoFrame';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { defaultVatRate } from '@/lib/vat';
@@ -19,8 +19,9 @@ import {
   type PublicPage,
 } from '@/lib/brochureLayout';
 import {
-  parseStudio, resolveStudio, sanitizeStudio, studioError, studioFonts, studioFontsHref, studioFromBrochure, studioPhotos, studioPrestationIds,
-  type ResolvedStudioPage, type StudioDoc,
+  BROCHURE_KINDS, DEFAULT_OPTIONS, brochureFromKind, parseStudio, resolveStudio, sanitizeStudio, studioError, studioFonts, studioFontsHref, studioFromBrochure,
+  studioPhotos, studioPrestationIds,
+  type BrochureKind, type ResolvedStudioPage, type StudioDoc, type StudioOptions,
 } from '@/lib/brochureStudio';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { brochureEmail } from '@/lib/mail/templates';
@@ -58,6 +59,8 @@ export interface PublicBrochure {
   fontsHref: string | null;
   /** Pages du Studio, prestations résolues (brochure faite dans le Studio), sinon null. */
   studio: ResolvedStudioPage[] | null;
+  /** Options du lien (animation, boutons d'appel), brochure du Studio seulement. */
+  studioOptions: StudioOptions | null;
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
 
@@ -97,7 +100,7 @@ function cleanContent(raw: unknown): BrochureContent {
 
 /** Coordonnées reprises par les modèles de pages du Studio. */
 function templateCompany(c: Awaited<ReturnType<typeof companyProfile>>) {
-  return { name: c?.name ?? '', address: c?.address ?? null, phone: c?.phone ?? null, email: c?.email ?? null, website: c?.website ?? null };
+  return { name: c?.name ?? '', address: c?.address ?? null, phone: c?.phone ?? null, email: c?.email ?? null, website: c?.website ?? null, logoUrl: c?.logoUrl ?? null };
 }
 
 /** Le profil de l'entreprise : celui du titulaire, même pour une brochure faite par un collaborateur. */
@@ -107,6 +110,13 @@ async function companyProfile(userId: string) {
     email: profiles.company_email, website: profiles.company_website, vat: profiles.default_vat_rate,
   }).from(profiles).where(sql`${profiles.id} = (select coalesce(me.parent_user_id, me.id) from public.profiles me where me.id = ${userId}::uuid)`).limit(1);
   return p ?? null;
+}
+
+/** Prestations du catalogue de l'entreprise, par catégorie puis nom (pour composer une brochure complète). */
+async function catalogIds(userId: string): Promise<string[]> {
+  const rows = await db.select({ id: prestations.id }).from(prestations)
+    .where(sql`${prestations.user_id} in ${companyIdsOf(userId)}`).orderBy(prestations.category, prestations.name).limit(18);
+  return rows.map((r) => r.id);
 }
 
 function studioCoverPhoto(doc: StudioDoc | null): string | null {
@@ -127,7 +137,7 @@ export async function listBrochures(): Promise<BrochureSummary[]> {
   }));
 }
 
-export async function createBrochure(input: { name: string; style?: BrochureStyle; editor?: EditorMode }): Promise<{ error: string | null; id?: string }> {
+export async function createBrochure(input: { name: string; style?: BrochureStyle; editor?: EditorMode; kind?: BrochureKind }): Promise<{ error: string | null; id?: string }> {
   const user = await requireWriter();
   const name = (input.name ?? '').trim().slice(0, 120);
   if (!name) return { error: 'Donnez un nom à la brochure.' };
@@ -139,7 +149,10 @@ export async function createBrochure(input: { name: string; style?: BrochureStyl
     cover: { title: name }, content: parseBrochureContent(null),
     ...(input.editor === 'studio' ? {
       editor_mode: 'studio',
-      studio: studioFromBrochure(parseBrochureContent(null), { title: name }, style, { company: templateCompany(company), language: 'fr' }),
+      // Brochure complète d'un genre (mariage, entreprise, cocktail) avec le catalogue, sinon les pages de départ.
+      studio: input.kind && BROCHURE_KINDS.some((k) => k.id === input.kind)
+        ? brochureFromKind(input.kind, { title: name, subtitle: null, photoUrl: null, company: templateCompany(company), language: 'fr' }, await catalogIds(user.id))
+        : studioFromBrochure(parseBrochureContent(null), { title: name }, style, { company: templateCompany(company), language: 'fr' }),
     } : {}),
   }).returning({ id: brochures.id });
   return { error: null, id: row.id };
@@ -371,6 +384,7 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
   return {
     name: row.name, style, language,
     studio: studio ? resolveStudio(studio, catalog, { ...prices, forEditor: false }) : null,
+    studioOptions: studio ? studio.options ?? DEFAULT_OPTIONS : null,
     cover: parseCover(row.cover, row.name),
     about: content.about.enabled && !studio ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null, photoFrame: content.about.photoFrame ?? null } : { html: '', photoUrl: null },
     // Studio : ses pages seules sont envoyées au lecteur (rien de la composition simple).
@@ -447,4 +461,90 @@ export async function sendBrochure(input: { brochureId: string; to: string; mess
     ));
   }
   return failed.length ? { error: `L’email n’a pas pu partir vers : ${failed.join(', ')}.` } : { error: null };
+}
+
+/** Est-ce quelqu'un de l'entreprise qui regarde (aperçu) ? Ses lectures ne comptent pas. */
+async function isCompanyViewer(ownerId: string): Promise<boolean> {
+  const viewer = await getSessionUser().catch(() => null);
+  if (!viewer) return false;
+  const [same] = await db.select({ id: profiles.id }).from(profiles)
+    .where(and(eq(profiles.id, viewer.id), sql`${profiles.id} in ${companyIdsOf(ownerId)}`)).limit(1);
+  return !!same;
+}
+
+/**
+ * Lecture d'une brochure du Studio, page par page : ouvertures et temps passé, envoyés par le lecteur. Bornée
+ * (60 pages, 10 minutes par page et par envoi) pour qu'un envoi trafiqué ne fausse pas tout.
+ */
+export async function recordStudioPages(token: string, entries: unknown): Promise<void> {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  const row = await byToken(token, true);
+  if (!row || row.editor_mode !== 'studio') return;
+  if (await isCompanyViewer(row.owner_user_id)) return;
+  const clean = new Map<number, { views: number; ms: number }>();
+  for (const e of entries.slice(0, 60)) {
+    const r = (e && typeof e === 'object' ? e : {}) as Record<string, unknown>;
+    const page = Number(r.page);
+    if (!Number.isInteger(page) || page < 0 || page >= 60) continue;
+    const views = Math.min(5, Math.max(0, Math.floor(Number(r.views) || 0)));
+    const ms = Math.min(600_000, Math.max(0, Math.floor(Number(r.ms) || 0)));
+    if (!views && !ms) continue;
+    const prev = clean.get(page) ?? { views: 0, ms: 0 };
+    clean.set(page, { views: Math.min(5, prev.views + views), ms: Math.min(600_000, prev.ms + ms) });
+  }
+  for (const [page, v] of clean) {
+    await db.insert(brochure_page_stats).values({ brochure_id: row.id, page, views: v.views, ms: v.ms })
+      .onConflictDoUpdate({
+        target: [brochure_page_stats.brochure_id, brochure_page_stats.page],
+        set: { views: sql`${brochure_page_stats.views} + ${v.views}`, ms: sql`${brochure_page_stats.ms} + ${v.ms}`, updated_at: new Date().toISOString() },
+      });
+  }
+}
+
+/** Lecture page par page d'une brochure de l'entreprise (éditeur). */
+export async function getBrochurePageStats(id: string): Promise<{ page: number; views: number; ms: number }[]> {
+  const b = await getBrochure(id);
+  if (!b) return [];
+  const rows = await db.select({ page: brochure_page_stats.page, views: brochure_page_stats.views, ms: brochure_page_stats.ms })
+    .from(brochure_page_stats).where(eq(brochure_page_stats.brochure_id, b.id)).orderBy(brochure_page_stats.page);
+  return rows.map((r) => ({ page: r.page, views: r.views, ms: Number(r.ms) }));
+}
+
+/** Remet la lecture page par page à zéro (après avoir refait les pages, par exemple). */
+export async function resetBrochurePageStats(id: string): Promise<{ error: string | null }> {
+  await requireWriter();
+  const b = await getBrochure(id);
+  if (!b) return { error: NOT_FOUND };
+  await db.delete(brochure_page_stats).where(eq(brochure_page_stats.brochure_id, b.id));
+  return { error: null };
+}
+
+/**
+ * Brochure du Studio composée d'un coup (Webo) : genre (mariage, entreprise, cocktail), prestations choisies du
+ * catalogue de l'entreprise (les autres sont ignorées), langue.
+ */
+export async function createKindBrochure(input: { name: string; kind: BrochureKind; prestationIds: string[]; language: 'fr' | 'en' }): Promise<{ error: string | null; id?: string }> {
+  const user = await requireWriter();
+  const name = (input.name ?? '').trim().slice(0, 120);
+  if (!name) return { error: 'Donnez un nom à la brochure.' };
+  if (!BROCHURE_KINDS.some((k) => k.id === input.kind)) return { error: 'Genre de brochure inconnu.' };
+  const wanted = [...new Set((input.prestationIds ?? []).filter((i) => UUID.test(i)))];
+  const found = wanted.length ? await db.select({ id: prestations.id }).from(prestations)
+    .where(and(inArray(prestations.id, wanted), sql`${prestations.user_id} in ${companyIdsOf(user.id)}`)) : [];
+  const ok = new Set(found.map((r) => r.id));
+  const ids = wanted.length ? wanted.filter((i) => ok.has(i)) : await catalogIds(user.id);
+  const company = await companyProfile(user.id);
+  const language = input.language === 'en' ? 'en' : 'fr';
+  const [row] = await db.insert(brochures).values({
+    owner_user_id: user.id, user_id: user.id, name, style: 'editorial', share_token: newToken(), language,
+    vat_rate: String(defaultVatRate(company ? { default_vat_rate: company.vat } : null)),
+    cover: { title: name }, content: parseBrochureContent(null), editor_mode: 'studio',
+    studio: brochureFromKind(input.kind, { title: name, subtitle: null, photoUrl: null, company: templateCompany(company), language }, ids),
+  }).returning({ id: brochures.id });
+  return { error: null, id: row.id };
+}
+
+/** Coordonnées de l'entreprise pour les modèles de pages (Webo). */
+export async function studioTemplateCompany(userId: string) {
+  return templateCompany(await companyProfile(userId));
 }

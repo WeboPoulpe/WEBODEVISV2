@@ -5,6 +5,9 @@ import { db } from '@/db';
 import { brochures, prestations } from '@/db/schema';
 import { parseBrochureContent, type BrochureCover } from '@/lib/brochure';
 import { parseLayout, type Block } from '@/lib/brochureLayout';
+import { BROCHURE_KINDS, parseStudio, studioPrestationIds, type TemplateContext } from '@/lib/brochureStudio';
+import { STUDIO_OPS, applyStudioUpdate, studioView } from '@/lib/webo/studioUpdate';
+import { studioTemplateCompany } from '../brochures';
 import { applyBrochureUpdate, BROCHURE_OPS, NEW_BLOCK_TYPES, preview, type BrochureOp, type BrochureSettings, type BrochureState } from '@/lib/webo/brochureUpdate';
 import { companyIdsOf } from '../companyScope';
 import { fail, isUuid, nullableStr, propose, tool, type Handler, type ToolContext } from './toolKit';
@@ -73,7 +76,9 @@ export async function brochureView(companyId: string, b: Row) {
     cover: { title: s.cover.title, subtitle: s.cover.subtitle ?? null },
   };
   if (b.editor_mode === 'studio') {
-    return { ...base, editor: 'studio', note: 'Brochure composée dans le Studio : Webo peut changer son nom, sa langue et l’affichage des prix, pas encore ses pages.' };
+    const doc = parseStudio(b.studio);
+    const studioNames = await prestationNames(companyId, doc ? studioPrestationIds(doc) : []);
+    return { ...base, editor: 'studio', pages: doc ? studioView(doc, studioNames) : [] };
   }
   if (s.editorMode === 'advanced') {
     return { ...base, pages: (s.layout?.pages ?? []).map((p, i) => ({ id: p.id, n: i + 1, kind: p.kind, ...(p.kind === 'blocks' ? { blocks: p.blocks.map((x) => blockView(x, names)) } : {}) })) };
@@ -102,12 +107,28 @@ const opSchema = {
   additionalProperties: false,
 };
 
+/** Réglages d'une brochure du Studio (nom, langue, prix…) : rien à faire s'ils sont tous laissés tels quels. */
+export function studioSettings(state: BrochureState, settings: BrochureSettings, names: ReadonlyMap<string, string>) {
+  const none = Object.values(settings).every((v) => v == null);
+  return none ? { patch: {}, lines: [] } : applyBrochureUpdate(state, settings, [], names);
+}
+
+/** Ce que les modèles de pages reprennent (couverture, coordonnées), pour une page ajoutée par Webo. */
+export async function templateContextOf(companyId: string, b: Row, company?: TemplateContext['company']): Promise<TemplateContext> {
+  const cover = stateOf(b).cover;
+  return {
+    title: cover.title, subtitle: cover.subtitle ?? null, photoUrl: cover.photoUrl ?? null,
+    company: company ?? await studioTemplateCompany(companyId), language: b.language === 'en' ? 'en' : 'fr',
+  };
+}
+
 export const BROCHURE_TOOLS: Record<string, Anthropic.Tool> = {
   get_brochure: tool('get_brochure', 'Lit une brochure : réglages, couverture, et ses pages à blocs (éditeur avancé) ou ses sections de prestations (éditeur simple), avec les identifiants à reprendre dans propose_brochure_update.', {
     brochure_id: { type: 'string' },
   }),
   propose_brochure_update: tool('propose_brochure_update', `Propose de modifier une brochure (lisez-la d'abord avec get_brochure). Réglages : null = inchangé. Opérations, dans l'ordre :
 - éditeur avancé : set_text (target = bloc ; text pour un titre, html pour un texte ou le texte propre d'une prestation), add_block (where = page, block_type, position ; text/level pour un titre, html pour un texte, prestation_id pour une prestation), remove_block (target = bloc), move_block (target = bloc, where = page, position), add_page (where = page après laquelle l'ajouter, null = avant le formulaire ; ref = nom pour la viser ensuite comme where), remove_page (target = page) ;
+- Studio (editor = studio, pages composées librement) : set_text (target = élément texte ou prestation ; html), add_block (where = page, block_type title/text/prestation ; text/level pour un titre, html pour un texte, prestation_id), remove_block (target = élément), add_page (where = page après laquelle l'ajouter, null = avant le formulaire ; text = modèle parmi cover-photo, cover-elegant, cover-split, one-prestation, two-prestations, menu-list, text-photo, gallery, quote, contact, blank ; ref), remove_page (target = page) ;
 - éditeur simple : set_about (html), add_section (text = titre, position, ref), set_section_title (target = section, text), remove_section (target = section), add_prestation (where = section, prestation_id, position), remove_prestation (target = section, prestation_id), set_prestation_text (target = section, prestation_id, html).
 html : paragraphes <p>, <strong>, <em>, listes ; du texte simple est accepté. Champs inutiles d'une opération : null.`, {
     brochure_id: { type: 'string' },
@@ -116,6 +137,12 @@ html : paragraphes <p>, <strong>, <em>, listes ; du texte simple est accepté. C
     show_prices: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
     cover_title: nullableStr, cover_subtitle: nullableStr,
     ops: { type: 'array', items: opSchema },
+  }),
+  propose_brochure_create: tool('propose_brochure_create', `Propose de créer une nouvelle brochure, composée dans le Studio (pages modifiables ensuite dans l'éditeur) : genre (${BROCHURE_KINDS.map((k) => `${k.id} = ${k.label}`).join(', ')}), prestations du catalogue à y mettre (identifiants lus avec search_catalogue, dans l'ordre voulu ; tableau vide = les premières du catalogue), langue.`, {
+    name: { type: 'string' },
+    kind: { type: 'string', enum: BROCHURE_KINDS.map((k) => k.id) },
+    prestation_ids: { type: 'array', items: { type: 'string' } },
+    language: { type: 'string', enum: ['fr', 'en'] },
   }),
 };
 
@@ -141,6 +168,21 @@ export function opsOf(raw: unknown): BrochureOp[] {
 }
 
 export const BROCHURE_HANDLERS: Record<string, Handler> = {
+  async propose_brochure_create(ctx: ToolContext, i) {
+    const name = typeof i.name === 'string' ? i.name.trim().slice(0, 120) : '';
+    if (!name) return fail('Donnez un nom à la brochure.');
+    const kind = BROCHURE_KINDS.find((k) => k.id === i.kind) ?? fail('Genre de brochure inconnu.');
+    const ids = Array.isArray(i.prestation_ids) ? i.prestation_ids.filter(isUuid).slice(0, 18) as string[] : [];
+    const names = await prestationNames(ctx.companyId, ids);
+    const kept = ids.filter((x) => names.has(x));
+    return propose(ctx, 'brochure_create', { name, kind: kind.id, prestationIds: kept, language: i.language === 'en' ? 'en' : 'fr' }, {
+      title: `Créer la brochure « ${name} »`,
+      fields: [{ label: 'Genre', value: kind.label }, { label: 'Prestations', value: kept.length ? String(kept.length) : 'les premières du catalogue' }],
+      lines: kept.map((x) => ({ label: names.get(x)!, detail: '', amount: '' })),
+      note: 'Composée dans le Studio : textes, photos et pages restent modifiables dans l’éditeur.',
+    });
+  },
+
   async get_brochure(ctx: ToolContext, i) {
     return brochureView(ctx.companyId, await brochureOf(ctx.companyId, i.brochure_id));
   },
@@ -150,10 +192,17 @@ export const BROCHURE_HANDLERS: Record<string, Handler> = {
     const state = stateOf(b);
     const settings = settingsOf(i);
     const ops = opsOf(i.ops);
-    if (b.editor_mode === 'studio' && ops.length) return fail('Cette brochure est composée dans le Studio : ses pages se modifient dans l’éditeur. Seuls son nom, sa langue et l’affichage des prix peuvent être changés ici.');
     const names = await prestationNames(ctx.companyId, idsOf(state, ops));
     let change;
-    try { change = applyBrochureUpdate(state, settings, ops, names); } catch (e) { return fail((e as Error).message); }
+    try {
+      if (b.editor_mode === 'studio') {
+        const doc = parseStudio(b.studio) ?? fail('Cette brochure n’a pas encore de pages.');
+        const own = studioSettings(state, settings, names);
+        const studio = applyStudioUpdate(doc, ops, names, await templateContextOf(ctx.companyId, b));
+        change = { lines: [...own.lines, ...studio.lines] };
+        if (!change.lines.length) fail('Rien à changer : la brochure est déjà comme demandé.');
+      } else change = applyBrochureUpdate(state, settings, ops, names);
+    } catch (e) { return fail((e as Error).message); }
     return propose(ctx, 'brochure_update', { brochureId: b.id, settings, ops }, {
       title: `Modifier la brochure « ${b.name} »`,
       fields: [{ label: 'Changements', value: String(change.lines.length) }],

@@ -35,7 +35,8 @@ export default async function BrochurePublicPage({ params }: { params: Promise<{
       <main className="min-h-[100dvh] bg-[#EDE6DA] flex flex-col items-center justify-center md:px-4 md:py-6">
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         {brochure.fontsHref && <link rel="stylesheet" href={brochure.fontsHref} />}
-        <StudioBook pages={brochure.studio} language={brochure.language} name={brochure.name} token={token} />
+        <StudioBook pages={brochure.studio} language={brochure.language} name={brochure.name} token={token}
+          options={brochure.studioOptions ?? undefined} companyPhone={brochure.company.phone} />
       </main>
     );
   }

@@ -7,8 +7,8 @@
 // - Écran large : le livre, en double page (Flipbook), formulaire dans la page.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { PAGE_H, type ResolvedStudioPage } from '@/lib/brochureStudio';
+import { ChevronLeft, ChevronRight, MessageCircle, Phone } from 'lucide-react';
+import { DEFAULT_OPTIONS, PAGE_H, whatsappNumber, type ResolvedStudioPage, type StudioOptions } from '@/lib/brochureStudio';
 import type { PhotoFrame } from '@/lib/photoFrame';
 import { Flipbook } from '../Flipbook';
 import FormSheet from '../FormSheet';
@@ -55,14 +55,83 @@ function backdropOf(page: ResolvedStudioPage): { url: string; frame?: PhotoFrame
   return full?.type === 'image' && full.url ? { url: full.url, ...(full.frame ? { frame: full.frame } : {}), opacity: full.opacity } : null;
 }
 
+/**
+ * Lecture page par page : à chaque changement de page, le temps passé sur la précédente est noté ; tout part vers
+ * le serveur de temps en temps et en quittant (sendBeacon). Rien n'est envoyé pour une page vue moins d'une seconde.
+ */
+function usePageStats(token: string | null, current: number | null) {
+  const pending = useRef(new Map<number, { views: number; ms: number }>());
+  const since = useRef<{ page: number; at: number } | null>(null);
+  const flush = useCallback((beacon: boolean) => {
+    if (!token) return;
+    const now = Date.now();
+    const cur = since.current;
+    if (cur) {
+      const e = pending.current.get(cur.page) ?? { views: 0, ms: 0 };
+      e.ms += now - cur.at;
+      pending.current.set(cur.page, e);
+      since.current = { page: cur.page, at: now };
+    }
+    const pages = [...pending.current].filter(([, v]) => v.ms >= 1000 || v.views).map(([page, v]) => ({ page, views: v.views, ms: Math.round(v.ms) }));
+    pending.current.clear();
+    if (!pages.length) return;
+    const body = JSON.stringify({ pages });
+    const url = `/api/b/${encodeURIComponent(token)}/stats`;
+    if (beacon && navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    else fetch(url, { method: 'POST', body, keepalive: true, headers: { 'content-type': 'application/json' } }).catch(() => {});
+  }, [token]);
+  useEffect(() => {
+    if (current == null || !token) return;
+    const now = Date.now();
+    const cur = since.current;
+    if (cur && cur.page !== current) {
+      const e = pending.current.get(cur.page) ?? { views: 0, ms: 0 };
+      e.ms += now - cur.at;
+      pending.current.set(cur.page, e);
+    }
+    if (!cur || cur.page !== current) {
+      const e = pending.current.get(current) ?? { views: 0, ms: 0 };
+      e.views += 1;
+      pending.current.set(current, e);
+      since.current = { page: current, at: now };
+    }
+  }, [current, token]);
+  useEffect(() => {
+    if (!token) return;
+    const timer = window.setInterval(() => flush(false), 20_000);
+    const hide = () => { if (document.visibilityState === 'hidden') flush(true); else if (since.current) since.current.at = Date.now(); };
+    const leave = () => flush(true);
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', leave);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', leave); flush(true); };
+  }, [token, flush]);
+}
+
+/** Boutons « Appeler » et « WhatsApp » du lien. */
+function ContactButtons({ phone, options, language, className }: { phone: string | null; options: StudioOptions; language: 'fr' | 'en'; className?: string }) {
+  if (!phone || (!options.call && !options.whatsapp)) return null;
+  const wa = options.whatsapp ? whatsappNumber(phone) : null;
+  const tel = phone.replace(/[^\d+]/g, '');
+  const pill = 'inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold text-white shadow-lg';
+  return (
+    <div className={className}>
+      {options.call && <a href={`tel:${tel}`} className={`${pill} bg-[#1c2621]/85 backdrop-blur`}><Phone className="h-4 w-4" />{language === 'en' ? 'Call' : 'Appeler'}</a>}
+      {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className={`${pill} bg-[#25D366]`}><MessageCircle className="h-4 w-4" />WhatsApp</a>}
+    </div>
+  );
+}
+
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="button"]';
 
-function PhoneReader({ pages, language, name, formSlot, onFormPage }: {
+function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, animate: appear, contact }: {
   pages: ResolvedStudioPage[];
   language: 'fr' | 'en';
   name: string;
   formSlot: ReactNode;
   onFormPage: (on: boolean) => void;
+  onPage: (i: number) => void;
+  animate: boolean;
+  contact: ReactNode;
 }) {
   const en = language === 'en';
   const [at, setAt] = useState(0);
@@ -74,7 +143,7 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage }: {
   const light = !backdropOf(pages[at] ?? pages[0]) && isLight(pages[at]?.bg ?? '#ffffff');
   const go = useCallback((to: number) => { setAnimate(true); setAt(Math.max(0, Math.min(last, to))); setDrag(0); }, [last]);
 
-  useEffect(() => { onFormPage(!!pages[at]?.form); }, [at, pages, onFormPage]);
+  useEffect(() => { onFormPage(!!pages[at]?.form); onPage(at); }, [at, pages, onFormPage, onPage]);
   useThemeColor(pages[at]?.bg ?? null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -139,7 +208,7 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage }: {
                 </div>
               )}
               <div data-studio-page="" className="relative" style={{ width: 'min(100%, calc(100dvh * 210 / 297))', aspectRatio: '210 / 297', containerType: 'inline-size' }}>
-                <StudioPageView page={page} language={language} formSlot={formSlot} />
+                <StudioPageView page={page} language={language} formSlot={formSlot} animate={appear && i === at} />
               </div>
             </>}
           </div>
@@ -160,7 +229,7 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage }: {
           className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur disabled:opacity-0">
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="rounded-full bg-black/30 px-3 py-1 text-xs tabular-nums text-white backdrop-blur" aria-live="polite">{at + 1} / {pages.length}</span>
+        {contact ?? <span className="rounded-full bg-black/30 px-3 py-1 text-xs tabular-nums text-white backdrop-blur" aria-live="polite">{at + 1} / {pages.length}</span>}
         <button type="button" onClick={() => go(at + 1)} disabled={at === last} aria-label={en ? 'Next page' : 'Page suivante'}
           className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur disabled:opacity-0">
           <ChevronRight className="h-5 w-5" />
@@ -170,9 +239,19 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage }: {
   );
 }
 
-export default function StudioBook({ pages, language, name, token }: { pages: ResolvedStudioPage[]; language: 'fr' | 'en'; name: string; token: string }) {
+export default function StudioBook({ pages, language, name, token, options = DEFAULT_OPTIONS, companyPhone = null, track = true }: {
+  pages: ResolvedStudioPage[]; language: 'fr' | 'en'; name: string; token: string;
+  options?: StudioOptions;
+  companyPhone?: string | null;
+  /** Noter la lecture page par page (lien public). */
+  track?: boolean;
+}) {
   const en = language === 'en';
   const phone = usePhone();
+  const [current, setCurrent] = useState<number | null>(null);
+  usePageStats(track ? token : null, current);
+  const onPage = useCallback((i: number) => setCurrent(i), []);
+  const hasContact = !!companyPhone && (options.call || options.whatsapp);
   // Saisie du formulaire gardée ici : elle survit aux pages qui tournent et à la fenêtre plein écran.
   const form = useBrochureForm();
   const [sheet, setSheet] = useState(false);
@@ -186,7 +265,8 @@ export default function StudioBook({ pages, language, name, token }: { pages: Re
   if (phone) {
     return (
       <>
-        <PhoneReader pages={pages} language={language} name={name} onFormPage={onFormPage}
+        <PhoneReader pages={pages} language={language} name={name} onFormPage={onFormPage} onPage={onPage} animate={options.animate}
+          contact={hasContact ? <ContactButtons phone={companyPhone} options={options} language={language} className="flex gap-2" /> : null}
           formSlot={(
             <button type="button" onClick={() => setSheet(true)}
               className="w-full rounded-lg bg-[#B4502D] px-3 py-3 text-[15px] font-semibold text-white">
@@ -200,13 +280,16 @@ export default function StudioBook({ pages, language, name, token }: { pages: Re
     );
   }
   return (
-    <Flipbook
-      ariaLabel={name}
-      onPageChange={(visible) => setOnForm(visible.includes(formIndex))}
-      labels={en ? { prev: 'Previous page', next: 'Next page' } : { prev: 'Page précédente', next: 'Page suivante' }}
-      pages={pages.map((page, i) => (
-        <StudioPageView key={i} page={page} language={language} formSlot={<BrochureRequestForm token={token} language={language} form={form} />} />
-      ))}
-    />
+    <>
+      <Flipbook
+        ariaLabel={name}
+        onPageChange={(visible) => { setOnForm(visible.includes(formIndex)); setCurrent(visible[visible.length - 1] ?? 0); }}
+        labels={en ? { prev: 'Previous page', next: 'Next page' } : { prev: 'Page précédente', next: 'Page suivante' }}
+        pages={pages.map((page, i) => (
+          <StudioPageView key={i} page={page} language={language} animate={options.animate} formSlot={<BrochureRequestForm token={token} language={language} form={form} />} />
+        ))}
+      />
+      {hasContact && <ContactButtons phone={companyPhone} options={options} language={language} className="fixed bottom-5 right-5 z-40 flex gap-2" />}
+    </>
   );
 }

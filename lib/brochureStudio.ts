@@ -43,6 +43,23 @@ export const STUDIO_SWATCHES = ['#1c2621', '#2f4a3a', '#b4502d', '#a8844f', '#5b
 
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 export type PrestationPhoto = 'top' | 'left' | 'right' | 'none';
+export type PhotoFilter = 'none' | 'bw' | 'sepia' | 'warm' | 'cool' | 'fade';
+export type PhotoMask = 'none' | 'circle' | 'arch';
+export type LineDash = 'solid' | 'dashed' | 'dotted' | 'double';
+/** Rôle d'un texte, relié au style de la brochure (Titre 1, Titre 2, Sur-titre, Paragraphe). */
+export type TextRole = 'h1' | 'h2' | 'kicker' | 'body';
+export const TEXT_ROLES: TextRole[] = ['h1', 'h2', 'kicker', 'body'];
+export const ROLE_LABELS: Record<TextRole, string> = { h1: 'Titre 1', h2: 'Titre 2', kicker: 'Sur-titre', body: 'Paragraphe' };
+
+/** Pictogrammes proposés (noms lucide-react), dessinés au trait dans la couleur choisie. */
+export const STUDIO_ICONS = [
+  'Utensils', 'UtensilsCrossed', 'ChefHat', 'CookingPot', 'Soup', 'Salad', 'Fish', 'Beef', 'Drumstick', 'Ham', 'Egg', 'Croissant', 'Sandwich',
+  'Pizza', 'Cake', 'CakeSlice', 'IceCreamCone', 'Candy', 'Cherry', 'Citrus', 'Apple', 'Grape', 'Carrot', 'Wheat', 'Leaf', 'Sprout', 'Vegan',
+  'Flower', 'Flower2', 'TreePine', 'Wine', 'Martini', 'Beer', 'GlassWater', 'Coffee', 'Milk', 'Heart', 'Star', 'Sparkles', 'Diamond', 'Gem',
+  'Crown', 'Feather', 'Sun', 'Moon', 'Snowflake', 'Gift', 'PartyPopper', 'Music', 'Camera', 'Award', 'Church', 'Building2', 'Handshake',
+  'Briefcase', 'Users', 'Baby', 'Calendar', 'Clock', 'Truck', 'Phone', 'Mail', 'MapPin', 'Globe', 'MessageCircle', 'Instagram', 'Facebook', 'Quote',
+] as const;
+export type StudioIconName = (typeof STUDIO_ICONS)[number];
 
 interface Base {
   id: string;
@@ -53,27 +70,39 @@ interface Base {
   /** Opacité, en %. */
   opacity: number;
   locked?: boolean;
+  /** Éléments groupés : ils se choisissent et se déplacent ensemble. */
+  group?: string;
+  /** Ombre portée douce. */
+  shadow?: boolean;
 }
 
 export type StudioText = Base & {
   type: 'text'; html: string; font: string; size: number; color: string; align: TextAlign; lineHeight: number;
   letterSpacing: number; uppercase: boolean; bg: string | null; padding: number; radius: number;
+  /** Relié au style de la brochure : il suit ses changements tant qu'on ne le met pas en forme à la main. */
+  role?: TextRole;
 };
-export type StudioImage = Base & { type: 'image'; url: string | null; frame?: PhotoFrame; radius: number; borderColor: string | null; borderWidth: number };
+export type StudioImage = Base & {
+  type: 'image'; url: string | null; frame?: PhotoFrame; radius: number; borderColor: string | null; borderWidth: number;
+  filter: PhotoFilter; mask: PhotoMask;
+};
 export type StudioShape = Base & {
-  type: 'shape'; shape: 'rect' | 'ellipse' | 'line'; fill: string | null; stroke: string | null; strokeWidth: number; radius: number;
+  type: 'shape'; shape: 'rect' | 'ellipse' | 'arch' | 'line'; fill: string | null; stroke: string | null; strokeWidth: number; radius: number; dash: LineDash;
 };
+export type StudioIcon = Base & { type: 'icon'; name: StudioIconName; color: string; strokeWidth: number };
 export type StudioPrestation = Base & {
   type: 'prestation'; prestationId: string;
   show: { name: boolean; text: boolean; price: boolean };
   text: 'full' | 'short'; photo: PrestationPhoto; photoSize: number; frame?: PhotoFrame;
   font: string; size: number; color: string; accent: string; align: 'left' | 'center' | 'right'; bg: string | null; padding: number; radius: number;
+  /** Le texte rapetisse pour tenir dans le cadre (jusqu'à 55 % de sa taille). */
+  fit: boolean;
   /** Retouches propres à la brochure (le catalogue n'est jamais modifié). */
   html?: string; titled?: boolean; photoUrl?: string; hidePrice?: boolean;
 };
 export type StudioForm = Base & { type: 'form'; bg: string | null; color: string; accent: string; radius: number };
 
-export type StudioElement = StudioText | StudioImage | StudioShape | StudioPrestation | StudioForm;
+export type StudioElement = StudioText | StudioImage | StudioShape | StudioIcon | StudioPrestation | StudioForm;
 export type StudioElementType = StudioElement['type'];
 
 export interface StudioPage {
@@ -85,12 +114,132 @@ export interface StudioPage {
   /** Du fond vers le premier plan. */
   els: StudioElement[];
 }
-export interface StudioDoc { pages: StudioPage[] }
+/** Allure d'un rôle de texte. */
+export interface StudioTextStyle { font: string; size: number; color: string; lineHeight: number; letterSpacing: number; uppercase: boolean }
+/** Thème de la brochure : fond des pages, couleur d'accent, styles de texte. */
+export interface StudioTheme { name: string; bg: string; accent: string; styles: Record<TextRole, StudioTextStyle> }
+/** Options du lien public. */
+export interface StudioOptions {
+  /** Les éléments de la page apparaissent en douceur quand elle s'affiche. */
+  animate: boolean;
+  /** Boutons « Appeler » et « WhatsApp » (numéro de l'entreprise) sur le lien. */
+  call: boolean;
+  whatsapp: boolean;
+}
+export interface StudioDoc { pages: StudioPage[]; theme?: StudioTheme | null; options?: StudioOptions }
+export const DEFAULT_OPTIONS: StudioOptions = { animate: true, call: false, whatsapp: false };
 
 /** Un élément Prestation tel que le lecteur le voit : le catalogue lu, sans identifiant. */
 export type ResolvedStudioPrestation = Omit<StudioPrestation, 'prestationId' | 'html' | 'titled' | 'photoUrl' | 'hidePrice'> & { item: ResolvedItem };
 export type ResolvedStudioElement = Exclude<StudioElement, StudioPrestation> | ResolvedStudioPrestation;
 export interface ResolvedStudioPage { bg: string; bgImage: StudioPage['bgImage']; form: boolean; els: ResolvedStudioElement[] }
+
+// ── Thèmes ───────────────────────────────────────────────────────────────────
+
+const style = (font: string, size: number, color: string, extra: Partial<StudioTextStyle> = {}): StudioTextStyle =>
+  ({ font, size, color, lineHeight: 1.3, letterSpacing: 0, uppercase: false, ...extra });
+
+/** Thèmes proposés : un clic les applique à toute la brochure. */
+export const THEMES: StudioTheme[] = [
+  {
+    name: 'Sapin et terracotta', bg: '#fbf7f0', accent: '#b4502d', styles: {
+      h1: style('Playfair Display', 8, '#1c2621', { lineHeight: 1.1 }), h2: style('Playfair Display', 5, '#1c2621', { lineHeight: 1.15 }),
+      kicker: style('Montserrat', 2.8, '#b4502d', { uppercase: true, letterSpacing: 0.18 }), body: style('Georgia', 3.4, '#1c2621', { lineHeight: 1.5 }),
+    },
+  },
+  {
+    name: 'Noir et or', bg: '#151515', accent: '#c9a45c', styles: {
+      h1: style('Cormorant Garamond', 9, '#f3ece0', { lineHeight: 1.05 }), h2: style('Cormorant Garamond', 5.5, '#f3ece0', { lineHeight: 1.15 }),
+      kicker: style('Montserrat', 2.6, '#c9a45c', { uppercase: true, letterSpacing: 0.25 }), body: style('Raleway', 3.2, '#d9d2c5', { lineHeight: 1.55 }),
+    },
+  },
+  {
+    name: 'Champêtre', bg: '#f4efe6', accent: '#5f6e52', styles: {
+      h1: style('Lora', 8, '#33402c', { lineHeight: 1.1 }), h2: style('Lora', 5, '#33402c', { lineHeight: 1.15 }),
+      kicker: style('Dancing Script', 4.2, '#5f6e52'), body: style('Raleway', 3.3, '#3d3d36', { lineHeight: 1.55 }),
+    },
+  },
+  {
+    name: 'Poudré', bg: '#fdf4f1', accent: '#c47a86', styles: {
+      h1: style('Great Vibes', 11, '#5b2638', { lineHeight: 1.05 }), h2: style('Playfair Display', 5, '#5b2638', { lineHeight: 1.15 }),
+      kicker: style('Montserrat', 2.6, '#c47a86', { uppercase: true, letterSpacing: 0.2 }), body: style('Lora', 3.3, '#4a3b3f', { lineHeight: 1.55 }),
+    },
+  },
+  {
+    name: 'Épuré', bg: '#ffffff', accent: '#1c2621', styles: {
+      h1: style('Oswald', 8.5, '#111111', { lineHeight: 1.05, uppercase: true, letterSpacing: 0.02 }), h2: style('Oswald', 5, '#111111', { lineHeight: 1.1 }),
+      kicker: style('Inter', 2.6, '#6b6b6b', { uppercase: true, letterSpacing: 0.22 }), body: style('Inter', 3.1, '#333333', { lineHeight: 1.6 }),
+    },
+  },
+];
+
+const luminance = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+};
+export const isDark = (hex: string) => luminance(hex) < 0.5;
+/** Couleur vive (ni noire, ni grise, ni blanche) : une couleur d'accent. */
+const isAccent = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return Math.max(...c) - Math.min(...c) > 60;
+};
+
+/** Le rôle le plus probable d'un texte sans rôle (pour appliquer un thème). */
+export function guessRole(t: Pick<StudioText, 'size' | 'uppercase'>): TextRole {
+  if (t.uppercase && t.size < 4) return 'kicker';
+  if (t.size >= 6.5) return 'h1';
+  if (t.size >= 4.4) return 'h2';
+  return 'body';
+}
+
+/** Une page « habillée par le thème » : sans photo de fond ni photo pleine page. */
+function themedPage(p: StudioPage): boolean {
+  return !p.bgImage && !p.els.some((e) => e.type === 'image' && e.url && e.x <= 1 && e.y <= 1 && e.w >= 99 && e.h >= PAGE_H - 1);
+}
+
+/** Les textes reliés à un rôle reprennent son style (couleur comprise sur les pages habillées par le thème). */
+export function applyRoleStyles(doc: StudioDoc, theme: StudioTheme): StudioDoc {
+  return {
+    ...doc,
+    pages: doc.pages.map((p) => {
+      const themed = themedPage(p);
+      return {
+        ...p,
+        els: p.els.map((e) => {
+          if (e.type !== 'text' || !e.role) return e;
+          const { color, ...st } = theme.styles[e.role];
+          return { ...e, ...st, ...(themed ? { color } : {}) };
+        }),
+      };
+    }),
+  };
+}
+
+/**
+ * Applique un thème à toute la brochure : fond des pages habillées, rôle donné à chaque texte (deviné s'il n'en a
+ * pas) et son style, police et couleurs des prestations, couleur d'accent des traits, pictogrammes et formulaire.
+ */
+export function applyTheme(doc: StudioDoc, theme: StudioTheme): StudioDoc {
+  const pages = doc.pages.map((p) => {
+    const themed = themedPage(p);
+    return {
+      ...p,
+      bg: themed ? theme.bg : p.bg,
+      els: p.els.map((e): StudioElement => {
+        switch (e.type) {
+          case 'text': return { ...e, role: e.role ?? guessRole(e) };
+          case 'prestation': return { ...e, font: theme.styles.body.font, accent: theme.accent, ...(themed ? { color: theme.styles.body.color } : {}) };
+          case 'shape': return themed && e.stroke && isAccent(e.stroke) ? { ...e, stroke: theme.accent } : e;
+          case 'icon': return themed ? { ...e, color: theme.accent } : e;
+          case 'form': return { ...e, accent: theme.accent, ...(themed && isDark(theme.bg) ? { bg: '#ffffff', color: '#1c2621' } : {}) };
+          default: return e;
+        }
+      }),
+    };
+  });
+  return applyRoleStyles({ ...doc, pages, theme }, theme);
+}
 
 export const newElementId = () => `e${Math.random().toString(36).slice(2, 10)}`;
 export const newStudioPageId = () => `q${Math.random().toString(36).slice(2, 10)}`;
@@ -119,6 +268,8 @@ function parseBase(r: Record<string, unknown>): Base {
     x: num(r.x, -w + 1, 99, 10), y: num(r.y, -h + 1, PAGE_H - 1, 10), w, h,
     rot: num(r.rot, -180, 180, 0, 0.5), opacity: num(r.opacity, 0, 100, 100, 1),
     ...(r.locked === true ? { locked: true } : {}),
+    ...(str(r.group, 40) ? { group: str(r.group, 40)! } : {}),
+    ...(r.shadow === true ? { shadow: true } : {}),
   };
 }
 
@@ -133,18 +284,27 @@ function parseElement(raw: unknown): StudioElement | null {
         color: color(r.color, '#1c2621'), align: pick(r.align, ['left', 'center', 'right', 'justify'] as const, 'left'),
         lineHeight: num(r.lineHeight, 0.8, 3, 1.3, 0.05), letterSpacing: num(r.letterSpacing, -0.1, 1, 0, 0.01),
         uppercase: r.uppercase === true, bg: colorOrNull(r.bg), padding: num(r.padding, 0, 20, 0), radius: num(r.radius, 0, 50, 0),
+        ...(TEXT_ROLES.includes(r.role as TextRole) ? { role: r.role as TextRole } : {}),
       };
     case 'image': {
       const frame = parsePhotoFrame(r.frame);
       return {
         ...base, type: 'image', url: url(r.url), ...(frame ? { frame } : {}), radius: num(r.radius, 0, 50, 0),
         borderColor: colorOrNull(r.borderColor), borderWidth: num(r.borderWidth, 0, 5, 0),
+        filter: pick(r.filter, ['none', 'bw', 'sepia', 'warm', 'cool', 'fade'] as const, 'none'),
+        mask: pick(r.mask, ['none', 'circle', 'arch'] as const, 'none'),
       };
     }
     case 'shape':
       return {
-        ...base, type: 'shape', shape: pick(r.shape, ['rect', 'ellipse', 'line'] as const, 'rect'),
+        ...base, type: 'shape', shape: pick(r.shape, ['rect', 'ellipse', 'arch', 'line'] as const, 'rect'),
         fill: colorOrNull(r.fill), stroke: colorOrNull(r.stroke), strokeWidth: num(r.strokeWidth, 0, 10, 0), radius: num(r.radius, 0, 50, 0),
+        dash: pick(r.dash, ['solid', 'dashed', 'dotted', 'double'] as const, 'solid'),
+      };
+    case 'icon':
+      return {
+        ...base, type: 'icon', name: pick(r.name, STUDIO_ICONS, 'Heart'), color: color(r.color, '#b4502d'),
+        strokeWidth: num(r.strokeWidth, 0.5, 3, 1.5, 0.25),
       };
     case 'prestation': {
       const prestationId = str(r.prestationId, 60);
@@ -159,7 +319,7 @@ function parseElement(raw: unknown): StudioElement | null {
         photoSize: num(r.photoSize, 20, 80, 45, 1), ...(frame ? { frame } : {}),
         font: font(r.font), size: num(r.size, 1, 12, 3.2), color: color(r.color, '#1c2621'), accent: color(r.accent, '#b4502d'),
         align: pick(r.align, ['left', 'center', 'right'] as const, 'left'), bg: colorOrNull(r.bg), padding: num(r.padding, 0, 20, 0),
-        radius: num(r.radius, 0, 50, 0),
+        radius: num(r.radius, 0, 50, 0), fit: r.fit !== false,
         ...(str(r.html, 20000) ? { html: str(r.html, 20000)! } : {}),
         ...(r.titled === true ? { titled: true } : {}),
         ...(photoUrl ? { photoUrl } : {}),
@@ -215,7 +375,31 @@ export function parseStudio(raw: unknown): StudioDoc | null {
   let seen = false;
   const formEls = form.els.filter((e) => e.type !== 'form' || (!seen && (seen = true)));
   if (!seen) formEls.push({ ...baseEl(10, 26, 80, 104), type: 'form', bg: '#ffffff', color: '#1c2621', accent: '#b4502d', radius: 2 });
-  return { pages: [...rest, { ...form, form: true, els: formEls }] };
+  const r = raw as Record<string, unknown>;
+  const theme = parseTheme(r.theme);
+  const o = (r.options && typeof r.options === 'object' ? r.options : {}) as Record<string, unknown>;
+  return {
+    pages: [...rest, { ...form, form: true, els: formEls }],
+    theme,
+    options: { animate: o.animate !== false, call: o.call === true, whatsapp: o.whatsapp === true },
+  };
+}
+
+function parseTheme(raw: unknown): StudioTheme | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const st = (r.styles && typeof r.styles === 'object' ? r.styles : {}) as Record<string, unknown>;
+  const base = THEMES[0];
+  const styles = Object.fromEntries(TEXT_ROLES.map((role) => {
+    const x = (st[role] && typeof st[role] === 'object' ? st[role] : {}) as Record<string, unknown>;
+    const d = base.styles[role];
+    return [role, {
+      font: typeof x.font === 'string' && STUDIO_FONTS.includes(x.font) ? x.font : d.font, size: num(x.size, 1, 30, d.size),
+      color: color(x.color, d.color), lineHeight: num(x.lineHeight, 0.8, 3, d.lineHeight, 0.05),
+      letterSpacing: num(x.letterSpacing, -0.1, 1, d.letterSpacing, 0.01), uppercase: x.uppercase === true,
+    }];
+  })) as Record<TextRole, StudioTextStyle>;
+  return { name: str(r.name, 60) ?? 'Personnalisé', bg: color(r.bg, base.bg), accent: color(r.accent, base.accent), styles };
 }
 
 /** Ce que le serveur refuse d'enregistrer, ou null. */
@@ -298,15 +482,18 @@ export function textEl(o: Partial<Omit<StudioText, 'type'>> & { x: number; y: nu
   };
 }
 export function imageEl(o: Partial<Omit<StudioImage, 'type'>> & { x: number; y: number; w: number; h: number }): StudioImage {
-  return { ...baseEl(o.x, o.y, o.w, o.h), url: null, radius: 0, borderColor: null, borderWidth: 0, ...o, type: 'image' };
+  return { ...baseEl(o.x, o.y, o.w, o.h), url: null, radius: 0, borderColor: null, borderWidth: 0, filter: 'none', mask: 'none', ...o, type: 'image' };
 }
 export function shapeEl(o: Partial<Omit<StudioShape, 'type'>> & { x: number; y: number; w: number; h: number }): StudioShape {
-  return { ...baseEl(o.x, o.y, o.w, o.h), shape: 'rect', fill: '#e6dfd3', stroke: null, strokeWidth: 0, radius: 0, ...o, type: 'shape' };
+  return { ...baseEl(o.x, o.y, o.w, o.h), shape: 'rect', fill: '#e6dfd3', stroke: null, strokeWidth: 0, radius: 0, dash: 'solid', ...o, type: 'shape' };
+}
+export function iconEl(o: Partial<Omit<StudioIcon, 'type'>> & { x: number; y: number; w: number; name: StudioIconName }): StudioIcon {
+  return { ...baseEl(o.x, o.y, o.w, o.h ?? o.w), color: '#b4502d', strokeWidth: 1.5, ...o, type: 'icon' };
 }
 export function prestationEl(o: Partial<Omit<StudioPrestation, 'type'>> & { x: number; y: number; w: number; h: number; prestationId: string }): StudioPrestation {
   return {
     ...baseEl(o.x, o.y, o.w, o.h), show: { name: true, text: true, price: true }, text: 'short', photo: 'top', photoSize: 45,
-    font: 'Georgia', size: 3.2, color: '#1c2621', accent: '#b4502d', align: 'left', bg: null, padding: 0, radius: 0, ...o, type: 'prestation',
+    font: 'Georgia', size: 3.2, color: '#1c2621', accent: '#b4502d', align: 'left', bg: null, padding: 0, radius: 0, fit: true, ...o, type: 'prestation',
   };
 }
 
@@ -323,9 +510,12 @@ export interface TemplateContext {
   subtitle: string | null;
   photoUrl: string | null;
   photoFrame?: PhotoFrame | null;
-  company: { name: string; address: string | null; phone: string | null; email: string | null; website: string | null };
+  company: { name: string; address: string | null; phone: string | null; email: string | null; website: string | null; logoUrl?: string | null };
   language: 'fr' | 'en';
 }
+
+/** Le logo de l'entreprise, entier (sans recadrage), centré à `y`. */
+export const logoEl = (url: string, y: number, w = 24, h = 14) => imageEl({ x: (100 - w) / 2, y, w, h, url, frame: { x: 50, y: 50, zoom: 100, fit: 'contain' } });
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -352,6 +542,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       ...blankPage('#fbf7f0'),
       els: [
         shapeEl({ x: 6, y: 6, w: 88, h: PAGE_H - 12, fill: null, stroke: '#a8844f', strokeWidth: 0.4 }),
+        ...(url(c.company.logoUrl) ? [logoEl(c.company.logoUrl!, 24)] : []),
         ...(c.subtitle ? [textEl({ x: 15, y: 46, w: 70, html: `<p>${esc(c.subtitle)}</p>`, size: 2.8, color: '#b4502d', align: 'center', uppercase: true, letterSpacing: 0.18, font: 'Montserrat' })] : []),
         textEl({ x: 12, y: 54, w: 76, h: 24, html: `<p>${esc(c.title)}</p>`, size: 9, align: 'center', font: 'Playfair Display', lineHeight: 1.1 }),
         shapeEl({ x: 45, y: 84, w: 10, h: 0.6, shape: 'line', stroke: '#b4502d', strokeWidth: 0.3, fill: null }),
@@ -434,6 +625,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     make: (c) => ({
       ...blankPage('#fbf7f0'),
       els: [
+        ...(url(c.company.logoUrl) ? [logoEl(c.company.logoUrl!, 20, 30, 16)] : []),
         textEl({ x: 10, y: 40, w: 80, html: `<p>${c.language === 'en' ? 'Contact us' : 'Nous contacter'}</p>`, size: 2.8, color: '#b4502d', align: 'center', uppercase: true, letterSpacing: 0.18, font: 'Montserrat' }),
         textEl({ x: 10, y: 48, w: 80, h: 10, html: `<p>${esc(c.company.name)}</p>`, size: 6, align: 'center', font: 'Playfair Display' }),
         textEl({
@@ -490,3 +682,76 @@ export function studioFromBrochure(
   pages.push(formPage({ language: ctx.language }));
   return { pages: pages.map((p) => ({ ...p, els: p.els.map((e) => ({ ...e, x: round(e.x), y: round(e.y), w: round(e.w), h: round(e.h) })) })) };
 }
+
+// ── Brochures complètes ──────────────────────────────────────────────────────
+
+export type BrochureKind = 'mariage' | 'entreprise' | 'cocktail';
+export const BROCHURE_KINDS: { id: BrochureKind; label: string; hint: string; theme: string }[] = [
+  { id: 'mariage', label: 'Mariage', hint: 'Couverture photo, promesse, menus deux par page, citation, galerie, contact.', theme: 'Poudré' },
+  { id: 'entreprise', label: 'Entreprise', hint: 'Sobre : présentation, carte en liste, contact.', theme: 'Épuré' },
+  { id: 'cocktail', label: 'Cocktail et réception', hint: 'Chic : une prestation en grand par page, citation, contact.', theme: 'Noir et or' },
+];
+
+const INTRO: Record<BrochureKind, { kicker: string; title: string; body: string; quote: string }> = {
+  mariage: {
+    kicker: 'Notre promesse', title: 'Un jour unique, une cuisine à votre image',
+    body: 'Nous imaginons avec vous un repas qui vous ressemble, du cocktail au dessert, avec des produits de saison et un service attentif.',
+    quote: '« Le plus beau jour mérite la plus belle table. »',
+  },
+  entreprise: {
+    kicker: 'Événements professionnels', title: 'Séminaires, cocktails, repas d’équipe',
+    body: 'Des formules claires, livrées à l’heure et servies avec soin, pour recevoir vos clients et vos équipes en toute sérénité.',
+    quote: '« Recevoir, c’est déjà convaincre. »',
+  },
+  cocktail: {
+    kicker: 'Cocktails et réceptions', title: 'L’art de recevoir',
+    body: 'Pièces cocktail, ateliers et douceurs : une réception élégante et généreuse, pensée pour vos invités.',
+    quote: '« Une bouchée, un sourire, un souvenir. »',
+  },
+};
+
+/** Une brochure entière, prête à personnaliser, avec le thème du genre choisi. */
+export function brochureFromKind(kind: BrochureKind, c: TemplateContext, prestationIds: string[]): StudioDoc {
+  const t = (id: string) => PAGE_TEMPLATES.find((x) => x.id === id)!;
+  const intro = INTRO[kind];
+  const pages: StudioPage[] = [t(kind === 'entreprise' ? 'cover-split' : c.photoUrl ? 'cover-photo' : 'cover-elegant').make(c, [])];
+  pages.push({
+    ...blankPage(),
+    els: [
+      textEl({ x: 10, y: 34, w: 80, html: `<p>${esc(intro.kicker)}</p>`, size: 2.8, uppercase: true, letterSpacing: 0.18, align: 'center', color: '#b4502d' }),
+      textEl({ x: 10, y: 42, w: 80, h: 22, html: `<p>${esc(intro.title)}</p>`, size: 7, align: 'center', lineHeight: 1.1 }),
+      shapeEl({ x: 45, y: 70, w: 10, h: 0.6, shape: 'line', stroke: '#b4502d', strokeWidth: 0.3, fill: null }),
+      textEl({ x: 14, y: 76, w: 72, h: 30, html: `<p>${esc(intro.body)}</p>`, size: 3.4, align: 'center', lineHeight: 1.55 }),
+    ],
+  });
+  const ids = prestationIds.slice(0, 18);
+  if (kind === 'entreprise') {
+    for (let i = 0; i < ids.length; i += 5) pages.push(t('menu-list').make(c, ids.slice(i, i + 5)));
+  } else if (kind === 'cocktail') {
+    ids.forEach((id) => pages.push(t('one-prestation').make(c, [id])));
+  } else {
+    for (let i = 0; i < ids.length; i += 2) {
+      const page = t('two-prestations').make(c, ids.slice(i, i + 2));
+      if (ids.length - i === 1) page.els = page.els.slice(0, 1);
+      pages.push(page);
+    }
+  }
+  const quote = t('quote').make(c, []);
+  quote.els = quote.els.map((e) => (e.type === 'text' ? { ...e, html: `<p>${esc(intro.quote)}</p>` } : e));
+  pages.push(quote);
+  if (kind === 'mariage') pages.push(t('gallery').make(c, []));
+  pages.push(t('contact').make(c, []));
+  pages.push(formPage({ language: c.language }));
+  const theme = THEMES.find((x) => x.name === BROCHURE_KINDS.find((k) => k.id === kind)!.theme) ?? THEMES[0];
+  return applyTheme({ pages, options: DEFAULT_OPTIONS }, theme);
+}
+
+/** Numéro pour WhatsApp (format international sans « + ») ; un numéro français 0X… devient 33X…. */
+export function whatsappNumber(phone: string): string | null {
+  let d = phone.replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = d.slice(1);
+  else if (d.startsWith('00')) d = d.slice(2);
+  else if (/^0\d{9}$/.test(d)) d = `33${d.slice(1)}`;
+  return /^\d{8,15}$/.test(d) ? d : null;
+}
+

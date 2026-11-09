@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parseBrochureContent, type CatalogPrestation } from './brochure';
 import {
-  PAGE_H, PAGE_TEMPLATES, formPage, parseStudio, resolveStudio, sanitizeStudio, studioError, studioFonts, studioFontsHref, studioFromBrochure,
-  studioPhotos, studioPrestationIds, textEl, type StudioDoc,
+  BROCHURE_KINDS, PAGE_H, PAGE_TEMPLATES, THEMES, applyRoleStyles, applyTheme, brochureFromKind, formPage, parseStudio, resolveStudio, sanitizeStudio,
+  studioError, studioFonts, studioFontsHref, studioFromBrochure, studioPhotos, studioPrestationIds, textEl, whatsappNumber, type StudioDoc, type StudioText,
 } from './brochureStudio';
 
 const P = '00000000-0000-4000-8000-000000000001';
@@ -66,8 +66,8 @@ describe('Studio : affichage', () => {
     pages: [
       { id: 'a', bg: '#ffffff', bgImage: { url: 'https://x.test/fond.jpg', opacity: 50 }, els: [
         textEl({ x: 1, y: 1, w: 50, html: '<p>Titre <span style="font-family: Lora">x</span></p>', font: 'Playfair Display' }),
-        { id: 'p', type: 'prestation', prestationId: P, x: 1, y: 1, w: 50, h: 50, rot: 0, opacity: 100, show: { name: true, text: true, price: true }, text: 'short', photo: 'top', photoSize: 40, font: 'Georgia', size: 3, color: '#000000', accent: '#b4502d', align: 'left', bg: null, padding: 0, radius: 0 },
-        { id: 'gone', type: 'prestation', prestationId: '00000000-0000-4000-8000-000000000099', x: 1, y: 1, w: 50, h: 50, rot: 0, opacity: 100, show: { name: true, text: true, price: true }, text: 'short', photo: 'top', photoSize: 40, font: 'Georgia', size: 3, color: '#000000', accent: '#b4502d', align: 'left', bg: null, padding: 0, radius: 0 },
+        { id: 'p', type: 'prestation', prestationId: P, x: 1, y: 1, w: 50, h: 50, rot: 0, opacity: 100, show: { name: true, text: true, price: true }, text: 'short', photo: 'top', photoSize: 40, font: 'Georgia', size: 3, color: '#000000', accent: '#b4502d', align: 'left', bg: null, padding: 0, radius: 0, fit: true },
+        { id: 'gone', type: 'prestation', prestationId: '00000000-0000-4000-8000-000000000099', x: 1, y: 1, w: 50, h: 50, rot: 0, opacity: 100, show: { name: true, text: true, price: true }, text: 'short', photo: 'top', photoSize: 40, font: 'Georgia', size: 3, color: '#000000', accent: '#b4502d', align: 'left', bg: null, padding: 0, radius: 0, fit: true },
       ] },
       formPage(),
     ],
@@ -123,5 +123,81 @@ describe('Studio : création', () => {
       const doc = parseStudio({ pages: [page] })!;
       expect(doc.pages[0].els.length, t.id).toBe(page.els.length);
     }
+  });
+});
+
+describe('Studio : thèmes, modèles, éléments V2', () => {
+  it('lit les nouveaux réglages (groupe, ombre, filtre, forme, trait, pictogramme, rôle, thème, options)', () => {
+    const doc = parseStudio({
+      theme: { name: 'X', bg: '#000000', accent: 'rouge', styles: { h1: { font: 'Lora', size: 99 } } },
+      options: { animate: false, whatsapp: true },
+      pages: [{ els: [
+        { type: 'image', url: 'https://x.test/a.jpg', x: 1, y: 1, w: 10, h: 10, filter: 'bw', mask: 'circle', group: 'g1', shadow: true },
+        { type: 'shape', shape: 'arch', dash: 'dotted', x: 1, y: 1, w: 10, h: 10 },
+        { type: 'icon', name: 'Wine', x: 1, y: 1, w: 10, h: 10 },
+        { type: 'icon', name: 'PasUnPicto', x: 1, y: 1, w: 10, h: 10 },
+        { type: 'text', html: '<p>x</p>', x: 1, y: 1, w: 10, role: 'h2' },
+        { type: 'text', html: '<p>x</p>', x: 1, y: 1, w: 10, role: 'h9' },
+      ] }],
+    })!;
+    const [img, shape, icon, icon2, t1, t2] = doc.pages[0].els;
+    expect(img).toMatchObject({ filter: 'bw', mask: 'circle', group: 'g1', shadow: true });
+    expect(shape).toMatchObject({ shape: 'arch', dash: 'dotted' });
+    expect(icon).toMatchObject({ type: 'icon', name: 'Wine' });
+    expect(icon2).toMatchObject({ name: 'Heart' });
+    expect(t1).toMatchObject({ role: 'h2' });
+    expect(t2.type === 'text' && t2.role).toBeFalsy();
+    expect(doc.theme).toMatchObject({ bg: '#000000', accent: THEMES[0].accent, styles: { h1: { font: 'Lora', size: 30 } } });
+    expect(doc.options).toEqual({ animate: false, call: false, whatsapp: true });
+    expect(parseStudio({ pages: [] })!.options).toEqual({ animate: true, call: false, whatsapp: false });
+  });
+
+  it('un thème habille les pages sans photo, donne un rôle à chaque texte et en applique le style', () => {
+    const noir = THEMES.find((t) => t.name === 'Noir et or')!;
+    const doc: StudioDoc = {
+      pages: [
+        { id: 'a', bg: '#fbf7f0', bgImage: null, els: [textEl({ x: 1, y: 1, w: 50, html: '<p>T</p>', size: 8 }), textEl({ x: 1, y: 1, w: 50, html: '<p>K</p>', size: 2.8, uppercase: true }), textEl({ x: 1, y: 1, w: 50, html: '<p>B</p>', size: 3.4, color: '#123456' })] },
+        { id: 'b', bg: '#fbf7f0', bgImage: { url: 'https://x.test/f.jpg', opacity: 100 }, els: [textEl({ x: 1, y: 1, w: 50, html: '<p>Sur photo</p>', size: 3.4, color: '#ffffff' })] },
+        formPage(),
+      ],
+    };
+    const out = applyTheme(doc, noir);
+    expect(out.theme).toBe(noir);
+    expect(out.pages[0].bg).toBe(noir.bg);
+    expect(out.pages[1].bg).toBe('#fbf7f0');
+    const [h1, kicker, body] = out.pages[0].els as StudioText[];
+    expect(h1).toMatchObject({ role: 'h1', font: noir.styles.h1.font, color: noir.styles.h1.color });
+    expect(kicker).toMatchObject({ role: 'kicker', font: noir.styles.kicker.font });
+    expect(body).toMatchObject({ role: 'body', color: noir.styles.body.color });
+    // Texte posé sur une photo : la police suit, la couleur reste.
+    expect(out.pages[1].els[0]).toMatchObject({ font: noir.styles.body.font, color: '#ffffff' });
+    // Fond sombre : le formulaire reste lisible.
+    expect(out.pages[2].els.find((e) => e.type === 'form')).toMatchObject({ accent: noir.accent, bg: '#ffffff' });
+    // Un style changé suit dans tous les textes qui y sont reliés.
+    const changed = { ...noir, styles: { ...noir.styles, body: { ...noir.styles.body, font: 'Lora', size: 4 } } };
+    expect(applyRoleStyles(out, changed).pages[0].els[2]).toMatchObject({ font: 'Lora', size: 4 });
+  });
+
+  it('brochures complètes : thème du genre, prestations, formulaire en dernier, pages valides', () => {
+    for (const k of BROCHURE_KINDS) {
+      const doc = brochureFromKind(k.id, { ...ctx, title: 'Ma brochure', subtitle: null, photoUrl: null }, [P, P, P]);
+      expect(doc.theme?.name, k.id).toBe(k.theme);
+      expect(doc.pages.at(-1)!.form).toBe(true);
+      expect(studioPrestationIds(doc)).toEqual([P]);
+      expect(doc.pages.flatMap((p) => p.els).filter((e) => e.type === 'prestation')).toHaveLength(3);
+      expect(parseStudio(JSON.parse(JSON.stringify(doc)))!.pages).toHaveLength(doc.pages.length);
+    }
+  });
+
+  it('le logo de l’entreprise est repris par les modèles, entier', () => {
+    const page = PAGE_TEMPLATES.find((t) => t.id === 'cover-elegant')!.make({ ...ctx, company: { ...ctx.company, logoUrl: 'https://x.test/logo.png' }, title: 'T', subtitle: null, photoUrl: null }, []);
+    expect(page.els.find((e) => e.type === 'image')).toMatchObject({ url: 'https://x.test/logo.png', frame: { fit: 'contain' } });
+  });
+
+  it('numéro WhatsApp au format international', () => {
+    expect(whatsappNumber('06 12 34 56 78')).toBe('33612345678');
+    expect(whatsappNumber('+33 6 12 34 56 78')).toBe('33612345678');
+    expect(whatsappNumber('0032 470 12 34 56')).toBe('32470123456');
+    expect(whatsappNumber('abc')).toBeNull();
   });
 });

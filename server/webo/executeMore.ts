@@ -5,12 +5,14 @@ import { brochures, customers, ingredient_stocks, profiles, prospect_requests, q
 import { createSupplierOrders } from '../events';
 import { sendSupplierOrder } from '../supplierOrders';
 import { issueInvoice, recordPayment } from '../invoices';
-import { sendBrochure } from '../brochures';
+import { createKindBrochure, sendBrochure, studioTemplateCompany } from '../brochures';
 import type { PaymentMethod } from '@/lib/invoices';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
 import { customerDuplicate, invoiceRemaining, prospectStatusProblem } from './moreTools';
-import { idsOf, opsOf, prestationNames, settingsOf, stateOf } from './brochureTools';
+import { idsOf, opsOf, prestationNames, settingsOf, stateOf, studioSettings, templateContextOf } from './brochureTools';
+import { parseStudio, sanitizeStudio, type BrochureKind } from '@/lib/brochureStudio';
+import { applyStudioUpdate } from '@/lib/webo/studioUpdate';
 import { applyBrochureUpdate, type BrochureSettings } from '@/lib/webo/brochureUpdate';
 
 // Exécution des propositions « du reste du logiciel » (clients, prospects, stock, commandes, brochures, factures),
@@ -167,12 +169,23 @@ async function updateBrochure(companyId: string, p: Record<string, unknown>): Pr
   // Mêmes champs que la proposition : relus par les mêmes fonctions que l'outil.
   const settings = settingsOf({ name: s.name, language: s.language, show_prices: s.showPrices, cover_title: s.coverTitle, cover_subtitle: s.coverSubtitle });
   const ops = opsOf(p.ops);
+  // Lu avant la transaction : une requête hors transaction attendrait la fin de celle-ci.
+  const company = await studioTemplateCompany(companyId);
   await db.transaction(async (tx) => {
     // Brochure verrouillée : les changements s'appliquent à ce qu'elle est maintenant, pas à ce qu'elle était.
     const [b] = await tx.select().from(brochures).where(and(eq(brochures.id, id), sql`${brochures.owner_user_id} in ${companyIdsOf(companyId)}`)).for('update').limit(1);
     if (!b) throw new Error('Brochure introuvable.');
     const state = stateOf(b);
     const names = await prestationNames(companyId, idsOf(state, ops), tx);
+    if (b.editor_mode === 'studio') {
+      // Studio : réglages comme ailleurs, opérations sur les pages composées librement.
+      const doc = parseStudio(b.studio);
+      if (!doc) throw new Error('Cette brochure n’a pas encore de pages.');
+      const { patch } = studioSettings(state, settings, names);
+      const studio = applyStudioUpdate(doc, ops, names, await templateContextOf(companyId, b, company)).doc;
+      await tx.update(brochures).set({ ...patch, studio: sanitizeStudio(studio), updated_at: new Date().toISOString() }).where(eq(brochures.id, b.id));
+      return;
+    }
     const { patch } = applyBrochureUpdate(state, settings, ops, names);
     await tx.update(brochures).set({ ...patch, updated_at: new Date().toISOString() }).where(eq(brochures.id, b.id));
   });
@@ -207,6 +220,14 @@ export async function executeMore(kind: string, p: Record<string, unknown>, user
       return { href: '/factures', label: 'Voir les factures' };
     }
     case 'brochure_update': return updateBrochure(companyId, p);
+    case 'brochure_create': {
+      const r = await createKindBrochure({
+        name: String(p.name ?? ''), kind: p.kind as BrochureKind, language: p.language === 'en' ? 'en' : 'fr',
+        prestationIds: Array.isArray(p.prestationIds) ? p.prestationIds.map(String) : [],
+      });
+      if (r.error || !r.id) throw new Error(r.error ?? 'La brochure n’a pas pu être créée.');
+      return { href: `/brochures/${r.id}`, label: 'Ouvrir la brochure' };
+    }
     case 'brochure_send': {
       const r = await sendBrochure({ brochureId: String(p.brochureId), to: String(p.to), ...(p.message ? { message: String(p.message) } : {}), ...(p.prospectId ? { prospectId: String(p.prospectId) } : {}) });
       if (r.error) throw new Error(r.error);

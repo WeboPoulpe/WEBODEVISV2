@@ -84,7 +84,7 @@ export const MORE_BY_AGENT: Partial<Record<AgentName, string[]>> = {
   stock: ['stock_levels', 'propose_stock_movement', 'list_suppliers', 'list_supplier_orders', 'propose_supplier_order', 'propose_supplier_order_send', 'propose_supplier_order_receive', 'propose_event_orders', 'list_events', 'propose_memory'],
   factures: ['list_invoices', 'propose_invoice_issue', 'propose_invoice_payment'],
   prospects: ['list_brochures', 'propose_brochure_send', 'propose_prospect_status', 'propose_prospect_to_quote'],
-  brochures: ['list_brochures', 'get_brochure', 'search_catalogue', 'propose_brochure_update', 'propose_brochure_send', 'propose_memory'],
+  brochures: ['list_brochures', 'get_brochure', 'search_catalogue', 'propose_brochure_update', 'propose_brochure_create', 'propose_brochure_send', 'propose_memory'],
   clients: ['search_customers', 'get_customer', 'propose_customer', 'list_prospects', 'propose_prospect_status', 'propose_prospect_to_quote', 'propose_memory'],
 };
 
