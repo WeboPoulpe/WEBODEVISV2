@@ -18,7 +18,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import {
   AlignCenter, AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround, AlignJustify, AlignLeft,
   AlignRight, AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, ArrowDownToLine, ArrowUpToLine, Bold, BringToFront, CaseUpper, Copy,
-  Grid3x3, Group as GroupIcon, Italic, Link2, Link2Off, List, ListOrdered, Loader2, Lock, LockOpen, Minus, Pencil, Plus, Redo2, RemoveFormatting,
+  BoxSelect, Grid3x3, Group as GroupIcon, Italic, Link2, Link2Off, List, ListOrdered, Loader2, Lock, LockOpen, Minus, Pencil, Plus, Redo2, RemoveFormatting,
   SendToBack, Sparkles, Trash2, Underline, Undo2, Ungroup, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -192,6 +192,10 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
   const [linkValue, setLinkValue] = useState('');
   const [weboOpen, setWeboOpen] = useState(false);
   const [weboBusy, setWeboBusy] = useState(false);
+  /** « Choisir plusieurs » : chaque toucher ajoute ou retire un élément (comme Maj+clic, utile au doigt). */
+  const [multi, setMulti] = useState(false);
+  /** Le menu Webo a été ouvert avec un passage sélectionné : seul ce passage sera réécrit. */
+  const [weboPart, setWeboPart] = useState(false);
   const clipboard = useRef<StudioElement[]>([]);
   const savedRange = useRef<Range | null>(null);
 
@@ -584,6 +588,48 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
     window.addEventListener('pointercancel', onUp);
   };
 
+  /**
+   * Agrandir ou réduire plusieurs éléments d'un bloc (groupe ou sélection) par un coin : proportions gardées, le
+   * coin opposé reste en place ; tailles de texte, traits et marges suivent.
+   */
+  const scaleGesture = (e: React.PointerEvent, corner: 'nw' | 'ne' | 'se' | 'sw') => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const items = selEls.filter((x) => !x.locked);
+    if (!items.length) return;
+    const b0 = bounds(items.map(boxOf));
+    const ax = corner.includes('w') ? b0.x + b0.w : b0.x;
+    const ay = corner.includes('n') ? b0.y + b0.h : b0.y;
+    const sx = corner.includes('e') ? 1 : -1;
+    const sy = corner.includes('s') ? 1 : -1;
+    const origin = new Map(items.map((x) => [x.id, x]));
+    const start = { px: e.clientX, py: e.clientY, key: `scale-${Date.now()}` };
+    const onMove = (ev: PointerEvent) => {
+      const dx = ((ev.clientX - start.px) / unit) * sx;
+      const dy = ((ev.clientY - start.py) / unit) * sy;
+      const k = Math.max(0.1, Math.max((b0.w + dx) / b0.w, (b0.h + dy) / b0.h));
+      const sc = (n: number) => Math.round(n * k * 100) / 100;
+      updateMany((x) => {
+        const o = origin.get(x.id);
+        if (!o) return null;
+        const patch: Record<string, unknown> = { x: round(ax + (o.x - ax) * k), y: round(ay + (o.y - ay) * k), w: round(o.w * k), h: round(o.h * k) };
+        if (o.type === 'text') Object.assign(patch, { size: Math.min(30, Math.max(1, sc(o.size))), padding: sc(o.padding), role: undefined });
+        if (o.type === 'prestation') Object.assign(patch, { size: Math.min(12, Math.max(1, sc(o.size))), padding: sc(o.padding) });
+        if (o.type === 'shape') patch.strokeWidth = Math.min(10, sc(o.strokeWidth));
+        return patch as Partial<StudioElement>;
+      }, start.key);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   /** Cadre de sélection, tiré sur le fond de la page. Sans mouvement : tout est désélectionné. */
   const startMarquee = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -680,18 +726,39 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
       node.querySelectorAll('a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
     });
   };
+  /** Webo réécrit le passage sélectionné (pendant la saisie) ou, sans sélection, tout le texte. */
   const rewrite = async (mode: string) => {
     setWeboOpen(false);
     if (selected?.type !== 'text' || weboBusy) return;
     const id = selected.id;
+    const range = weboPart && savedRange.current ? savedRange.current.cloneRange() : null;
+    let html = selected.html;
+    if (range) {
+      const holder = document.createElement('div');
+      holder.append(range.cloneContents());
+      html = holder.innerHTML;
+    }
     setWeboBusy(true);
-    const res = await rewriteWithWebo({ html: selected.html, mode: mode as never, requestId: crypto.randomUUID() })
+    const res = await rewriteWithWebo({ html, mode: mode as never, requestId: crypto.randomUUID() })
       .catch(() => ({ error: 'Webo n’a pas répondu. Vérifiez votre connexion.' }));
     setWeboBusy(false);
     if ('error' in res) { notify(res.error, { tone: 'error' }); return; }
-    setEditing(null);
-    update(id, { html: res.html });
-    notify('Texte réécrit par Webo (1 WeboCoin). « Annuler » revient au texte d’avant.', { tone: 'success' });
+    const node = document.querySelector<HTMLElement>(`[data-editing][data-studio-text="${id}"]`);
+    if (range && node && node.contains(range.commonAncestorContainer)) {
+      // Le passage est remplacé à sa place ; le reste du texte ne bouge pas.
+      node.focus({ preventScroll: true });
+      const sel = document.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      // Un seul paragraphe renvoyé pour un passage pris dans un paragraphe : sans ses balises <p>.
+      const inline = /^<p>((?:(?!<\/?p[ >])[\s\S])*)<\/p>$/.exec(res.html.trim());
+      document.execCommand('insertHTML', false, inline && !/<p[ >]/.test(html) ? inline[1] : res.html);
+      update(id, { html: node.innerHTML });
+    } else {
+      setEditing(null);
+      update(id, { html: res.html });
+    }
+    notify(`${range ? 'Passage' : 'Texte'} réécrit par Webo (1 WeboCoin). « Annuler » revient en arrière.`, { tone: 'success' });
   };
   const queryState = (cmd: string) => { try { return editing ? document.queryCommandState(cmd) : false; } catch { return false; } };
 
@@ -782,42 +849,25 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
         </select>
         <div className="relative">
           <ToolBtn label="Lien (site, email, téléphone)" active={linkOpen} onPress={() => { setLinkValue(''); setLinkOpen((v) => !v); setWeboOpen(false); }}><Link2 className="h-4 w-4" /></ToolBtn>
-          {linkOpen && (
-            <div className="absolute left-0 top-9 z-30 w-64 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-              <input autoFocus value={linkValue} onChange={(e) => setLinkValue(e.target.value)} placeholder="monsite.fr, email ou téléphone"
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyLink(); } if (e.key === 'Escape') setLinkOpen(false); }}
-                className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm" aria-label="Adresse du lien" />
-              <div className="mt-2 flex justify-between gap-2">
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setLinkOpen(false); exec('unlink'); }} className="inline-flex items-center gap-1 text-xs text-gray-600"><Link2Off className="h-3.5 w-3.5" /> Retirer le lien</button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={applyLink} className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-white">Appliquer</button>
-              </div>
-            </div>
-          )}
         </div>
         <ToolBtn label="Effacer la mise en forme" onPress={() => exec('removeFormat')}><RemoveFormatting className="h-4 w-4" /></ToolBtn>
         <div className="relative">
-          <ToolBtn label="Webo : corriger, reformuler…" active={weboOpen} disabled={weboBusy} onPress={() => { setWeboOpen((v) => !v); setLinkOpen(false); }}>
+          <ToolBtn label="Webo : corriger, reformuler…" active={weboOpen} disabled={weboBusy} onPress={() => { setWeboPart(editingSel()); setWeboOpen((v) => !v); setLinkOpen(false); }}>
             {weboBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}<span className="ml-1 hidden sm:inline">Webo</span>
           </ToolBtn>
-          {weboOpen && (
-            <div className="absolute right-0 top-9 z-30 w-56 rounded-xl border border-gray-200 bg-white p-1 shadow-lg sm:left-0 sm:right-auto" role="menu">
-              {REWRITES.map(([m, label]) => (
-                <button key={m} type="button" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => rewrite(m)}
-                  className="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">{label}</button>
-              ))}
-              <p className="px-2.5 py-1 text-[11px] text-gray-400">1 WeboCoin par texte · tout le texte de l’élément</p>
-            </div>
-          )}
         </div>
       </>
     );
   })();
 
+  // Téléphone : une seule ligne qui défile ; les menus (lien, Webo) s'ouvrent sous la barre, hors de la ligne.
   const toolbar = (
+    <div className="sticky top-0 z-20">
     <div role="toolbar" aria-label="Outils du Studio"
-      className="sticky top-0 z-20 flex flex-wrap items-center gap-0.5 rounded-xl border border-gray-200 bg-white/95 p-1 shadow-sm backdrop-blur">
+      className="flex items-center gap-0.5 rounded-xl border border-gray-200 bg-white/95 p-1 shadow-sm backdrop-blur max-md:overflow-x-auto max-md:[scrollbar-width:none] md:flex-wrap [&>*]:shrink-0">
       <ToolBtn label="Annuler (Ctrl+Z)" onPress={undo} disabled={!canUndo}><Undo2 className="h-4 w-4" /></ToolBtn>
       <ToolBtn label="Rétablir (Ctrl+Y)" onPress={redo} disabled={!canRedo}><Redo2 className="h-4 w-4" /></ToolBtn>
+      <ToolBtn label="Choisir plusieurs éléments" active={multi} onPress={() => setMulti((v) => !v)}><BoxSelect className="h-4 w-4" /><span className="ml-1 md:hidden">Plusieurs</span></ToolBtn>
       {selEls.length > 0 && <Sep />}
       {textTools}
       {selEls.length > 1 && (
@@ -854,13 +904,36 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
           </>}
         </>
       )}
-      {!selEls.length && <span className="px-2 text-xs text-gray-500">Cliquez sur un élément (Maj+clic ou cadre pour plusieurs), ou ajoutez-en un.</span>}
-      <span className="ml-auto flex items-center">
+      {!selEls.length && <span className="px-2 text-xs text-gray-500 max-md:hidden">Cliquez sur un élément (Maj+clic ou cadre pour plusieurs), ou ajoutez-en un.</span>}
+      <span className="ml-auto flex items-center max-md:ml-2 max-md:border-l max-md:border-gray-200 max-md:pl-1">
         <ToolBtn label="Grille et règles" active={showGrid} onPress={() => setShowGrid((v) => !v)}><Grid3x3 className="h-4 w-4" /></ToolBtn>
         <ToolBtn label="Zoom arrière" disabled={zoom <= 0.5} onPress={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}><ZoomOut className="h-4 w-4" /></ToolBtn>
         <button type="button" onClick={() => setZoom(1)} title="Taille ajustée" className="h-8 w-12 rounded-md text-xs tabular-nums text-gray-600 hover:bg-gray-100">{Math.round(zoom * 100)} %</button>
         <ToolBtn label="Zoom avant" disabled={zoom >= 2.5} onPress={() => setZoom((z) => Math.min(2.5, Math.round((z + 0.25) * 100) / 100))}><ZoomIn className="h-4 w-4" /></ToolBtn>
       </span>
+    </div>
+    {selected?.type === 'text' && <>
+          {linkOpen && (
+            <div className="absolute left-1 top-full z-30 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+              <input autoFocus value={linkValue} onChange={(e) => setLinkValue(e.target.value)} placeholder="monsite.fr, email ou téléphone"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyLink(); } if (e.key === 'Escape') setLinkOpen(false); }}
+                className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm" aria-label="Adresse du lien" />
+              <div className="mt-2 flex justify-between gap-2">
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setLinkOpen(false); exec('unlink'); }} className="inline-flex items-center gap-1 text-xs text-gray-600"><Link2Off className="h-3.5 w-3.5" /> Retirer le lien</button>
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={applyLink} className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-white">Appliquer</button>
+              </div>
+            </div>
+          )}
+          {weboOpen && (
+            <div className="absolute left-1 top-full z-30 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-1 shadow-lg" role="menu">
+              {REWRITES.map(([m, label]) => (
+                <button key={m} type="button" role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => rewrite(m)}
+                  className="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">{label}</button>
+              ))}
+              <p className="px-2.5 py-1 text-[11px] text-gray-400">1 WeboCoin · {weboPart ? 'le passage sélectionné' : 'tout le texte (sélectionnez un passage en écrivant pour ne changer que lui)'}</p>
+            </div>
+          )}
+    </>}
     </div>
   );
 
@@ -1066,7 +1139,15 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
           {selEls.map((e) => (
             <div key={e.id} aria-hidden className="pointer-events-none absolute" style={{ left: e.x * unit, top: e.y * unit, width: e.w * unit, height: heightOf(e) * unit, transform: e.rot ? `rotate(${e.rot}deg)` : undefined, outline: '1px solid #B4502D' }} />
           ))}
-          <div aria-hidden className="pointer-events-none absolute" style={{ left: b.x * unit - 3, top: b.y * unit - 3, width: b.w * unit + 6, height: b.h * unit + 6, border: '1.5px dashed #B4502D' }} />
+          <div aria-hidden className="pointer-events-none absolute" style={{ left: b.x * unit - 3, top: b.y * unit - 3, width: b.w * unit + 6, height: b.h * unit + 6, border: '1.5px dashed #B4502D' }}>
+            {(['nw', 'ne', 'se', 'sw'] as const).map((c) => (
+              <span key={c} className="pointer-events-auto absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                style={{ left: c.includes('w') ? '0%' : '100%', top: c.includes('n') ? '0%' : '100%', cursor: CURSOR[c], touchAction: 'none' }}
+                onPointerDown={(e) => scaleGesture(e, c)} title="Agrandir ou réduire l’ensemble">
+                <span className="block h-3 w-3 rounded-full border-2 border-[#B4502D] bg-white shadow" />
+              </span>
+            ))}
+          </div>
         </>
       );
     }
@@ -1136,7 +1217,7 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
                   onPointerDown={(e) => {
                     if (isEditing) { e.stopPropagation(); return; }
                     if (editing) stopEditing();
-                    if (e.shiftKey) {
+                    if (e.shiftKey || multi) {
                       e.stopPropagation();
                       const ids = groupIds(el);
                       setSel((s) => (ids.every((i) => s.includes(i)) ? s.filter((i) => !ids.includes(i)) : [...s, ...ids.filter((i) => !s.includes(i))]));

@@ -8,24 +8,27 @@ import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { btnSecondary } from '@/components/ui/kit';
 import { useFeedback } from '@/components/ui/Feedback';
+import type { ResolvedStudioPage } from '@/lib/brochureStudio';
 import { getBrochurePageStats, resetBrochurePageStats } from '@/server/brochures';
+import { PageThumb } from './StudioPanels';
 
 const secs = (ms: number) => (ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`);
 
-export default function StudioStats({ brochureId, pageCount, onClose }: { brochureId: string; pageCount: number; onClose: () => void }) {
+export default function StudioStats({ brochureId, pages, language, onClose }: { brochureId: string; pages: ResolvedStudioPage[]; language: 'fr' | 'en'; onClose: () => void }) {
   const { confirm, notify } = useFeedback();
-  const [rows, setRows] = useState<{ page: number; views: number; ms: number }[] | null>(null);
+  const [rows, setRows] = useState<{ pageId: string; views: number; ms: number }[] | null>(null);
   useEffect(() => {
     let alive = true;
     getBrochurePageStats(brochureId).then((r) => { if (alive) setRows(r); }).catch(() => { if (alive) setRows([]); });
     return () => { alive = false; };
   }, [brochureId]);
-  const byPage = new Map((rows ?? []).map((r) => [r.page, r]));
-  const first = byPage.get(0)?.views ?? 0;
+  // Chaque page garde sa lecture même déplacée : elle est repérée par son identifiant.
+  const byPage = new Map((rows ?? []).map((r) => [r.pageId, r]));
+  const first = byPage.get(pages[0]?.id ?? '')?.views ?? 0;
   const max = Math.max(1, ...(rows ?? []).map((r) => r.views));
   const total = (rows ?? []).reduce((t, r) => t + r.ms, 0);
   const reset = async () => {
-    if (!(await confirm({ title: 'Remettre la lecture à zéro ?', message: 'Utile après avoir refait les pages : les chiffres repartent de zéro.', confirmLabel: 'Remettre à zéro', danger: true }))) return;
+    if (!(await confirm({ title: 'Remettre la lecture à zéro ?', message: 'Les chiffres repartent de zéro, par exemple après un nouvel envoi.', confirmLabel: 'Remettre à zéro', danger: true }))) return;
     const r = await resetBrochurePageStats(brochureId);
     if (r.error) notify(r.error, { tone: 'error' }); else setRows([]);
   };
@@ -42,12 +45,17 @@ export default function StudioStats({ brochureId, pageCount, onClose }: { brochu
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs uppercase tracking-wider text-gray-500"><th className="py-1 font-semibold">Page</th><th className="font-semibold">Vues</th><th className="font-semibold">Temps moyen</th><th className="font-semibold">Atteinte</th></tr></thead>
             <tbody>
-              {Array.from({ length: pageCount }, (_, i) => {
-                const r = byPage.get(i);
+              {pages.map((page, i) => {
+                const r = byPage.get(page.id);
                 const views = r?.views ?? 0;
                 return (
-                  <tr key={i} className="border-t border-gray-100">
-                    <td className="py-1.5 pr-2 text-gray-700">{i === pageCount - 1 ? 'Formulaire' : i + 1}</td>
+                  <tr key={page.id} className="border-t border-gray-100">
+                    <td className="py-1.5 pr-2 text-gray-700">
+                      <span className="flex items-center gap-2">
+                        <span className="block w-7 overflow-hidden rounded-sm ring-1 ring-gray-200"><PageThumb page={page} language={language} /></span>
+                        {page.form ? 'Formulaire' : i + 1}
+                      </span>
+                    </td>
                     <td className="w-1/3 pr-3">
                       <div className="flex items-center gap-2">
                         <span className="h-2 rounded-full bg-primary" style={{ width: `${(views / max) * 100}%`, minWidth: views ? 4 : 0 }} />
@@ -61,7 +69,7 @@ export default function StudioStats({ brochureId, pageCount, onClose }: { brochu
               })}
             </tbody>
           </table>
-          <p className="mt-3 text-xs text-gray-500">Les numéros suivent l’ordre actuel des pages : après avoir déplacé ou supprimé des pages, remettez la lecture à zéro.</p>
+          <p className="mt-3 text-xs text-gray-500">Une page déplacée garde ses chiffres ; une page ajoutée part de zéro.</p>
         </>
       )}
     </Modal>

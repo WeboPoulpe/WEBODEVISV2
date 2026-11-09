@@ -20,7 +20,7 @@ import {
   type BrochureContent, type BrochureCover, type BrochureItem, type BrochureStyle, type CatalogPrestation,
 } from '@/lib/brochure';
 import { parseLayout, type BrochureLayout } from '@/lib/brochureLayout';
-import { parseStudio, type StudioDoc } from '@/lib/brochureStudio';
+import { parseStudio, resolveStudio, type StudioDoc } from '@/lib/brochureStudio';
 import { renewBrochureLink, saveBrochure, switchBrochureEditor, type BrochureRow, type EditorMode, type PublicBrochure } from '@/server/brochures';
 import AdvancedEditor from './advanced/AdvancedEditor';
 import StudioEditor from './studio/StudioEditor';
@@ -340,8 +340,14 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
             <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
             <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
             <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
-            <a href={`/b/${token}/pdf`} target="_blank" rel="noreferrer" className={cn(btnSecondary, !draft.is_active && 'pointer-events-none opacity-50')}
-              title={draft.is_active ? 'Imprimer ou enregistrer en PDF' : 'Activez le lien pour exporter'}><FileDown className="h-4 w-4" /> PDF</a>
+            <a href={`/brochures/${brochure.id}/pdf`} target="_blank" rel="noreferrer" className={btnSecondary} title="Imprimer ou enregistrer en PDF"
+              onClick={async (e) => {
+                // Le dernier changement part d'abord : le PDF montre les pages telles qu'elles sont à l'écran.
+                e.preventDefault();
+                const win = window.open('', '_blank');
+                await flush();
+                if (win) win.location.href = `/brochures/${brochure.id}/pdf`; else window.location.href = `/brochures/${brochure.id}/pdf`;
+              }}><FileDown className="h-4 w-4" /> PDF</a>
             <button type="button" onClick={() => setStatsOpen(true)} className={btnSecondary}><BarChart3 className="h-4 w-4" /> Lecture</button>
             <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className={btnSecondary}>
               <Settings2 className="h-4 w-4" /> Réglages de la brochure
@@ -494,7 +500,8 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
           <p className="text-sm text-gray-700">Cette brochure a déjà une mise en page avancée. Vous pouvez la reprendre telle que vous l’aviez laissée (les prestations ajoutées entre-temps sont mises à la suite), ou repartir de la composition simple actuelle.</p>
         </Modal>
       )}
-      {statsOpen && <StudioStats brochureId={brochure.id} pageCount={studioDoc.pages.length} onClose={() => setStatsOpen(false)} />}
+      {statsOpen && <StudioStats brochureId={brochure.id} language={draft.language} onClose={() => setStatsOpen(false)}
+        pages={resolveStudio(studioDoc, byId, { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: true })} />}
       {sending && <SendBrochureModal brochureId={brochure.id} onClose={() => setSending(false)} />}
       {picking && <PrestationPicker catalog={catalog} already={inBrochure} onAdd={addPrestations} onClose={() => setPicking(false)} />}
       {retouch && retouched && retouchedPrestation && (

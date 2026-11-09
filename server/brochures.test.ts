@@ -426,27 +426,33 @@ describe('brochures : Studio (v2)', () => {
 });
 
 describe('brochures : lecture page par page (Studio)', () => {
-  const statsOf = async (id: string) => (await pg.query<{ page: number; views: number; ms: string }>(`select page, views, ms from brochure_page_stats where brochure_id = $1 order by page`, [id])).rows;
-  it('compte vues et temps par page, borné, sans les visites de l’entreprise', async () => {
+  const statsOf = async (id: string) => (await pg.query<{ page_id: string; views: number; ms: string }>(`select page_id, views, ms from brochure_page_stats where brochure_id = $1 order by page_id`, [id])).rows;
+  it('compte vues et temps par page (repérée par son identifiant), borné, sans les visites de l’entreprise', async () => {
     current = OWNER;
     const { id } = await br.createBrochure({ name: 'Lue', editor: 'studio' });
-    const token = (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;
+    const row = (await pg.query<{ share_token: string; studio: { pages: { id: string }[] } }>(`select share_token, studio from brochures where id = $1`, [id])).rows[0];
+    const token = row.share_token;
+    const [a, b] = row.studio.pages.map((p) => p.id);
     session = null;
-    await br.recordStudioPages(token, [{ page: 0, views: 1, ms: 4000 }, { page: 1, views: 1, ms: 99_000_000 }, { page: -1, views: 1 }, { page: 0, views: 1, ms: 1000 }]);
-    await br.recordStudioPages(token, [{ page: 0, views: 1, ms: 500 }]);
-    expect((await statsOf(id!)).map((r) => ({ ...r, ms: Number(r.ms) }))).toEqual([{ page: 0, views: 3, ms: 5500 }, { page: 1, views: 1, ms: 600_000 }]);
+    await br.recordStudioPages(token, [{ pageId: a, views: 1, ms: 4000 }, { pageId: b, views: 1, ms: 99_000_000 }, { pageId: 'inventee', views: 1 }, { pageId: a, views: 1, ms: 1000 }]);
+    await br.recordStudioPages(token, [{ pageId: a, views: 1, ms: 500 }]);
+    const rows = Object.fromEntries((await statsOf(id!)).map((r) => [r.page_id, { views: r.views, ms: Number(r.ms) }]));
+    expect(rows).toEqual({ [a]: { views: 3, ms: 5500 }, [b]: { views: 1, ms: 600_000 } });
     // Quelqu'un de l'entreprise : rien n'est compté.
     session = { id: OWNER, email: 'chef@b.fr' };
-    await br.recordStudioPages(token, [{ page: 0, views: 1, ms: 1000 }]);
+    await br.recordStudioPages(token, [{ pageId: a, views: 1, ms: 1000 }]);
     session = null;
-    expect((await br.getBrochurePageStats(id!))[0]).toEqual({ page: 0, views: 3, ms: 5500 });
+    // Pages déplacées : chaque page garde ses chiffres.
+    const moved = { ...row.studio, pages: [row.studio.pages[1], row.studio.pages[0], ...row.studio.pages.slice(2)] };
+    expect((await br.saveBrochure(id!, { studio: moved })).error).toBeNull();
+    expect((await br.getBrochurePageStats(id!)).find((r) => r.pageId === a)).toEqual({ pageId: a, views: 3, ms: 5500 });
     expect((await br.resetBrochurePageStats(id!)).error).toBeNull();
     expect(await br.getBrochurePageStats(id!)).toEqual([]);
     // Pas de lecture comptée hors Studio, ni avec un jeton inconnu.
     const simple = await br.createBrochure({ name: 'Simple' });
     const t2 = (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [simple.id])).rows[0].share_token;
-    await br.recordStudioPages(t2, [{ page: 0, views: 1, ms: 1000 }]);
-    await br.recordStudioPages('jeton-inconnu-000000000', [{ page: 0, views: 1, ms: 1000 }]);
+    await br.recordStudioPages(t2, [{ pageId: a, views: 1, ms: 1000 }]);
+    await br.recordStudioPages('jeton-inconnu-000000000', [{ pageId: a, views: 1, ms: 1000 }]);
     expect(await statsOf(simple.id!)).toEqual([]);
   });
 

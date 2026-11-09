@@ -37,7 +37,10 @@ export default function StudioPrint({ pages, language, name }: { pages: Resolved
         .wb-print-page:last-child { break-after: auto; page-break-after: auto; }
       `}</style>
       <div className="wb-print-bar mx-auto mb-4 flex max-w-[210mm] items-center justify-between gap-3 px-2 text-sm text-[#1C2621]">
-        <span className="font-semibold">{name} · {pages.length} page{pages.length > 1 ? 's' : ''}</span>
+        <span>
+          <span className="block font-semibold">{name} · {pages.length} page{pages.length > 1 ? 's' : ''}</span>
+          <span className="block text-xs text-[#5b5b55]">Dans la fenêtre d’impression : destination « Enregistrer en PDF », marges « Aucune », graphiques d’arrière-plan cochés.</span>
+        </span>
         <button type="button" onClick={() => window.print()} disabled={!ready}
           className="inline-flex items-center gap-1.5 rounded-lg bg-[#B4502D] px-3 py-2 font-semibold text-white disabled:opacity-60">
           <Printer className="h-4 w-4" /> {ready ? 'Imprimer ou enregistrer en PDF' : 'Préparation…'}

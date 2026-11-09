@@ -481,33 +481,35 @@ export async function recordStudioPages(token: string, entries: unknown): Promis
   const row = await byToken(token, true);
   if (!row || row.editor_mode !== 'studio') return;
   if (await isCompanyViewer(row.owner_user_id)) return;
-  const clean = new Map<number, { views: number; ms: number }>();
+  // Seules les pages de la brochure telle qu'elle est comptent.
+  const known = new Set(parseStudio(row.studio)?.pages.map((p) => p.id) ?? []);
+  const clean = new Map<string, { views: number; ms: number }>();
   for (const e of entries.slice(0, 60)) {
     const r = (e && typeof e === 'object' ? e : {}) as Record<string, unknown>;
-    const page = Number(r.page);
-    if (!Number.isInteger(page) || page < 0 || page >= 60) continue;
+    const pageId = typeof r.pageId === 'string' ? r.pageId : '';
+    if (!known.has(pageId)) continue;
     const views = Math.min(5, Math.max(0, Math.floor(Number(r.views) || 0)));
     const ms = Math.min(600_000, Math.max(0, Math.floor(Number(r.ms) || 0)));
     if (!views && !ms) continue;
-    const prev = clean.get(page) ?? { views: 0, ms: 0 };
-    clean.set(page, { views: Math.min(5, prev.views + views), ms: Math.min(600_000, prev.ms + ms) });
+    const prev = clean.get(pageId) ?? { views: 0, ms: 0 };
+    clean.set(pageId, { views: Math.min(5, prev.views + views), ms: Math.min(600_000, prev.ms + ms) });
   }
-  for (const [page, v] of clean) {
-    await db.insert(brochure_page_stats).values({ brochure_id: row.id, page, views: v.views, ms: v.ms })
+  for (const [pageId, v] of clean) {
+    await db.insert(brochure_page_stats).values({ brochure_id: row.id, page_id: pageId, views: v.views, ms: v.ms })
       .onConflictDoUpdate({
-        target: [brochure_page_stats.brochure_id, brochure_page_stats.page],
+        target: [brochure_page_stats.brochure_id, brochure_page_stats.page_id],
         set: { views: sql`${brochure_page_stats.views} + ${v.views}`, ms: sql`${brochure_page_stats.ms} + ${v.ms}`, updated_at: new Date().toISOString() },
       });
   }
 }
 
-/** Lecture page par page d'une brochure de l'entreprise (éditeur). */
-export async function getBrochurePageStats(id: string): Promise<{ page: number; views: number; ms: number }[]> {
+/** Lecture page par page d'une brochure de l'entreprise (éditeur), par identifiant de page. */
+export async function getBrochurePageStats(id: string): Promise<{ pageId: string; views: number; ms: number }[]> {
   const b = await getBrochure(id);
   if (!b) return [];
-  const rows = await db.select({ page: brochure_page_stats.page, views: brochure_page_stats.views, ms: brochure_page_stats.ms })
-    .from(brochure_page_stats).where(eq(brochure_page_stats.brochure_id, b.id)).orderBy(brochure_page_stats.page);
-  return rows.map((r) => ({ page: r.page, views: r.views, ms: Number(r.ms) }));
+  const rows = await db.select({ pageId: brochure_page_stats.page_id, views: brochure_page_stats.views, ms: brochure_page_stats.ms })
+    .from(brochure_page_stats).where(eq(brochure_page_stats.brochure_id, b.id));
+  return rows.map((r) => ({ pageId: r.pageId, views: r.views, ms: Number(r.ms) }));
 }
 
 /** Remet la lecture page par page à zéro (après avoir refait les pages, par exemple). */
@@ -547,4 +549,18 @@ export async function createKindBrochure(input: { name: string; kind: BrochureKi
 /** Coordonnées de l'entreprise pour les modèles de pages (Webo). */
 export async function studioTemplateCompany(userId: string) {
   return templateCompany(await companyProfile(userId));
+}
+
+/**
+ * Pages d'une brochure du Studio pour l'export PDF par l'entreprise (même lien désactivé), sans la page du
+ * formulaire ; null si la brochure n'est pas de l'entreprise ou n'est pas faite dans le Studio.
+ */
+export async function getStudioPrint(id: string): Promise<{ name: string; language: 'fr' | 'en'; pages: ResolvedStudioPage[]; fontsHref: string | null } | null> {
+  const row = await getBrochure(id);
+  const studio = row?.editor_mode === 'studio' ? parseStudio(row.studio) : null;
+  if (!row || !studio) return null;
+  const language = row.language === 'en' ? 'en' : 'fr';
+  const catalog = await catalogFor(row);
+  const pages = resolveStudio(studio, catalog, { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language, forEditor: false });
+  return { name: row.name, language, pages: pages.filter((p) => !p.form), fontsHref: studioFontsHref(studioFonts(studio)) };
 }

@@ -59,9 +59,9 @@ function backdropOf(page: ResolvedStudioPage): { url: string; frame?: PhotoFrame
  * Lecture page par page : à chaque changement de page, le temps passé sur la précédente est noté ; tout part vers
  * le serveur de temps en temps et en quittant (sendBeacon). Rien n'est envoyé pour une page vue moins d'une seconde.
  */
-function usePageStats(token: string | null, current: number | null) {
-  const pending = useRef(new Map<number, { views: number; ms: number }>());
-  const since = useRef<{ page: number; at: number } | null>(null);
+function usePageStats(token: string | null, current: string | null) {
+  const pending = useRef(new Map<string, { views: number; ms: number }>());
+  const since = useRef<{ page: string; at: number } | null>(null);
   const flush = useCallback((beacon: boolean) => {
     if (!token) return;
     const now = Date.now();
@@ -72,7 +72,7 @@ function usePageStats(token: string | null, current: number | null) {
       pending.current.set(cur.page, e);
       since.current = { page: cur.page, at: now };
     }
-    const pages = [...pending.current].filter(([, v]) => v.ms >= 1000 || v.views).map(([page, v]) => ({ page, views: v.views, ms: Math.round(v.ms) }));
+    const pages = [...pending.current].filter(([, v]) => v.ms >= 1000 || v.views).map(([pageId, v]) => ({ pageId, views: v.views, ms: Math.round(v.ms) }));
     pending.current.clear();
     if (!pages.length) return;
     const body = JSON.stringify({ pages });
@@ -248,9 +248,9 @@ export default function StudioBook({ pages, language, name, token, options = DEF
 }) {
   const en = language === 'en';
   const phone = usePhone();
-  const [current, setCurrent] = useState<number | null>(null);
+  const [current, setCurrent] = useState<string | null>(null);
   usePageStats(track ? token : null, current);
-  const onPage = useCallback((i: number) => setCurrent(i), []);
+  const onPage = useCallback((i: number) => setCurrent(pages[i]?.id ?? null), [pages]);
   const hasContact = !!companyPhone && (options.call || options.whatsapp);
   // Saisie du formulaire gardée ici : elle survit aux pages qui tournent et à la fenêtre plein écran.
   const form = useBrochureForm();
@@ -283,7 +283,7 @@ export default function StudioBook({ pages, language, name, token, options = DEF
     <>
       <Flipbook
         ariaLabel={name}
-        onPageChange={(visible) => { setOnForm(visible.includes(formIndex)); setCurrent(visible[visible.length - 1] ?? 0); }}
+        onPageChange={(visible) => { setOnForm(visible.includes(formIndex)); setCurrent(pages[visible[visible.length - 1] ?? 0]?.id ?? null); }}
         labels={en ? { prev: 'Previous page', next: 'Next page' } : { prev: 'Page précédente', next: 'Page suivante' }}
         pages={pages.map((page, i) => (
           <StudioPageView key={i} page={page} language={language} animate={options.animate} formSlot={<BrochureRequestForm token={token} language={language} form={form} />} />

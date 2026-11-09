@@ -374,15 +374,16 @@ export const devis_templates = pgTable("devis_templates", {
 		}).onDelete("cascade"),
 ]);
 
-// Lecture des brochures du Studio, page par page : ouvertures et temps passé (lien public, hors entreprise).
+// Lecture des brochures du Studio, page par page (repérée par son identifiant : elle se suit même déplacée) :
+// ouvertures et temps passé (lien public, hors entreprise).
 export const brochure_page_stats = pgTable("brochure_page_stats", {
 	brochure_id: uuid().notNull(),
-	page: integer().notNull(),
+	page_id: text().notNull(),
 	views: integer().default(0).notNull(),
 	ms: bigint({ mode: 'number' }).default(0).notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	primaryKey({ columns: [table.brochure_id, table.page], name: "brochure_page_stats_pkey" }),
+	primaryKey({ columns: [table.brochure_id, table.page_id], name: "brochure_page_stats_pkey" }),
 	foreignKey({
 			columns: [table.brochure_id],
 			foreignColumns: [brochures.id],

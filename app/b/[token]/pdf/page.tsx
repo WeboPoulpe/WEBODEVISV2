@@ -6,7 +6,13 @@ import { getPublicBrochure } from '@/server/brochures';
 import StudioPrint from '@/components/brochures/studio/StudioPrint';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Brochure (PDF)', robots: { index: false, follow: false } };
+
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  const b = await getPublicBrochure(token).catch(() => null);
+  // Le titre de la page devient le nom proposé pour le fichier PDF.
+  return { title: { absolute: b?.name ?? 'Brochure' }, robots: { index: false, follow: false } };
+}
 
 export default async function BrochurePdfPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

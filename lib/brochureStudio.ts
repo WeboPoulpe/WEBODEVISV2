@@ -132,7 +132,8 @@ export const DEFAULT_OPTIONS: StudioOptions = { animate: true, call: false, what
 /** Un élément Prestation tel que le lecteur le voit : le catalogue lu, sans identifiant. */
 export type ResolvedStudioPrestation = Omit<StudioPrestation, 'prestationId' | 'html' | 'titled' | 'photoUrl' | 'hidePrice'> & { item: ResolvedItem };
 export type ResolvedStudioElement = Exclude<StudioElement, StudioPrestation> | ResolvedStudioPrestation;
-export interface ResolvedStudioPage { bg: string; bgImage: StudioPage['bgImage']; form: boolean; els: ResolvedStudioElement[] }
+/** Une page prête à afficher ; `id` sert à suivre la lecture de la page, même déplacée. */
+export interface ResolvedStudioPage { id: string; bg: string; bgImage: StudioPage['bgImage']; form: boolean; els: ResolvedStudioElement[] }
 
 // ── Thèmes ───────────────────────────────────────────────────────────────────
 
@@ -461,7 +462,7 @@ export function studioPhotos(doc: StudioDoc): string[] {
 export function resolveStudio(doc: StudioDoc, catalog: ReadonlyMap<string, CatalogPrestation>, o: PriceOptions & { forEditor: boolean }): ResolvedStudioPage[] {
   let n = 0;
   return doc.pages.map((p) => ({
-    bg: p.bg, bgImage: p.bgImage, form: !!p.form,
+    id: p.id, bg: p.bg, bgImage: p.bgImage, form: !!p.form,
     els: p.els.flatMap((e): ResolvedStudioElement[] => {
       if (e.type !== 'prestation') return [e];
       const { prestationId, html, titled, photoUrl, hidePrice, ...rest } = e;

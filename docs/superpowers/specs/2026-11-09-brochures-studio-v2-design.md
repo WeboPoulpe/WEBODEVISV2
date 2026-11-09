@@ -69,6 +69,16 @@ Demandé par Maxence après la liste d'améliorations proposée : tout est fait.
 - **Webo** lit les pages du Studio, y change des textes, ajoute titres, textes, prestations et pages (modèles),
   en retire ; et crée une brochure complète (`propose_brochure_create`).
 
-Limites : le PDF passe par la fenêtre d'impression du navigateur (« Enregistrer en PDF ») ; la lecture page par page
-suit l'ordre actuel des pages (remettre à zéro après les avoir réorganisées) ; Webo réécrit un texte entier, pas une
-partie sélectionnée.
+## Lot 3 (2026-11-09) : limites corrigées
+
+- **Lecture page par page** : chaque page est suivie par son identifiant (migration 0046, lectures notées par rang
+  effacées) : une page déplacée garde ses chiffres, une page inconnue est ignorée ; vignette de la page dans le tableau.
+- **PDF** : export réservé à l'entreprise (`/brochures/<id>/pdf`), même lien désactivé ; le dernier changement est
+  enregistré avant ; le nom de la brochure est proposé comme nom de fichier ; consignes d'impression affichées.
+- **Webo** réécrit le passage sélectionné pendant la saisie (le reste du texte ne bouge pas), ou tout le texte.
+- **Téléphone** : barre d'outils sur une ligne qui défile, menus Lien et Webo sous la barre ; bouton « Plusieurs »
+  pour choisir plusieurs éléments au doigt.
+- **Ensemble redimensionnable** : poignées aux coins d'une sélection ou d'un groupe (proportions gardées, textes et
+  traits suivent).
+
+Limite restante : le PDF passe par la fenêtre d'impression du navigateur (pas de fichier créé directement).
