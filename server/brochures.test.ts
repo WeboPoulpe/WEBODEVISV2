@@ -7,7 +7,14 @@ import { createTestDb } from '@/db/testDb';
 // Brochures, sur le vrai schéma (baseline + migrations) en mémoire.
 
 vi.mock('server-only', () => ({}));
-vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.9', 'user-agent': 'Test' }) }));
+// Cookies du navigateur du lecteur (code d'accès saisi), en mémoire.
+const jar = new Map<string, string>();
+vi.mock('next/headers', () => ({
+  headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.9', 'user-agent': 'Test' }),
+  cookies: async () => ({ get: (k: string) => (jar.has(k) ? { value: jar.get(k) } : undefined), set: (k: string, v: string) => { jar.set(k, v); } }),
+}));
+const pushes: { userId: string; title: string; body: string }[] = [];
+vi.mock('@/lib/push', () => ({ pushToUser: async (userId: string, m: { title: string; body: string }) => { pushes.push({ userId, title: m.title, body: m.body }); return 1; } }));
 const sent: { to: string; subject: string; html: string }[] = [];
 vi.mock('@/lib/mail', () => ({
   appOrigin: async () => 'https://webodevis.fr',
@@ -31,6 +38,7 @@ vi.mock('@/db', () => ({
 
 const br = await import('./brochures');
 const req = await import('./brochureRequests');
+const links = await import('./brochureLinks');
 const mail = await import('./prospectMail');
 
 const PRESTATION = '00000000-0000-4000-8000-0000000000c1';
@@ -480,5 +488,103 @@ describe('brochures : lecture page par page (Studio)', () => {
     expect(row.studio.pages.flatMap((p) => p.els).some((e) => e.prestationId === PRESTATION)).toBe(true);
     const pub = (await br.getPublicBrochure(row.share_token))!;
     expect(pub.studioOptions).toEqual({ animate: true, call: false, whatsapp: false, choose: true, estimate: true });
+  });
+});
+
+
+describe('brochures : liens, accès et notifications', () => {
+  const rowOf = async (id: string) => (await pg.query<{ share_token: string; view_count: number }>(`select share_token, view_count from brochures where id = $1`, [id])).rows[0];
+
+  it('lien par source : la brochure s’ouvre, ses ouvertures et ses demandes sont comptées à part', async () => {
+    current = OWNER;
+    session = null;
+    const { id } = await br.createBrochure({ name: 'Sources' });
+    const made = await links.createBrochureLink(id!, { kind: 'source', label: 'Instagram' });
+    expect(made.error).toBeNull();
+    expect((await br.getPublicBrochure(made.token!))!.name).toBe('Sources');
+    await br.recordBrochureView(made.token!);
+    await br.recordBrochureView((await rowOf(id!)).share_token);
+    expect((await req.submitBrochureRequest(made.token!, { first_name: 'Iris', last_name: 'Gram', email: 'iris@exemple.fr' })).error).toBeNull();
+    const list = (await links.listBrochureLinks(id!))!;
+    expect(list.map((l) => [l.kind, l.label, l.views, l.requests])).toEqual([['main', 'Lien principal', 1, 0], ['source', 'Instagram', 1, 1]]);
+    // Lien désactivé : plus rien.
+    await links.updateBrochureLink(made.id!, { isActive: false });
+    expect(await br.getPublicBrochure(made.token!)).toBeNull();
+    expect(await br.brochureGate(made.token!)).toBe('gone');
+  });
+
+  it('lien d’un client : message d’accueil et {{client}} remplacé, seulement sur son lien', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Perso', editor: 'studio' });
+    await br.saveBrochure(id!, { studio: { pages: [{ id: 'a', els: [{ id: 't', type: 'text', html: '<p>Bienvenue {{client}}</p>', x: 1, y: 1, w: 80 }] }] } });
+    const made = await links.createBrochureLink(id!, { kind: 'client', label: 'Julie & Thomas', greeting: 'Pour le mariage de Julie & Thomas' });
+    const pub = (await br.getPublicBrochure(made.token!))!;
+    expect(pub.greeting).toBe('Pour le mariage de Julie & Thomas');
+    expect(JSON.stringify(pub.studio)).toContain('Bienvenue Julie &amp; Thomas');
+    const main = (await br.getPublicBrochure((await rowOf(id!)).share_token))!;
+    expect(main.greeting).toBeNull();
+    expect(JSON.stringify(main.studio)).toContain('Bienvenue <');
+    expect((await br.brochureShareMeta(made.token!))!.title).toBe('Pour le mariage de Julie & Thomas');
+  });
+
+  it('expiration et code d’accès, sur le lien principal comme sur un lien', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Privée' });
+    const token = (await rowOf(id!)).share_token;
+    expect((await links.setBrochureAccess(id!, { expiresAt: '2001-01-01' })).error).toBeNull();
+    expect(await br.brochureGate(token)).toBe('expired');
+    expect(await br.getPublicBrochure(token)).toBeNull();
+    expect(await br.brochureShareMeta(token)).toBeNull();
+    await links.setBrochureAccess(id!, { expiresAt: null, code: 'Sesame42' });
+    expect(await br.brochureGate(token)).toBe('code');
+    expect(await br.getPublicBrochure(token)).toBeNull();
+    expect((await req.submitBrochureRequest(token, { first_name: 'A', last_name: 'B', email: 'ab@exemple.fr' })).error).toBeTruthy();
+    expect((await br.brochureShareMeta(token))!.image).toBeNull();
+    expect((await br.unlockBrochure(token, 'mauvais')).error).toBeTruthy();
+    expect((await br.unlockBrochure(token, ' sesame42 ')).error).toBeNull();
+    expect(await br.brochureGate(token)).toBe('ok');
+    expect(await br.getPublicBrochure(token)).not.toBeNull();
+    // Code changé : l'ancien accès ne vaut plus.
+    await links.setBrochureAccess(id!, { code: 'AutreCode' });
+    expect(await br.brochureGate(token)).toBe('code');
+    expect((await links.setBrochureAccess(id!, { code: 'abc' })).error).toMatch(/4 à 40/);
+    const stored = (await pg.query<{ access_code: string }>(`select access_code from brochures where id = $1`, [id])).rows[0].access_code;
+    expect(stored).not.toContain('AutreCode');
+  });
+
+  it('notifications : ouverture et arrivée au formulaire, une par demi-heure et par lien, pas pour l’entreprise', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Suivie' });
+    const token = (await rowOf(id!)).share_token;
+    pushes.length = 0;
+    session = { id: OWNER, email: 'chef@b.fr' };
+    await br.recordBrochureView(token);
+    expect(pushes).toHaveLength(0);
+    session = null;
+    await br.recordBrochureView(token);
+    await br.recordBrochureView(token);
+    await br.recordBrochureFormReached(token);
+    await br.recordBrochureFormReached(token);
+    expect(pushes.map((p) => p.title)).toEqual(['Brochure ouverte', 'Un lecteur arrive au formulaire']);
+    expect(pushes[0]).toMatchObject({ userId: OWNER, body: expect.stringContaining('Suivie') });
+    // Un autre lien a sa propre limite ; notifications coupées : plus rien.
+    const other = await links.createBrochureLink(id!, { kind: 'source', label: 'Salon' });
+    await br.recordBrochureView(other.token!);
+    expect(pushes.at(-1)!.body).toContain('Salon');
+    await links.setBrochureAccess(id!, { notify: false });
+    const third = await links.createBrochureLink(id!, { kind: 'source', label: 'Flyer' });
+    await br.recordBrochureView(third.token!);
+    expect(pushes).toHaveLength(3);
+  });
+
+  it('envoi avec un lien personnalisé : le lien du client part, pas le lien principal', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Envoi perso' });
+    sent.length = 0;
+    expect((await br.sendBrochure({ brochureId: id!, to: 'julie@exemple.fr', personal: { label: 'Julie', greeting: 'Pour Julie' } })).error).toBeNull();
+    const [l] = (await links.listBrochureLinks(id!))!.filter((x) => x.kind === 'client');
+    expect(l).toMatchObject({ label: 'Julie', greeting: 'Pour Julie' });
+    expect(sent[0].html).toContain(`/b/${l.token}`);
+    expect(sent[0].html).not.toContain(`/b/${(await rowOf(id!)).share_token}`);
   });
 });

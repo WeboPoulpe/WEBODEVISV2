@@ -7,12 +7,13 @@ import crypto from 'node:crypto';
 import { headers } from 'next/headers';
 import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { brochures, prestations, prospect_requests } from '@/db/schema';
+import { prestations, prospect_requests } from '@/db/schema';
 import { isDemoUser } from '@/lib/demo';
 import { isPerGuestPrestation } from '@/lib/brochure';
 import type { ChosenLine } from '@/lib/brochureChoice';
 import { parseStudio } from '@/lib/brochureStudio';
 import { companyIdsOf } from './companyScope';
+import { openAccess } from './brochureAccess';
 import { notifyProspect } from './prospectMail';
 
 /** Demandes acceptées par heure, pour une brochure, depuis une même connexion. */
@@ -72,9 +73,11 @@ async function chosenLines(studio: unknown, owner: string, keys: unknown): Promi
 
 export async function submitBrochureRequest(token: string, fields: BrochureRequestFields, chosen: string[] = []): Promise<{ error: string | null }> {
   if (!TOKEN.test(token ?? '')) return { error: 'Ce lien n’est plus valable.' };
-  const [b] = await db.select({ id: brochures.id, owner: brochures.owner_user_id, name: brochures.name, language: brochures.language, studio: brochures.studio, mode: brochures.editor_mode }).from(brochures)
-    .where(and(eq(brochures.share_token, token), eq(brochures.is_active, true))).limit(1);
-  if (!b) return { error: MESSAGES.fr.gone };
+  // Lien principal ou lien supplémentaire (source, client) ; actif, pas expiré, code saisi s'il en faut un.
+  const access = await openAccess(token);
+  if (!access) return { error: MESSAGES.fr.gone };
+  const b = { id: access.row.id, owner: access.row.owner_user_id, name: access.row.name, language: access.row.language, studio: access.row.studio, mode: access.row.editor_mode };
+  const linkId = access.link?.id ?? null;
   const language = b.language === 'en' ? 'en' : 'fr';
   const t = MESSAGES[language];
 
@@ -114,6 +117,7 @@ export async function submitBrochureRequest(token: string, fields: BrochureReque
     guest_count_children: prospect.guestCountChildren, message: prospect.message,
     owner_user_id: b.owner, brochure_id: b.id, ip_hash: ipHash, status: 'nouveau',
     ...(lines.length ? { chosen: lines } : {}),
+    ...(linkId ? { brochure_link_id: linkId } : {}),
   });
   // Le traiteur voit dans l'email ce que le client a choisi.
   const withChoice = lines.length

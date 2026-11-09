@@ -14,6 +14,7 @@ import { Flipbook } from '../Flipbook';
 import FormSheet from '../FormSheet';
 import BrochureRequestForm, { useBrochureForm, type Selection } from '../BrochureRequestForm';
 import { StudioPageView } from './StudioPage';
+import { recordBrochureFormReached } from '@/server/brochures';
 import { FramedPhoto } from '../PhotoText';
 
 const PHONE = '(max-width: 767px)';
@@ -244,8 +245,10 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, anim
   );
 }
 
-export default function StudioBook({ pages, language, name, token, options = DEFAULT_OPTIONS, companyPhone = null, track = true, tax = 'TTC' }: {
+export default function StudioBook({ pages, language, name, token, options = DEFAULT_OPTIONS, companyPhone = null, track = true, tax = 'TTC', greeting = null }: {
   pages: ResolvedStudioPage[]; language: 'fr' | 'en'; name: string; token: string;
+  /** Lien personnalisé d'un client : son message d'accueil, affiché sur la couverture. */
+  greeting?: string | null;
   /** « TTC » ou « HT », comme les prix de la brochure. */
   tax?: string;
   options?: StudioOptions;
@@ -257,7 +260,7 @@ export default function StudioBook({ pages, language, name, token, options = DEF
   const phone = usePhone();
   const [current, setCurrent] = useState<string | null>(null);
   usePageStats(track ? token : null, current);
-  const onPage = useCallback((i: number) => setCurrent(pages[i]?.id ?? null), [pages]);
+  const onPage = useCallback((i: number) => { setCurrent(pages[i]?.id ?? null); setAtCover(i === 0); }, [pages]);
   const hasContact = !!companyPhone && (options.call || options.whatsapp);
   // Saisie du formulaire gardée ici : elle survit aux pages qui tournent et à la fenêtre plein écran.
   const form = useBrochureForm();
@@ -267,6 +270,14 @@ export default function StudioBook({ pages, language, name, token, options = DEF
   // Téléphone : en arrivant sur la page du formulaire, il s'ouvre en plein écran (une fois par arrivée).
   useEffect(() => { setSheet(!!phone && onForm); }, [phone, onForm]);
   const formIndex = pages.findIndex((p) => p.form);
+  // Arrivée au formulaire : le traiteur est prévenu (le serveur limite à une notification par demi-heure).
+  useEffect(() => { if (onForm && track) recordBrochureFormReached(token).catch(() => {}); }, [onForm, track, token]);
+  const [atCover, setAtCover] = useState(true);
+  const welcome = greeting && atCover && (
+    <p className={phone ? 'pointer-events-none absolute inset-x-0 z-10 flex justify-center px-6' : 'mb-3 flex justify-center'} style={phone ? { top: 'calc(max(10px, env(safe-area-inset-top)) + 14px)' } : undefined}>
+      <span className="rounded-full bg-white/90 px-4 py-1.5 text-center text-sm font-medium text-[#1C2621] shadow-md" style={{ fontFamily: 'Georgia, serif' }}>{greeting}</span>
+    </p>
+  );
 
   // « Je veux ce menu » : les prestations choisies (rangs) partent avec la demande.
   const [chosen, setChosen] = useState<string[]>([]);
@@ -298,7 +309,7 @@ export default function StudioBook({ pages, language, name, token, options = DEF
     return (
       <>
         <PhoneReader pages={pages} language={language} name={name} onFormPage={onFormPage} onPage={onPage} animate={options.animate}
-          chosen={chosenSet} onChoose={onChoose} overlay={bar}
+          chosen={chosenSet} onChoose={onChoose} overlay={<>{welcome}{bar}</>}
           contact={hasContact ? <ContactButtons phone={companyPhone} options={options} language={language} className="flex gap-2" /> : null}
           formSlot={(
             <button type="button" onClick={() => setSheet(true)}
@@ -314,10 +325,11 @@ export default function StudioBook({ pages, language, name, token, options = DEF
   }
   return (
     <>
+      {welcome}
       <Flipbook
         ariaLabel={name}
         jumpTo={jump}
-        onPageChange={(visible) => { setOnForm(visible.includes(formIndex)); setCurrent(pages[visible[visible.length - 1] ?? 0]?.id ?? null); }}
+        onPageChange={(visible) => { setOnForm(visible.includes(formIndex)); setCurrent(pages[visible[visible.length - 1] ?? 0]?.id ?? null); setAtCover(visible.includes(0)); }}
         labels={en ? { prev: 'Previous page', next: 'Next page' } : { prev: 'Page précédente', next: 'Page suivante' }}
         pages={pages.map((page, i) => (
           <StudioPageView key={i} page={page} language={language} animate={options.animate} chosen={chosenSet} onChoose={onChoose}

@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { brochure_page_stats, brochures, prestations, profiles, prospect_requests } from '@/db/schema';
+import { brochure_links, brochure_page_stats, brochures, prestations, profiles, prospect_requests } from '@/db/schema';
 import { parsePhotoFrame, type PhotoFrame } from '@/lib/photoFrame';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { defaultVatRate } from '@/lib/vat';
@@ -29,6 +29,7 @@ import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { isValidEmail, MAX_RECIPIENTS, splitEmails, uniqueEmails } from '@/lib/emailList';
 import { googleFontsHref } from '@/lib/quoteOutput';
 import { companyIdsOf } from './companyScope';
+import { findByToken, gateOf, isCompanyViewer as companyViewer, newLinkToken, notifyOwner, openAccess, unlock, type Gate } from './brochureAccess';
 import { getSessionUser, requireUser, requireWriter } from './session';
 
 export type BrochureRow = typeof brochures.$inferSelect;
@@ -63,6 +64,8 @@ export interface PublicBrochure {
   studioOptions: StudioOptions | null;
   /** « TTC » ou « HT » (en anglais : incl. / excl. VAT), pour l'estimation du lecteur. */
   tax: string;
+  /** Lien personnalisé d'un client : son message d'accueil (« Pour le mariage de Julie & Thomas »), sinon null. */
+  greeting: string | null;
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
 
@@ -242,13 +245,6 @@ export async function renewBrochureLink(id: string): Promise<{ error: string | n
   return done.length ? { error: null, token } : { error: NOT_FOUND };
 }
 
-async function byToken(token: string, activeOnly: boolean): Promise<BrochureRow | null> {
-  if (!TOKEN.test(token ?? '')) return null;
-  const [row] = await db.select().from(brochures)
-    .where(and(eq(brochures.share_token, token), ...(activeOnly ? [eq(brochures.is_active, true)] : []))).limit(1);
-  return row ?? null;
-}
-
 /** Prestations du catalogue de l'entreprise citées par la brochure. */
 async function catalogFor(row: BrochureRow): Promise<Map<string, CatalogPrestation>> {
   const layout = row.editor_mode === 'advanced' ? parseLayout(row.layout) : null;
@@ -375,8 +371,9 @@ export async function switchBrochureEditor(id: string, to: EditorMode, opts: { r
 
 /** La brochure telle que le lecteur la feuillette, ou null (jeton invalide, inconnu, lien désactivé). */
 export async function getPublicBrochure(token: string): Promise<PublicBrochure | null> {
-  const row = await byToken(token, true);
-  if (!row) return null;
+  const access = await openAccess(token);
+  if (!access) return null;
+  const { row, link } = access;
   const [company, catalog] = await Promise.all([companyProfile(row.owner_user_id), catalogFor(row)]);
   const language = row.language === 'en' ? 'en' : 'fr';
   const style = row.style as BrochureStyle;
@@ -385,7 +382,8 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
   const prices: Omit<PriceOptions, 'forEditor'> = { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language };
   return {
     name: row.name, style, language,
-    studio: studio ? resolveStudio(studio, catalog, { ...prices, forEditor: false }) : null,
+    studio: studio ? personalize(resolveStudio(studio, catalog, { ...prices, forEditor: false }), link?.kind === 'client' ? link.label : '') : null,
+    greeting: link?.kind === 'client' ? link.greeting || null : null,
     studioOptions: studio ? studio.options ?? DEFAULT_OPTIONS : null,
     tax: language === 'en' ? (prices.mode === 'ttc' ? 'incl. VAT' : 'excl. VAT') : (prices.mode === 'ttc' ? 'TTC' : 'HT'),
     cover: parseCover(row.cover, row.name),
@@ -403,7 +401,7 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
 
 /** Lien désactivé : de quoi joindre l'entreprise sur la page « plus disponible ». */
 export async function brochureUnavailableCompany(token: string): Promise<{ name: string; email: string | null } | null> {
-  const row = await byToken(token, false);
+  const row = (await findByToken(token))?.row;
   if (!row) return null;
   const company = await companyProfile(row.owner_user_id);
   return company?.name ? { name: company.name, email: company.email ?? null } : null;
@@ -411,23 +409,61 @@ export async function brochureUnavailableCompany(token: string): Promise<{ name:
 
 /** Compte une ouverture du lien, sauf quand c'est quelqu'un de l'entreprise (aperçu). */
 export async function recordBrochureView(token: string): Promise<void> {
-  const row = await byToken(token, true);
-  if (!row) return;
-  const viewer = await getSessionUser().catch(() => null);
-  if (viewer) {
-    const [same] = await db.select({ id: profiles.id }).from(profiles)
-      .where(and(eq(profiles.id, viewer.id), sql`${profiles.id} in ${companyIdsOf(row.owner_user_id)}`)).limit(1);
-    if (same) return;
-  }
-  await db.update(brochures).set({ view_count: sql`${brochures.view_count} + 1`, viewed_at: new Date().toISOString() })
-    .where(eq(brochures.id, row.id));
+  const access = await openAccess(token);
+  if (!access) return;
+  const { row, link } = access;
+  if (await isCompanyViewer(row.owner_user_id)) return;
+  const now = new Date().toISOString();
+  await db.update(brochures).set({ view_count: sql`${brochures.view_count} + 1`, viewed_at: now }).where(eq(brochures.id, row.id));
+  if (link) await db.update(brochure_links).set({ view_count: sql`${brochure_links.view_count} + 1`, viewed_at: now }).where(eq(brochure_links.id, link.id));
+  await notifyOwner(access, 'open').catch(() => false);
+}
+
+/** Le lecteur arrive à la page du formulaire : le traiteur est prévenu (une fois par demi-heure et par lien). */
+export async function recordBrochureFormReached(token: string): Promise<void> {
+  const access = await openAccess(token);
+  if (!access || await isCompanyViewer(access.row.owner_user_id)) return;
+  await notifyOwner(access, 'form').catch(() => false);
+}
+
+/** Où en est un lien reçu, pour la page publique : ouvert, code à saisir, expiré, plus disponible. */
+export async function brochureGate(token: string): Promise<Gate> {
+  return gateOf(await findByToken(token));
+}
+
+/** Le lecteur saisit le code d'accès : juste, la brochure s'ouvre dans ce navigateur. */
+export async function unlockBrochure(token: string, code: string): Promise<{ error: string | null }> {
+  const access = await findByToken(token);
+  if (!access || (await gateOf(access)) === 'gone') return { error: 'Cette brochure n’est plus disponible.' };
+  const en = access.row.language === 'en';
+  if (typeof code !== 'string' || code.length > 60) return { error: en ? 'Wrong code.' : 'Code incorrect.' };
+  return (await unlock(access, code)) ? { error: null } : { error: en ? 'Wrong code.' : 'Code incorrect.' };
+}
+
+/** Pour l'aperçu du lien partagé (WhatsApp, Facebook…) : titre, description, image ; rien de privé si un code est demandé. */
+export async function brochureShareMeta(token: string): Promise<{ title: string; description: string; image: string | null } | null> {
+  const access = await findByToken(token);
+  const gate = await gateOf(access);
+  if (!access || gate === 'gone' || gate === 'expired') return null;
+  const { row, link } = access;
+  const company = await companyProfile(row.owner_user_id);
+  const en = row.language === 'en';
+  const title = link?.kind === 'client' && link.greeting ? link.greeting : row.name;
+  const description = [company?.name, en ? 'Our brochure: flip through it and send your request.' : 'Notre brochure : feuilletez-la et envoyez votre demande.'].filter(Boolean).join(' · ');
+  if (gate === 'code') return { title: row.name, description, image: null };
+  const image = (row.editor_mode === 'studio' ? studioCoverPhoto(parseStudio(row.studio)) : null) ?? parseCover(row.cover, row.name).photoUrl ?? company?.logoUrl ?? null;
+  return { title, description, image };
 }
 
 /**
  * Envoie le lien de la brochure par email, au nom de l'entreprise (une adresse ou plusieurs). Envoyée à une demande
  * de Prospects de l'entreprise encore « nouvelle », celle-ci passe à « Brochure envoyée ».
  */
-export async function sendBrochure(input: { brochureId: string; to: string; message?: string; prospectId?: string }): Promise<{ error: string | null }> {
+export async function sendBrochure(input: {
+  brochureId: string; to: string; message?: string; prospectId?: string;
+  /** Lien personnalisé pour ce client (nom, message d'accueil) : créé et envoyé à la place du lien principal. */
+  personal?: { label: string; greeting?: string | null } | null;
+}): Promise<{ error: string | null }> {
   const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const recipients = uniqueEmails(splitEmails(input.to ?? ''));
@@ -439,6 +475,14 @@ export async function sendBrochure(input: { brochureId: string; to: string; mess
   const row = await getBrochure(input.brochureId);
   if (!row) return { error: NOT_FOUND };
   if (!row.is_active) return { error: 'Le lien de cette brochure est désactivé : réactivez-le avant de l’envoyer.' };
+  let personalToken: string | null = null;
+  if (input.personal?.label?.trim()) {
+    personalToken = newLinkToken();
+    await db.insert(brochure_links).values({
+      brochure_id: row.id, owner_user_id: row.owner_user_id, token: personalToken, kind: 'client',
+      label: input.personal.label.trim().slice(0, 80), greeting: String(input.personal.greeting ?? '').trim().slice(0, 140) || null,
+    });
+  }
   const company = await companyProfile(row.owner_user_id);
   const companyName = company?.name || 'Votre traiteur';
   const mail = {
@@ -446,7 +490,7 @@ export async function sendBrochure(input: { brochureId: string; to: string; mess
     replyTo: company?.email || user.email,
     ...brochureEmail({
       companyName, brochureName: row.name, message: input.message ?? null,
-      link: `${await appOrigin()}/b/${row.share_token}`, language: row.language === 'en' ? 'en' : 'fr',
+      link: `${await appOrigin()}/b/${personalToken ?? row.share_token}`, language: row.language === 'en' ? 'en' : 'fr',
     }),
   };
   // Un email par destinataire, l'un après l'autre (Resend limite le nombre d'envois par seconde).
@@ -469,10 +513,17 @@ export async function sendBrochure(input: { brochureId: string; to: string; mess
 /** Est-ce quelqu'un de l'entreprise qui regarde (aperçu) ? Ses lectures ne comptent pas. */
 async function isCompanyViewer(ownerId: string): Promise<boolean> {
   const viewer = await getSessionUser().catch(() => null);
-  if (!viewer) return false;
-  const [same] = await db.select({ id: profiles.id }).from(profiles)
-    .where(and(eq(profiles.id, viewer.id), sql`${profiles.id} in ${companyIdsOf(ownerId)}`)).limit(1);
-  return !!same;
+  return companyViewer(ownerId, viewer?.id ?? null);
+}
+
+/** {{client}} dans un texte : le nom du client sur son lien personnalisé (rien ailleurs). */
+function personalize(pages: ResolvedStudioPage[], name: string): ResolvedStudioPage[] {
+  const safe = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const put = (html: string) => html.replace(/\{\{\s*client\s*\}\}/gi, safe);
+  return pages.map((p) => ({
+    ...p,
+    els: p.els.map((e) => (e.type === 'text' ? { ...e, html: put(e.html) } : e.type === 'prestation' ? { ...e, item: { ...e.item, html: put(e.item.html) } } : e)),
+  }));
 }
 
 /**
@@ -481,7 +532,7 @@ async function isCompanyViewer(ownerId: string): Promise<boolean> {
  */
 export async function recordStudioPages(token: string, entries: unknown): Promise<void> {
   if (!Array.isArray(entries) || entries.length === 0) return;
-  const row = await byToken(token, true);
+  const row = (await openAccess(token))?.row;
   if (!row || row.editor_mode !== 'studio') return;
   if (await isCompanyViewer(row.owner_user_id)) return;
   // Seules les pages de la brochure telle qu'elle est comptent.

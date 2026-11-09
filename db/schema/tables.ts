@@ -391,6 +391,36 @@ export const brochure_page_stats = pgTable("brochure_page_stats", {
 		}).onDelete("cascade"),
 ]);
 
+// Liens supplémentaires d'une brochure : par source (Instagram, salon, site…) pour savoir d'où viennent les lecteurs,
+// ou par client (brochure personnalisée « Pour le mariage de Julie & Thomas »). Chacun a ses chiffres, son
+// expiration et son code d'accès (voir server/brochureLinks.ts).
+export const brochure_links = pgTable("brochure_links", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	brochure_id: uuid().notNull(),
+	owner_user_id: uuid().notNull(),
+	token: text().notNull(),
+	kind: text().default('source').notNull(),
+	label: text().notNull(),
+	greeting: text(),
+	expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+	access_code: text(),
+	is_active: boolean().default(true).notNull(),
+	view_count: integer().default(0).notNull(),
+	viewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+	open_notified_at: timestamp({ withTimezone: true, mode: 'string' }),
+	form_notified_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("brochure_links_token_key").on(table.token),
+	index("idx_brochure_links_brochure").using("btree", table.brochure_id.asc().nullsLast().op("uuid_ops")),
+	check("brochure_links_kind_check", sql`kind = ANY (ARRAY['source'::text, 'client'::text])`),
+	foreignKey({
+			columns: [table.brochure_id],
+			foreignColumns: [brochures.id],
+			name: "brochure_links_brochure_id_fkey"
+		}).onDelete("cascade"),
+]);
+
 // Brochures : catalogue de prestations feuilletable, envoyé par lien (voir lib/brochure.ts, server/brochures.ts).
 export const brochures = pgTable("brochures", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -414,6 +444,13 @@ export const brochures = pgTable("brochures", {
 	editor_mode: text().default('simple').notNull(),
 	layout: jsonb(),
 	studio: jsonb(),
+	// Lien principal : date d'expiration et code d'accès (empreinte, jamais le code), notifications au traiteur
+	// (ouverture, arrivée au formulaire) et dernière notification envoyée de chaque sorte (pas de rafale).
+	expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+	access_code: text(),
+	notify: boolean().default(true).notNull(),
+	open_notified_at: timestamp({ withTimezone: true, mode: 'string' }),
+	form_notified_at: timestamp({ withTimezone: true, mode: 'string' }),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -1264,6 +1301,8 @@ export const prospect_requests = pgTable("prospect_requests", {
 	ip_hash: text(),
 	// Prestations choisies dans la brochure (« Je veux ce menu »), figées au moment de la demande (lib/brochureChoice.ts).
 	chosen: jsonb(),
+	// Lien de la brochure par lequel la demande est arrivée (source ou client), sinon null.
+	brochure_link_id: uuid(),
 }, (table) => [
 	foreignKey({
 			columns: [table.brochure_id],

@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown, Link2 } from 'lucide-react';
 import SendBrochureModal from './SendBrochureModal';
 import Modal from '@/components/ui/Modal';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -25,6 +25,7 @@ import { renewBrochureLink, saveBrochure, switchBrochureEditor, type BrochureRow
 import AdvancedEditor from './advanced/AdvancedEditor';
 import StudioEditor from './studio/StudioEditor';
 import StudioStats from './studio/StudioStats';
+import BrochureLinks from './BrochureLinks';
 import { Flipbook } from './Flipbook';
 import { BrochurePageView, pageFlow } from './BrochurePages';
 import { expandPages, useFlowBreaks } from './flow';
@@ -96,6 +97,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   const [studioDoc, setStudioDoc] = useState<StudioDoc>(() => parseStudio(brochure.studio) ?? { pages: [] });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
   const [layout, setLayout] = useState<BrochureLayout>(() => parseLayout(brochure.layout) ?? { pages: [] });
   const [switching, setSwitching] = useState(false);
   const [choosing, setChoosing] = useState(false);
@@ -307,6 +309,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
           <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
           <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
           <button type="button" onClick={renew} className={btnSecondary}><RefreshCw className="h-4 w-4" /> Nouveau lien</button>
+          <button type="button" onClick={() => setLinksOpen(true)} className={btnSecondary}><Link2 className="h-4 w-4" /> Liens, code, expiration</button>
         </div>
       </div>
     </Section>
@@ -349,6 +352,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
                 if (win) win.location.href = `/brochures/${brochure.id}/pdf`; else window.location.href = `/brochures/${brochure.id}/pdf`;
               }}><FileDown className="h-4 w-4" /> PDF</a>
             <button type="button" onClick={() => setStatsOpen(true)} className={btnSecondary}><BarChart3 className="h-4 w-4" /> Lecture</button>
+            <button type="button" onClick={() => setLinksOpen(true)} className={btnSecondary}><Link2 className="h-4 w-4" /> Liens</button>
             <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className={btnSecondary}>
               <Settings2 className="h-4 w-4" /> Réglages de la brochure
             </button>
@@ -500,6 +504,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
           <p className="text-sm text-gray-700">Cette brochure a déjà une mise en page avancée. Vous pouvez la reprendre telle que vous l’aviez laissée (les prestations ajoutées entre-temps sont mises à la suite), ou repartir de la composition simple actuelle.</p>
         </Modal>
       )}
+      {linksOpen && <BrochureLinks brochureId={brochure.id} notify={brochure.notify} onClose={() => setLinksOpen(false)} />}
       {statsOpen && <StudioStats brochureId={brochure.id} language={draft.language} onClose={() => setStatsOpen(false)}
         pages={resolveStudio(studioDoc, byId, { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: true })} />}
       {sending && <SendBrochureModal brochureId={brochure.id} onClose={() => setSending(false)} />}

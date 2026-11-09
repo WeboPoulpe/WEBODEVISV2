@@ -8,7 +8,7 @@ import FormSheet from '@/components/brochures/FormSheet';
 import BrochureRequestForm, { useBrochureForm } from '@/components/brochures/BrochureRequestForm';
 import { BrochurePageView, pageFlow } from '@/components/brochures/BrochurePages';
 import { expandPages, useFlowBreaks } from '@/components/brochures/flow';
-import type { PublicBrochure } from '@/server/brochures';
+import { recordBrochureFormReached, type PublicBrochure } from '@/server/brochures';
 
 export default function BrochureBook({ brochure, token }: { brochure: PublicBrochure; token: string }) {
   const en = brochure.language === 'en';
@@ -32,6 +32,8 @@ export default function BrochureBook({ brochure, token }: { brochure: PublicBroc
   const [onForm, setOnForm] = useState(false);
   const [sheet, setSheet] = useState(false);
   useEffect(() => { setSheet(phone && onForm); }, [phone, onForm]);
+  // Arrivée au formulaire : le traiteur est prévenu (une notification par demi-heure au plus).
+  useEffect(() => { if (onForm) recordBrochureFormReached(token).catch(() => {}); }, [onForm, token]);
   const formSlot = phone
     ? (
       <button type="button" onClick={() => setSheet(true)}

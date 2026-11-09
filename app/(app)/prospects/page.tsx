@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import SendBrochureModal from '@/components/brochures/SendBrochureModal';
 import { listBrochures, type BrochureSummary } from '@/server/brochures';
+import { linkLabels } from '@/server/brochureLinks';
 import { companyIds } from '@/lib/companyFilter';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
@@ -56,6 +57,8 @@ interface Prospect {
   brochure_id?: string | null;
   /** Prestations choisies dans la brochure (« Je veux ce menu »). */
   chosen?: unknown;
+  /** Lien de la brochure par lequel la demande est arrivée. */
+  brochure_link_id?: string | null;
   created_at: string;
 }
 
@@ -860,7 +863,7 @@ function ProspectDrawer({
           Envoyer une brochure
         </button>
         {sendingBrochure && (
-          <SendBrochureModal defaultTo={prospect.email} prospectId={prospect.id} onClose={() => setSendingBrochure(false)}
+          <SendBrochureModal defaultTo={prospect.email} defaultName={`${prospect.first_name} ${prospect.last_name}`.trim()} prospectId={prospect.id} onClose={() => setSendingBrochure(false)}
             // La demande (et son devis rattaché) passe à « Brochure envoyée » si elle était nouvelle.
             onSent={() => { if (prospect.status === 'nouveau') handleStatus('broch_envoyee'); }} />
         )}
@@ -952,6 +955,15 @@ function ProspectsPageInner() {
   // Noms des brochures, pour dire d'où vient une demande.
   const [brochureNames, setBrochureNames] = useState<Map<string, string>>(new Map());
   useEffect(() => { listBrochures().then((all) => setBrochureNames(new Map(all.map((b) => [b.id, b.name])))).catch(() => {}); }, []);
+  // Lien par lequel la demande est arrivée (source ou client), pour savoir d'où viennent les demandes.
+  const [linkNames, setLinkNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = prospects.flatMap((p) => (p.brochure_link_id ? [p.brochure_link_id] : []));
+    if (ids.length) linkLabels(ids).then(setLinkNames).catch(() => {});
+  }, [prospects]);
+  const sourceOf = (p: Prospect) => (p.brochure_id && brochureNames.get(p.brochure_id)
+    ? `${brochureNames.get(p.brochure_id)}${p.brochure_link_id && linkNames[p.brochure_link_id] ? ` (${linkNames[p.brochure_link_id]})` : ''}`
+    : null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProspectStatus | 'all'>('all');
   const [eventFilter, setEventFilter] = useState<string>('all');
@@ -1225,7 +1237,7 @@ function ProspectsPageInner() {
                   prospect={p}
                   selected={selected?.id === p.id}
                   onClick={() => setSelected((cur) => cur?.id === p.id ? null : p)}
-                  brochureName={p.brochure_id ? brochureNames.get(p.brochure_id) : null}
+                  brochureName={sourceOf(p)}
                 />
               ))}
             </div>
@@ -1239,7 +1251,7 @@ function ProspectsPageInner() {
           )}>
             <ProspectDrawer
               prospect={selected}
-              brochureName={selected.brochure_id ? brochureNames.get(selected.brochure_id) : null}
+              brochureName={sourceOf(selected)}
               linkedQuoteId={prospectQuoteMap[selected.id] ?? null}
               onClose={() => setSelected(null)}
               onStatusChange={handleStatusChange}
