@@ -6,7 +6,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical,
-  ArrowLeft, ArrowRight, BookmarkPlus, Circle, Copy, Film, ImagePlus, Loader2, Minus, Plus, QrCode, Search, Square, SquareDashed, Trash2,
+  ArrowLeft, ArrowRight, BookmarkPlus, Circle, Copy, Film, Sparkles, ImagePlus, Loader2, Minus, Plus, QrCode, Search, Square, SquareDashed, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { iconBtn, iconBtnDanger, inputCls } from '@/components/ui/kit';
@@ -238,7 +238,9 @@ const draggable = (item: AddItem) => ({
   onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(item)); e.dataTransfer.effectAllowed = 'copy'; },
 });
 
-export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, onCompanyPage, templatesVersion = 0, catalog, used, templateContext, resolve, language, logoUrl }: {
+export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, onCompanyPage, onWeboCover, templatesVersion = 0, catalog, used, templateContext, resolve, language, logoUrl }: {
+  /** « Fais-moi une couverture » : Webo propose une couverture d'après une description (renvoie un message d'erreur, ou null). */
+  onWeboCover?: (description: string) => Promise<string | null>;
   /** Une page enregistrée comme modèle par l'entreprise, à ajouter. */
   onCompanyPage: (page: StudioPage) => void;
   /** Change quand un modèle d'entreprise vient d'être enregistré (relire la liste). */
@@ -267,6 +269,7 @@ export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, onCompanyPage,
         ))}
       </div>
       {tab === 'templates' && <>
+        {onWeboCover && <WeboCover onAsk={onWeboCover} />}
         <CompanyTemplates onPick={onCompanyPage} resolve={resolve} language={language} version={templatesVersion} />
         <TemplatesTab onTemplate={onTemplate} onKind={onKind} ctx={templateContext} catalog={catalog} used={used} resolve={resolve} language={language} />
       </>}
@@ -337,6 +340,27 @@ export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, onCompanyPage,
         </div>
       )}
       {tab === 'prestations' && <PrestationsTab catalog={catalog} used={used} onPick={(id) => onAdd({ kind: 'prestation', id })} />}
+    </div>
+  );
+}
+
+/** Webo compose une couverture : mise en page, thème, photo de l'entreprise, titres. */
+function WeboCover({ onAsk }: { onAsk: (d: string) => Promise<string | null> }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="mb-3 rounded-xl border border-primary/30 bg-primary-50/40 p-2.5">
+      <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-gray-900"><Sparkles className="h-4 w-4 text-primary" /> Fais-moi une couverture</p>
+      <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={600}
+        placeholder="Mariage champêtre, tons verts, photo de buffet en extérieur…" className={cn(inputCls, 'py-1.5 text-sm')} aria-label="Couverture voulue" />
+      {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
+      <button type="button" disabled={busy || text.trim().length < 3}
+        onClick={async () => { setBusy(true); setError(null); const e = await onAsk(text); setBusy(false); if (!e) setText(''); else setError(e); }}
+        className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Proposer (1 WeboCoin)
+      </button>
+      <p className="mt-1 text-[11px] text-gray-500">Webo choisit la mise en page, le thème et une de vos photos, et écrit les titres. La page s’ajoute en premier ; tout reste modifiable.</p>
     </div>
   );
 }

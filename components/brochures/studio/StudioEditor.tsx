@@ -31,7 +31,7 @@ import {
   type BrochureKind, type ResolvedStudioElement, type StudioDoc, type StudioElement, type StudioPage, type StudioText, type StudioTheme,
   type TemplateContext, type TextRole,
 } from '@/lib/brochureStudio';
-import { rewriteWithWebo } from '@/server/weboRewrite';
+import { designCoverWithWebo, rewriteWithWebo } from '@/server/weboRewrite';
 import ItemRetouch from '../ItemRetouch';
 import type { BrochureCompany } from '../BrochurePages';
 import { ElementContent, PageBackground, STUDIO_CSS, elementBox, textStyle } from './StudioPage';
@@ -367,6 +367,20 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
     const ids = used.size ? [...used] : catalog.map((p) => p.id);
     set((d) => ({ ...brochureFromKind(kind, templateContext, ids), options: d.options }));
     setPi(0); setSel([]); setEditing(null);
+  };
+  /** Webo propose une couverture : elle s'ajoute en première page, avec son thème. */
+  const weboCover = async (description: string): Promise<string | null> => {
+    const res = await designCoverWithWebo({ description, language: settings.language, requestId: crypto.randomUUID() })
+      .catch(() => ({ error: 'Webo n’a pas répondu. Vérifiez votre connexion.' }));
+    if ('error' in res) return res.error;
+    const t = PAGE_TEMPLATES.find((x) => x.id === res.templateId) ?? PAGE_TEMPLATES[0];
+    const theme = THEMES.find((x) => x.name === res.themeName);
+    const made = t.make({ ...templateContext, title: res.title, subtitle: res.subtitle || null, photoUrl: res.photoUrl ?? templateContext.photoUrl, photoFrame: null }, []);
+    const cover = theme ? applyTheme({ pages: [made] }, theme).pages[0] : made;
+    set((d) => ({ ...d, pages: [cover, ...d.pages] }));
+    setPi(0); setSel([]); setEditing(null);
+    notify('Couverture proposée par Webo (1 WeboCoin), ajoutée en première page.', { tone: 'success' });
+    return null;
   };
   const deletePage = async () => {
     if (page.form) return;
@@ -1169,7 +1183,7 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
 
   const addPanel = (
     <AddPanel tab={addTab} onTab={setAddTab} onAdd={(item) => addItem(item)} onTemplate={addTemplate} onKind={addKind}
-      onCompanyPage={(p) => insertPage(clonePage(p))} templatesVersion={templatesVersion}
+      onCompanyPage={(p) => insertPage(clonePage(p))} templatesVersion={templatesVersion} onWeboCover={weboCover}
       catalog={catalog} used={used} templateContext={templateContext} resolve={resolvePage} language={settings.language} logoUrl={company.logoUrl} />
   );
 

@@ -5,9 +5,9 @@
 // En éditeur avancé, l'aperçu et la composition laissent la place aux pages à blocs (AdvancedEditor) ; le thème, les
 // réglages et la couverture restent à gauche.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown, Link2, QrCode, History, MessageSquare } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown, Link2, QrCode, History, MessageSquare, Share2, Instagram, Code2, Languages } from 'lucide-react';
 import SendBrochureModal from './SendBrochureModal';
 import Modal from '@/components/ui/Modal';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -27,6 +27,10 @@ import StudioEditor from './studio/StudioEditor';
 import StudioStats from './studio/StudioStats';
 import BrochureLinks from './BrochureLinks';
 import QrModal from './QrModal';
+import EmbedModal from './EmbedModal';
+import InstagramExport from './studio/InstagramExport';
+import { createEnglishVersion } from '@/server/weboRewrite';
+import { useRouter } from 'next/navigation';
 import { CommentsModal, ReviewBar, VersionsModal } from './studio/StudioCollab';
 import { getReview, listComments } from '@/server/brochureCollab';
 import { Flipbook } from './Flipbook';
@@ -119,6 +123,32 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
     if (brochure.editor_mode === 'studio') listComments(brochure.id).then((c) => setOpenComments((c ?? []).filter((x) => !x.resolved).length)).catch(() => {});
   }, [brochure.id, brochure.editor_mode]);
   const [qr, setQr] = useState<{ url: string; label: string } | null>(null);
+  const [shareMenu, setShareMenu] = useState(false);
+  const [embedOpen, setEmbedOpen] = useState(false);
+  const [instaOpen, setInstaOpen] = useState(false);
+  const router = useRouter();
+  /** PDF : le dernier changement part d'abord, le PDF montre les pages telles qu'elles sont à l'écran. */
+  const openPdf = async () => {
+    const win = window.open('', '_blank');
+    await flush();
+    if (win) win.location.href = `/brochures/${brochure.id}/pdf`; else window.location.href = `/brochures/${brochure.id}/pdf`;
+  };
+  /** Version anglaise : une copie traduite par Webo, mise en page gardée. */
+  const englishVersion = async () => {
+    const texts = studioDoc.pages.flatMap((p) => p.els.filter((e) => (e.type === 'text' && e.html.replace(/<[^>]*>|&nbsp;|\s/g, '')) || (e.type === 'prestation' && e.html))).length;
+    const coins = Math.max(1, Math.ceil(texts / 10));
+    if (!(await confirm({
+      title: 'Créer la version anglaise ?',
+      message: `Webo traduit les ${texts} textes de la brochure dans une copie en anglais (${coins} WeboCoin${coins > 1 ? 's' : ''}). La mise en page ne change pas ; les fiches des prestations prennent leur version anglaise du catalogue quand elle existe. La brochure française reste telle quelle.`,
+      confirmLabel: 'Traduire',
+    }))) return;
+    await flush();
+    notify('Webo traduit la brochure…');
+    const res = await createEnglishVersion(brochure.id, crypto.randomUUID()).catch(() => ({ error: 'Webo n’a pas répondu. Vérifiez votre connexion.' }));
+    if ('error' in res) { notify(res.error, { tone: 'error' }); return; }
+    notify('Version anglaise créée.', { tone: 'success' });
+    router.push(`/brochures/${res.id}`);
+  };
   const [layout, setLayout] = useState<BrochureLayout>(() => parseLayout(brochure.layout) ?? { pages: [] });
   const [switching, setSwitching] = useState(false);
   const [choosing, setChoosing] = useState(false);
@@ -364,21 +394,30 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
             <button type="button" onClick={askSend} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
             <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
             <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
-            <a href={`/brochures/${brochure.id}/pdf`} target="_blank" rel="noreferrer" className={btnSecondary} title="Imprimer ou enregistrer en PDF"
-              onClick={async (e) => {
-                // Le dernier changement part d'abord : le PDF montre les pages telles qu'elles sont à l'écran.
-                e.preventDefault();
-                const win = window.open('', '_blank');
-                await flush();
-                if (win) win.location.href = `/brochures/${brochure.id}/pdf`; else window.location.href = `/brochures/${brochure.id}/pdf`;
-              }}><FileDown className="h-4 w-4" /> PDF</a>
+
             <button type="button" onClick={() => setStatsOpen(true)} className={btnSecondary}><BarChart3 className="h-4 w-4" /> Lecture</button>
             <button type="button" onClick={() => setLinksOpen(true)} className={btnSecondary}><Link2 className="h-4 w-4" /> Liens</button>
             <button type="button" onClick={() => setVersionsOpen(true)} className={btnSecondary}><History className="h-4 w-4" /> Versions</button>
             <button type="button" onClick={() => setCommentsOpen(true)} className={btnSecondary}>
               <MessageSquare className="h-4 w-4" /> Commentaires{openComments ? <span className="ml-1 rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">{openComments}</span> : null}
             </button>
-            <button type="button" onClick={() => setQr({ url: link, label: draft.name })} className={btnSecondary}><QrCode className="h-4 w-4" /> QR code</button>
+            <div className="relative">
+              <button type="button" onClick={() => setShareMenu((v) => !v)} aria-expanded={shareMenu} className={btnSecondary}><Share2 className="h-4 w-4" /> Partager et exporter</button>
+              {shareMenu && (
+                <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-gray-200 bg-white p-1 shadow-lg" role="menu" onClick={() => setShareMenu(false)}>
+                  {([
+                    [<FileDown key="i" className="h-4 w-4" />, 'PDF (imprimer, envoyer)', openPdf],
+                    [<Instagram key="i" className="h-4 w-4" />, 'Images pour Instagram', () => setInstaOpen(true)],
+                    [<QrCode key="i" className="h-4 w-4" />, 'QR code (flyer, stand)', () => setQr({ url: link, label: draft.name })],
+                    [<Code2 key="i" className="h-4 w-4" />, 'Intégrer à mon site', () => setEmbedOpen(true)],
+                    [<Languages key="i" className="h-4 w-4" />, 'Créer la version anglaise', englishVersion],
+                  ] as [ReactNode, string, () => void][]).map(([icon, label, act]) => (
+                    <button key={label} type="button" role="menuitem" onClick={act}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">{icon}{label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className={btnSecondary}>
               <Settings2 className="h-4 w-4" /> Réglages de la brochure
             </button>
@@ -541,6 +580,9 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
         <CommentsModal brochureId={brochure.id} currentPageId={studioPageId} onCount={setOpenComments} onClose={() => setCommentsOpen(false)}
           pages={studioDoc.pages.map((p, i) => ({ id: p.id, label: p.form ? 'la page du formulaire' : `la page ${i + 1}` }))} />
       )}
+      {embedOpen && <EmbedModal brochureId={brochure.id} name={draft.name} onClose={() => setEmbedOpen(false)} />}
+      {instaOpen && <InstagramExport name={draft.name} language={draft.language} onClose={() => setInstaOpen(false)}
+        pages={resolveStudio(studioDoc, byId, { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: false, brochureUrl: link })} />}
       {qr && <QrModal url={qr.url} label={qr.label} onClose={() => setQr(null)} />}
       {statsOpen && <StudioStats brochureId={brochure.id} language={draft.language} onClose={() => setStatsOpen(false)}
         pages={resolveStudio(studioDoc, byId, { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: true })} />}

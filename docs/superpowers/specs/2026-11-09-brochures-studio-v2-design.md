@@ -82,3 +82,33 @@ Demandé par Maxence après la liste d'améliorations proposée : tout est fait.
   traits suivent).
 
 Limite restante : le PDF passe par la fenêtre d'impression du navigateur (pas de fichier créé directement).
+
+## Lot 4 (2026-11-09) : vendre, suivre, travailler à plusieurs, diffuser
+
+Demandé par Maxence : toute la liste proposée.
+
+- **Vendre plus** : bouton « Je veux ce menu » sous chaque prestation (option du lien), barre « Faire ma demande » ;
+  sélection et estimation instantanée (invités × prix affichés) dans le formulaire ; prestations choisies gardées
+  avec la demande (migration 0047, figées au catalogue : nom, prix HT…), visibles dans l'email et la fiche
+  prospect, et lignes du devis créé depuis Prospects ou par Webo.
+- **Liens** (migration 0048) : par source (Instagram, salon, site…) ou par client (message d'accueil, `{{client}}`
+  remplacé par son nom), chacun avec ouvertures, demandes, expiration, code d'accès ; expiration et code aussi sur le
+  lien principal (empreinte du code, cookie signé 30 jours après saisie). Envoi par email avec lien personnalisé.
+  Prospects dit par quel lien la demande est arrivée.
+- **Notifications push** au traiteur : ouverture et arrivée au formulaire, une par demi-heure et par lien ; les
+  aperçus de l'entreprise ne comptent pas. Coupables par brochure.
+- **Aperçu du lien partagé** (WhatsApp, Facebook…) : titre (ou message d'accueil), entreprise, photo de couverture ;
+  rien de privé si un code est demandé.
+- **Éditeur** : annuler / rétablir gardés dans le navigateur ; versions (migration 0049 : automatiques au plus toutes
+  les 30 min, nommées, retour à l'une d'elles) ; commentaires (page ou brochure) ; validation par un collègue avant
+  l'envoi (à refaire après une modification) ; modèles de pages de l'entreprise ; vidéo courte et GIF ; QR code
+  (élément, et QR de chaque lien en PNG ou SVG).
+- **Webo** : « Fais-moi une couverture » (mise en page, thème, photo de l'entreprise, titres ; 1 WeboCoin) — Webo
+  ne dessine pas d'image, il choisit parmi les photos de l'entreprise ; version anglaise en un clic (copie traduite,
+  mise en page gardée, 1 WeboCoin par 10 textes).
+- **Diffusion** : intégration au site (`/embed/b/<jeton>`, code iframe à copier) ; images pour Instagram (4:5, 9:16,
+  1:1, page entière), faites dans le navigateur.
+
+Limites : les notifications demandent qu'elles soient activées sur l'appareil (Paramètres) et les clés VAPID du
+serveur ; l'export d'images peut échouer si une photo est hébergée sur un site qui refuse d'être lu par une autre
+page (photos envoyées dans l'app : pas de souci) ; le PDF passe toujours par la fenêtre d'impression.

@@ -102,3 +102,75 @@ export async function rewriteBrochureText(html: string, mode: RewriteMode): Prom
   if (typeof out?.html !== 'string' || !out.html.replace(/<[^>]*>|&nbsp;|\s/g, '')) throw fail('Webo : réponse vide.');
   return { html: out.html, usage };
 }
+
+// ── Couverture proposée par Webo (Studio) ───────────────────────────────────
+
+export interface CoverIdea { template: string; theme: string; title: string; subtitle: string; photo: number }
+
+const COVER_SYSTEM = `You design the cover page of a French caterer's brochure from a short description.
+Choose one layout among the given templates, one theme among the given themes, write a short title (max 6 words) and a short subtitle (max 8 words) in the brochure's language, and pick the best matching photo index from the list (or -1 if none fits or the list is empty). Never invent prices, names or facts not in the description. Answer only with the JSON object.`;
+
+/** Mise en page, thème, titres et photo d'une couverture, d'après une description. */
+export async function designCover(input: { description: string; language: 'fr' | 'en'; templates: string[]; themes: string[]; photos: string[] }): Promise<{ idea: CoverIdea; usage: WeboUsage }> {
+  if (fake()) {
+    return { idea: { template: input.templates[0], theme: input.themes[0], title: input.description.slice(0, 40), subtitle: 'Webo', photo: input.photos.length ? 0 : -1 }, usage: { input: 120, output: 60, cacheWrite: 0, cacheRead: 0 } };
+  }
+  client ??= new Anthropic({ apiKey: anthropicKey(), timeout: 60_000, maxRetries: 1 });
+  const res = await client.messages.create({
+    model: WEBO_MODEL,
+    max_tokens: 1000,
+    system: [{ type: 'text', text: COVER_SYSTEM, cache_control: { type: 'ephemeral' } }],
+    output_config: {
+      effort: 'low',
+      format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: {
+            template: { type: 'string', enum: input.templates }, theme: { type: 'string', enum: input.themes },
+            title: { type: 'string' }, subtitle: { type: 'string' }, photo: { type: 'integer' },
+          },
+          required: ['template', 'theme', 'title', 'subtitle', 'photo'], additionalProperties: false,
+        },
+      },
+    },
+    messages: [{ role: 'user', content: JSON.stringify({ description: input.description, language: input.language, photos: input.photos.map((label, i) => ({ index: i, label })) }) }],
+  });
+  const u = res.usage;
+  const usage: WeboUsage = { input: u.input_tokens, output: u.output_tokens, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0 };
+  const fail = (message: string) => Object.assign(new Error(message), { usage });
+  if (res.stop_reason !== 'end_turn') throw fail('Webo : réponse incomplète.');
+  let out: CoverIdea;
+  try { out = JSON.parse(res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')); } catch { throw fail('Webo : réponse illisible.'); }
+  if (!input.templates.includes(out.template) || !input.themes.includes(out.theme)) throw fail('Webo : réponse illisible.');
+  return { idea: { ...out, title: String(out.title).slice(0, 120), subtitle: String(out.subtitle).slice(0, 160), photo: Number.isInteger(out.photo) ? out.photo : -1 }, usage };
+}
+
+// ── Traduction de tous les textes d'une brochure (version anglaise) ──────────
+
+const TEXTS_SYSTEM = `You translate the texts of a French caterer's brochure into English, as found on a restaurant or wedding brochure: natural, concise, appetising.
+"texts" is a list of HTML fragments. Return the list with the same length and order; keep each fragment's exact HTML structure (same tags and attributes), translate only the visible text. Keep proper names, place names, brand names, wine appellations, prices and numbers unchanged. Keep the placeholder {{client}} as is.
+Use this glossary whenever the French term appears:
+${MENU_GLOSSARY.map(([fr, en]) => `  ${fr} → ${en}`).join('\n')}
+Answer only with the JSON object.`;
+
+/** Plusieurs textes HTML traduits en anglais, dans le même ordre. */
+export async function translateTexts(texts: string[]): Promise<{ texts: string[]; usage: WeboUsage }> {
+  if (fake()) return { texts: texts.map((t) => t.replace(/>([^<]*\S[^<]*)</g, '>EN $1<')), usage: { input: 100 * texts.length, output: 60 * texts.length, cacheWrite: 0, cacheRead: 0 } };
+  client ??= new Anthropic({ apiKey: anthropicKey(), timeout: 90_000, maxRetries: 1 });
+  const res = await client.messages.create({
+    model: WEBO_MODEL,
+    max_tokens: 32000,
+    system: [{ type: 'text', text: TEXTS_SYSTEM, cache_control: { type: 'ephemeral' } }],
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', properties: { texts: { type: 'array', items: { type: 'string' } } }, required: ['texts'], additionalProperties: false } } },
+    messages: [{ role: 'user', content: JSON.stringify({ texts }) }],
+  });
+  const u = res.usage;
+  const usage: WeboUsage = { input: u.input_tokens, output: u.output_tokens, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0 };
+  const fail = (message: string) => Object.assign(new Error(message), { usage });
+  if (res.stop_reason !== 'end_turn') throw fail('Webo : réponse incomplète.');
+  let out: { texts?: unknown };
+  try { out = JSON.parse(res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')); } catch { throw fail('Webo : réponse illisible.'); }
+  if (!Array.isArray(out.texts) || out.texts.length !== texts.length || out.texts.some((t) => typeof t !== 'string')) throw fail('Webo : réponse incomplète.');
+  return { texts: out.texts as string[], usage };
+}

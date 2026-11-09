@@ -50,7 +50,7 @@ function isLight(hex: string): boolean {
 }
 
 /** Photo qui prolonge la page au-dessus et au-dessous : celle du fond, sinon une photo qui couvre toute la page. */
-function backdropOf(page: ResolvedStudioPage): { url: string; frame?: PhotoFrame; opacity: number } | null {
+export function backdropOf(page: ResolvedStudioPage): { url: string; frame?: PhotoFrame; opacity: number } | null {
   if (page.bgImage) return page.bgImage;
   const full = page.els.find((e) => e.type === 'image' && e.url && !e.rot && e.x <= 0.5 && e.y <= 0.5 && e.x + e.w >= 99.5 && e.y + e.h >= PAGE_H - 0.5);
   return full?.type === 'image' && full.url ? { url: full.url, ...(full.frame ? { frame: full.frame } : {}), opacity: full.opacity } : null;
