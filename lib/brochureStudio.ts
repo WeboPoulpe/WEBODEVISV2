@@ -90,6 +90,10 @@ export type StudioShape = Base & {
   type: 'shape'; shape: 'rect' | 'ellipse' | 'arch' | 'line'; fill: string | null; stroke: string | null; strokeWidth: number; radius: number; dash: LineDash;
 };
 export type StudioIcon = Base & { type: 'icon'; name: StudioIconName; color: string; strokeWidth: number };
+/** Vidéo courte (mp4, webm), jouée en boucle et sans le son ; un GIF animé se pose comme une photo. */
+export type StudioVideo = Base & { type: 'video'; url: string | null; fit: 'cover' | 'contain'; radius: number };
+/** QR code : vers le lien de la brochure, ou vers une adresse donnée. */
+export type StudioQr = Base & { type: 'qr'; target: 'brochure' | 'url'; url: string | null; color: string; bg: string | null };
 export type StudioPrestation = Base & {
   type: 'prestation'; prestationId: string;
   show: { name: boolean; text: boolean; price: boolean };
@@ -102,7 +106,7 @@ export type StudioPrestation = Base & {
 };
 export type StudioForm = Base & { type: 'form'; bg: string | null; color: string; accent: string; radius: number };
 
-export type StudioElement = StudioText | StudioImage | StudioShape | StudioIcon | StudioPrestation | StudioForm;
+export type StudioElement = StudioText | StudioImage | StudioShape | StudioIcon | StudioVideo | StudioQr | StudioPrestation | StudioForm;
 export type StudioElementType = StudioElement['type'];
 
 export interface StudioPage {
@@ -135,7 +139,9 @@ export const DEFAULT_OPTIONS: StudioOptions = { animate: true, call: false, what
 
 /** Un élément Prestation tel que le lecteur le voit : le catalogue lu, sans identifiant. */
 export type ResolvedStudioPrestation = Omit<StudioPrestation, 'prestationId' | 'html' | 'titled' | 'photoUrl' | 'hidePrice'> & { item: ResolvedItem };
-export type ResolvedStudioElement = Exclude<StudioElement, StudioPrestation> | ResolvedStudioPrestation;
+/** Un QR code prêt à dessiner : l'adresse qu'il porte (null : pas encore d'adresse). */
+export type ResolvedStudioQr = StudioQr & { value: string | null };
+export type ResolvedStudioElement = Exclude<StudioElement, StudioPrestation | StudioQr> | ResolvedStudioPrestation | ResolvedStudioQr;
 /** Une page prête à afficher ; `id` sert à suivre la lecture de la page, même déplacée. */
 export interface ResolvedStudioPage { id: string; bg: string; bgImage: StudioPage['bgImage']; form: boolean; els: ResolvedStudioElement[] }
 
@@ -306,6 +312,13 @@ function parseElement(raw: unknown): StudioElement | null {
         fill: colorOrNull(r.fill), stroke: colorOrNull(r.stroke), strokeWidth: num(r.strokeWidth, 0, 10, 0), radius: num(r.radius, 0, 50, 0),
         dash: pick(r.dash, ['solid', 'dashed', 'dotted', 'double'] as const, 'solid'),
       };
+    case 'video':
+      return { ...base, type: 'video', url: url(r.url), fit: pick(r.fit, ['cover', 'contain'] as const, 'cover'), radius: num(r.radius, 0, 50, 0) };
+    case 'qr':
+      return {
+        ...base, type: 'qr', target: pick(r.target, ['brochure', 'url'] as const, 'brochure'), url: url(r.url),
+        color: color(r.color, '#1c2621'), bg: colorOrNull(r.bg),
+      };
     case 'icon':
       return {
         ...base, type: 'icon', name: pick(r.name, STUDIO_ICONS, 'Heart'), color: color(r.color, '#b4502d'),
@@ -463,11 +476,15 @@ export function studioPhotos(doc: StudioDoc): string[] {
  * Pages prêtes à afficher : chaque prestation lue dans le catalogue (texte, photo, prix). Pour le lien public, une
  * prestation supprimée du catalogue disparaît ; dans l'éditeur, elle est signalée.
  */
-export function resolveStudio(doc: StudioDoc, catalog: ReadonlyMap<string, CatalogPrestation>, o: PriceOptions & { forEditor: boolean }): ResolvedStudioPage[] {
+export function resolveStudio(
+  doc: StudioDoc, catalog: ReadonlyMap<string, CatalogPrestation>,
+  o: PriceOptions & { forEditor: boolean; /** Adresse du lien de la brochure, pour ses QR codes. */ brochureUrl?: string | null },
+): ResolvedStudioPage[] {
   let n = 0;
   return doc.pages.map((p) => ({
     id: p.id, bg: p.bg, bgImage: p.bgImage, form: !!p.form,
     els: p.els.flatMap((e): ResolvedStudioElement[] => {
+      if (e.type === 'qr') return [{ ...e, value: e.target === 'url' ? e.url : o.brochureUrl ?? null }];
       if (e.type !== 'prestation') return [e];
       const { prestationId, html, titled, photoUrl, hidePrice, ...rest } = e;
       const [item] = resolveItems({ id: '', title: '', items: [{ prestationId, html, titled, photoUrl, hidePrice }] }, catalog, o, n++);
@@ -491,6 +508,12 @@ export function imageEl(o: Partial<Omit<StudioImage, 'type'>> & { x: number; y: 
 }
 export function shapeEl(o: Partial<Omit<StudioShape, 'type'>> & { x: number; y: number; w: number; h: number }): StudioShape {
   return { ...baseEl(o.x, o.y, o.w, o.h), shape: 'rect', fill: '#e6dfd3', stroke: null, strokeWidth: 0, radius: 0, dash: 'solid', ...o, type: 'shape' };
+}
+export function videoEl(o: Partial<Omit<StudioVideo, 'type'>> & { x: number; y: number; w: number; h: number; url: string }): StudioVideo {
+  return { ...baseEl(o.x, o.y, o.w, o.h), fit: 'cover', radius: 0, ...o, type: 'video' };
+}
+export function qrEl(o: Partial<Omit<StudioQr, 'type'>> & { x: number; y: number; w: number }): StudioQr {
+  return { ...baseEl(o.x, o.y, o.w, o.h ?? o.w), target: 'brochure', url: null, color: '#1c2621', bg: '#ffffff', ...o, type: 'qr' };
 }
 export function iconEl(o: Partial<Omit<StudioIcon, 'type'>> & { x: number; y: number; w: number; name: StudioIconName }): StudioIcon {
   return { ...baseEl(o.x, o.y, o.w, o.h ?? o.w), color: '#b4502d', strokeWidth: 1.5, ...o, type: 'icon' };

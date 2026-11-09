@@ -201,3 +201,24 @@ describe('Studio : thèmes, modèles, éléments V2', () => {
     expect(whatsappNumber('abc')).toBeNull();
   });
 });
+
+describe('Studio : vidéo et QR code', () => {
+  it('lit vidéo et QR ; le QR « brochure » prend l’adresse du lien, l’autre la sienne', async () => {
+    const { qrPath, qrSvg } = await import('./qr');
+    const doc = parseStudio({ pages: [{ els: [
+      { type: 'video', url: 'https://x.test/v.mp4', x: 1, y: 1, w: 50, h: 30, fit: 'contain' },
+      { type: 'video', url: 'javascript:x', x: 1, y: 1, w: 50, h: 30 },
+      { type: 'qr', target: 'brochure', x: 1, y: 1, w: 20, h: 20 },
+      { type: 'qr', target: 'url', url: 'https://monsite.fr', x: 1, y: 1, w: 20, h: 20, color: '#000000' },
+    ] }] })!;
+    const [v1, v2] = doc.pages[0].els;
+    expect(v1).toMatchObject({ type: 'video', fit: 'contain', url: 'https://x.test/v.mp4' });
+    expect(v2).toMatchObject({ type: 'video', url: null });
+    const [page] = resolveStudio(doc, new Map(), { show: false, mode: 'ttc', vatRate: 10, language: 'fr', forEditor: false, brochureUrl: 'https://w.fr/b/abc' });
+    expect(page.els.filter((e) => e.type === 'qr').map((e) => (e.type === 'qr' ? e.value : null))).toEqual(['https://w.fr/b/abc', 'https://monsite.fr']);
+    const p = qrPath('https://w.fr/b/abc');
+    expect(p.size).toBeGreaterThanOrEqual(21);
+    expect(p.d).toMatch(/^M\d+ \d+h1v1h-1z/);
+    expect(qrSvg('x', { bg: null })).not.toContain('<rect');
+  });
+});

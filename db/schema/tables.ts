@@ -391,6 +391,55 @@ export const brochure_page_stats = pgTable("brochure_page_stats", {
 		}).onDelete("cascade"),
 ]);
 
+// Versions des pages du Studio : une prise automatiquement au plus toutes les 30 minutes de travail, ou enregistrée
+// à la main avec un nom ; on peut revenir à l'une d'elles.
+export const brochure_versions = pgTable("brochure_versions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	brochure_id: uuid().notNull(),
+	studio: jsonb().notNull(),
+	label: text(),
+	auto: boolean().default(true).notNull(),
+	created_by: uuid(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_brochure_versions_brochure").using("btree", table.brochure_id.asc().nullsLast().op("uuid_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.brochure_id],
+			foreignColumns: [brochures.id],
+			name: "brochure_versions_brochure_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+// Commentaires sur une brochure (entre collègues), sur une page ou sur l'ensemble.
+export const brochure_comments = pgTable("brochure_comments", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	brochure_id: uuid().notNull(),
+	page_id: text(),
+	author_id: uuid().notNull(),
+	body: text().notNull(),
+	resolved: boolean().default(false).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_brochure_comments_brochure").using("btree", table.brochure_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.brochure_id],
+			foreignColumns: [brochures.id],
+			name: "brochure_comments_brochure_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+// Modèles de pages du Studio enregistrés par l'entreprise, pour toutes ses brochures.
+export const studio_templates = pgTable("studio_templates", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	owner_user_id: uuid().notNull(),
+	name: text().notNull(),
+	page: jsonb().notNull(),
+	created_by: uuid(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_studio_templates_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
+]);
+
 // Liens supplémentaires d'une brochure : par source (Instagram, salon, site…) pour savoir d'où viennent les lecteurs,
 // ou par client (brochure personnalisée « Pour le mariage de Julie & Thomas »). Chacun a ses chiffres, son
 // expiration et son code d'accès (voir server/brochureLinks.ts).
@@ -451,9 +500,17 @@ export const brochures = pgTable("brochures", {
 	notify: boolean().default(true).notNull(),
 	open_notified_at: timestamp({ withTimezone: true, mode: 'string' }),
 	form_notified_at: timestamp({ withTimezone: true, mode: 'string' }),
+	// Validation par un collègue avant l'envoi : aucune, demandée, validée, changements demandés (voir
+	// server/brochureCollab.ts) ; qui l'a demandée, qui a répondu, quand, et son mot.
+	review_status: text().default('none').notNull(),
+	review_note: text(),
+	review_requested_by: uuid(),
+	review_by: uuid(),
+	review_at: timestamp({ withTimezone: true, mode: 'string' }),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	check("brochures_review_status_check", sql`review_status = ANY (ARRAY['none'::text, 'pending'::text, 'approved'::text, 'changes'::text])`),
 	check("brochures_editor_mode_check", sql`editor_mode = ANY (ARRAY['simple'::text, 'advanced'::text, 'studio'::text])`),
 	index("idx_brochures_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({

@@ -4,7 +4,8 @@
 // la largeur de la page, qui est un conteneur) : la page s'affiche à l'identique dans l'éditeur, dans les vignettes et
 // sur le lien public, quelle que soit la taille de l'écran. Rendu partagé par l'éditeur et le lecteur.
 
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { qrPath } from '@/lib/qr';
 import { shortText } from '@/lib/brochure';
 import { frameImgStyle } from '@/lib/photoFrame';
 import type { PhotoFilter, ResolvedStudioElement, ResolvedStudioPage, ResolvedStudioPrestation, StudioText } from '@/lib/brochureStudio';
@@ -134,6 +135,26 @@ function Prestation({ el, language }: { el: ResolvedStudioPrestation; language: 
   );
 }
 
+/** QR code : carré, net à toutes les tailles (SVG). Sans adresse : un repère dans l'éditeur, rien sur le lien. */
+function Qr({ value, color, bg, editor }: { value: string | null; color: string; bg: string | null; editor?: boolean }) {
+  const qr = useMemo(() => (value ? qrPath(value) : null), [value]);
+  if (!qr) {
+    return editor ? (
+      <div style={{ width: '100%', height: '100%', border: '1px dashed rgba(28,38,33,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: cq(2.2), color: 'rgba(28,38,33,.5)', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+        QR code
+      </div>
+    ) : null;
+  }
+  const m = 2;
+  const v = qr.size + m * 2;
+  return (
+    <svg viewBox={`${-m} ${-m} ${v} ${v}`} width="100%" height="100%" shapeRendering="crispEdges" preserveAspectRatio="xMidYMid meet" role="img" aria-label={`QR code : ${value}`}>
+      {bg && <rect x={-m} y={-m} width={v} height={v} fill={bg} />}
+      <path d={qr.d} fill={color} />
+    </svg>
+  );
+}
+
 /** Aperçu du formulaire dans l'éditeur (le vrai formulaire n'existe que sur le lien public). */
 function FormPreview({ color, accent, language }: { color: string; accent: string; language: 'fr' | 'en' }) {
   const en = language === 'en';
@@ -201,6 +222,18 @@ export function ElementContent({ el, editor, language, formSlot }: {
         }} />
       );
     }
+    case 'video': {
+      const box: CSSProperties = { width: '100%', height: '100%', overflow: 'hidden', borderRadius: el.radius ? cq(el.radius) : undefined, background: '#000' };
+      if (!el.url) return null;
+      return (
+        <div style={box}>
+          <video src={el.url} autoPlay muted loop playsInline preload="metadata" aria-hidden
+            style={{ display: 'block', width: '100%', height: '100%', objectFit: el.fit }} />
+        </div>
+      );
+    }
+    case 'qr':
+      return <Qr value={el.value} color={el.color} bg={el.bg} editor={editor} />;
     case 'icon': {
       const Icon = ICONS[el.name];
       return Icon ? <Icon aria-hidden width="100%" height="100%" color={el.color} strokeWidth={el.strokeWidth} absoluteStrokeWidth={false} style={{ display: 'block' }} /> : null;

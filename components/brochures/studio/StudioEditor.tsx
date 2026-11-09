@@ -27,7 +27,7 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import type { BrochureCover, CatalogPrestation } from '@/lib/brochure';
 import {
   DEFAULT_OPTIONS, PAGE_H, PAGE_TEMPLATES, ROLE_LABELS, STUDIO_FONTS, STUDIO_ICONS, TEXT_ROLES, THEMES, applyRoleStyles, applyTheme, blankPage,
-  brochureFromKind, cloneElement, clonePage, iconEl, imageEl, logoEl, prestationEl, resolveStudio, shapeEl, studioFontsHref, textEl,
+  brochureFromKind, cloneElement, clonePage, parseStudio, iconEl, imageEl, logoEl, prestationEl, qrEl, resolveStudio, shapeEl, studioFontsHref, textEl, videoEl,
   type BrochureKind, type ResolvedStudioElement, type StudioDoc, type StudioElement, type StudioPage, type StudioText, type StudioTheme,
   type TemplateContext, type TextRole,
 } from '@/lib/brochureStudio';
@@ -41,7 +41,7 @@ import {
   type AddItem, type AddTab,
 } from './StudioPanels';
 import { ICONS } from './icons';
-import { useHistory } from './useHistory';
+import { stableJson, useHistory } from './useHistory';
 
 const RATIO = PAGE_H / 100;
 /** Une taille de texte (centièmes de page) en points, comme dans un traitement de texte (A4 : 595 pt de large). */
@@ -162,11 +162,20 @@ function Ruler({ length, unit, vertical }: { length: number; unit: number; verti
 
 export interface StudioSettings {
   language: 'fr' | 'en';
+  /** Adresse du lien principal de la brochure (QR codes). */
+  shareUrl?: string | null;
   cover: BrochureCover;
   prices: { show: boolean; mode: 'ht' | 'ttc'; vatRate: number };
 }
 
-export default function StudioEditor({ initial, onChange, catalog, company, settings }: {
+/** Forme comparable d'un document (relu comme le serveur le relit). */
+const canonStudio = (d: StudioDoc) => stableJson(parseStudio(JSON.parse(JSON.stringify(d))));
+
+export default function StudioEditor({ initial, onChange, catalog, company, settings, historyKey, onPageChange }: {
+  /** La page affichée change (commentaires sur la page en cours). */
+  onPageChange?: (pageId: string) => void;
+  /** Clé de l'historique gardé dans le navigateur (une par brochure). */
+  historyKey?: string;
   initial: StudioDoc;
   onChange: (doc: StudioDoc) => void;
   catalog: CatalogPrestation[];
@@ -174,7 +183,8 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
   settings: StudioSettings;
 }) {
   const { confirm, notify } = useFeedback();
-  const { doc, set, undo, redo, canUndo, canRedo } = useHistory(initial);
+  // Historique gardé dans ce navigateur, par brochure : il survit au rechargement de la page.
+  const { doc, set, undo, redo, canUndo, canRedo } = useHistory(initial, historyKey, canonStudio);
   const [pi, setPi] = useState(0);
   const [sel, setSel] = useState<string[]>([]);
   const [editing, setEditing] = useState<{ id: string; caret: { x: number; y: number } | 'all' | null } | null>(null);
@@ -194,6 +204,7 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
   const [weboBusy, setWeboBusy] = useState(false);
   /** « Choisir plusieurs » : chaque toucher ajoute ou retire un élément (comme Maj+clic, utile au doigt). */
   const [multi, setMulti] = useState(false);
+  const [templatesVersion, setTemplatesVersion] = useState(0);
   /** Le menu Webo a été ouvert avec un passage sélectionné : seul ce passage sera réécrit. */
   const [weboPart, setWeboPart] = useState(false);
   const clipboard = useRef<StudioElement[]>([]);
@@ -207,10 +218,11 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
 
   const pageIndex = Math.min(pi, doc.pages.length - 1);
   const page = doc.pages[pageIndex];
+  useEffect(() => { onPageChange?.(page.id); }, [page.id, onPageChange]);
   const theme: StudioTheme = doc.theme ?? THEMES[0];
   const options = doc.options ?? DEFAULT_OPTIONS;
   const byId = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
-  const priceOpts = useMemo(() => ({ ...settings.prices, language: settings.language, forEditor: true }), [settings.prices, settings.language]);
+  const priceOpts = useMemo(() => ({ ...settings.prices, language: settings.language, forEditor: true, brochureUrl: settings.shareUrl ?? null }), [settings.prices, settings.language, settings.shareUrl]);
   const resolved = useMemo(() => resolveStudio(doc, byId, priceOpts), [doc, byId, priceOpts]);
   const resolvePage = useCallback((p: StudioPage) => resolveStudio({ pages: [p] }, byId, priceOpts)[0], [byId, priceOpts]);
   const rpage = resolved[pageIndex];
@@ -452,6 +464,15 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
       case 'icon':
         add(placed([iconEl({ x: 44, y: PAGE_H / 2 - 6, w: 12, name: item.name, color: accent })], at));
         return;
+      case 'video': {
+        const target = onto?.type === 'video' ? onto : !at && selected?.type === 'video' ? selected : null;
+        if (target) { update(target.id, { url: item.url }); setSel([target.id]); return; }
+        add(placed([videoEl({ x: 15, y: PAGE_H / 2 - 20, w: 70, h: 39.4, url: item.url })], at));
+        return;
+      }
+      case 'qr':
+        add(placed([qrEl({ x: 38, y: PAGE_H / 2 - 12, w: 24 })], at));
+        return;
       case 'prestation':
         add(placed([prestationEl({ x: 8, y: round(PAGE_H / 2 - 22), w: 84, h: 44, prestationId: item.id, photo: 'left', font: theme.styles.body.font, accent })], at));
     }
@@ -560,7 +581,7 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
         let nw = Math.max(2, el.w + sx * lx);
         let nh = Math.max(minH, start.h + sy * ly);
         const corner = sx !== 0 && sy !== 0;
-        const keep = el.type === 'text' ? corner : (corner && (el.type === 'image' || el.type === 'icon') !== ev.shiftKey);
+        const keep = el.type === 'text' ? corner : (corner && (el.type === 'image' || el.type === 'icon' || el.type === 'qr') !== ev.shiftKey);
         if (keep) {
           const k = Math.max(nw / el.w, el.type === 'text' ? 0 : nh / start.h, 0.05);
           nw = el.w * k; nh = start.h * k;
@@ -1059,6 +1080,28 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
             </ul>
           </Group>
         )}
+        {el.type === 'video' && (
+          <Group title="Vidéo">
+            <p className="text-xs text-gray-500">Jouée en boucle et sans le son sur le lien. Dans le PDF, sa première image.</p>
+            <Segmented label="Cadrage" value={el.fit} onChange={(fit) => up({ fit })} options={[['cover', 'Remplir le cadre'], ['contain', 'Vidéo entière']]} />
+            <NumberField label="Arrondi des coins" value={el.radius} min={0} max={50} scale={2.1} suffix="mm" onChange={(v) => up({ radius: v }, `rad-${el.id}`)} />
+            <p className="text-xs text-gray-500">Pour la remplacer : « Photos » → « Vidéo courte ou GIF », la vidéo choisie.</p>
+          </Group>
+        )}
+        {el.type === 'qr' && (
+          <Group title="QR code">
+            <Segmented label="Il mène vers" value={el.target} onChange={(target) => up({ target })} options={[['brochure', 'Cette brochure'], ['url', 'Une autre adresse']]} />
+            {el.target === 'url' && (
+              <label className="block"><span className="mb-1 block text-xs font-medium text-gray-600">Adresse</span>
+                <input defaultValue={el.url ?? ''} placeholder="https://monsite.fr" onBlur={(e) => { const v = e.target.value.trim(); up({ url: v ? (/^https?:\/\//.test(v) ? v : `https://${v}`) : null }); }}
+                  className="h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm" /></label>
+            )}
+            {el.target === 'brochure' && <p className="text-xs text-gray-500">Sur un lien par source ou par client, il mène à ce lien-là.</p>}
+            <ColorField label="Couleur" value={el.color} onChange={(c) => up({ color: c ?? '#1c2621' })} />
+            <ColorField label="Fond" value={el.bg} nullable onChange={(c) => up({ bg: c })} />
+            <p className="text-xs text-gray-500">Gardez un fond clair et un code foncé : les téléphones le lisent mieux.</p>
+          </Group>
+        )}
         {el.type === 'prestation' && (() => {
           const p = byId.get(el.prestationId);
           return (
@@ -1126,6 +1169,7 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
 
   const addPanel = (
     <AddPanel tab={addTab} onTab={setAddTab} onAdd={(item) => addItem(item)} onTemplate={addTemplate} onKind={addKind}
+      onCompanyPage={(p) => insertPage(clonePage(p))} templatesVersion={templatesVersion}
       catalog={catalog} used={used} templateContext={templateContext} resolve={resolvePage} language={settings.language} logoUrl={company.logoUrl} />
   );
 
@@ -1256,7 +1300,8 @@ export default function StudioEditor({ initial, onChange, catalog, company, sett
 
   const strip = (
     <PagesStrip pages={doc.pages} resolved={resolved} current={pageIndex} language={settings.language} onSelect={selectPage}
-      onAdd={() => insertPage(blankPage(doc.theme?.bg ?? page.bg))} onDuplicate={() => insertPage(clonePage(page))} onDelete={deletePage} onMove={movePage} />
+      onAdd={() => insertPage(blankPage(doc.theme?.bg ?? page.bg))} onDuplicate={() => insertPage(clonePage(page))} onDelete={deletePage} onMove={movePage}
+      onTemplateSaved={() => setTemplatesVersion((v) => v + 1)} />
   );
 
   const retouched = retouch ? page.els.find((e) => e.id === retouch) : null;

@@ -29,6 +29,7 @@ import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { isValidEmail, MAX_RECIPIENTS, splitEmails, uniqueEmails } from '@/lib/emailList';
 import { googleFontsHref } from '@/lib/quoteOutput';
 import { companyIdsOf } from './companyScope';
+import { snapshotBeforeSave } from './brochureSnapshot';
 import { findByToken, gateOf, isCompanyViewer as companyViewer, newLinkToken, notifyOwner, openAccess, unlock, type Gate } from './brochureAccess';
 import { getSessionUser, requireUser, requireWriter } from './session';
 
@@ -209,9 +210,16 @@ export async function saveBrochure(id: string, patch: Partial<Editable>): Promis
     const problem = studioError(doc);
     if (problem) return { error: problem };
     set.studio = sanitizeStudio(doc);
+    // L'état d'avant devient une version automatique (au plus une par demi-heure de travail).
+    const [prev] = await db.select({ studio: brochures.studio }).from(brochures).where(and(eq(brochures.id, id), mine(user.id))).limit(1);
+    if (prev?.studio) await snapshotBeforeSave(id, prev.studio, user.id).catch(() => {});
   }
-  const done = await db.update(brochures).set({ ...set, updated_at: new Date().toISOString() })
-    .where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
+  // Une brochure validée puis modifiée doit être revalidée.
+  const reviewed = ['studio', 'content', 'layout', 'cover', 'name', 'show_prices', 'price_mode', 'language'].some((k) => k in set);
+  const done = await db.update(brochures).set({
+    ...set, updated_at: new Date().toISOString(),
+    ...(reviewed ? { review_status: sql`case when ${brochures.review_status} = 'approved' then 'none' else ${brochures.review_status} end` } : {}),
+  }).where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
   return done.length ? { error: null } : { error: NOT_FOUND };
 }
 
@@ -382,7 +390,8 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
   const prices: Omit<PriceOptions, 'forEditor'> = { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language };
   return {
     name: row.name, style, language,
-    studio: studio ? personalize(resolveStudio(studio, catalog, { ...prices, forEditor: false }), link?.kind === 'client' ? link.label : '') : null,
+    // Les QR codes « vers la brochure » mènent au lien par lequel on la lit (source ou client compris).
+    studio: studio ? personalize(resolveStudio(studio, catalog, { ...prices, forEditor: false, brochureUrl: `${await appOrigin()}/b/${access.token}` }), link?.kind === 'client' ? link.label : '') : null,
     greeting: link?.kind === 'client' ? link.greeting || null : null,
     studioOptions: studio ? studio.options ?? DEFAULT_OPTIONS : null,
     tax: language === 'en' ? (prices.mode === 'ttc' ? 'incl. VAT' : 'excl. VAT') : (prices.mode === 'ttc' ? 'TTC' : 'HT'),
@@ -615,6 +624,9 @@ export async function getStudioPrint(id: string): Promise<{ name: string; langua
   if (!row || !studio) return null;
   const language = row.language === 'en' ? 'en' : 'fr';
   const catalog = await catalogFor(row);
-  const pages = resolveStudio(studio, catalog, { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language, forEditor: false });
+  const pages = resolveStudio(studio, catalog, {
+    show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language, forEditor: false,
+    brochureUrl: `${await appOrigin()}/b/${row.share_token}`,
+  });
   return { name: row.name, language, pages: pages.filter((p) => !p.form), fontsHref: studioFontsHref(studioFonts(studio)) };
 }

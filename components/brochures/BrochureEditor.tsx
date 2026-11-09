@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown, Link2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2, BarChart3, FileDown, Link2, QrCode, History, MessageSquare } from 'lucide-react';
 import SendBrochureModal from './SendBrochureModal';
 import Modal from '@/components/ui/Modal';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -26,6 +26,9 @@ import AdvancedEditor from './advanced/AdvancedEditor';
 import StudioEditor from './studio/StudioEditor';
 import StudioStats from './studio/StudioStats';
 import BrochureLinks from './BrochureLinks';
+import QrModal from './QrModal';
+import { CommentsModal, ReviewBar, VersionsModal } from './studio/StudioCollab';
+import { getReview, listComments } from '@/server/brochureCollab';
 import { Flipbook } from './Flipbook';
 import { BrochurePageView, pageFlow } from './BrochurePages';
 import { expandPages, useFlowBreaks } from './flow';
@@ -98,6 +101,24 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [openComments, setOpenComments] = useState(0);
+  const [studioPageId, setStudioPageId] = useState<string | null>(null);
+  /** Envoyer : si un collègue doit encore valider (ou a demandé des changements), on le rappelle d'abord. */
+  const askSend = async () => {
+    const r = await getReview(brochure.id).catch(() => null);
+    if (r && (r.status === 'pending' || r.status === 'changes') && !(await confirm({
+      title: r.status === 'pending' ? 'Pas encore validée' : 'Des changements sont demandés',
+      message: r.status === 'pending' ? 'Un collègue n’a pas encore validé cette brochure. L’envoyer quand même ?' : `Changements demandés : « ${r.note ?? ''} ». L’envoyer quand même ?`,
+      confirmLabel: 'Envoyer quand même',
+    }))) return;
+    setSending(true);
+  };
+  useEffect(() => {
+    if (brochure.editor_mode === 'studio') listComments(brochure.id).then((c) => setOpenComments((c ?? []).filter((x) => !x.resolved).length)).catch(() => {});
+  }, [brochure.id, brochure.editor_mode]);
+  const [qr, setQr] = useState<{ url: string; label: string } | null>(null);
   const [layout, setLayout] = useState<BrochureLayout>(() => parseLayout(brochure.layout) ?? { pages: [] });
   const [switching, setSwitching] = useState(false);
   const [choosing, setChoosing] = useState(false);
@@ -305,7 +326,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
           Lien actif
         </label>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
+          <button type="button" onClick={askSend} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
           <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
           <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
           <button type="button" onClick={renew} className={btnSecondary}><RefreshCw className="h-4 w-4" /> Nouveau lien</button>
@@ -340,7 +361,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
       {studio ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
+            <button type="button" onClick={askSend} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
             <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
             <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
             <a href={`/brochures/${brochure.id}/pdf`} target="_blank" rel="noreferrer" className={btnSecondary} title="Imprimer ou enregistrer en PDF"
@@ -353,10 +374,16 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
               }}><FileDown className="h-4 w-4" /> PDF</a>
             <button type="button" onClick={() => setStatsOpen(true)} className={btnSecondary}><BarChart3 className="h-4 w-4" /> Lecture</button>
             <button type="button" onClick={() => setLinksOpen(true)} className={btnSecondary}><Link2 className="h-4 w-4" /> Liens</button>
+            <button type="button" onClick={() => setVersionsOpen(true)} className={btnSecondary}><History className="h-4 w-4" /> Versions</button>
+            <button type="button" onClick={() => setCommentsOpen(true)} className={btnSecondary}>
+              <MessageSquare className="h-4 w-4" /> Commentaires{openComments ? <span className="ml-1 rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">{openComments}</span> : null}
+            </button>
+            <button type="button" onClick={() => setQr({ url: link, label: draft.name })} className={btnSecondary}><QrCode className="h-4 w-4" /> QR code</button>
             <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className={btnSecondary}>
               <Settings2 className="h-4 w-4" /> Réglages de la brochure
             </button>
           </div>
+          <ReviewBar brochureId={brochure.id} version={String(brochure.updated_at)} />
           {settingsOpen && (
             <div className="grid gap-3 md:grid-cols-2">
               {settingsSection}
@@ -366,8 +393,8 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
               </Section>
             </div>
           )}
-          <StudioEditor initial={studioDoc} onChange={setStudioDoc} catalog={catalog} company={company}
-            settings={{ language: draft.language, cover: draft.cover, prices: { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate } }} />
+          <StudioEditor initial={studioDoc} onChange={setStudioDoc} catalog={catalog} company={company} historyKey={`wb-studio-history-${brochure.id}`} onPageChange={setStudioPageId}
+            settings={{ language: draft.language, cover: draft.cover, prices: { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate }, shareUrl: link || null }} />
         </div>
       ) : (
       <div className={cn('grid grid-cols-1 gap-6 items-start', advanced ? 'xl:grid-cols-[320px_1fr]' : 'lg:grid-cols-[400px_1fr]')}>
@@ -504,7 +531,17 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
           <p className="text-sm text-gray-700">Cette brochure a déjà une mise en page avancée. Vous pouvez la reprendre telle que vous l’aviez laissée (les prestations ajoutées entre-temps sont mises à la suite), ou repartir de la composition simple actuelle.</p>
         </Modal>
       )}
-      {linksOpen && <BrochureLinks brochureId={brochure.id} notify={brochure.notify} onClose={() => setLinksOpen(false)} />}
+      {linksOpen && <BrochureLinks brochureId={brochure.id} notify={brochure.notify} onClose={() => setLinksOpen(false)} onQr={(url, label) => setQr({ url, label })} />}
+      {versionsOpen && (
+        <VersionsModal brochureId={brochure.id} language={draft.language} onClose={() => setVersionsOpen(false)} prepare={flush}
+          onRestored={() => { setVersionsOpen(false); onReload(); }}
+          resolve={(p) => resolveStudio({ pages: [p] }, byId, { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: true })[0]} />
+      )}
+      {commentsOpen && (
+        <CommentsModal brochureId={brochure.id} currentPageId={studioPageId} onCount={setOpenComments} onClose={() => setCommentsOpen(false)}
+          pages={studioDoc.pages.map((p, i) => ({ id: p.id, label: p.form ? 'la page du formulaire' : `la page ${i + 1}` }))} />
+      )}
+      {qr && <QrModal url={qr.url} label={qr.label} onClose={() => setQr(null)} />}
       {statsOpen && <StudioStats brochureId={brochure.id} language={draft.language} onClose={() => setStatsOpen(false)}
         pages={resolveStudio(studioDoc, byId, { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate, language: draft.language, forEditor: true })} />}
       {sending && <SendBrochureModal brochureId={brochure.id} onClose={() => setSending(false)} />}

@@ -11,6 +11,9 @@ import { getSessionUser } from '@/server/session';
 const MAX_BYTES = 25 * 1024 * 1024;
 const ALLOWED_TYPES = [
   'image/*',
+  // Vidéos courtes des brochures (Studio).
+  'video/mp4',
+  'video/webm',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

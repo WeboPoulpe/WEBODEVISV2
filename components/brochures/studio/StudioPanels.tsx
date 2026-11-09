@@ -6,7 +6,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical,
-  ArrowLeft, ArrowRight, Circle, Copy, ImagePlus, Loader2, Minus, Plus, Search, Square, SquareDashed, Trash2,
+  ArrowLeft, ArrowRight, BookmarkPlus, Circle, Copy, Film, ImagePlus, Loader2, Minus, Plus, QrCode, Search, Square, SquareDashed, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { iconBtn, iconBtnDanger, inputCls } from '@/components/ui/kit';
@@ -18,7 +18,11 @@ import {
 } from '@/lib/brochureStudio';
 import type { PhotoFrame } from '@/lib/photoFrame';
 import { listBrochurePhotos } from '@/server/brochures';
+import { deleteStudioTemplate, listStudioTemplates, saveStudioTemplate, type TemplateView } from '@/server/brochureCollab';
 import { PhotoFramer, PhotoPicker, usePhotoUpload } from '../PhotoPicker';
+import { useAuth } from '@/context/AuthContext';
+import { useFeedback } from '@/components/ui/Feedback';
+import { createClient } from '@/lib/supabase/client';
 import { categoryLabel } from '../PrestationPicker';
 import { StudioPageView } from './StudioPage';
 import { ICONS } from './icons';
@@ -192,7 +196,40 @@ export type AddItem =
   | { kind: 'shape'; shape: ShapeKind }
   | { kind: 'ornament'; ornament: OrnamentId }
   | { kind: 'icon'; name: StudioIconName }
+  | { kind: 'video'; url: string }
+  | { kind: 'qr' }
   | { kind: 'prestation'; id: string };
+
+/**
+ * Vidéo courte ou GIF envoyé tel quel (pas de conversion en WebP : l'animation serait perdue). 25 Mo au plus.
+ * Renvoie l'adresse et la sorte (vidéo ou image animée), ou null (message déjà montré).
+ */
+export function useMediaUpload() {
+  const { user } = useAuth();
+  const { notify } = useFeedback();
+  const [busy, setBusy] = useState(false);
+  const upload = async (file: File): Promise<{ url: string; kind: 'video' | 'gif' } | null> => {
+    if (!user) return null;
+    const kind = /^video\/(mp4|webm)$/.test(file.type) ? 'video' : file.type === 'image/gif' ? 'gif' : null;
+    if (!kind) { notify('Choisissez une vidéo MP4 ou WebM, ou un GIF.', { tone: 'error' }); return null; }
+    if (file.size > 25 * 1024 * 1024) { notify('Fichier trop lourd : 25 Mo au plus. Raccourcissez la vidéo.', { tone: 'error' }); return null; }
+    setBusy(true);
+    try {
+      const ext = kind === 'gif' ? 'gif' : file.type === 'video/webm' ? 'webm' : 'mp4';
+      const path = `${user.id}/brochures/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+      const supabase = createClient();
+      const { error } = await supabase.storage.from('storage').upload(path, file, { upsert: false });
+      if (error) throw error;
+      return { url: supabase.storage.from('storage').getPublicUrl(path).data.publicUrl, kind };
+    } catch {
+      notify('Le fichier n’a pas pu être envoyé. Vérifiez votre connexion, puis réessayez.', { tone: 'error' });
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { upload, busy };
+}
 
 /** Glisser un élément du panneau sur la page (ordinateur) ; un clic le pose au centre. */
 export const DRAG_TYPE = 'application/x-wb-studio';
@@ -201,7 +238,11 @@ const draggable = (item: AddItem) => ({
   onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(item)); e.dataTransfer.effectAllowed = 'copy'; },
 });
 
-export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, catalog, used, templateContext, resolve, language, logoUrl }: {
+export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, onCompanyPage, templatesVersion = 0, catalog, used, templateContext, resolve, language, logoUrl }: {
+  /** Une page enregistrée comme modèle par l'entreprise, à ajouter. */
+  onCompanyPage: (page: StudioPage) => void;
+  /** Change quand un modèle d'entreprise vient d'être enregistré (relire la liste). */
+  templatesVersion?: number;
   tab: AddTab;
   onTab: (t: AddTab) => void;
   onAdd: (item: AddItem) => void;
@@ -225,7 +266,10 @@ export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, catalog, used,
           </button>
         ))}
       </div>
-      {tab === 'templates' && <TemplatesTab onTemplate={onTemplate} onKind={onKind} ctx={templateContext} catalog={catalog} used={used} resolve={resolve} language={language} />}
+      {tab === 'templates' && <>
+        <CompanyTemplates onPick={onCompanyPage} resolve={resolve} language={language} version={templatesVersion} />
+        <TemplatesTab onTemplate={onTemplate} onKind={onKind} ctx={templateContext} catalog={catalog} used={used} resolve={resolve} language={language} />
+      </>}
       {tab === 'text' && (
         <div className="space-y-2">
           {TEXT_PRESETS.map((p) => (
@@ -267,6 +311,10 @@ export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, catalog, used,
       )}
       {tab === 'icons' && (
         <div className="space-y-3">
+          <button type="button" onClick={() => onAdd({ kind: 'qr' })} {...draggable({ kind: 'qr' })}
+            className={cn(card, 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700')}>
+            <QrCode className="h-5 w-5 text-[#1c2621]" /> QR code vers la brochure
+          </button>
           <div className="grid grid-cols-2 gap-2">
             {ORNAMENTS.map((o) => (
               <button key={o.id} type="button" onClick={() => onAdd({ kind: 'ornament', ornament: o.id })} {...draggable({ kind: 'ornament', ornament: o.id })}
@@ -289,6 +337,39 @@ export function AddPanel({ tab, onTab, onAdd, onTemplate, onKind, catalog, used,
         </div>
       )}
       {tab === 'prestations' && <PrestationsTab catalog={catalog} used={used} onPick={(id) => onAdd({ kind: 'prestation', id })} />}
+    </div>
+  );
+}
+
+/** Pages enregistrées comme modèles par l'entreprise (pour toutes ses brochures). */
+function CompanyTemplates({ onPick, resolve, language, version }: { onPick: (p: StudioPage) => void; resolve: (p: StudioPage) => ResolvedStudioPage; language: 'fr' | 'en'; version: number }) {
+  const { confirm, notify } = useFeedback();
+  const [list, setList] = useState<TemplateView[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    listStudioTemplates().then((l) => { if (alive) setList(l); }).catch(() => { if (alive) setList([]); });
+    return () => { alive = false; };
+  }, [version]);
+  if (!list?.length) return null;
+  return (
+    <div className="mb-3">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Modèles de l’entreprise</p>
+      <ul className="grid grid-cols-2 gap-2">
+        {list.map((t) => (
+          <li key={t.id} className="relative">
+            <button type="button" onClick={() => onPick(t.page)} title={`Par ${t.author}`} className="block w-full overflow-hidden rounded-lg border border-gray-200 bg-white text-left hover:border-primary hover:ring-1 hover:ring-primary">
+              <PageThumb page={resolve(t.page)} language={language} />
+              <span className="block truncate border-t border-gray-100 px-2 py-1 text-[11px] text-gray-600">{t.name}</span>
+            </button>
+            <button type="button" aria-label={`Supprimer le modèle ${t.name}`} className="absolute right-1 top-1 rounded bg-white/90 p-1 text-gray-500 shadow hover:text-red-700"
+              onClick={async () => {
+                if (!(await confirm({ title: `Supprimer le modèle « ${t.name} » ?`, message: 'Il disparaît pour toute l’entreprise. Les pages déjà faites ne changent pas.', danger: true }))) return;
+                const r = await deleteStudioTemplate(t.id);
+                if (r.error) notify(r.error, { tone: 'error' }); else setList((l) => l?.filter((x) => x.id !== t.id) ?? null);
+              }}><Trash2 className="h-3.5 w-3.5" /></button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -334,6 +415,23 @@ function TemplatesTab({ onTemplate, onKind, ctx, catalog, used, resolve, languag
   );
 }
 
+function MediaButton({ onAdd }: { onAdd: (item: AddItem) => void }) {
+  const { upload, busy } = useMediaUpload();
+  return (
+    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:border-primary">
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+      Vidéo courte ou GIF
+      <input type="file" accept="video/mp4,video/webm,image/gif" className="sr-only" disabled={busy}
+        onChange={async (e) => {
+          const f = e.target.files?.[0]; e.target.value = '';
+          if (!f) return;
+          const r = await upload(f);
+          if (r) onAdd(r.kind === 'video' ? { kind: 'video', url: r.url } : { kind: 'photo', url: r.url });
+        }} />
+    </label>
+  );
+}
+
 function PhotosTab({ onAdd, logoUrl }: { onAdd: (item: AddItem) => void; logoUrl: string | null }) {
   const [photos, setPhotos] = useState<{ url: string; label: string }[] | null>(null);
   const { upload, busy } = usePhotoUpload();
@@ -355,6 +453,7 @@ function PhotosTab({ onAdd, logoUrl }: { onAdd: (item: AddItem) => void; logoUrl
             if (url) { onAdd({ kind: 'photo', url }); setPhotos((p) => [{ url, label: 'Envoyée' }, ...(p ?? [])]); }
           }} />
       </label>
+      <MediaButton onAdd={onAdd} />
       {logoUrl && (
         <button type="button" onClick={() => onAdd({ kind: 'logo' })} {...draggable({ kind: 'logo' })}
           className="flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white p-2 text-left text-sm hover:border-primary/50">
@@ -565,7 +664,8 @@ export function PhotoGroup({ url, frame, onUrl, onFrame, ratio, title = 'Photo' 
 
 // ── Bandeau des pages ────────────────────────────────────────────────────────
 
-export function PagesStrip({ pages, resolved, current, language, onSelect, onAdd, onDuplicate, onDelete, onMove }: {
+export function PagesStrip({ pages, resolved, current, language, onSelect, onAdd, onDuplicate, onDelete, onMove, onTemplateSaved }: {
+  onTemplateSaved?: () => void;
   pages: StudioPage[];
   resolved: ResolvedStudioPage[];
   current: number;
@@ -578,13 +678,34 @@ export function PagesStrip({ pages, resolved, current, language, onSelect, onAdd
 }) {
   const page = pages[current];
   const lastMovable = pages.length - 2;
+  const { notify } = useFeedback();
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState('');
+  const saveTemplate = async () => {
+    const r = await saveStudioTemplate(name, page).catch(() => ({ error: 'Non enregistré.' }));
+    if (r.error) { notify(r.error, { tone: 'error' }); return; }
+    notify('Modèle enregistré : il est dans « Modèles » pour toutes les brochures de l’entreprise.', { tone: 'success' });
+    setNaming(false);
+    onTemplateSaved?.();
+  };
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-2">
+      {naming && (
+        <div className="mb-2 flex flex-wrap gap-2 px-1">
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Nom du modèle (« Page menu mariage »…)"
+            onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) saveTemplate(); if (e.key === 'Escape') setNaming(false); }}
+            className={cn(inputCls, 'flex-1 py-1.5')} />
+          <button type="button" disabled={!name.trim()} onClick={saveTemplate} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">Enregistrer</button>
+          <button type="button" onClick={() => setNaming(false)} className="rounded-lg px-3 py-1.5 text-sm text-gray-600">Annuler</button>
+        </div>
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-1 px-1">
         <span className="mr-auto text-xs font-semibold uppercase tracking-wider text-gray-500">Page {current + 1} / {pages.length}{page?.form ? ' · formulaire' : ''}</span>
         <button type="button" className={iconBtn} title="Déplacer avant" aria-label="Déplacer la page avant" disabled={!!page?.form || current === 0} onClick={() => onMove(-1)}><ArrowLeft className="h-4 w-4" /></button>
         <button type="button" className={iconBtn} title="Déplacer après" aria-label="Déplacer la page après" disabled={!!page?.form || current >= lastMovable} onClick={() => onMove(1)}><ArrowRight className="h-4 w-4" /></button>
         <button type="button" className={iconBtn} title="Dupliquer la page" aria-label="Dupliquer la page" disabled={!!page?.form} onClick={onDuplicate}><Copy className="h-4 w-4" /></button>
+        <button type="button" className={iconBtn} title="Enregistrer comme modèle de l’entreprise" aria-label="Enregistrer la page comme modèle de l’entreprise" disabled={!!page?.form}
+          onClick={() => { setNaming(true); setName(''); }}><BookmarkPlus className="h-4 w-4" /></button>
         <button type="button" className={iconBtnDanger} title="Supprimer la page" aria-label="Supprimer la page" disabled={!!page?.form} onClick={onDelete}><Trash2 className="h-4 w-4" /></button>
       </div>
       <ol className="flex gap-2 overflow-x-auto pb-1" aria-label="Pages">
