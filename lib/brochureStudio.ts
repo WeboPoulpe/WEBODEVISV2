@@ -125,9 +125,13 @@ export interface StudioOptions {
   /** Boutons « Appeler » et « WhatsApp » (numéro de l'entreprise) sur le lien. */
   call: boolean;
   whatsapp: boolean;
+  /** Bouton « Je veux ce menu » sous chaque prestation : elle part avec la demande. */
+  choose: boolean;
+  /** Estimation du prix (invités × prestations choisies) dans le formulaire, si les prix sont affichés. */
+  estimate: boolean;
 }
 export interface StudioDoc { pages: StudioPage[]; theme?: StudioTheme | null; options?: StudioOptions }
-export const DEFAULT_OPTIONS: StudioOptions = { animate: true, call: false, whatsapp: false };
+export const DEFAULT_OPTIONS: StudioOptions = { animate: true, call: false, whatsapp: false, choose: true, estimate: true };
 
 /** Un élément Prestation tel que le lecteur le voit : le catalogue lu, sans identifiant. */
 export type ResolvedStudioPrestation = Omit<StudioPrestation, 'prestationId' | 'html' | 'titled' | 'photoUrl' | 'hidePrice'> & { item: ResolvedItem };
@@ -382,7 +386,7 @@ export function parseStudio(raw: unknown): StudioDoc | null {
   return {
     pages: [...rest, { ...form, form: true, els: formEls }],
     theme,
-    options: { animate: o.animate !== false, call: o.call === true, whatsapp: o.whatsapp === true },
+    options: { animate: o.animate !== false, call: o.call === true, whatsapp: o.whatsapp === true, choose: o.choose !== false, estimate: o.estimate !== false },
   };
 }
 

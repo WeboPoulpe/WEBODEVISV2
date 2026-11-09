@@ -5,10 +5,14 @@
 
 import crypto from 'node:crypto';
 import { headers } from 'next/headers';
-import { and, eq, gt, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { brochures, prospect_requests } from '@/db/schema';
+import { brochures, prestations, prospect_requests } from '@/db/schema';
 import { isDemoUser } from '@/lib/demo';
+import { isPerGuestPrestation } from '@/lib/brochure';
+import type { ChosenLine } from '@/lib/brochureChoice';
+import { parseStudio } from '@/lib/brochureStudio';
+import { companyIdsOf } from './companyScope';
 import { notifyProspect } from './prospectMail';
 
 /** Demandes acceptées par heure, pour une brochure, depuis une même connexion. */
@@ -42,9 +46,33 @@ const MESSAGES = {
 const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const count = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 && n < 100000 ? n : null; };
 
-export async function submitBrochureRequest(token: string, fields: BrochureRequestFields): Promise<{ error: string | null }> {
+/**
+ * Prestations choisies par le lecteur : il n'envoie que leurs rangs dans la brochure (jamais d'identifiant), relus
+ * ici dans les pages du Studio puis dans le catalogue de l'entreprise, figés tels qu'ils sont maintenant.
+ */
+async function chosenLines(studio: unknown, owner: string, keys: unknown): Promise<ChosenLine[]> {
+  const doc = parseStudio(studio);
+  if (!doc || !Array.isArray(keys)) return [];
+  const order = doc.pages.flatMap((p) => p.els.flatMap((e) => (e.type === 'prestation' ? [e.prestationId] : [])));
+  const ids = [...new Set(keys.slice(0, 30).map((k) => order[Number(k)]).filter((x): x is string => typeof x === 'string'))];
+  if (!ids.length) return [];
+  const rows = await db.select().from(prestations)
+    .where(and(inArray(prestations.id, ids), sql`${prestations.user_id} in ${companyIdsOf(owner)}`));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.flatMap((id): ChosenLine[] => {
+    const p = byId.get(id);
+    if (!p) return [];
+    return [{
+      prestationId: p.id, name: p.name, unitPrice: Number(p.unit_price ?? 0) || 0,
+      childUnitPrice: p.child_unit_price != null && p.child_unit_price !== '' ? Number(p.child_unit_price) : null,
+      perGuest: isPerGuestPrestation(p), category: p.category ?? null, description: p.description ?? null, gastroCardHtml: p.gastro_card_html ?? null,
+    }];
+  });
+}
+
+export async function submitBrochureRequest(token: string, fields: BrochureRequestFields, chosen: string[] = []): Promise<{ error: string | null }> {
   if (!TOKEN.test(token ?? '')) return { error: 'Ce lien n’est plus valable.' };
-  const [b] = await db.select({ id: brochures.id, owner: brochures.owner_user_id, name: brochures.name, language: brochures.language }).from(brochures)
+  const [b] = await db.select({ id: brochures.id, owner: brochures.owner_user_id, name: brochures.name, language: brochures.language, studio: brochures.studio, mode: brochures.editor_mode }).from(brochures)
     .where(and(eq(brochures.share_token, token), eq(brochures.is_active, true))).limit(1);
   if (!b) return { error: MESSAGES.fr.gone };
   const language = b.language === 'en' ? 'en' : 'fr';
@@ -79,12 +107,18 @@ export async function submitBrochureRequest(token: string, fields: BrochureReque
     location: clean(fields.service_address, 300) || null,
     message: clean(fields.message, 4000) || null,
   };
+  const lines = b.mode === 'studio' ? await chosenLines(b.studio, b.owner, chosen) : [];
   await db.insert(prospect_requests).values({
     first_name: first, last_name: last, email, phone: prospect.phone, service_address: prospect.location,
     event_type: prospect.eventType, event_date: eventDate, guest_count: prospect.guestCount,
     guest_count_children: prospect.guestCountChildren, message: prospect.message,
     owner_user_id: b.owner, brochure_id: b.id, ip_hash: ipHash, status: 'nouveau',
+    ...(lines.length ? { chosen: lines } : {}),
   });
-  await notifyProspect({ ownerId: b.owner, prospect, brochureName: b.name, language }).catch(() => {});
+  // Le traiteur voit dans l'email ce que le client a choisi.
+  const withChoice = lines.length
+    ? { ...prospect, message: [`Prestations choisies : ${lines.map((l) => l.name).join(', ')}.`, prospect.message].filter(Boolean).join('\n\n') }
+    : prospect;
+  await notifyProspect({ ownerId: b.owner, prospect: withChoice, brochureName: b.name, language }).catch(() => {});
   return { error: null };
 }

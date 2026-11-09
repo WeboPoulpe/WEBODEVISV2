@@ -30,8 +30,10 @@ function useBookSize(double: boolean, reserved: number) {
   return size;
 }
 
-export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente', next: 'Page suivante' }, reserved = 120, allowDouble = true, onPageChange }: {
+export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente', next: 'Page suivante' }, reserved = 120, allowDouble = true, onPageChange, jumpTo }: {
   pages: ReactNode[];
+  /** Aller directement à une page (le compteur `n` change à chaque demande). */
+  jumpTo?: { page: number; n: number } | null;
   ariaLabel: string;
   /** Pages visibles (index) après chaque tour, et au premier affichage. */
   onPageChange?: (visible: number[]) => void;
@@ -47,6 +49,13 @@ export function Flipbook({ pages, ariaLabel, labels = { prev: 'Page précédente
   const [turn, setTurn] = useState<Turn>(null);
   const reduced = useRef(false);
   useEffect(() => { reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches; }, []);
+
+  useEffect(() => {
+    if (!jumpTo) return;
+    setTurn(null);
+    setAt(clampAt(double ? jumpTo.page + (jumpTo.page % 2) : jumpTo.page));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpTo?.n]);
 
   const step = double ? 2 : 1;
   const last = pages.length - 1;

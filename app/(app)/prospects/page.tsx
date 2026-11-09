@@ -16,6 +16,8 @@ import { useUrlAction } from '@/lib/useUrlAction';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { defaultVatRate } from '@/lib/vat';
+import { chosenToServices, parseChosen } from '@/lib/brochureChoice';
+import { quoteVatBreakdown } from '@/lib/quoteTotals';
 import { useFeedback } from '@/components/ui/Feedback';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ interface Prospect {
   user_token: string | null;
   /** Brochure d'où vient la demande (formulaire en fin de brochure). */
   brochure_id?: string | null;
+  /** Prestations choisies dans la brochure (« Je veux ce menu »). */
+  chosen?: unknown;
   created_at: string;
 }
 
@@ -360,6 +364,7 @@ function CreateDevisModal({
       }
 
       // 2. Create quote
+      const services = chosenToServices(parseChosen(prospect.chosen), parseInt(guestCount) || null);
       const { data: quote, error: quoteErr } = await supabase
         .from('quotes')
         .insert({
@@ -371,8 +376,9 @@ function CreateDevisModal({
           event_type: eventType.trim() || null,
           event_date: eventDate || null,
           guest_count: parseInt(guestCount) || null,
-          services: [],
-          total_amount: 0,
+          // Prestations choisies dans la brochure : elles deviennent les lignes du devis.
+          services,
+          total_amount: quoteVatBreakdown(services, defaultVatRate(profile), parseInt(guestCount) || 0, 0).ttc,
           // Tout ce que la demande contient passe dans le devis : lieu, adresse, message du client, style du compte.
           event_location: prospect.service_address?.trim() || '',
           client_address: address.trim() || null,
@@ -427,6 +433,11 @@ ${prospect.message.trim()}`
           </button>
         </div>
 
+        {parseChosen(prospect.chosen).length > 0 && (
+          <p className="mx-6 mt-4 rounded-xl bg-primary-50 px-3 py-2 text-sm text-primary">
+            Le devis reprend les {parseChosen(prospect.chosen).length} prestation(s) choisie(s) dans la brochure : {parseChosen(prospect.chosen).map((c) => c.name).join(', ')}.
+          </p>
+        )}
         <div className="p-6 grid sm:grid-cols-2 gap-6">
           {/* Left: customer */}
           <div className="space-y-3">
@@ -719,6 +730,20 @@ function ProspectDrawer({
             <p className="flex items-center gap-2 text-sm text-gray-700">
               <BookOpen className="h-4 w-4 text-gray-400" /> Demande envoyée depuis la brochure « {brochureName} »
             </p>
+          )}
+          {parseChosen(prospect.chosen).length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prestations choisies dans la brochure</p>
+              <ul className="space-y-1 text-sm text-gray-700">
+                {parseChosen(prospect.chosen).map((c) => (
+                  <li key={c.prestationId} className="flex justify-between gap-2">
+                    <span>{c.name}</span>
+                    <span className="text-gray-500 tabular-nums">{c.unitPrice.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} HT{c.perGuest ? ' / pers.' : ''}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-gray-500">« Créer un devis » les met dans le devis, au nombre d’invités demandé.</p>
+            </div>
           )}
 
           {/* Contact */}

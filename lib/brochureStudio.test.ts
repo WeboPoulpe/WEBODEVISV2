@@ -148,8 +148,8 @@ describe('Studio : thèmes, modèles, éléments V2', () => {
     expect(t1).toMatchObject({ role: 'h2' });
     expect(t2.type === 'text' && t2.role).toBeFalsy();
     expect(doc.theme).toMatchObject({ bg: '#000000', accent: THEMES[0].accent, styles: { h1: { font: 'Lora', size: 30 } } });
-    expect(doc.options).toEqual({ animate: false, call: false, whatsapp: true });
-    expect(parseStudio({ pages: [] })!.options).toEqual({ animate: true, call: false, whatsapp: false });
+    expect(doc.options).toEqual({ animate: false, call: false, whatsapp: true, choose: true, estimate: true });
+    expect(parseStudio({ pages: [] })!.options).toEqual({ animate: true, call: false, whatsapp: false, choose: true, estimate: true });
   });
 
   it('un thème habille les pages sans photo, donne un rôle à chaque texte et en applique le style', () => {

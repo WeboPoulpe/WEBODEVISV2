@@ -500,6 +500,8 @@ export function OptionsPanel({ options, onChange, phone }: { options: StudioOpti
   return (
     <Group title="Sur le lien">
       {box('animate', 'Apparition en douceur', 'Les éléments de chaque page apparaissent l’un après l’autre.')}
+      {box('choose', 'Bouton « Je veux ce menu »', 'Sous chaque prestation : le lecteur la choisit, elle part avec sa demande puis devient une ligne du devis.')}
+      {box('estimate', 'Estimation du prix', 'Dans le formulaire : invités × prestations choisies (si les prix sont affichés).')}
       {box('call', 'Bouton « Appeler »')}
       {box('whatsapp', 'Bouton « WhatsApp »')}
       {(options.call || options.whatsapp) && (

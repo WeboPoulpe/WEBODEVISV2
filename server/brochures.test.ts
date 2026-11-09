@@ -226,6 +226,22 @@ describe('brochures : formulaire de fin', () => {
     expect(sent.find((m) => m.to === 'contact@b.fr')!.html).toContain('Formulaire');
   });
 
+  it('Studio : les prestations choisies (par leur rang) partent figées avec la demande, et sont dans l’email', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Choix', editor: 'studio' });
+    const doc = { pages: [{ id: 'a', els: [
+      { id: 'x', type: 'prestation', prestationId: PRESTATION, x: 1, y: 1, w: 50, h: 40 },
+      { id: 'y', type: 'prestation', prestationId: '00000000-0000-4000-8000-0000000000c9', x: 1, y: 50, w: 50, h: 40 },
+    ] }] };
+    await br.saveBrochure(id!, { studio: doc });
+    sent.length = 0;
+    expect(await req.submitBrochureRequest(await tokenOf(id!), { ...fields, email: 'choix@exemple.fr' }, ['0', '1', '7', '0'])).toEqual({ error: null });
+    const { rows } = await pg.query<{ chosen: { prestationId: string; name: string; unitPrice: number; perGuest: boolean }[] }>(`select chosen from prospect_requests where email = 'choix@exemple.fr'`);
+    // Rang 1 : prestation hors catalogue de l'entreprise ; rang 7 : inexistant ; doublon ignoré.
+    expect(rows[0].chosen).toEqual([expect.objectContaining({ prestationId: PRESTATION, name: 'Menu Tentation', unitPrice: 76, perGuest: true })]);
+    expect(sent.find((m) => m.to === 'contact@b.fr')!.html).toContain('Menu Tentation');
+  });
+
   it('email invalide ou brochure désactivée : refusé, rien d’enregistré', async () => {
     current = OWNER;
     const { id } = await br.createBrochure({ name: 'Refus' });
@@ -463,6 +479,6 @@ describe('brochures : lecture page par page (Studio)', () => {
     expect(row.studio.theme.name).toBe('Noir et or');
     expect(row.studio.pages.flatMap((p) => p.els).some((e) => e.prestationId === PRESTATION)).toBe(true);
     const pub = (await br.getPublicBrochure(row.share_token))!;
-    expect(pub.studioOptions).toEqual({ animate: true, call: false, whatsapp: false });
+    expect(pub.studioOptions).toEqual({ animate: true, call: false, whatsapp: false, choose: true, estimate: true });
   });
 });

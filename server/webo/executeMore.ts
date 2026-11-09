@@ -8,6 +8,8 @@ import { issueInvoice, recordPayment } from '../invoices';
 import { createKindBrochure, sendBrochure, studioTemplateCompany } from '../brochures';
 import type { PaymentMethod } from '@/lib/invoices';
 import { defaultVatRate } from '@/lib/vat';
+import { chosenToServices, parseChosen } from '@/lib/brochureChoice';
+import { quoteVatBreakdown } from '@/lib/quoteTotals';
 import { companyIdsOf } from '../companyScope';
 import { customerDuplicate, invoiceRemaining, prospectStatusProblem } from './moreTools';
 import { idsOf, opsOf, prestationNames, settingsOf, stateOf, studioSettings, templateContextOf } from './brochureTools';
@@ -97,13 +99,16 @@ async function prospectToQuote(user: User, companyId: string, p: Record<string, 
       if (!c) [c] = await tx.select().from(customers).where(and(eq(customers.email, email), eq(customers.owner_user_id, user.id))).limit(1);
     }
     const [profile] = await tx.select({ vat: profiles.default_vat_rate }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
+    const vat = defaultVatRate(profile ? { default_vat_rate: profile.vat } : null);
+    const services = chosenToServices(parseChosen(pr.chosen), Math.max(1, pr.guest_count ?? 1));
     const [q] = await tx.insert(quotes).values({
       owner_user_id: user.id, user_id: user.id, customer_id: c?.id ?? null, prospect_id: id,
       client_name: `${pr.first_name} ${pr.last_name}`, client_first_name: pr.first_name, client_last_name: pr.last_name, client_email: email, client_phone: pr.phone, client_address: pr.address,
       event_type: pr.event_type || 'Autre', event_date: pr.event_date, guest_count: Math.max(1, pr.guest_count ?? 1),
       ...(pr.guest_count_children ? { guest_count_children: pr.guest_count_children } : {}),
       event_location: pr.service_address, remarks: pr.message, status: 'devis_a_faire', template: 'classique',
-      vat_rate: String(defaultVatRate(profile ? { default_vat_rate: profile.vat } : null)), services: [], total_amount: '0', hide_price: false, language: 'fr',
+      // Prestations choisies dans la brochure : lignes du devis, au nombre d'invités demandé.
+      vat_rate: String(vat), services, total_amount: String(quoteVatBreakdown(services, vat, Math.max(1, pr.guest_count ?? 1), 0).ttc), hide_price: false, language: 'fr',
     }).returning({ id: quotes.id });
     await tx.update(prospect_requests).set({ status: 'devis_a_faire', updated_at: new Date().toISOString() }).where(eq(prospect_requests.id, id));
     return q.id;

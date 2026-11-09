@@ -97,6 +97,18 @@ describe('Webo : revérifications à la validation', () => {
     expect((await pg.query(`select 1 from quotes where prospect_id = $1`, [P2])).rows).toHaveLength(1);
   });
 
+  it('prestations choisies dans la brochure : elles deviennent les lignes du devis', async () => {
+    const P4 = '00000000-0000-4000-8000-000000000a24';
+    const chosen = [{ prestationId: 'x', name: 'Menu Tentation', unitPrice: 50, childUnitPrice: null, perGuest: true, category: 'dîner', description: null, gastroCardHtml: null }];
+    await pg.query(`insert into prospect_requests (id, owner_user_id, first_name, last_name, email, event_type, event_date, guest_count, chosen) values ($1, $2, 'Zoé', 'Choix', 'zoe@c.fr', 'Mariage', '2027-09-02', 40, $3)`,
+      [P4, CHEF, JSON.stringify(chosen)]);
+    const r = await call('propose_prospect_to_quote', { prospect_id: P4 });
+    expect((await decideProposal(r.proposal_id, 'accept')).error).toBeNull();
+    const [q] = (await pg.query<{ services: { name: string; quantity: number; unitPrice: number }[]; total_amount: string }>(`select services, total_amount from quotes where prospect_id = $1`, [P4])).rows;
+    expect(q.services).toEqual([expect.objectContaining({ name: 'Menu Tentation', quantity: 40, unitPrice: 50 })]);
+    expect(Number(q.total_amount)).toBeGreaterThan(2000);
+  });
+
   it('statut d’un prospect : un devis confirmé (validé, acompte, payé) ne redescend pas', async () => {
     const P3 = '00000000-0000-4000-8000-000000000a23';
     await pg.exec(`insert into prospect_requests (id, owner_user_id, first_name, last_name, email, status) values ('${P3}', '${CHEF}', 'Ana', 'Paye', 'ana@p.fr', 'paye');

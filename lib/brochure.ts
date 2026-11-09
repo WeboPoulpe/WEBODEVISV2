@@ -67,6 +67,10 @@ export interface ResolvedItem {
   /** Place et taille réglées pour cette brochure, ou null (celles du style). */
   placement: PhotoPlacement | null;
   frame: PhotoFrame | null;
+  /** Prix affiché, en nombre (HT ou TTC comme la brochure), pour l'estimation du lecteur ; null si masqué. */
+  amount?: number | null;
+  /** Prix au couvert (multiplié par le nombre d'invités dans l'estimation). */
+  perGuest?: boolean;
 }
 
 export type BrochurePage =
@@ -133,6 +137,13 @@ export function isPerGuestPrestation(p: { category?: string | null; name?: strin
     && !/forfait/i.test(p.name ?? '') && Number(p.unit_price ?? 0) < 150;
 }
 
+/** Prix affiché d'une prestation, en nombre (HT ou TTC), ou null quand les prix sont masqués ou absents. */
+export function priceAmount(p: Pick<CatalogPrestation, 'unit_price'>, o: PriceOptions): number | null {
+  const n = Number(p.unit_price);
+  if (!o.show || p.unit_price == null || p.unit_price === '' || !Number.isFinite(n)) return null;
+  return o.mode === 'ttc' ? Math.round(n * (1 + o.vatRate / 100) * 100) / 100 : n;
+}
+
 /** Prix affichés d'une prestation (HT ou TTC, au couvert, prix enfant), ou null quand les prix sont masqués. */
 export function formatPrice(p: CatalogPrestation, o: PriceOptions): { price: string | null; childPrice: string | null } {
   if (!o.show) return { price: null, childPrice: null };
@@ -165,7 +176,7 @@ export function resolveItems(
     const key = String(offset + i);
     if (!p) {
       return o.forEditor
-        ? [{ key, name: '', html: '', titled: false, photoUrl: null, price: null, childPrice: null, missing: true, placement: null, frame: null }]
+        ? [{ key, name: '', html: '', titled: false, photoUrl: null, price: null, childPrice: null, missing: true, placement: null, frame: null, amount: null, perGuest: false }]
         : [];
     }
     const card = (o.language === 'en' && p.gastro_card_html_en) || p.gastro_card_html;
@@ -176,6 +187,7 @@ export function resolveItems(
       key, name: p.name, html: sanitizeHtml(html), titled: item.html ? item.titled === true : !!card,
       photoUrl: item.photoUrl ?? p.photo_url ?? null, ...prices, missing: false,
       placement: item.placement ?? null, frame: item.frame ?? null,
+      amount: item.hidePrice ? null : priceAmount(p, o), perGuest: isPerGuestPrestation(p),
     }];
   });
 }

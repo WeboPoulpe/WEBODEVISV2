@@ -6,13 +6,13 @@
 //   ou gauche pour tourner les pages (comme une story) ; le formulaire s'ouvre en plein écran en arrivant au bout.
 // - Écran large : le livre, en double page (Flipbook), formulaire dans la page.
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, MessageCircle, Phone } from 'lucide-react';
-import { DEFAULT_OPTIONS, PAGE_H, whatsappNumber, type ResolvedStudioPage, type StudioOptions } from '@/lib/brochureStudio';
+import { DEFAULT_OPTIONS, PAGE_H, whatsappNumber, type ResolvedStudioPage, type ResolvedStudioPrestation, type StudioOptions } from '@/lib/brochureStudio';
 import type { PhotoFrame } from '@/lib/photoFrame';
 import { Flipbook } from '../Flipbook';
 import FormSheet from '../FormSheet';
-import BrochureRequestForm, { useBrochureForm } from '../BrochureRequestForm';
+import BrochureRequestForm, { useBrochureForm, type Selection } from '../BrochureRequestForm';
 import { StudioPageView } from './StudioPage';
 import { FramedPhoto } from '../PhotoText';
 
@@ -123,7 +123,11 @@ function ContactButtons({ phone, options, language, className }: { phone: string
 
 const INTERACTIVE = 'a, button, input, select, textarea, label, [role="button"]';
 
-function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, animate: appear, contact }: {
+function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, animate: appear, contact, chosen, onChoose, overlay }: {
+  chosen?: ReadonlySet<string>;
+  onChoose?: (el: ResolvedStudioPrestation) => void;
+  /** Barre posée au-dessus du lecteur (prestations choisies). */
+  overlay?: ReactNode;
   pages: ResolvedStudioPage[];
   language: 'fr' | 'en';
   name: string;
@@ -208,7 +212,7 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, anim
                 </div>
               )}
               <div data-studio-page="" className="relative" style={{ width: 'min(100%, calc(100dvh * 210 / 297))', aspectRatio: '210 / 297', containerType: 'inline-size' }}>
-                <StudioPageView page={page} language={language} formSlot={formSlot} animate={appear && i === at} />
+                <StudioPageView page={page} language={language} formSlot={formSlot} animate={appear && i === at} chosen={chosen} onChoose={onChoose} />
               </div>
             </>}
           </div>
@@ -224,6 +228,7 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, anim
             : { background: i <= at ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.4)', boxShadow: '0 0 2px rgba(0,0,0,.35)' }} />
         ))}
       </div>
+      {overlay}
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-between px-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <button type="button" onClick={() => go(at - 1)} disabled={at === 0} aria-label={en ? 'Previous page' : 'Page précédente'}
           className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur disabled:opacity-0">
@@ -239,8 +244,10 @@ function PhoneReader({ pages, language, name, formSlot, onFormPage, onPage, anim
   );
 }
 
-export default function StudioBook({ pages, language, name, token, options = DEFAULT_OPTIONS, companyPhone = null, track = true }: {
+export default function StudioBook({ pages, language, name, token, options = DEFAULT_OPTIONS, companyPhone = null, track = true, tax = 'TTC' }: {
   pages: ResolvedStudioPage[]; language: 'fr' | 'en'; name: string; token: string;
+  /** « TTC » ou « HT », comme les prix de la brochure. */
+  tax?: string;
   options?: StudioOptions;
   companyPhone?: string | null;
   /** Noter la lecture page par page (lien public). */
@@ -261,11 +268,37 @@ export default function StudioBook({ pages, language, name, token, options = DEF
   useEffect(() => { setSheet(!!phone && onForm); }, [phone, onForm]);
   const formIndex = pages.findIndex((p) => p.form);
 
+  // « Je veux ce menu » : les prestations choisies (rangs) partent avec la demande.
+  const [chosen, setChosen] = useState<string[]>([]);
+  const chosenSet = useMemo(() => new Set(chosen), [chosen]);
+  const allItems = useMemo(() => new Map(pages.flatMap((p) => p.els.flatMap((e) => (e.type === 'prestation' ? [[e.item.key, e.item] as const] : [])))), [pages]);
+  const toggle = useCallback((el: ResolvedStudioPrestation) => {
+    setChosen((c) => (c.includes(el.item.key) ? c.filter((k) => k !== el.item.key) : [...c, el.item.key]));
+  }, []);
+  const selection: Selection = {
+    items: chosen.flatMap((k) => { const it = allItems.get(k); return it ? [{ key: k, name: it.name, price: it.price, amount: it.amount ?? null, perGuest: !!it.perGuest }] : []; }),
+    onRemove: (k) => setChosen((c) => c.filter((x) => x !== k)),
+    estimate: options.estimate, tax,
+  };
+  const onChoose = options.choose ? toggle : undefined;
+  const [jump, setJump] = useState<{ page: number; n: number } | null>(null);
+  const toForm = () => (phone ? setSheet(true) : setJump((j) => ({ page: formIndex, n: (j?.n ?? 0) + 1 })));
+  const bar = chosen.length > 0 && !(onForm && !phone) && (
+    <div className={phone ? 'pointer-events-none absolute inset-x-0 z-10 flex justify-center px-3' : 'fixed inset-x-0 bottom-20 z-40 flex justify-center px-3'}
+      style={phone ? { bottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 52px)' } : undefined}>
+      <button type="button" onClick={toForm}
+        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-[#B4502D] px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
+        {chosen.length} {en ? (chosen.length > 1 ? 'items chosen' : 'item chosen') : (chosen.length > 1 ? 'prestations choisies' : 'prestation choisie')} · {en ? 'Send my request' : 'Faire ma demande'} →
+      </button>
+    </div>
+  );
+
   if (phone === null) return null;
   if (phone) {
     return (
       <>
         <PhoneReader pages={pages} language={language} name={name} onFormPage={onFormPage} onPage={onPage} animate={options.animate}
+          chosen={chosenSet} onChoose={onChoose} overlay={bar}
           contact={hasContact ? <ContactButtons phone={companyPhone} options={options} language={language} className="flex gap-2" /> : null}
           formSlot={(
             <button type="button" onClick={() => setSheet(true)}
@@ -274,7 +307,7 @@ export default function StudioBook({ pages, language, name, token, options = DEF
             </button>
           )} />
         <FormSheet open={sheet} onClose={() => setSheet(false)} title={en ? 'Your request' : 'Votre demande'} language={language}>
-          <BrochureRequestForm token={token} language={language} form={form} />
+          <BrochureRequestForm token={token} language={language} form={form} selection={selection} />
         </FormSheet>
       </>
     );
@@ -283,12 +316,15 @@ export default function StudioBook({ pages, language, name, token, options = DEF
     <>
       <Flipbook
         ariaLabel={name}
+        jumpTo={jump}
         onPageChange={(visible) => { setOnForm(visible.includes(formIndex)); setCurrent(pages[visible[visible.length - 1] ?? 0]?.id ?? null); }}
         labels={en ? { prev: 'Previous page', next: 'Next page' } : { prev: 'Page précédente', next: 'Page suivante' }}
         pages={pages.map((page, i) => (
-          <StudioPageView key={i} page={page} language={language} animate={options.animate} formSlot={<BrochureRequestForm token={token} language={language} form={form} />} />
+          <StudioPageView key={i} page={page} language={language} animate={options.animate} chosen={chosenSet} onChoose={onChoose}
+            formSlot={<BrochureRequestForm token={token} language={language} form={form} selection={selection} />} />
         ))}
       />
+      {bar}
       {hasContact && <ContactButtons phone={companyPhone} options={options} language={language} className="fixed bottom-5 right-5 z-40 flex gap-2" />}
     </>
   );

@@ -5,7 +5,20 @@
 // du livre : la page du formulaire se démonte quand on tourne les pages, la saisie reste.
 
 import { useState } from 'react';
+import { X } from 'lucide-react';
+import { estimate } from '@/lib/brochureChoice';
 import { submitBrochureRequest, type BrochureRequestFields } from '@/server/brochureRequests';
+
+/** Une prestation choisie dans la brochure (« Je veux ce menu »), telle que le lecteur la voit. */
+export interface SelectionItem { key: string; name: string; price: string | null; amount: number | null; perGuest: boolean }
+export interface Selection {
+  items: SelectionItem[];
+  onRemove: (key: string) => void;
+  /** Estimation affichée (prix visibles et option activée). */
+  estimate: boolean;
+  /** « TTC » ou « HT ». */
+  tax: string;
+}
 
 const TEXT = {
   fr: {
@@ -34,9 +47,14 @@ export function useBrochureForm() {
 }
 export type BrochureFormState = ReturnType<typeof useBrochureForm>;
 
-export default function BrochureRequestForm({ token, language, form }: { token: string; language: 'fr' | 'en'; form: BrochureFormState }) {
+export default function BrochureRequestForm({ token, language, form, selection }: { token: string; language: 'fr' | 'en'; form: BrochureFormState; selection?: Selection }) {
   const t = TEXT[language];
+  const en = language === 'en';
   const { f, setF, state, setState, error, setError } = form;
+  const items = selection?.items ?? [];
+  const guests = Number(f.guest_count) || 0;
+  const total = selection?.estimate ? estimate(items, guests || 1) : null;
+  const money = new Intl.NumberFormat(en ? 'en-GB' : 'fr-FR', { style: 'currency', currency: 'EUR' });
   const set = (k: keyof BrochureRequestFields, v: string) => setF((x) => ({ ...x, [k]: v }));
 
   if (state === 'sent') {
@@ -54,7 +72,7 @@ export default function BrochureRequestForm({ token, language, form }: { token: 
       onSubmit={async (e) => {
         e.preventDefault();
         setState('sending'); setError(null);
-        const res = await submitBrochureRequest(token, { ...f, guest_count: Number(f.guest_count) || undefined })
+        const res = await submitBrochureRequest(token, { ...f, guest_count: Number(f.guest_count) || undefined }, items.map((i) => i.key))
           .catch(() => ({ error: language === 'en' ? 'Your request could not be sent. Please try again.' : 'La demande n’a pas pu être envoyée. Réessayez.' }));
         if (res.error) { setError(res.error); setState('idle'); return; }
         setState('sent');
@@ -79,6 +97,27 @@ export default function BrochureRequestForm({ token, language, form }: { token: 
         <label><span className={lab}>{t.guests}</span><input type="number" min={1} inputMode="numeric" value={f.guest_count ?? ''} onChange={(e) => set('guest_count', e.target.value)} className={field} /></label>
         <label><span className={lab}>{t.place}</span><input value={f.service_address ?? ''} onChange={(e) => set('service_address', e.target.value)} className={field} /></label>
       </div>
+      {items.length > 0 && (
+        <div className="rounded-lg border border-[#B4502D]/30 bg-white/70 p-2" aria-label={en ? 'Your selection' : 'Votre sélection'}>
+          <p className={lab}>{en ? 'Your selection' : 'Votre sélection'}</p>
+          <ul className="space-y-1">
+            {items.map((i) => (
+              <li key={i.key} className="flex items-center gap-2 text-[13px] text-[#1C2621]">
+                <span className="min-w-0 flex-1 truncate">{i.name}</span>
+                {i.price && <span className="whitespace-nowrap text-[#5b5b55]">{i.price}</span>}
+                <button type="button" onClick={() => selection?.onRemove(i.key)} aria-label={`${en ? 'Remove' : 'Retirer'} ${i.name}`} className="rounded p-0.5 text-[#5b5b55] hover:bg-black/5"><X className="h-3.5 w-3.5" /></button>
+              </li>
+            ))}
+          </ul>
+          {total != null && (
+            <p className="mt-1.5 border-t border-black/10 pt-1.5 text-[13px] text-[#1C2621]" aria-live="polite">
+              {en ? 'Estimate' : 'Estimation'}{guests ? ` (${guests} ${en ? 'guests' : 'invités'})` : ` (${en ? '1 guest — enter your number of guests' : '1 invité — indiquez le nombre d’invités'})`} :{' '}
+              <strong className="text-[#B4502D]">{money.format(total)} {selection?.tax}</strong>
+              <span className="block text-[11px] text-[#5b5b55]">{en ? 'Indicative, confirmed in your quote.' : 'Indicative, confirmée dans votre devis.'}</span>
+            </p>
+          )}
+        </div>
+      )}
       <label className="block"><span className={lab}>{t.message}</span><textarea rows={3} value={f.message ?? ''} onChange={(e) => set('message', e.target.value)} className={field} /></label>
       {error && <p role="alert" className="text-[13px] text-red-700">{error}</p>}
       <button type="submit" disabled={state === 'sending'}

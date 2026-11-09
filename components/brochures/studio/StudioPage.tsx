@@ -234,10 +234,28 @@ export function PageBackground({ page }: { page: Pick<ResolvedStudioPage, 'bg' |
 }
 
 /** Une page entière, telle que le lecteur la voit. Le parent doit être un conteneur (container-type: inline-size). */
-export function StudioPageView({ page, language, formSlot, editor, animate }: {
+/** « Je veux ce menu » : posé dans le coin bas d'une prestation, sur le lien public. */
+function ChooseButton({ el, chosen, onChoose, language }: { el: ResolvedStudioPrestation; chosen: boolean; onChoose: () => void; language: 'fr' | 'en' }) {
+  const en = language === 'en';
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); onChoose(); }} aria-pressed={chosen}
+      style={{
+        position: 'absolute', right: cq(1.2), bottom: cq(1.2), zIndex: 2, fontFamily: 'system-ui, sans-serif', fontSize: cq(2.3), fontWeight: 600,
+        padding: `${cq(0.9)} ${cq(1.8)}`, borderRadius: 999, border: `1px solid ${el.accent}`, cursor: 'pointer',
+        background: chosen ? el.accent : 'rgba(255,255,255,.92)', color: chosen ? '#fff' : el.accent, boxShadow: '0 1px 4px rgba(0,0,0,.15)',
+      }}>
+      {chosen ? (en ? '✓ Chosen' : '✓ Choisi') : (en ? 'I want this' : 'Je veux ce menu')}
+    </button>
+  );
+}
+
+export function StudioPageView({ page, language, formSlot, editor, animate, chosen, onChoose }: {
   page: ResolvedStudioPage; language: 'fr' | 'en'; formSlot?: ReactNode; editor?: boolean;
   /** Les éléments apparaissent en douceur, l'un après l'autre (page qui s'affiche sur le lien). */
   animate?: boolean;
+  /** Prestations choisies par le lecteur (rangs) ; avec `onChoose`, chaque prestation porte son bouton. */
+  chosen?: ReadonlySet<string>;
+  onChoose?: (el: ResolvedStudioPrestation) => void;
 }) {
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
@@ -250,6 +268,9 @@ export function StudioPageView({ page, language, formSlot, editor, animate }: {
               <ElementContent el={el} language={language} formSlot={formSlot} editor={editor} />
             </div>
           ) : <ElementContent el={el} language={language} formSlot={formSlot} editor={editor} />}
+          {onChoose && el.type === 'prestation' && !el.item.missing && (
+            <ChooseButton el={el} chosen={!!chosen?.has(el.item.key)} onChoose={() => onChoose(el)} language={language} />
+          )}
         </div>
       ))}
     </div>

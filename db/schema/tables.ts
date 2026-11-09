@@ -1262,6 +1262,8 @@ export const prospect_requests = pgTable("prospect_requests", {
 	brochure_id: uuid(),
 	// Empreinte de l'adresse IP (jamais l'adresse elle-même) : limite des envois depuis une même connexion.
 	ip_hash: text(),
+	// Prestations choisies dans la brochure (« Je veux ce menu »), figées au moment de la demande (lib/brochureChoice.ts).
+	chosen: jsonb(),
 }, (table) => [
 	foreignKey({
 			columns: [table.brochure_id],

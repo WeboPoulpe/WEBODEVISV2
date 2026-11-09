@@ -61,6 +61,8 @@ export interface PublicBrochure {
   studio: ResolvedStudioPage[] | null;
   /** Options du lien (animation, boutons d'appel), brochure du Studio seulement. */
   studioOptions: StudioOptions | null;
+  /** « TTC » ou « HT » (en anglais : incl. / excl. VAT), pour l'estimation du lecteur. */
+  tax: string;
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
 
@@ -385,6 +387,7 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
     name: row.name, style, language,
     studio: studio ? resolveStudio(studio, catalog, { ...prices, forEditor: false }) : null,
     studioOptions: studio ? studio.options ?? DEFAULT_OPTIONS : null,
+    tax: language === 'en' ? (prices.mode === 'ttc' ? 'incl. VAT' : 'excl. VAT') : (prices.mode === 'ttc' ? 'TTC' : 'HT'),
     cover: parseCover(row.cover, row.name),
     about: content.about.enabled && !studio ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null, photoFrame: content.about.photoFrame ?? null } : { html: '', photoUrl: null },
     // Studio : ses pages seules sont envoyées au lecteur (rien de la composition simple).
