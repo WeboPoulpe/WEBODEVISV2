@@ -4,6 +4,7 @@
 import type { Metadata } from 'next';
 import { brochureUnavailableCompany, getPublicBrochure, recordBrochureView } from '@/server/brochures';
 import BrochureBook from './BrochureBook';
+import StudioBook from '@/components/brochures/studio/StudioBook';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Brochure', robots: { index: false, follow: false } };
@@ -28,6 +29,16 @@ export default async function BrochurePublicPage({ params }: { params: Promise<{
   }
   // Une ouverture comptée ne doit jamais empêcher d'afficher la brochure.
   await recordBrochureView(token).catch(() => {});
+  if (brochure.studio) {
+    // Studio : plein écran sur téléphone (le lecteur prend tout l'écran), livre centré ailleurs.
+    return (
+      <main className="min-h-[100dvh] bg-[#EDE6DA] flex flex-col items-center justify-center md:px-4 md:py-6">
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        {brochure.fontsHref && <link rel="stylesheet" href={brochure.fontsHref} />}
+        <StudioBook pages={brochure.studio} language={brochure.language} name={brochure.name} token={token} />
+      </main>
+    );
+  }
   return (
     <main className="min-h-screen bg-[#EDE6DA] flex flex-col items-center justify-center px-4 py-6">
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}

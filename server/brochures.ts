@@ -18,6 +18,10 @@ import {
   layoutError, layoutFonts, layoutFromSimple, layoutPrestationIds, mergeLayout, parseLayout, resolveLayout, sanitizeLayout, sectionsFromLayout,
   type PublicPage,
 } from '@/lib/brochureLayout';
+import {
+  parseStudio, resolveStudio, sanitizeStudio, studioError, studioFonts, studioFontsHref, studioFromBrochure, studioPhotos, studioPrestationIds,
+  type ResolvedStudioPage, type StudioDoc,
+} from '@/lib/brochureStudio';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { brochureEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
@@ -33,6 +37,7 @@ export interface BrochureSummary {
   name: string;
   style: BrochureStyle;
   is_active: boolean;
+  editor_mode: EditorMode;
   view_count: number;
   viewed_at: string | null;
   updated_at: string;
@@ -49,10 +54,16 @@ export interface PublicBrochure {
   about: { html: string; photoUrl: string | null; photoFrame?: PhotoFrame | null };
   /** Pages de l'éditeur simple, ou pages de la mise en page avancée (pages à blocs déjà résolues). */
   pages: PublicPage[];
-  /** Feuille Google Fonts des polices choisies dans les blocs (éditeur avancé), ou null. */
+  /** Feuille Google Fonts des polices choisies dans les blocs (éditeur avancé) ou le Studio, ou null. */
   fontsHref: string | null;
+  /** Pages du Studio, prestations résolues (brochure faite dans le Studio), sinon null. */
+  studio: ResolvedStudioPage[] | null;
   company: { name: string; logoUrl: string | null; address: string | null; phone: string | null; email: string | null; website: string | null };
 }
+
+export type EditorMode = 'simple' | 'advanced' | 'studio';
+const EDITOR_MODES: EditorMode[] = ['simple', 'advanced', 'studio'];
+const modeOf = (v: unknown): EditorMode => (EDITOR_MODES.includes(v as EditorMode) ? (v as EditorMode) : 'simple');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN = /^[A-Za-z0-9_-]{16,}$/;
@@ -84,6 +95,11 @@ function cleanContent(raw: unknown): BrochureContent {
   };
 }
 
+/** Coordonnées reprises par les modèles de pages du Studio. */
+function templateCompany(c: Awaited<ReturnType<typeof companyProfile>>) {
+  return { name: c?.name ?? '', address: c?.address ?? null, phone: c?.phone ?? null, email: c?.email ?? null, website: c?.website ?? null };
+}
+
 /** Le profil de l'entreprise : celui du titulaire, même pour une brochure faite par un collaborateur. */
 async function companyProfile(userId: string) {
   const [p] = await db.select({
@@ -93,17 +109,25 @@ async function companyProfile(userId: string) {
   return p ?? null;
 }
 
+function studioCoverPhoto(doc: StudioDoc | null): string | null {
+  const first = doc?.pages[0];
+  if (!first) return null;
+  const img = first.els.find((e) => e.type === 'image' && e.url);
+  return (img?.type === 'image' ? img.url : null) ?? first.bgImage?.url ?? null;
+}
+
 export async function listBrochures(): Promise<BrochureSummary[]> {
   const user = await requireUser();
   const rows = await db.select().from(brochures).where(mine(user.id)).orderBy(desc(brochures.updated_at));
   return rows.map((b) => ({
-    id: b.id, name: b.name, style: b.style as BrochureStyle, is_active: b.is_active, view_count: b.view_count,
+    id: b.id, name: b.name, style: b.style as BrochureStyle, is_active: b.is_active, editor_mode: modeOf(b.editor_mode), view_count: b.view_count,
     viewed_at: b.viewed_at, updated_at: b.updated_at, share_token: b.share_token,
-    coverPhotoUrl: parseCover(b.cover, b.name).photoUrl ?? null,
+    // Studio : la première photo de la première page tient lieu de couverture.
+    coverPhotoUrl: (b.editor_mode === 'studio' ? studioCoverPhoto(parseStudio(b.studio)) : null) ?? parseCover(b.cover, b.name).photoUrl ?? null,
   }));
 }
 
-export async function createBrochure(input: { name: string; style?: BrochureStyle }): Promise<{ error: string | null; id?: string }> {
+export async function createBrochure(input: { name: string; style?: BrochureStyle; editor?: EditorMode }): Promise<{ error: string | null; id?: string }> {
   const user = await requireWriter();
   const name = (input.name ?? '').trim().slice(0, 120);
   if (!name) return { error: 'Donnez un nom à la brochure.' };
@@ -113,6 +137,10 @@ export async function createBrochure(input: { name: string; style?: BrochureStyl
     owner_user_id: user.id, user_id: user.id, name, style, share_token: newToken(),
     vat_rate: String(defaultVatRate(company ? { default_vat_rate: company.vat } : null)),
     cover: { title: name }, content: parseBrochureContent(null),
+    ...(input.editor === 'studio' ? {
+      editor_mode: 'studio',
+      studio: studioFromBrochure(parseBrochureContent(null), { title: name }, style, { company: templateCompany(company), language: 'fr' }),
+    } : {}),
   }).returning({ id: brochures.id });
   return { error: null, id: row.id };
 }
@@ -124,7 +152,7 @@ export async function getBrochure(id: string): Promise<BrochureRow | null> {
   return row ?? null;
 }
 
-type Editable = Pick<BrochureRow, 'name' | 'style' | 'language' | 'show_prices' | 'price_mode' | 'vat_rate' | 'cover' | 'content' | 'is_active' | 'layout'>;
+type Editable = Pick<BrochureRow, 'name' | 'style' | 'language' | 'show_prices' | 'price_mode' | 'vat_rate' | 'cover' | 'content' | 'is_active' | 'layout' | 'studio'>;
 
 export async function saveBrochure(id: string, patch: Partial<Editable>): Promise<{ error: string | null }> {
   const user = await requireWriter();
@@ -157,6 +185,13 @@ export async function saveBrochure(id: string, patch: Partial<Editable>): Promis
     if (problem) return { error: problem };
     set.layout = sanitizeLayout(layout);
   }
+  if (patch.studio !== undefined) {
+    const doc = parseStudio(patch.studio);
+    if (!doc) return { error: 'Pages du Studio illisibles.' };
+    const problem = studioError(doc);
+    if (problem) return { error: problem };
+    set.studio = sanitizeStudio(doc);
+  }
   const done = await db.update(brochures).set({ ...set, updated_at: new Date().toISOString() })
     .where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
   return done.length ? { error: null } : { error: NOT_FOUND };
@@ -170,6 +205,7 @@ export async function duplicateBrochure(id: string): Promise<{ error: string | n
     owner_user_id: user.id, user_id: user.id, name: `${source.name} (copie)`.slice(0, 120), style: source.style,
     language: source.language, show_prices: source.show_prices, price_mode: source.price_mode, vat_rate: source.vat_rate,
     is_active: true, share_token: newToken(), cover: source.cover, content: source.content,
+    editor_mode: source.editor_mode, layout: source.layout, studio: source.studio,
   }).returning({ id: brochures.id });
   return { error: null, id: row.id };
 }
@@ -201,9 +237,11 @@ async function byToken(token: string, activeOnly: boolean): Promise<BrochureRow 
 /** Prestations du catalogue de l'entreprise citées par la brochure. */
 async function catalogFor(row: BrochureRow): Promise<Map<string, CatalogPrestation>> {
   const layout = row.editor_mode === 'advanced' ? parseLayout(row.layout) : null;
+  const studio = row.editor_mode === 'studio' ? parseStudio(row.studio) : null;
   const ids = [...new Set([
     ...parseBrochureContent(row.content).sections.flatMap((s) => s.items.map((i) => i.prestationId)),
     ...(layout ? layoutPrestationIds(layout) : []),
+    ...(studio ? studioPrestationIds(studio) : []),
   ])].filter((i) => UUID.test(i));
   if (ids.length === 0) return new Map();
   const rows = await db.select({
@@ -242,7 +280,7 @@ export async function getBrochureEditorData(id: string): Promise<{ brochure: Bro
 export async function listBrochurePhotos(): Promise<{ url: string; label: string }[]> {
   const user = await requireUser();
   const [rows, catalog] = await Promise.all([
-    db.select({ name: brochures.name, cover: brochures.cover, content: brochures.content, layout: brochures.layout })
+    db.select({ name: brochures.name, cover: brochures.cover, content: brochures.content, layout: brochures.layout, studio: brochures.studio })
       .from(brochures).where(mine(user.id)).orderBy(desc(brochures.updated_at)).limit(100),
     db.select({ name: prestations.name, url: prestations.photo_url }).from(prestations)
       .where(and(sql`${prestations.user_id} in ${companyIdsOf(user.id)}`, sql`${prestations.photo_url} is not null`)).orderBy(prestations.name),
@@ -260,6 +298,8 @@ export async function listBrochurePhotos(): Promise<{ url: string; label: string
       if (x.type === 'image') add(x.url, b.name);
       if (x.type === 'prestation') add(x.photoUrl, b.name);
     }));
+    const studio = parseStudio(b.studio);
+    if (studio) studioPhotos(studio).forEach((u) => add(u, b.name));
   }
   for (const c of catalog) add(c.url, c.name);
   return [...found].slice(0, 300).map(([url, label]) => ({ url, label }));
@@ -279,13 +319,27 @@ function publicPages(row: BrochureRow, content: BrochureContent, catalog: Map<st
  * simple : les sections sont reconstruites depuis les blocs (contenu gardé, disposition perdue), la mise en page
  * avancée reste de côté.
  */
-export async function switchBrochureEditor(id: string, to: 'simple' | 'advanced', opts: { resume?: boolean } = {}): Promise<{ error: string | null; needsChoice?: boolean }> {
+export async function switchBrochureEditor(id: string, to: EditorMode, opts: { resume?: boolean } = {}): Promise<{ error: string | null; needsChoice?: boolean }> {
   const user = await requireWriter();
   const row = await getBrochure(id);
   if (!row) return { error: NOT_FOUND };
+  if (!EDITOR_MODES.includes(to)) return { error: 'Éditeur inconnu.' };
   const content = parseBrochureContent(row.content);
   const set: Partial<BrochureRow> = { editor_mode: to };
-  if (to === 'simple') {
+  if (to === 'studio') {
+    // Studio : on reprend ses pages gardées (sauf « repartir », resume = false), sinon on les compose depuis la brochure.
+    if (row.editor_mode === 'studio' && opts.resume !== false) return { error: null };
+    const layout = parseLayout(row.layout);
+    const from = row.editor_mode === 'advanced' && layout ? { ...content, sections: sectionsFromLayout(layout) } : content;
+    if (from !== content) set.content = from;
+    const saved = parseStudio(row.studio);
+    if (!saved || opts.resume === false) {
+      const company = await companyProfile(row.owner_user_id);
+      set.studio = studioFromBrochure(from, parseCover(row.cover, row.name), row.style as BrochureStyle, {
+        company: templateCompany(company), language: row.language === 'en' ? 'en' : 'fr',
+      });
+    }
+  } else if (to === 'simple') {
     const layout = parseLayout(row.layout);
     if (row.editor_mode === 'advanced' && layout) set.content = { ...content, sections: sectionsFromLayout(layout) };
   } else {
@@ -312,12 +366,17 @@ export async function getPublicBrochure(token: string): Promise<PublicBrochure |
   const language = row.language === 'en' ? 'en' : 'fr';
   const style = row.style as BrochureStyle;
   const content = parseBrochureContent(row.content);
+  const studio = row.editor_mode === 'studio' ? parseStudio(row.studio) : null;
+  const prices: Omit<PriceOptions, 'forEditor'> = { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language };
   return {
     name: row.name, style, language,
+    studio: studio ? resolveStudio(studio, catalog, { ...prices, forEditor: false }) : null,
     cover: parseCover(row.cover, row.name),
-    about: content.about.enabled ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null, photoFrame: content.about.photoFrame ?? null } : { html: '', photoUrl: null },
-    pages: publicPages(row, content, catalog, { show: row.show_prices, mode: row.price_mode === 'ht' ? 'ht' : 'ttc', vatRate: Number(row.vat_rate), language }),
-    fontsHref: row.editor_mode === 'advanced' ? googleFontsHref(layoutFonts(parseLayout(row.layout))) : null,
+    about: content.about.enabled && !studio ? { html: sanitizeHtml(content.about.html), photoUrl: content.about.photoUrl ?? null, photoFrame: content.about.photoFrame ?? null } : { html: '', photoUrl: null },
+    // Studio : ses pages seules sont envoyées au lecteur (rien de la composition simple).
+    pages: studio ? [] : publicPages(row, content, catalog, prices),
+    fontsHref: studio ? studioFontsHref(studioFonts(studio))
+      : row.editor_mode === 'advanced' ? googleFontsHref(layoutFonts(parseLayout(row.layout))) : null,
     company: {
       name: company?.name ?? '', logoUrl: company?.logoUrl ?? null, address: company?.address ?? null,
       phone: company?.phone ?? null, email: company?.email ?? null, website: company?.website ?? null,

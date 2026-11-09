@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Send, Settings2, Trash2 } from 'lucide-react';
 import SendBrochureModal from './SendBrochureModal';
 import Modal from '@/components/ui/Modal';
 import RichTextEditor from '@/components/ui/RichTextEditor';
@@ -20,8 +20,10 @@ import {
   type BrochureContent, type BrochureCover, type BrochureItem, type BrochureStyle, type CatalogPrestation,
 } from '@/lib/brochure';
 import { parseLayout, type BrochureLayout } from '@/lib/brochureLayout';
-import { renewBrochureLink, saveBrochure, switchBrochureEditor, type BrochureRow, type PublicBrochure } from '@/server/brochures';
+import { parseStudio, type StudioDoc } from '@/lib/brochureStudio';
+import { renewBrochureLink, saveBrochure, switchBrochureEditor, type BrochureRow, type EditorMode, type PublicBrochure } from '@/server/brochures';
 import AdvancedEditor from './advanced/AdvancedEditor';
+import StudioEditor from './studio/StudioEditor';
 import { Flipbook } from './Flipbook';
 import { BrochurePageView, pageFlow } from './BrochurePages';
 import { expandPages, useFlowBreaks } from './flow';
@@ -87,7 +89,11 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   const [picking, setPicking] = useState(false);
   const [sending, setSending] = useState(false);
   const [retouch, setRetouch] = useState<{ section: number; item: number } | null>(null);
-  const advanced = brochure.editor_mode === 'advanced';
+  const mode: EditorMode = brochure.editor_mode === 'advanced' || brochure.editor_mode === 'studio' ? brochure.editor_mode : 'simple';
+  const advanced = mode === 'advanced';
+  const studio = mode === 'studio';
+  const [studioDoc, setStudioDoc] = useState<StudioDoc>(() => parseStudio(brochure.studio) ?? { pages: [] });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [layout, setLayout] = useState<BrochureLayout>(() => parseLayout(brochure.layout) ?? { pages: [] });
   const [switching, setSwitching] = useState(false);
   const [choosing, setChoosing] = useState(false);
@@ -122,12 +128,29 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
     return () => window.clearTimeout(timer);
   }, [layout, advanced, brochure.id]);
 
+  // Les pages du Studio aussi (seulement dans le Studio).
+  const savedStudio = useRef(JSON.stringify(studioDoc));
+  useEffect(() => {
+    const now = JSON.stringify(studioDoc);
+    if (!studio || now === savedStudio.current) return;
+    setSaveState('saving');
+    const timer = window.setTimeout(async () => {
+      const res = await saveBrochure(brochure.id, { studio: studioDoc }).catch(() => ({ error: 'réseau' }));
+      if (!res.error) savedStudio.current = now;
+      if (res.error && res.error !== 'réseau') notify(`Pages non enregistrées : ${res.error}`, { tone: 'error' });
+      setSaveState(res.error ? 'error' : 'saved');
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [studioDoc, studio, brochure.id]);
+
   // En quittant l'éditeur (« Retour », lien du menu) avant la fin du délai : le dernier changement part tout de suite.
   // En fermant l'onglet pendant un enregistrement : le navigateur demande confirmation.
   const latest = useRef(draft);
   latest.current = draft;
   const latestLayout = useRef(layout);
   latestLayout.current = layout;
+  const latestStudio = useRef(studioDoc);
+  latestStudio.current = studioDoc;
   /** Enregistre tout de suite ce qui attend encore son délai. */
   const flush = async () => {
     const jobs: Promise<unknown>[] = [];
@@ -135,12 +158,15 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
     if (d !== saved.current) jobs.push(saveBrochure(brochure.id, { ...latest.current, vat_rate: String(latest.current.vat_rate) }).then((r) => { if (!r.error) saved.current = d; }));
     const l = JSON.stringify(latestLayout.current);
     if (advanced && l !== savedLayout.current) jobs.push(saveBrochure(brochure.id, { layout: latestLayout.current }).then((r) => { if (!r.error) savedLayout.current = l; }));
+    const st = JSON.stringify(latestStudio.current);
+    if (studio && st !== savedStudio.current) jobs.push(saveBrochure(brochure.id, { studio: latestStudio.current }).then((r) => { if (!r.error) savedStudio.current = st; }));
     await Promise.all(jobs).catch(() => {});
   };
   const flushRef = useRef(flush);
   flushRef.current = flush;
   useEffect(() => {
-    const pending = () => JSON.stringify(latest.current) !== saved.current || JSON.stringify(latestLayout.current) !== savedLayout.current;
+    const pending = () => JSON.stringify(latest.current) !== saved.current || JSON.stringify(latestLayout.current) !== savedLayout.current
+      || JSON.stringify(latestStudio.current) !== savedStudio.current;
     const onLeave = (e: BeforeUnloadEvent) => { if (pending()) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', onLeave);
     return () => {
@@ -150,7 +176,26 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   }, [brochure.id]);
 
   /** Changement d'éditeur : ce qui attend part d'abord, puis le serveur convertit et la brochure est rechargée. */
-  const switchTo = async (to: 'simple' | 'advanced', resume?: boolean) => {
+  /** Vers le Studio : ses pages gardées sont reprises ; la première fois, elles sont composées depuis la brochure. */
+  const toStudio = async () => {
+    if (studio || switching) return;
+    if (brochure.studio && !(await confirm({
+      title: 'Revenir au Studio ?',
+      message: 'Vous retrouvez vos pages du Studio telles que vous les aviez laissées. Le lien montrera ces pages.',
+      confirmLabel: 'Ouvrir le Studio',
+    }))) return;
+    await switchTo('studio');
+  };
+  /** Studio : repartir de la brochure (prestations, couverture), les pages actuelles sont remplacées. */
+  const restartStudio = async () => {
+    if (!(await confirm({
+      title: 'Recomposer les pages ?',
+      message: 'Les pages du Studio sont refaites à partir de la couverture et des prestations de la brochure. Ce que vous avez composé à la main est remplacé.',
+      confirmLabel: 'Recomposer', danger: true,
+    }))) return;
+    await switchTo('studio', false);
+  };
+  const switchTo = async (to: EditorMode, resume?: boolean) => {
     setSwitching(true);
     await flush();
     const res = await switchBrochureEditor(brochure.id, to, resume === undefined ? {} : { resume }).catch(() => ({ error: 'réseau', needsChoice: false }));
@@ -161,7 +206,16 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
     onReload();
   };
   const toSimple = async () => {
-    if (!advanced || switching) return;
+    if (mode === 'simple' || switching) return;
+    if (studio) {
+      const ok = await confirm({
+        title: 'Revenir à l’éditeur simple ?',
+        message: 'Le lien montrera de nouveau la mise en page automatique. Vos pages du Studio sont gardées : vous les retrouverez en revenant au Studio.',
+        confirmLabel: 'Passer à l’éditeur simple',
+      });
+      if (ok) await switchTo('simple');
+      return;
+    }
     const ok = await confirm({
       title: 'Revenir à l’éditeur simple ?',
       message: 'Les pages sont recomposées automatiquement à partir de vos prestations : la disposition faite à la main est remplacée. Vous pourrez la reprendre en repassant en éditeur avancé.',
@@ -213,6 +267,49 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
   const retouched = retouch && draft.content.sections[retouch.section]?.items[retouch.item];
   const retouchedPrestation = retouched ? byId.get(retouched.prestationId) : undefined;
 
+  const settingsSection = (
+    <Section title="Réglages">
+      <label className="block">
+        <span className={labelCls}>Langue de la brochure</span>
+        <select value={draft.language} onChange={(e) => set('language', e.target.value === 'en' ? 'en' : 'fr')} className={inputCls}>
+          <option value="fr">Français</option>
+          <option value="en">Anglais (fiches anglaises du catalogue quand elles existent)</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" className="h-4 w-4 accent-primary" checked={draft.show_prices} onChange={(e) => set('show_prices', e.target.checked)} />
+        Afficher les prix
+      </label>
+      {draft.show_prices && (
+        <div className="flex flex-wrap items-center gap-3 pl-6">
+          {(['ttc', 'ht'] as const).map((m) => (
+            <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input type="radio" name="price_mode" className="accent-primary" checked={draft.price_mode === m} onChange={() => set('price_mode', m)} />
+              {m === 'ttc' ? 'TTC' : 'HT'}
+            </label>
+          ))}
+          {draft.price_mode === 'ttc' && (
+            <select value={draft.vat_rate} onChange={(e) => set('vat_rate', Number(e.target.value))} aria-label="Taux de TVA" className={cn(inputCls, 'w-auto py-1.5')}>
+              {VAT_RATES.map((r) => <option key={r} value={r}>TVA {vatLabel(r)}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+      <div className="border-t border-gray-100 pt-3 space-y-2">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" className="h-4 w-4 accent-primary" checked={draft.is_active} onChange={(e) => set('is_active', e.target.checked)} />
+          Lien actif
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
+          <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
+          <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
+          <button type="button" onClick={renew} className={btnSecondary}><RefreshCw className="h-4 w-4" /> Nouveau lien</button>
+        </div>
+      </div>
+    </Section>
+  );
+
   return (
     <div className="px-4 md:px-6 pb-8">
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -220,11 +317,11 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
         <input value={draft.name} onChange={(e) => set('name', e.target.value)} aria-label="Nom de la brochure" maxLength={120}
           className="flex-1 min-w-[12rem] bg-transparent text-[24px] md:text-[28px] font-bold text-gray-900 outline-none border-b border-transparent focus:border-gray-300" />
         <div className="inline-flex rounded-xl border border-gray-200 bg-white p-0.5 text-sm" role="group" aria-label="Éditeur">
-          {([['simple', 'Éditeur simple'], ['advanced', 'Éditeur avancé']] as const).map(([m, label]) => (
-            <button key={m} type="button" aria-pressed={advanced === (m === 'advanced')} disabled={switching}
-              onClick={() => (m === 'advanced' ? !advanced && switchTo('advanced') : toSimple())}
-              className={cn('rounded-lg px-3 py-1.5 font-medium', advanced === (m === 'advanced') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50')}>
-              {label}
+          {([['simple', 'Éditeur simple'], ['advanced', 'Éditeur avancé'], ['studio', 'Studio']] as const).map(([m, label]) => (
+            <button key={m} type="button" aria-pressed={mode === m} disabled={switching}
+              onClick={() => (m === 'advanced' ? !advanced && switchTo('advanced') : m === 'studio' ? toStudio() : toSimple())}
+              className={cn('rounded-lg px-3 py-1.5 font-medium', mode === m ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50')}>
+              {label}{m === 'studio' && <span className={cn('ml-1 rounded px-1 text-[10px] font-bold', mode === m ? 'bg-white/25' : 'bg-primary-50 text-primary')}>V2</span>}
             </button>
           ))}
         </div>
@@ -235,6 +332,29 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
         </span>
       </div>
 
+      {studio ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
+            <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
+            <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
+            <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className={btnSecondary}>
+              <Settings2 className="h-4 w-4" /> Réglages de la brochure
+            </button>
+          </div>
+          {settingsOpen && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {settingsSection}
+              <Section title="Pages du Studio">
+                <p className="text-sm text-gray-500">Chaque page se compose librement. Le lien montre ces pages : en plein écran sur téléphone, en livre sur ordinateur.</p>
+                <button type="button" onClick={restartStudio} disabled={switching} className={btnSecondary}><RefreshCw className="h-4 w-4" /> Recomposer depuis la brochure</button>
+              </Section>
+            </div>
+          )}
+          <StudioEditor initial={studioDoc} onChange={setStudioDoc} catalog={catalog} company={company}
+            settings={{ language: draft.language, cover: draft.cover, prices: { show: draft.show_prices, mode: draft.price_mode, vatRate: draft.vat_rate } }} />
+        </div>
+      ) : (
       <div className={cn('grid grid-cols-1 gap-6 items-start', advanced ? 'xl:grid-cols-[320px_1fr]' : 'lg:grid-cols-[400px_1fr]')}>
         <div className={cn('min-w-0 space-y-4', advanced && 'order-2 xl:order-1')} role="region" aria-label={advanced ? 'Réglages de la brochure' : 'Composition'}>
           <Section title={advanced ? 'Thème' : 'Style'}>
@@ -249,46 +369,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
             <p className="text-sm text-gray-500">{advanced ? 'Couleurs et typographie de la couverture et des pages spéciales ; les pages à blocs le suivent par défaut.' : STYLE_HINTS[draft.style]}</p>
           </Section>
 
-          <Section title="Réglages">
-            <label className="block">
-              <span className={labelCls}>Langue de la brochure</span>
-              <select value={draft.language} onChange={(e) => set('language', e.target.value === 'en' ? 'en' : 'fr')} className={inputCls}>
-                <option value="fr">Français</option>
-                <option value="en">Anglais (fiches anglaises du catalogue quand elles existent)</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" className="h-4 w-4 accent-primary" checked={draft.show_prices} onChange={(e) => set('show_prices', e.target.checked)} />
-              Afficher les prix
-            </label>
-            {draft.show_prices && (
-              <div className="flex flex-wrap items-center gap-3 pl-6">
-                {(['ttc', 'ht'] as const).map((m) => (
-                  <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
-                    <input type="radio" name="price_mode" className="accent-primary" checked={draft.price_mode === m} onChange={() => set('price_mode', m)} />
-                    {m === 'ttc' ? 'TTC' : 'HT'}
-                  </label>
-                ))}
-                {draft.price_mode === 'ttc' && (
-                  <select value={draft.vat_rate} onChange={(e) => set('vat_rate', Number(e.target.value))} aria-label="Taux de TVA" className={cn(inputCls, 'w-auto py-1.5')}>
-                    {VAT_RATES.map((r) => <option key={r} value={r}>TVA {vatLabel(r)}</option>)}
-                  </select>
-                )}
-              </div>
-            )}
-            <div className="border-t border-gray-100 pt-3 space-y-2">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" className="h-4 w-4 accent-primary" checked={draft.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-                Lien actif
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setSending(true)} disabled={!draft.is_active || saveState !== 'saved'} className={btnSecondary}><Send className="h-4 w-4" /> Envoyer</button>
-                <button type="button" onClick={copyLink} className={btnSecondary}><Copy className="h-4 w-4" /> Copier le lien</button>
-                <a href={`/b/${token}`} target="_blank" rel="noreferrer" className={btnSecondary}><ExternalLink className="h-4 w-4" /> Voir comme le lecteur</a>
-                <button type="button" onClick={renew} className={btnSecondary}><RefreshCw className="h-4 w-4" /> Nouveau lien</button>
-              </div>
-            </div>
-          </Section>
+          {settingsSection}
 
           <Section title="Couverture">
             <label className="block">
@@ -397,6 +478,7 @@ export default function BrochureEditor({ brochure, catalog, company, onReload }:
         </div>
         )}
       </div>
+      )}
 
       {choosing && (
         <Modal title="Reprendre la mise en page avancée ?" onClose={() => setChoosing(false)}

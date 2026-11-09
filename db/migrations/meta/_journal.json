@@ -309,6 +309,13 @@
       "when": 1793974179615,
       "tag": "0043_site_web_demandes",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794210169660,
+      "tag": "0044_brochure_studio",
+      "breakpoints": true
     }
   ]
 }

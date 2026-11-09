@@ -72,6 +72,9 @@ export async function brochureView(companyId: string, b: Row) {
     id: b.id, name: b.name, editor: s.editorMode, language: b.language, show_prices: b.show_prices, active: b.is_active,
     cover: { title: s.cover.title, subtitle: s.cover.subtitle ?? null },
   };
+  if (b.editor_mode === 'studio') {
+    return { ...base, editor: 'studio', note: 'Brochure composée dans le Studio : Webo peut changer son nom, sa langue et l’affichage des prix, pas encore ses pages.' };
+  }
   if (s.editorMode === 'advanced') {
     return { ...base, pages: (s.layout?.pages ?? []).map((p, i) => ({ id: p.id, n: i + 1, kind: p.kind, ...(p.kind === 'blocks' ? { blocks: p.blocks.map((x) => blockView(x, names)) } : {}) })) };
   }
@@ -147,6 +150,7 @@ export const BROCHURE_HANDLERS: Record<string, Handler> = {
     const state = stateOf(b);
     const settings = settingsOf(i);
     const ops = opsOf(i.ops);
+    if (b.editor_mode === 'studio' && ops.length) return fail('Cette brochure est composée dans le Studio : ses pages se modifient dans l’éditeur. Seuls son nom, sa langue et l’affichage des prix peuvent être changés ici.');
     const names = await prestationNames(ctx.companyId, idsOf(state, ops));
     let change;
     try { change = applyBrochureUpdate(state, settings, ops, names); } catch (e) { return fail((e as Error).message); }

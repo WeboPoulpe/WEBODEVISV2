@@ -25,6 +25,8 @@ export default function BrochuresPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Éditeur de départ : la brochure actuelle (simple) ou le Studio (v2, pages composées librement).
+  const [startIn, setStartIn] = useState<'simple' | 'studio'>('simple');
   const [sending, setSending] = useState<string | null>(null);
 
   // Raccourci du menu : « Nouvelle brochure ».
@@ -38,7 +40,7 @@ export default function BrochuresPage() {
   const create = async () => {
     if (!creating?.trim()) return;
     setBusy(true);
-    const res = await createBrochure({ name: creating }).catch(() => ({ error: 'La brochure n’a pas pu être créée. Réessayez.', id: undefined }));
+    const res = await createBrochure({ name: creating, editor: startIn }).catch(() => ({ error: 'La brochure n’a pas pu être créée. Réessayez.', id: undefined }));
     setBusy(false);
     if (res.error || !res.id) { notify(res.error ?? 'La brochure n’a pas pu être créée.', { tone: 'error' }); return; }
     router.push(`/brochures/${res.id}`);
@@ -104,7 +106,9 @@ export default function BrochuresPage() {
               </div>
               <div className="p-3 flex-1 flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                  <span className={cn(pill, 'bg-sage-100 text-forest')}>{STYLE_LABELS[b.style] ?? b.style}</span>
+                  {b.editor_mode === 'studio'
+                    ? <span className={cn(pill, 'bg-primary-50 text-primary')}>Studio V2</span>
+                    : <span className={cn(pill, 'bg-sage-100 text-forest')}>{STYLE_LABELS[b.style] ?? b.style}</span>}
                   {!b.is_active && <span className={cn(pill, 'bg-gray-100 text-gray-500')}>Lien désactivé</span>}
                   <span>{b.view_count} ouverture{b.view_count > 1 ? 's' : ''}{b.viewed_at ? `, la dernière le ${when(b.viewed_at)}` : ''}</span>
                 </div>
@@ -134,6 +138,23 @@ export default function BrochuresPage() {
           <input id="brochure-name" autoFocus value={creating} onChange={(e) => setCreating(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
             placeholder="Mariages 2027" maxLength={120} className={inputCls} />
+          <fieldset className="mt-4">
+            <legend className={labelCls}>Composer avec</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                ['simple', 'Mise en page automatique', 'Choisissez un style et vos prestations : les pages se font seules.'],
+                ['studio', 'Studio V2', 'Composez chaque page librement : textes, photos, formes et prestations où vous voulez.'],
+              ] as const).map(([v, title, hint]) => (
+                <label key={v} className={cn('cursor-pointer rounded-xl border p-3 text-sm', startIn === v ? 'border-primary bg-primary-50/50' : 'border-gray-200 hover:bg-gray-50')}>
+                  <span className="flex items-center gap-2 font-medium text-gray-900">
+                    <input type="radio" name="start-in" className="accent-primary" checked={startIn === v} onChange={() => setStartIn(v)} />
+                    {title}
+                  </span>
+                  <span className="mt-1 block text-gray-500">{hint}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </Modal>
       )}
     </div>

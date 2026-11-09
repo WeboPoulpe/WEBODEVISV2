@@ -391,14 +391,16 @@ export const brochures = pgTable("brochures", {
 	content: jsonb().default({}).notNull(),
 	view_count: integer().default(0).notNull(),
 	viewed_at: timestamp({ withTimezone: true, mode: 'string' }),
-	// Éditeur choisi (simple : mise en page automatique ; advanced : pages à blocs) et mise en page à blocs
-	// (lib/brochureLayout.ts), gardée même après un retour à l'éditeur simple.
+	// Éditeur choisi (simple : mise en page automatique ; advanced : pages à blocs ; studio : pages composées
+	// librement, lib/brochureStudio.ts), mise en page à blocs (lib/brochureLayout.ts) et document du Studio, chacun
+	// gardé même après un changement d'éditeur.
 	editor_mode: text().default('simple').notNull(),
 	layout: jsonb(),
+	studio: jsonb(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	check("brochures_editor_mode_check", sql`editor_mode = ANY (ARRAY['simple'::text, 'advanced'::text])`),
+	check("brochures_editor_mode_check", sql`editor_mode = ANY (ARRAY['simple'::text, 'advanced'::text, 'studio'::text])`),
 	index("idx_brochures_owner").using("btree", table.owner_user_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
 			columns: [table.owner_user_id],

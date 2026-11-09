@@ -372,3 +372,55 @@ describe('brochures : éditeur avancé', () => {
     expect(JSON.stringify((await layoutOf(id!)).layout)).toContain(PRESTATION);
   });
 });
+
+describe('brochures : Studio (v2)', () => {
+  const rowOf = async (id: string) => (await pg.query<{ studio: { pages: { form?: boolean; els: { type: string; html?: string; prestationId?: string }[] }[] } | null; editor_mode: string; share_token: string }>(
+    `select studio, editor_mode, share_token from brochures where id = $1`, [id])).rows[0];
+  const content = { about: { enabled: false, html: '' }, contact: { enabled: false }, sections: [{ id: 's1', title: 'Menus', items: [{ prestationId: PRESTATION }] }] };
+
+  it('créée dans le Studio : couverture et formulaire ; le lien ne montre que ses pages, sans identifiant', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Studio', editor: 'studio' });
+    const row = await rowOf(id!);
+    expect(row.editor_mode).toBe('studio');
+    // Une brochure neuve : couverture, qui sommes-nous, contact, formulaire.
+    expect(row.studio!.pages).toHaveLength(4);
+    expect(row.studio!.pages.at(-1)!.form).toBe(true);
+    const doc = { pages: [{ id: 'a', bg: '#ffffff', els: [{ id: 'p', type: 'prestation', prestationId: PRESTATION, x: 5, y: 5, w: 80, h: 40 }] }, row.studio!.pages.at(-1)] };
+    expect(await br.saveBrochure(id!, { studio: doc })).toEqual({ error: null });
+    const pub = (await br.getPublicBrochure(row.share_token))!;
+    expect(pub.pages).toEqual([]);
+    expect(pub.studio).toHaveLength(2);
+    expect(JSON.stringify(pub.studio)).toContain('Menu Tentation');
+    expect(JSON.stringify(pub)).not.toContain(PRESTATION);
+  });
+
+  it('passer au Studio compose les pages depuis la brochure ; on revient au simple sans perdre le Studio', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Bascule' });
+    await br.saveBrochure(id!, { content });
+    expect(await br.switchBrochureEditor(id!, 'studio')).toEqual({ error: null });
+    const first = (await rowOf(id!)).studio!;
+    expect(first.pages.flatMap((p) => p.els).some((e) => e.prestationId === PRESTATION)).toBe(true);
+    expect((await br.switchBrochureEditor(id!, 'simple')).error).toBeNull();
+    const back = await rowOf(id!);
+    expect(back.editor_mode).toBe('simple');
+    expect((await br.getPublicBrochure(back.share_token))!.studio).toBeNull();
+    expect(await br.switchBrochureEditor(id!, 'studio')).toEqual({ error: null });
+    expect((await rowOf(id!)).studio).toEqual(first);
+    const copy = await br.duplicateBrochure(id!);
+    expect((await rowOf(copy.id!)).editor_mode).toBe('studio');
+    expect((await rowOf(copy.id!)).studio).toEqual(first);
+  });
+
+  it('pages illisibles ou hors limites refusées ; HTML nettoyé', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Règles Studio', editor: 'studio' });
+    expect((await br.saveBrochure(id!, { studio: { pages: 'x' } })).error).toBeTruthy();
+    expect((await br.saveBrochure(id!, { studio: { pages: Array.from({ length: 45 }, () => ({ els: [] })) } })).error).toMatch(/40 pages/);
+    expect((await br.saveBrochure(id!, { studio: { pages: [{ els: [{ type: 'text', html: '<p>ok</p><script>x()</script>', x: 1, y: 1, w: 20 }] }] } })).error).toBeNull();
+    const saved = (await rowOf(id!)).studio!;
+    expect(saved.pages[0].els[0].html).toBe('<p>ok</p>');
+    expect(saved.pages.at(-1)!.form).toBe(true);
+  });
+});
