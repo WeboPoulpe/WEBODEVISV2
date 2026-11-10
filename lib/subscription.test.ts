@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { accessFrom, periodStart, nextPeriodStart, periodKey, statusLabel, type SubRow } from './subscription';
+import { describe, it, expect, vi } from 'vitest';
+import {
+  accessFrom, periodStart, nextPeriodStart, periodKey, statusLabel, type SubRow,
+  isSubscriptionRequired, signalSubscriptionRequired, SUBSCRIPTION_REQUIRED_EVENT, SUBSCRIPTION_REQUIRED_MESSAGE,
+} from './subscription';
 
 const row = (o: Partial<SubRow> = {}): SubRow => ({
   status: 'active', comped: false, ever_subscribed: true, cancel_at_period_end: false,
@@ -61,5 +64,31 @@ describe('statusLabel', () => {
     expect(statusLabel('past_due', false)).toBe('Paiement en retard');
     expect(statusLabel('canceled', false)).toBe('Terminé');
     expect(statusLabel('incomplete', false)).toBe('Inactif');
+  });
+});
+
+describe('message « abonnement inactif » reconnu par le navigateur', () => {
+  it('reconnaît le message, seul ou dans un texte plus long', () => {
+    expect(isSubscriptionRequired(SUBSCRIPTION_REQUIRED_MESSAGE)).toBe(true);
+    expect(isSubscriptionRequired(`Erreur : ${SUBSCRIPTION_REQUIRED_MESSAGE}`)).toBe(true);
+    expect(isSubscriptionRequired('Votre accès est en consultation seule : demandez au gérant de modifier votre rôle.')).toBe(false);
+    expect(isSubscriptionRequired(null)).toBe(false);
+  });
+
+  it('demande la fenêtre par un événement ; vrai seulement si une fenêtre le prend en charge', () => {
+    const target = new EventTarget();
+    vi.stubGlobal('window', target);
+    try {
+      const seen: Event[] = [];
+      const listener = (e: Event) => { seen.push(e); e.preventDefault(); };
+      expect(signalSubscriptionRequired(SUBSCRIPTION_REQUIRED_MESSAGE)).toBe(false); // personne n'écoute
+      target.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, listener);
+      expect(signalSubscriptionRequired('Le dossier n’a pas pu être créé.')).toBe(false);
+      expect(seen).toHaveLength(0);
+      expect(signalSubscriptionRequired(SUBSCRIPTION_REQUIRED_MESSAGE)).toBe(true);
+      expect(seen).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

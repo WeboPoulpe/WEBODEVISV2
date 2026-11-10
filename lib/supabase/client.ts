@@ -1,6 +1,7 @@
 import { getSession } from 'next-auth/react';
 import { upload as blobUpload } from '@vercel/blob/client';
 import { QueryBuilder, type QueryDescriptor, type QueryResult } from '@/lib/compat/builder';
+import { isSubscriptionRequired, signalSubscriptionRequired, SUBSCRIPTION_REQUIRED_MESSAGE } from '@/lib/subscription';
 
 // Client historique de l'app, désormais branché sur Neon et Vercel Blob : même syntaxe
 // `.from(...).select(...)` et `.storage.from(...)`, mais tout passe par le serveur,
@@ -30,6 +31,8 @@ async function flush() {
     const body = await res.json();
     if (!Array.isArray(body.results)) { fail(body.error ?? 'Le serveur n’a pas répondu correctement.'); return; }
     batch.forEach((b, i) => b.resolve(body.results[i]));
+    // Une écriture refusée faute d'abonnement ouvre une seule fenêtre « Abonnement inactif », quelle que soit la page.
+    if (body.results.some((r: QueryResult | undefined) => isSubscriptionRequired(r?.error?.message))) signalSubscriptionRequired(SUBSCRIPTION_REQUIRED_MESSAGE);
   } catch {
     fail('Connexion au serveur impossible. Vérifiez votre réseau.');
   }
@@ -58,6 +61,7 @@ const storage = {
         uploadedUrls.set(path, blob.url);
         return { data: { path }, error: null };
       } catch (e) {
+        if (e instanceof Error) signalSubscriptionRequired(e.message);
         return { data: null, error: { message: e instanceof Error ? e.message : 'Le fichier n’a pas pu être envoyé.' } };
       }
     },
@@ -67,7 +71,11 @@ const storage = {
     },
     async remove(paths: string[]) {
       const res = await fetch('/api/files', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths }) });
-      if (!res.ok) return { data: null, error: { message: (await res.json().catch(() => null))?.error ?? 'Le fichier n’a pas pu être supprimé.' } };
+      if (!res.ok) {
+        const message: string = (await res.json().catch(() => null))?.error ?? 'Le fichier n’a pas pu être supprimé.';
+        signalSubscriptionRequired(message);
+        return { data: null, error: { message } };
+      }
       return { data: paths, error: null };
     },
   }),

@@ -1,13 +1,13 @@
 import 'server-only';
-import type { Access } from '@/lib/subscription';
+import { SUBSCRIPTION_REQUIRED_MESSAGE, type Access } from '@/lib/subscription';
 import { logAudit } from '@/lib/audit';
 import { accessOfUser } from './subscription';
 
 // Porte d'écriture liée à l'abonnement, partagée par requireWriter (server/session.ts) et executeQuery
 // (server/compat/execute.ts). Dans le doute, on laisse écrire : un client qui paie ne doit jamais être bloqué.
 
-export const SUBSCRIPTION_REQUIRED_MESSAGE =
-  'Votre abonnement n’est pas actif : vos données restent consultables et exportables. Réactivez-le pour modifier.';
+// Le message vit dans lib/subscription.ts pour que le navigateur le reconnaisse.
+export { SUBSCRIPTION_REQUIRED_MESSAGE };
 
 /** Message neutre pour le client final d'un traiteur sans abonnement (acceptation en ligne, « Je veux ce menu »). */
 export const OWNER_UNAVAILABLE_MESSAGE = 'Ce traiteur ne peut pas recevoir de réponse en ligne pour le moment, contactez-le directement.';

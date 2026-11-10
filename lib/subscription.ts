@@ -7,6 +7,29 @@ import { parisMidnight } from './webocoins';
 
 export type Access = 'full' | 'readonly' | 'unpaid';
 
+/** Message unique d'une écriture refusée faute d'abonnement (serveur), reconnu tel quel par le navigateur. */
+export const SUBSCRIPTION_REQUIRED_MESSAGE =
+  'Votre abonnement n’est pas actif : vos données restent consultables et exportables. Réactivez-le pour modifier.';
+
+/** En-tête posé par le middleware au retour de Checkout (« /?abonnement=ok&session_id=… »), lu par le layout de l'app. */
+export const CHECKOUT_SESSION_HEADER = 'x-abonnement-session';
+
+/** Événement du navigateur qui ouvre la fenêtre « Abonnement inactif » (écoutée par AppShell). */
+export const SUBSCRIPTION_REQUIRED_EVENT = 'abonnement:requis';
+
+export function isSubscriptionRequired(message: string | null | undefined): boolean {
+  return !!message && message.includes(SUBSCRIPTION_REQUIRED_MESSAGE);
+}
+
+/**
+ * Si le message est celui d'un abonnement inactif, demande la fenêtre « Abonnement inactif ». Vrai si une fenêtre l'a
+ * prise en charge (l'écouteur annule l'événement) : l'appelant n'affiche alors pas le message lui-même.
+ */
+export function signalSubscriptionRequired(message: string | null | undefined): boolean {
+  if (!isSubscriptionRequired(message) || typeof window === 'undefined') return false;
+  return !window.dispatchEvent(new Event(SUBSCRIPTION_REQUIRED_EVENT, { cancelable: true }));
+}
+
 export interface SubRow {
   status: string;
   comped: boolean;

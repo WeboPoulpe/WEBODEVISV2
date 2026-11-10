@@ -7,6 +7,7 @@ import Modal from './Modal';
 import { btnPrimary, btnSecondary } from './kit';
 import { cn } from '@/lib/utils';
 import { addToast, toastDuration, toastRole, type FeedbackTone, type Toast } from '@/lib/feedback';
+import { signalSubscriptionRequired } from '@/lib/subscription';
 
 // Fenêtres de confirmation et bandeaux de message de l'app, à la place des fenêtres du navigateur.
 // Le fournisseur est placé une fois dans la coque (AppShell, AdminShell) ; les pages appellent useFeedback().
@@ -79,6 +80,8 @@ export function FeedbackProvider({ children, aboveTabBar = true }: ProviderProps
   }, []);
 
   const notify = useCallback((message: string, options?: NotifyOptions) => {
+    // Écriture refusée faute d'abonnement : la fenêtre « Abonnement inactif » (AppShell) remplace le bandeau.
+    if (signalSubscriptionRequired(message)) return;
     const tone = options?.tone ?? 'info';
     const id = nextId.current++;
     setToasts((list) => addToast(list, { id, message, tone }));

@@ -1,13 +1,15 @@
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
+import { CHECKOUT_SESSION_HEADER } from '@/lib/subscription';
 
 // Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
 const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
 
 // Écrans de l'application (dossiers de app/(app) et app/(print), et l'administration) : sans session, ils
 // renvoient vers la connexion. À compléter quand un écran s'ajoute à la racine de l'app.
+// /abonnement : l'écran de paiement, hors de app/(app) mais réservé aux comptes connectés.
 const APP_PREFIXES = [
-  '/admin', '/brochures', '/calendrier', '/clients', '/commandes', '/courses-globales', '/devis', '/evenements', '/extras',
+  '/abonnement', '/admin', '/brochures', '/calendrier', '/clients', '/commandes', '/courses-globales', '/devis', '/evenements', '/extras',
   '/factures', '/fournisseurs', '/ingredients', '/journee', '/location-globale', '/location-templates', '/materiel',
   '/modeles', '/notifications', '/parametres', '/prestations', '/prospects', '/site-web', '/stock', '/tableau-de-bord', '/webo',
 ];
@@ -75,6 +77,17 @@ export async function middleware(request: NextRequest) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = '/';
     return NextResponse.redirect(dashboardUrl);
+  }
+
+  // Retour de Stripe Checkout : le layout de l'app ne voit pas l'adresse, on lui passe la session de paiement (il la
+  // vérifie chez Stripe). Un en-tête du même nom venu du navigateur n'est jamais transmis tel quel.
+  const checkoutSession = pathname === '/' && request.nextUrl.searchParams.get('abonnement') === 'ok'
+    ? request.nextUrl.searchParams.get('session_id') : null;
+  if (checkoutSession || request.headers.has(CHECKOUT_SESSION_HEADER)) {
+    const headers = new Headers(request.headers);
+    headers.delete(CHECKOUT_SESSION_HEADER);
+    if (checkoutSession) headers.set(CHECKOUT_SESSION_HEADER, checkoutSession);
+    return NextResponse.next({ request: { headers } });
   }
 
   return NextResponse.next();
