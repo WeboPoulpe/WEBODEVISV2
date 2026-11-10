@@ -17,16 +17,18 @@ export function monthKeyParis(d: Date): string {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
-/** Minuit à Paris, le premier jour du mois suivant : le renouvellement des pièces du mois. */
-export function nextMonthStartParis(d: Date): Date {
-  const { year, month } = parisParts(d);
-  const y = month === 12 ? year + 1 : year;
-  const m = month === 12 ? 1 : month + 1;
-  // Minuit UTC ce jour-là, corrigé du décalage de Paris à cet instant (une ou deux heures).
-  const utc = Date.UTC(y, m - 1, 1);
+/** Minuit à Paris (jour civil y-m-d) : minuit UTC ce jour-là, corrigé du décalage de Paris à cet instant (une ou deux heures). */
+export function parisMidnight(year: number, month: number, day: number): Date {
+  const utc = Date.UTC(year, month - 1, day);
   const shown = new Date(new Date(utc).toLocaleString('en-US', { timeZone: PARIS }));
   const asUtc = new Date(new Date(utc).toLocaleString('en-US', { timeZone: 'UTC' }));
   return new Date(utc - (shown.getTime() - asUtc.getTime()));
+}
+
+/** Minuit à Paris, le premier jour du mois suivant : le renouvellement des pièces du mois. */
+export function nextMonthStartParis(d: Date): Date {
+  const { year, month } = parisParts(d);
+  return month === 12 ? parisMidnight(year + 1, 1, 1) : parisMidnight(year, month + 1, 1);
 }
 
 /** Répartition d'un débit : pièces du mois puis pièces gardées ; null si le solde ne suffit pas. */
