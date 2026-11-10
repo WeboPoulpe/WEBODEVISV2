@@ -14,14 +14,14 @@ import { isDemoUser } from '@/lib/demo';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { haikuCostUsd } from '@/lib/webocoins';
 import { REWRITE_MODES, designCover, rewriteBrochureText, translateTexts, weboAvailable, WEBO_MODEL, type RewriteMode, type WeboUsage } from '@/lib/webo/claude';
-import { requireUser, requireWriter } from './session';
+import { requireWriter } from './session';
 import { getWeboSettings } from './settings';
 import { companyIdFor, debitCoins, recordUsage, refundDebit, walletOf } from './weboWallet';
 
 const MAX_HTML = 12_000;
 
 export async function rewriteWithWebo(input: { html: string; mode: RewriteMode; requestId: string }): Promise<{ html: string; balance: number } | { error: string }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const mode = input?.mode;
   if (!mode || !(mode in REWRITE_MODES)) return { error: 'Demande inconnue.' };
   const html = String(input.html ?? '');
@@ -88,7 +88,7 @@ export interface CoverProposal { templateId: string; themeName: string; title: s
 
 /** « Fais-moi une couverture » : Webo choisit une mise en page, un thème, une photo de l'entreprise, et écrit les titres. */
 export async function designCoverWithWebo(input: { description: string; language: 'fr' | 'en'; requestId: string }): Promise<CoverProposal | { error: string }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const description = String(input?.description ?? '').trim().slice(0, 600);
   if (description.length < 3) return { error: 'Décrivez la couverture voulue (« mariage champêtre, tons verts, photo de buffet »…).' };
   const companyId = await companyIdFor(user.id);

@@ -17,6 +17,7 @@ export const AUDIT_LABELS = {
   suppression_demandee: 'Suppression demandée par le titulaire',
   suppression_annulee: 'Suppression annulée',
   compte_purge: 'Compte et données effacés',
+  ecriture_admin_compte_inactif: 'Modification par un administrateur dans un compte sans abonnement',
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_LABELS;

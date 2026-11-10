@@ -12,7 +12,7 @@ import { appOrigin, sendMail } from '@/lib/mail';
 import { teamInviteEmail } from '@/lib/mail/templates';
 import { COMPANY_ROLES, type CompanyRole } from '@/lib/team';
 import { transferAccountData } from './accountPurge';
-import { requireUser } from './session';
+import { requireUser, requireWriter } from './session';
 
 // Équipe d'une entreprise : le titulaire (ou un gérant) invite des collaborateurs, change leur rôle, les retire.
 // Les collaborateurs partagent les données de l'entreprise (voir server/compat/rules.ts, companyMembers).
@@ -78,7 +78,7 @@ export async function getTeam(): Promise<{ canManage: boolean; members: TeamMemb
 }
 
 export async function inviteMember(input: { email: string; role: CompanyRole }): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const ctx = await teamContext(user.id);
   if (!ctx.canManage) return { error: 'Seul le titulaire ou un gérant peut inviter un collaborateur.' };
@@ -118,7 +118,7 @@ export async function inviteMember(input: { email: string; role: CompanyRole }):
 const COMPANY_ROLE_LABEL: Record<CompanyRole, string> = { gerant: 'gérant', collaborateur: 'collaborateur', lecture: 'consultation' };
 
 export async function revokeInvitation(id: string): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const ctx = await teamContext(user.id);
   if (!ctx.canManage) return { error: 'Seul le titulaire ou un gérant peut gérer l’équipe.' };
   await db.delete(company_invitations).where(and(eq(company_invitations.id, id), eq(company_invitations.company_id, ctx.company)));
@@ -132,7 +132,7 @@ async function memberOf(company: string, memberId: string) {
 }
 
 export async function setMemberRole(memberId: string, role: CompanyRole): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const ctx = await teamContext(user.id);
   if (!ctx.canManage) return { error: 'Seul le titulaire ou un gérant peut changer les rôles.' };
@@ -146,7 +146,7 @@ export async function setMemberRole(memberId: string, role: CompanyRole): Promis
 
 /** Retire un collaborateur : ses données passent au titulaire, son accès est désactivé. */
 export async function removeMember(memberId: string): Promise<Result> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const ctx = await teamContext(user.id);
   if (!ctx.canManage) return { error: 'Seul le titulaire ou un gérant peut retirer un collaborateur.' };

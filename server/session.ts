@@ -4,10 +4,15 @@ import { eq } from 'drizzle-orm';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/db';
 import { profiles } from '@/db/schema';
+import { SubscriptionRequiredError, subscriptionAllowsWrite } from './subscriptionGuard';
+
+export { SubscriptionRequiredError } from './subscriptionGuard';
 
 export interface SessionUser {
   id: string;
   email: string;
+  /** Un administrateur est entré dans ce compte (assistance). */
+  actingAsAdmin?: boolean;
 }
 
 export class UnauthorizedError extends Error {
@@ -21,7 +26,7 @@ export class UnauthorizedError extends Error {
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
-  return { id: session.user.id, email: session.user.email };
+  return { id: session.user.id, email: session.user.email, actingAsAdmin: !!session.actingAsAdmin };
 }
 
 /**
@@ -48,10 +53,14 @@ export class ReadOnlyError extends Error {
   }
 }
 
-/** Comme requireUser, pour une action qui écrit : refusée à un collaborateur en consultation seule. */
+/**
+ * Comme requireUser, pour une action qui écrit : refusée à un collaborateur en consultation seule, et à une entreprise
+ * dont l'abonnement n'est pas actif (sauf administrateur entré dans le compte, voir server/subscriptionGuard.ts).
+ */
 export async function requireWriter(): Promise<SessionUser> {
   const user = await requireUser();
   const [profile] = await db.select({ role: profiles.company_role }).from(profiles).where(eq(profiles.id, user.id)).limit(1);
   if (profile?.role === 'lecture') throw new ReadOnlyError();
+  if (!(await subscriptionAllowsWrite(user.id, user.actingAsAdmin))) throw new SubscriptionRequiredError();
   return user;
 }

@@ -100,7 +100,7 @@ export async function listComments(brochureId: string): Promise<CommentView[] | 
 }
 
 export async function addComment(brochureId: string, input: { pageId?: string | null; body: string }): Promise<{ error: string | null }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const b = await own(user.id, brochureId);
   if (!b) return { error: NOT_FOUND };
   const body = String(input.body ?? '').trim().slice(0, 2000);
@@ -113,7 +113,7 @@ export async function addComment(brochureId: string, input: { pageId?: string | 
 }
 
 export async function setCommentResolved(id: string, resolved: boolean): Promise<{ error: string | null }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (!UUID.test(id ?? '')) return { error: 'Commentaire introuvable.' };
   const [c] = await db.select().from(brochure_comments).where(eq(brochure_comments.id, id)).limit(1);
   if (!c || !(await own(user.id, c.brochure_id))) return { error: 'Commentaire introuvable.' };
@@ -122,7 +122,7 @@ export async function setCommentResolved(id: string, resolved: boolean): Promise
 }
 
 export async function deleteComment(id: string): Promise<{ error: string | null }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (!UUID.test(id ?? '')) return { error: 'Commentaire introuvable.' };
   const [c] = await db.select().from(brochure_comments).where(eq(brochure_comments.id, id)).limit(1);
   if (!c || !(await own(user.id, c.brochure_id))) return { error: 'Commentaire introuvable.' };

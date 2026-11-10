@@ -25,6 +25,6 @@ export async function POST(request: NextRequest) {
   }
   // La session est lue une fois pour tout le lot ; les requêtes s'exécutent en parallèle.
   const user = await getSessionUser();
-  const results = await Promise.all(batch.map((d) => executeQuery(d, { uid: user?.id ?? null })));
+  const results = await Promise.all(batch.map((d) => executeQuery(d, { uid: user?.id ?? null, actingAsAdmin: user?.actingAsAdmin })));
   return NextResponse.json({ results });
 }

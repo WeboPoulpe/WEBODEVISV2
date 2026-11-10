@@ -7,7 +7,7 @@ import { getSessionUser } from '@/server/session';
 export async function createClient() {
   const user = await getSessionUser();
   return {
-    from: (table: string) => new QueryBuilder((d) => executeQuery(d, { uid: user?.id ?? null }), table),
+    from: (table: string) => new QueryBuilder((d) => executeQuery(d, { uid: user?.id ?? null, actingAsAdmin: user?.actingAsAdmin }), table),
     auth: {
       async getUser() {
         return { data: { user }, error: null };

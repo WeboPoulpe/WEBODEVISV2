@@ -7,6 +7,7 @@ import { sendMail } from '@/lib/mail';
 import { tastingEmail, type TastingMailKind } from '@/lib/mail/templates';
 import { durationLabel, tastingEnd, tastingIcs } from '@/lib/tastings';
 import { addDays, parisDate } from './reminders';
+import { companyAccessOfUser } from './subscriptionGuard';
 
 // Emails des dégustations au client : confirmation, changement, annulation (depuis les actions de server/tastings.ts)
 // et rappels automatiques, lancés une fois par jour par la tâche planifiée de 16 h (app/api/cron/rappels-extras) :
@@ -130,6 +131,8 @@ export async function runTastingReminders({ now = new Date() }: { now?: Date } =
   const companies = new Map<string, TastingCompany>();
   for (const t of due) {
     if (isDemoUser(t.owner_user_id)) continue;
+    // Entreprise sans abonnement actif : pas de rappel envoyé en son nom.
+    if (await companyAccessOfUser(t.owner_user_id) !== 'full') continue;
     try {
       const company = companies.get(t.owner_user_id) ?? await tastingCompany(t.owner_user_id);
       companies.set(t.owner_user_id, company);

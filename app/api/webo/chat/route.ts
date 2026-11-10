@@ -14,6 +14,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     user = await requireWriter();
   } catch (e) {
+    if (e instanceof Error && e.name === 'SubscriptionRequiredError') return Response.json({ error: e.message }, { status: 403 });
     const readOnly = e instanceof Error && e.name === 'ReadOnlyError';
     return Response.json({ error: readOnly ? 'Votre accès est en consultation seule : Webo ne peut pas agir pour vous.' : 'Connectez-vous pour parler à Webo.' }, { status: readOnly ? 403 : 401 });
   }

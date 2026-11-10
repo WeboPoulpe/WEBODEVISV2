@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { del } from '@vercel/blob';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
-import { getSessionUser } from '@/server/session';
+import { requireWriter, UnauthorizedError } from '@/server/session';
 
 // Fichiers des utilisateurs (logos, photos, devis importés), stockés sur Vercel Blob.
 // Le navigateur envoie le fichier directement à Blob ; cette route ne fait que délivrer
@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       request,
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        const user = await getSessionUser();
-        if (!user) throw new Error('Non connecté');
+        // Envoi : refusé en consultation seule et sans abonnement actif.
+        const user = await requireWriter();
         if (isDemoUser(user.id)) throw new Error(DEMO_BLOCKED);
         // Chaque compte n'écrit que dans son propre dossier.
         if (!pathname.startsWith(`${user.id}/`) || pathname.includes('..')) throw new Error('Emplacement refusé');
@@ -49,8 +49,13 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return notConfigured();
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+  let user: { id: string };
+  try {
+    user = await requireWriter();
+  } catch (e) {
+    const signedOut = e instanceof UnauthorizedError || !(e instanceof Error);
+    return NextResponse.json({ error: signedOut ? 'Non connecté' : e.message }, { status: signedOut ? 401 : 403 });
+  }
   if (isDemoUser(user.id)) return NextResponse.json({ error: DEMO_BLOCKED }, { status: 403 });
   const { paths } = (await request.json()) as { paths?: string[] };
   const own = (paths ?? []).filter((p) => typeof p === 'string' && p.startsWith(`${user.id}/`) && !p.includes('..'));

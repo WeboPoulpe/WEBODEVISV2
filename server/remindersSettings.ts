@@ -69,7 +69,7 @@ export async function getCalendarFeedUrl(): Promise<{ url: string | null }> {
 
 /** Crée l'adresse, ou la remplace : l'ancienne cesse aussitôt de marcher. */
 export async function renewCalendarFeedUrl(): Promise<{ error: string | null; url?: string }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const token = newCalendarToken();
   await db.update(profiles).set({ ical_token: token, updated_at: new Date().toISOString() }).where(eq(profiles.id, user.id));
