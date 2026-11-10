@@ -60,8 +60,8 @@ export default function DashboardPreview({ className }: { className?: string }) 
       {/* Barre latérale : rail d'icônes sur tablette, complète sur grand écran */}
       <div className="hidden md:flex flex-col flex-shrink-0 w-[68px] lg:w-[220px] m-2 mr-0 rounded-[18px] bg-forest">
         <div className="flex items-center h-16 px-5">
-          <Wordmark className="hidden lg:inline text-[21px] text-white" />
-          <Wordmark short className="lg:hidden w-full text-center text-[21px] text-white" />
+          <Wordmark className="hidden lg:inline-flex text-[20px] text-white" />
+          <Wordmark short className="lg:hidden w-full text-[21px] text-white" />
         </div>
         <div className="px-2.5 pb-4">
           {NAV.map((group, gi) => (

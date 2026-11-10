@@ -270,6 +270,7 @@ export default function SiteNav({ entries, links, demo, login, signup, asides }:
   };
 
   const isCurrent = (href: string) => pathname === href;
+  const demoShown = pastHero && !panel && !mobileOpen;
   const topLink = 'items-center h-10 px-3.5 rounded-xl text-[15px] font-medium whitespace-nowrap transition-colors';
   const mobileTitle = 'font-display text-[26px] font-bold leading-none tracking-[-0.02em] text-white';
 
@@ -292,7 +293,7 @@ export default function SiteNav({ entries, links, demo, login, signup, asides }:
         <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
           <header className="relative flex items-center gap-3 h-[64px] lg:h-[72px]">
             <Link href="/" aria-label="WeboDevis, accueil" className="relative z-20 rounded-lg">
-              <Wordmark className="text-[25px] lg:text-[27px] text-white" />
+              <Wordmark className="text-[21px] sm:text-[25px] lg:text-[22px] xl:text-[26px] text-white" />
             </Link>
 
             <nav
@@ -420,11 +421,13 @@ export default function SiteNav({ entries, links, demo, login, signup, asides }:
             </nav>
 
             <div className="relative z-20 ml-auto lg:ml-2 flex items-center gap-1.5">
-              <Link href={login.href} className={cn('items-center h-11 px-3.5 lg:px-4 rounded-xl text-[15px] font-semibold text-white/85 hover:text-white hover:bg-white/[0.06] whitespace-nowrap transition-colors', mobileOpen ? 'hidden lg:flex' : 'flex')}>
+              <Link href={login.href} className={cn('items-center h-11 px-3.5 lg:px-4 rounded-xl text-[15px] font-semibold text-white/85 hover:text-white hover:bg-white/[0.06] whitespace-nowrap transition-colors',
+                // Une fois le bouton de démo affiché, la place manque entre 1024 et 1280 px : la connexion s'efface.
+                mobileOpen ? 'hidden lg:flex' : demoShown ? 'flex lg:hidden xl:flex' : 'flex')}>
                 {login.label}
               </Link>
               {signup && (
-                <Link href={signup.href} className="hidden lg:flex items-center h-11 px-4 rounded-xl text-[15px] font-semibold text-white/85 hover:text-white hover:bg-white/[0.06] whitespace-nowrap transition-colors">
+                <Link href={signup.href} className={cn(demoShown ? 'hidden min-[1440px]:flex' : 'hidden xl:flex', 'items-center h-11 px-4 rounded-xl text-[15px] font-semibold text-white/85 hover:text-white hover:bg-white/[0.06] whitespace-nowrap transition-colors')}>
                   {signup.label}
                 </Link>
               )}
@@ -434,7 +437,7 @@ export default function SiteNav({ entries, links, demo, login, signup, asides }:
                 href={demo.href}
 
                 className={cn('site-header-demo items-center h-11 rounded-xl bg-primary text-white text-[15px] font-semibold hover:bg-primary-dark whitespace-nowrap',
-                  pastHero && !panel && !mobileOpen ? 'hidden md:flex px-5' : 'hidden')}
+                  demoShown ? 'hidden md:flex px-5' : 'hidden')}
               >
                 {demo.label}
               </Link>

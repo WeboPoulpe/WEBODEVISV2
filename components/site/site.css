@@ -55,7 +55,7 @@
   text-wrap: pretty;
 }
 
-/* Seul mouvement de la page : l'aperçu du tableau de bord se pose à l'ouverture. */
+/* À l'ouverture, l'aperçu du tableau de bord se pose. */
 @keyframes site-settle {
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -264,4 +264,76 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .site-header { transition: none; }
+}
+
+/* ── Un peu de mouvement ───────────────────────────────────────────────────── */
+
+/* Bandeau des occasions : terracotta, légèrement penché, qui défile sans fin. */
+.site-marquee-wrap {
+  overflow: hidden;
+  padding: 28px 0;
+}
+.site-marquee {
+  transform: rotate(-2deg);
+  margin: 0 -24px;
+  background: rgb(var(--p-700));
+  color: #fff;
+  box-shadow: 0 18px 40px -24px rgb(var(--p-900) / 0.6);
+}
+.site-marquee-track {
+  display: flex;
+  width: max-content;
+}
+.site-marquee-row {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 18px 1rem;
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.875rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+@media (min-width: 768px) { .site-marquee-row { gap: 2.5rem; padding: 22px 1.25rem; } }
+@keyframes site-marquee { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: no-preference) {
+  .site-marquee-track { animation: site-marquee 38s linear infinite; }
+  .site-marquee:hover .site-marquee-track { animation-play-state: paused; }
+}
+
+/* Trait terracotta tracé à la main sous un mot du grand titre. */
+.site-swoosh { position: relative; white-space: nowrap; }
+.site-swoosh > svg {
+  position: absolute;
+  left: -2%;
+  bottom: -0.03em;
+  width: 104%;
+  height: 0.26em;
+  overflow: visible;
+}
+.site-swoosh path { stroke-dasharray: 1; stroke-dashoffset: 0; }
+@keyframes site-draw { from { stroke-dashoffset: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .site-swoosh path { animation: site-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.45s both; }
+}
+
+/* Les blocs montent en douceur quand on arrive dessus (navigateurs qui savent lier l'animation au défilement). */
+@keyframes site-rise {
+  from { opacity: 0; transform: translateY(40px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .site-reveal {
+      animation: site-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 45%;
+    }
+  }
+}
+
+/* Les cartes de guides et les écrans se soulèvent au survol. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .site-lift { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s; }
+  .site-lift:hover { transform: translateY(-6px); box-shadow: 0 24px 40px -28px rgb(var(--n-900) / 0.35); }
 }

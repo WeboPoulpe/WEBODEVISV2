@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import DashboardPreview from '@/components/site/DashboardPreview';
+import EventMarquee from '@/components/site/EventMarquee';
 import EventPreview from '@/components/site/EventPreview';
 import FeaturePreviewFor from '@/components/site/FeaturePreviews';
 import FaqList from '@/components/site/FaqList';
@@ -7,12 +8,13 @@ import LinkList from '@/components/site/LinkList';
 import { PhoneChecklist, PhoneCourses, PhoneHome, PhoneMission, PhoneQuotes } from '@/components/site/Phone';
 import QuotePreview from '@/components/site/QuotePreview';
 import RequestPreview from '@/components/site/RequestPreview';
+import Testimonial from '@/components/site/Testimonial';
 import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
 import { RELEASE } from '@/lib/site/config';
 import { FEATURE_LIST } from '@/lib/site/features';
 import { pageMetadata } from '@/lib/site/metadata';
 import { GUIDES } from '@/lib/site/guides';
-import { AUDIENCE_LINKS, FEATURES_INDEX, FEATURE_COLUMNS, GUIDES_INDEX, HOME, QUOTE_REQUEST, RELEASES } from '@/lib/site/pages';
+import { AUDIENCE_LINKS, FEATURES_INDEX, FEATURE_COLUMNS, GUIDES_INDEX, HOME, PRICING, QUOTE_REQUEST, RELEASES } from '@/lib/site/pages';
 import { breadcrumbSchema, faqSchema, organizationSchema, softwareSchema, websiteSchema, type Faq } from '@/lib/site/schema';
 import { fr } from '@/lib/site/typo';
 
@@ -64,7 +66,13 @@ export default function SitePage() {
         <div className={`${container} relative`}>
           <div className="site-dark grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-x-14 gap-y-6 lg:items-end pt-7 sm:pt-12 lg:pt-16">
             <div>
-              <h1 className="site-hero-title font-display text-white">Le logiciel des&nbsp;traiteurs.</h1>
+              <h1 className="site-hero-title font-display text-white">
+                Le logiciel des&nbsp;<span className="site-swoosh">traiteurs
+                  <svg aria-hidden viewBox="0 0 300 24" preserveAspectRatio="none">
+                    <path d="M4 16 C 70 4, 160 2, 296 12" pathLength="1" fill="none" stroke="rgb(var(--p-400))" strokeWidth="9" strokeLinecap="round" />
+                  </svg>
+                </span>.
+              </h1>
               <p className="site-tagline font-display text-primary-300 mt-5 lg:mt-7 max-w-[17ch] sm:max-w-none">Du premier devis au dernier couvert servi.</p>
             </div>
             <div className="lg:pb-2">
@@ -75,6 +83,10 @@ export default function SitePage() {
               <p className="text-[15px] leading-relaxed text-white/60 mt-5 md:mt-6 max-w-[46ch]">
                 Sortie de la version {RELEASE.version} le {RELEASE.dateLabel}.{' '}
                 <Link href={RELEASES.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">Voir ce qu’elle contient</Link>
+              </p>
+              <p className="text-[15px] leading-relaxed text-white/60 mt-2 max-w-[46ch]">
+                <span className="font-semibold text-white">100&nbsp;€&nbsp;HT par mois</span>, sans engagement.{' '}
+                <Link href={PRICING.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">Les tarifs</Link>
               </p>
             </div>
           </div>
@@ -90,9 +102,13 @@ export default function SitePage() {
         </div>
       </section>
 
+      {/* ── Les occasions, en bandeau qui défile, puis la parole d'un traiteur ── */}
+      <EventMarquee className="mt-14 md:mt-20" />
+      <Testimonial className="pt-14 md:pt-20 lg:pt-24" />
+
       {/* ── Le parcours d'une affaire : demande, devis, événement ── */}
       <section id="demandes" aria-labelledby="titre-demandes" className={sectionGap}>
-        <div className={`${container} ${two} lg:items-center`}>
+        <div className={`${container} site-reveal ${two} lg:items-center`}>
           <div>
             <h2 id="titre-demandes" className="site-h2">Les demandes arrivent directement dans l’application.</h2>
             <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
@@ -108,7 +124,7 @@ export default function SitePage() {
       </section>
 
       <section id="devis" aria-labelledby="titre-devis" className={sectionGap}>
-        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
+        <div className={`${container} site-reveal grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
           <div className="lg:order-2">
             <h2 id="titre-devis" className="site-h2">Un devis soigné, envoyé en un lien.</h2>
             <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
@@ -125,7 +141,7 @@ export default function SitePage() {
 
       {/* ── Les nouveautés fortes : la brochure qui attire, l'assistant qui prépare ── */}
       <section id="brochures" aria-labelledby="titre-brochures" className={sectionGap}>
-        <div className={`${container} ${two} lg:items-center`}>
+        <div className={`${container} site-reveal ${two} lg:items-center`}>
           <div>
             <h2 id="titre-brochures" className="site-h2">Votre carte, en brochure qui ramène des demandes.</h2>
             <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
@@ -141,7 +157,7 @@ export default function SitePage() {
       </section>
 
       <section id="webo" aria-labelledby="titre-webo" className={sectionGap}>
-        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
+        <div className={`${container} site-reveal grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
           <div className="lg:order-2">
             <h2 id="titre-webo" className="site-h2">Webo prépare. Vous validez.</h2>
             <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
@@ -170,7 +186,7 @@ export default function SitePage() {
               </p>
             </div>
           </div>
-          <EventPreview className="mt-10 lg:mt-14" />
+          <EventPreview className="site-reveal mt-10 lg:mt-14" />
         </div>
       </section>
 
@@ -268,7 +284,7 @@ export default function SitePage() {
                 La première version publique couvre le métier d’un bout à l’autre&nbsp;: brochures, demandes, devis signés en ligne, événements, liste de courses, extras, stock, factures, et l’assistant Webo.
               </p>
               <p className="site-body text-gray-700 mt-4 max-w-[46ch]">
-                D’ici là, la démonstration est ouverte, sur un compte rempli de données fictives.
+                D’ici là, la démonstration est ouverte, sur un compte rempli de données fictives. Ensuite&nbsp;: <strong className="font-semibold text-gray-900">100&nbsp;€&nbsp;HT par mois</strong>, sans engagement.
               </p>
               <p className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <DemoButton />
@@ -294,7 +310,7 @@ export default function SitePage() {
           <ul className="site-rail gap-3 px-5 sm:px-8 pb-2 lg:grid lg:grid-cols-5 lg:px-0">
             {GUIDES.map((g) => (
               <li key={g.slug} className="w-[272px] lg:w-auto">
-                <Link href={g.href} className="group flex flex-col h-full min-h-[300px] lg:min-h-[340px] rounded-3xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-colors">
+                <Link href={g.href} className="site-lift group flex flex-col h-full min-h-[300px] lg:min-h-[340px] rounded-3xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-colors">
                   <span className="text-sm text-gray-500">{g.minutes} min de lecture</span>
                   <span className="block font-display text-[24px] font-semibold leading-[1.12] tracking-[-0.02em] text-gray-900 mt-4 underline-offset-4 decoration-2 group-hover:underline">{fr(g.title)}</span>
                   <span className="block text-[15px] leading-relaxed text-gray-600 mt-auto pt-6">{fr(g.blurb)}</span>

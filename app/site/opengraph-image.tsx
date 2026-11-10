@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { logoDataUri } from '@/lib/brand/logo';
 
 // Image de partage (Open Graph) : le nom et la promesse sur le vert sapin, générée sans fichier image.
 export const alt = 'WeboDevis, le logiciel des traiteurs : du premier devis au dernier couvert servi.';
@@ -20,7 +21,10 @@ export default function OpengraphImage() {
           color: '#FFFFFF',
         }}
       >
-        <div style={{ display: 'flex', fontSize: 44, fontWeight: 600, letterSpacing: -1.5 }}>WeboDevis</div>
+        <div style={{ display: 'flex', alignItems: 'center', fontSize: 44, fontWeight: 600, letterSpacing: -1.5 }}>
+          <img alt="" src={logoDataUri()} width={70} height={41} style={{ marginRight: 18 }} />
+          WeboDevis
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', fontSize: 92, fontWeight: 700, lineHeight: 1, letterSpacing: -3, maxWidth: 980 }}>
             Du premier devis au dernier couvert servi.

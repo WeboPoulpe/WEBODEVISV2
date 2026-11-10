@@ -14,7 +14,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
 
   return (
     <div className="min-h-[100dvh] bg-page flex flex-col items-center justify-center px-6 text-center">
-      <Wordmark className="text-[26px] text-gray-900" />
+      <Wordmark tone="light" className="text-[26px] text-gray-900" />
       <h1 className="text-[28px] font-bold text-gray-900 leading-tight mt-10">Cette page n’a pas pu s’afficher</h1>
       <p className="text-base text-gray-600 mt-2 max-w-[40ch]">
         Vos données ne sont pas touchées. Réessayez ; si le problème continue, écrivez-nous en donnant ce code :{' '}

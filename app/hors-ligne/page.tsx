@@ -6,7 +6,7 @@ export const metadata = { title: 'Hors ligne — WeboDevis' };
 export default function HorsLignePage() {
   return (
     <div className="min-h-[100dvh] bg-page flex flex-col items-center justify-center px-6 text-center">
-      <Wordmark className="text-[26px] text-gray-900" />
+      <Wordmark tone="light" className="text-[26px] text-gray-900" />
       <h1 className="text-[28px] font-bold text-gray-900 leading-tight mt-10">Pas de connexion</h1>
       <p className="text-base text-gray-600 mt-2 max-w-[36ch]">
         Cette page a besoin du réseau. Vos données sont en sécurité : elles réapparaîtront dès que la connexion revient.
