@@ -34,12 +34,36 @@ export async function undoCancelForDeletion(companyId: string): Promise<void> {
   await applyStripeSubscription(sub.id);
 }
 
+const ENDED = new Set(['canceled', 'incomplete_expired']);
+
+/** Un abonnement déjà disparu ou déjà résilié chez Stripe compte comme résilié. */
+function alreadyGone(e: unknown): boolean {
+  const err = e as { code?: string; message?: string };
+  return err?.code === 'resource_missing' || /already.*cancel|cancel.*already/i.test(err?.message ?? '');
+}
+
 /**
- * Avant la purge : résiliation immédiate. Pas de relecture ensuite, la ligne d'abonnement est effacée avec le compte.
- * Une erreur remonte : la purge ne doit pas avoir lieu tant que Stripe peut encore facturer ce client.
+ * Avant la purge : résiliation immédiate de tous les abonnements encore vivants du client, relus chez Stripe (la
+ * ligne locale peut être en retard : une purge interrompue après la résiliation doit pouvoir être rejouée, et un
+ * client peut avoir plusieurs abonnements). Sans client Stripe connu, on se rabat sur l'abonnement enregistré.
+ * Pas de relecture ensuite : la ligne est effacée avec le compte. Une vraie panne remonte : la purge ne doit pas avoir
+ * lieu tant que Stripe peut encore facturer ce client.
  */
 export async function cancelNowBeforePurge(companyId: string): Promise<void> {
-  const sub = await liveSubscriptionId(companyId);
+  const sub = await getSubscription(companyId);
   if (!sub) return;
-  await stripe().subscriptions.cancel(sub.id);
+  let ids: string[] = [];
+  if (sub.stripe_customer_id) {
+    const { data } = await stripe().subscriptions.list({ customer: sub.stripe_customer_id, status: 'all', limit: 10 });
+    ids = data.filter((s) => !ENDED.has(s.status)).map((s) => s.id);
+  } else if (sub.stripe_subscription_id && !ENDED.has(sub.status)) {
+    ids = [sub.stripe_subscription_id];
+  }
+  for (const id of ids) {
+    try {
+      await stripe().subscriptions.cancel(id);
+    } catch (e) {
+      if (!alreadyGone(e)) throw e;
+    }
+  }
 }

@@ -10,7 +10,8 @@ let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); } }));
 
 const subCancel = vi.fn();
-vi.mock('@/lib/stripe', () => ({ stripe: () => ({ subscriptions: { cancel: subCancel } }) }));
+const subList = vi.fn();
+vi.mock('@/lib/stripe', () => ({ stripe: () => ({ subscriptions: { cancel: subCancel, list: subList } }) }));
 
 const { purgeAccount } = await import('./accountPurge');
 
@@ -99,9 +100,14 @@ describe('purge et abonnement Stripe', () => {
       insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status) values ('${C}', 'cus_c', 'sub_c', 'active'), ('${D}', 'cus_d', 'sub_d', 'canceled');
     `);
   });
-  beforeEach(() => subCancel.mockReset());
+  beforeEach(() => {
+    subCancel.mockReset();
+    subList.mockReset();
+    subList.mockResolvedValue({ data: [] });
+  });
 
   it('si Stripe est en panne, rien n’est effacé et l’erreur remonte', async () => {
+    subList.mockResolvedValue({ data: [{ id: 'sub_c', status: 'active' }] });
     subCancel.mockRejectedValueOnce(new Error('stripe en panne'));
     await expect(purgeAccount(C)).rejects.toThrow(/stripe en panne/);
     expect((await pg.query(`select 1 from users where id = $1`, [C])).rows).toHaveLength(1);
@@ -109,10 +115,40 @@ describe('purge et abonnement Stripe', () => {
   });
 
   it('résilie tout de suite chez Stripe puis efface', async () => {
+    subList.mockResolvedValue({ data: [{ id: 'sub_c', status: 'active' }, { id: 'sub_c2', status: 'past_due' }, { id: 'sub_old', status: 'canceled' }] });
     subCancel.mockResolvedValue({});
     await purgeAccount(C);
-    expect(subCancel).toHaveBeenCalledWith('sub_c');
+    expect(subList).toHaveBeenCalledWith({ customer: 'cus_c', status: 'all', limit: 10 });
+    expect(subCancel.mock.calls.map((c) => c[0])).toEqual(['sub_c', 'sub_c2']);
     expect((await pg.query(`select 1 from users where id = $1`, [C])).rows).toHaveLength(0);
+  });
+
+  it('une purge rejouée passe : abonnement déjà résilié chez Stripe alors que la ligne dit active', async () => {
+    const E = '00000000-0000-4000-8000-00000000ffff';
+    await pg.exec(`
+      insert into users (id, email, password_hash) values ('${E}', 'e@t.fr', 'x');
+      insert into profiles (id, email) values ('${E}', 'e@t.fr');
+      insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status) values ('${E}', 'cus_e', 'sub_e', 'active');
+    `);
+    subList.mockResolvedValue({ data: [{ id: 'sub_e', status: 'canceled' }] });
+    await purgeAccount(E);
+    expect(subCancel).not.toHaveBeenCalled();
+    expect((await pg.query(`select 1 from users where id = $1`, [E])).rows).toHaveLength(0);
+  });
+
+  it('une erreur « introuvable » ou « déjà résilié » à la résiliation compte comme un succès', async () => {
+    const F = '00000000-0000-4000-8000-00000000f0f0';
+    await pg.exec(`
+      insert into users (id, email, password_hash) values ('${F}', 'f@t.fr', 'x');
+      insert into profiles (id, email) values ('${F}', 'f@t.fr');
+      insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status) values ('${F}', 'cus_f', 'sub_f', 'active');
+    `);
+    subList.mockResolvedValue({ data: [{ id: 'sub_f1', status: 'active' }, { id: 'sub_f2', status: 'active' }] });
+    subCancel.mockRejectedValueOnce(Object.assign(new Error('No such subscription'), { code: 'resource_missing' }))
+      .mockRejectedValueOnce(new Error('This subscription is already canceled'));
+    await purgeAccount(F);
+    expect(subCancel).toHaveBeenCalledTimes(2);
+    expect((await pg.query(`select 1 from users where id = $1`, [F])).rows).toHaveLength(0);
   });
 
   it('n’appelle pas Stripe pour un abonnement déjà terminé', async () => {
