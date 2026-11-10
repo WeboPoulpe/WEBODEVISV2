@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Loader2, LogIn, Plus, Search, Trash2 } from 'lucide-react';
 import {
-  createAccount, deleteEmptyAccount, listAccounts, sendAccountPasswordLink, setAccountActive, setAccountRole, updateAccount,
+  createAccount, deleteEmptyAccount, listAccounts, sendAccountPasswordLink, setAccountActive, setAccountComped, setAccountRole, updateAccount,
   type AdminAccount,
 } from '@/server/admin';
 import { cancelAccountDeletion, purgeRequestedAccount } from '@/server/account';
 import { useAuth } from '@/context/AuthContext';
 import { MODULES } from '@/lib/modules';
+import { statusLabel } from '@/lib/subscription';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,14 @@ import { useFeedback } from '@/components/ui/Feedback';
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const accountName = (a: AdminAccount) => a.company_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email;
+/** Libellé court de la colonne Abonnement ; « — » pour un collaborateur (il dépend de son titulaire). */
+const subscriptionText = (a: AdminAccount) => {
+  if (a.is_collaborator || a.is_demo) return '—';
+  const s = a.subscription;
+  if (!s) return 'Aucun';
+  if (s.comped) return 'Offert';
+  return s.status === 'none' ? 'Aucun' : statusLabel(s.status, s.cancel_at_period_end);
+};
 const STANDARD = MODULES.filter((m) => m.standard).map((m) => m.key);
 
 type Filter = 'tous' | 'actifs' | 'desactives';
@@ -133,6 +142,12 @@ export default function AdminAccountsPage() {
                   {a.quotes} devis, {a.customers} client{a.customers > 1 ? 's' : ''}
                   <span className="block text-gray-500">{a.last_seen_at ? `Vu le ${day(a.last_seen_at)}` : a.last_quote_at ? `Dernier devis le ${day(a.last_quote_at)}` : 'Jamais venu'}</span>
                 </span>
+                <span className="hidden lg:block w-32 text-sm text-gray-700">
+                  {subscriptionText(a)}
+                  {a.subscription && !a.subscription.comped && a.subscription.current_period_end && (
+                    <span className="block text-gray-500">jusqu’au {day(a.subscription.current_period_end)}</span>
+                  )}
+                </span>
                 <span className="hidden sm:block w-28 text-right text-sm text-gray-500 whitespace-nowrap">{day(a.created_at)}</span>
               </button>
             </li>
@@ -153,6 +168,7 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
   const [lastName, setLastName] = useState(account.last_name ?? '');
   const [companyName, setCompanyName] = useState(account.company_name ?? '');
   const [modules, setModules] = useState(account.modules);
+  const [compedNote, setCompedNote] = useState(account.subscription?.comped_note ?? '');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -236,6 +252,26 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
           <section>
             <h3 className="text-[15px] font-semibold text-gray-900 mb-1">Options</h3>
             <ModulesPicker value={modules} onChange={setModules} />
+          </section>
+        )}
+
+        {!locked && !account.is_collaborator && (
+          <section>
+            <h3 className="text-[15px] font-semibold text-gray-900 mb-1">Abonnement</h3>
+            <p className="text-sm text-gray-500">
+              {account.subscription && account.subscription.status !== 'none'
+                ? `${statusLabel(account.subscription.status, account.subscription.cancel_at_period_end)}${account.subscription.plan ? `, formule ${account.subscription.plan}` : ''}${account.subscription.current_period_end ? `, jusqu’au ${day(account.subscription.current_period_end)}` : ''}.`
+                : 'Pas d’abonnement Stripe.'}
+            </p>
+            <Switch label="Accès offert" hint="Accès complet sans abonnement (compte bêta, geste commercial)." checked={!!account.subscription?.comped}
+              disabled={busy !== null} onChange={(v) => run('comped', () => setAccountComped(account.id, v, compedNote))} />
+            <label htmlFor="acc-comped-note" className={labelCls}>Note (visible de vous seul)</label>
+            <div className="flex gap-2">
+              <input id="acc-comped-note" value={compedNote} onChange={(e) => setCompedNote(e.target.value)} placeholder="Ex. compte bêta" className={inputCls} />
+              {account.subscription?.comped && (
+                <button onClick={() => run('comped-note', () => setAccountComped(account.id, true, compedNote), 'Note enregistrée.')} disabled={busy !== null} className={btnSecondary}>OK</button>
+              )}
+            </div>
           </section>
         )}
 
