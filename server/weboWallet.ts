@@ -4,7 +4,9 @@ import { db } from '@/db';
 import { profiles, webo_ledger, webo_wallets } from '@/db/schema';
 import { isDemoUser } from '@/lib/demo';
 import { monthKeyParis, nextMonthStartParis, splitDebit } from '@/lib/webocoins';
-import { getWeboSettings } from './settings';
+import { nextPeriodStart, periodKey } from '@/lib/subscription';
+import { getBillingEnforced, getWeboSettings } from './settings';
+import { accessOf, getSubscription } from './subscription';
 
 // Portefeuille de WeboCoins d'une entreprise (clé : son compte titulaire). Seul ce module change un solde : allocation
 // du mois au premier usage, débit atomique et idempotent, remboursement, pièces offertes. Voir
@@ -35,13 +37,32 @@ export async function companyIdFor(userId: string): Promise<string> {
   return row?.parent ?? userId;
 }
 
-/** Le portefeuille, créé au besoin, avec les pièces du mois remises si le mois a changé. */
+/**
+ * Faut-il remettre les pièces ? Quand la clé calculée diffère de la clé gardée, et, dans le même calendrier (mois civil
+ * ou date anniversaire « s: »), seulement vers une période plus récente : un appel parti juste avant le changement ne
+ * ramène pas le portefeuille en arrière. Un changement de calendrier remet une fois ; la clé vide initiale remet toujours.
+ */
+function shouldAllocate(stored: string, key: string): boolean {
+  if (stored === '') return true;
+  if (stored === key) return false;
+  const sameCalendar = stored.startsWith('s:') === key.startsWith('s:');
+  return sameCalendar ? key > stored : true;
+}
+
+/** Le portefeuille, créé au besoin, avec les pièces du mois remises si le mois (ou la période d'abonnement) a changé. */
 export async function walletOf(companyId: string, now: Date = new Date()): Promise<Wallet> {
-  const key = monthKeyParis(now);
+  // Abonné payant (réglage allumé, pas offert, actif ou en retard de paiement, jour d'ancrage connu) : les pièces se
+  // renouvellent à la date anniversaire. Sinon, mois civil comme avant.
+  const enforced = await getBillingEnforced();
+  const sub = enforced && !isDemoUser(companyId) ? await getSubscription(companyId) : null;
+  const paid = !!sub && !sub.comped && (sub.status === 'active' || sub.status === 'past_due') && sub.anchor_day != null;
+  const key = paid ? periodKey(sub!.anchor_day!, now) : monthKeyParis(now);
+  const renewsAt = paid ? nextPeriodStart(sub!.anchor_day!, now) : nextMonthStartParis(now);
+  // Accès non complet : rien n'est remis, la clé n'avance pas, les pièces existantes restent.
+  const mayAllocate = !enforced || (await accessOf(companyId)) === 'full';
   await db.insert(webo_wallets).values({ company_id: companyId }).onConflictDoNothing();
   let [row] = await db.select().from(webo_wallets).where(eq(webo_wallets.company_id, companyId)).limit(1);
-  // Seulement vers un mois plus récent : un appel parti juste avant minuit ne ramène pas le portefeuille en arrière.
-  if (row.month_key < key) {
+  if (mayAllocate && shouldAllocate(row.month_key, key)) {
     const settings = await getWeboSettings();
     const coins = isDemoUser(companyId) ? 0 : (row.monthly_override ?? settings.monthlyCoins);
     // Conditionnel sur l'ancien mois : deux premiers usages simultanés ne donnent qu'une allocation.
@@ -58,7 +79,7 @@ export async function walletOf(companyId: string, now: Date = new Date()): Promi
   }
   return {
     month: row.month_coins, kept: row.kept_coins, total: row.month_coins + row.kept_coins, monthKey: row.month_key,
-    mode: row.translation_mode === 'free' ? 'free' : 'webo', renewsAt: nextMonthStartParis(now).toISOString(),
+    mode: row.translation_mode === 'free' ? 'free' : 'webo', renewsAt: renewsAt.toISOString(),
   };
 }
 
