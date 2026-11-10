@@ -1987,7 +1987,7 @@ export const site_requests = pgTable("site_requests", {
 	index("idx_site_requests_created_at").using("btree", table.created_at.desc().nullsFirst()),
 	index("idx_site_requests_user").using("btree", table.user_id.asc().nullsLast()).where(sql`(user_id IS NOT NULL)`),
 	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text, 'demo'::text, 'service'::text])`),
-	check("site_requests_status_check", sql`status = ANY (ARRAY['nouvelle'::text, 'en_cours'::text, 'traitee'::text])`),
+	check("site_requests_status_check", sql`status = ANY (ARRAY['nouvelle'::text, 'en_cours'::text, 'traitee'::text, 'suspecte'::text])`),
 ]);
 
 // Réglages de la plateforme, modifiables depuis l'espace d'administration (une ligne par réglage).

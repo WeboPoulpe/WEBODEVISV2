@@ -274,7 +274,7 @@ export async function deleteEmptyAccount(id: string): Promise<Result> {
 }
 
 // ── Demandes du site ──────────────────────────────────────────────────────────
-export type SiteRequestStatus = 'nouvelle' | 'en_cours' | 'traitee';
+export type SiteRequestStatus = 'nouvelle' | 'en_cours' | 'traitee' | 'suspecte';
 export type AdminSiteRequest = Omit<typeof site_requests.$inferSelect, 'ip_hash'>;
 
 export async function listSiteRequests(): Promise<AdminSiteRequest[]> {
@@ -287,7 +287,7 @@ export async function listSiteRequests(): Promise<AdminSiteRequest[]> {
 export async function updateSiteRequest(id: string, patch: { status?: SiteRequestStatus; admin_notes?: string }): Promise<Result> {
   await requireAdmin();
   const set: Partial<typeof site_requests.$inferInsert> = {};
-  if (patch.status && ['nouvelle', 'en_cours', 'traitee'].includes(patch.status)) {
+  if (patch.status && ['nouvelle', 'en_cours', 'traitee', 'suspecte'].includes(patch.status)) {
     set.status = patch.status;
     set.handled_at = patch.status === 'traitee' ? new Date().toISOString() : null;
   }

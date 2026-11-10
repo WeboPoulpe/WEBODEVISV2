@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { profiles, site_requests } from '@/db/schema';
 import { appOrigin, isTestAddress, sendMail } from '@/lib/mail';
 import { siteRequestAckEmail, siteRequestNotificationEmail } from '@/lib/mail/templates';
+import { spamReason } from '@/lib/siteSpam';
 
 export interface SiteRequestInput {
   kind: 'devis' | 'message';
@@ -19,6 +20,8 @@ export interface SiteRequestInput {
   message: string;
   /** Champ piège, invisible pour une personne : s'il est rempli, l'envoi vient d'un robot. */
   website?: string;
+  /** Heure d'ouverture du formulaire (ms) : un envoi trop rapide vient d'un robot. */
+  startedAt?: number;
 }
 
 const MAX_PER_HOUR = 5;
@@ -46,6 +49,13 @@ export async function submitSiteRequest(input: SiteRequestInput): Promise<{ erro
     .where(and(eq(site_requests.ip_hash, ip_hash), gt(site_requests.created_at, new Date(Date.now() - 3600_000).toISOString())));
   if (n >= MAX_PER_HOUR) return { error: 'Vous avez déjà envoyé plusieurs messages. Réessayez dans une heure.' };
 
+  // Le même message, depuis la même adresse, dans les 24 heures : déjà reçu, rien de plus n'est fait.
+  const [dup] = await db.select({ id: site_requests.id }).from(site_requests).where(and(
+    eq(site_requests.email, email), eq(site_requests.message, message),
+    gt(site_requests.created_at, new Date(Date.now() - 86_400_000).toISOString()),
+  )).limit(1);
+  if (dup) return { error: null };
+
   const request = {
     kind: kind as 'devis' | 'message',
     name,
@@ -55,10 +65,16 @@ export async function submitSiteRequest(input: SiteRequestInput): Promise<{ erro
     teamSize: clean(input.teamSize, 60) || null,
     message,
   };
+  // Une demande suspecte (lien, envoi trop rapide) est gardée à part dans l'admin, sans aucun email : ni l'alerte,
+  // ni l'accusé de réception, qui partirait vers une adresse souvent fausse et nuirait à la réputation du domaine.
+  const elapsedMs = typeof input.startedAt === 'number' ? Date.now() - input.startedAt : null;
+  const suspicious = spamReason({ message, name, company: request.company, elapsedMs });
   await db.insert(site_requests).values({
     kind, name, email, message, ip_hash,
     phone: request.phone, company: request.company, team_size: request.teamSize,
+    ...(suspicious ? { status: 'suspecte', admin_notes: `Classée suspecte automatiquement : ${suspicious}.` } : {}),
   });
+  if (suspicious) return { error: null };
 
   // Une adresse d'essai (tests automatiques) ne prévient personne.
   if (isTestAddress(email)) return { error: null };

@@ -32,6 +32,8 @@ export default function ContactForm({ initialKind, initialMigration = false }: {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const doneRef = useRef<HTMLHeadingElement>(null);
+  // Heure d'ouverture du formulaire, pour repérer un envoi de robot (trop rapide).
+  const startedAt = useRef(Date.now());
 
   // Une fois le message parti, le lecteur d'écran et le clavier arrivent sur la confirmation.
   useEffect(() => { if (sent) doneRef.current?.focus(); }, [sent]);
@@ -55,6 +57,7 @@ export default function ContactForm({ initialKind, initialMigration = false }: {
 
 ${values.message}` : values.message,
       website: values.website,
+      startedAt: startedAt.current,
     }).catch(() => ({ error: 'L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez.' }));
     setSending(false);
     if (result.error) { setError(result.error); return; }

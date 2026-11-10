@@ -15,13 +15,14 @@ import { useFeedback } from '@/components/ui/Feedback';
 const when = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 const day = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
-type Filter = 'a_traiter' | 'traitees' | 'toutes';
+type Filter = 'a_traiter' | 'traitees' | 'suspectes' | 'toutes';
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'a_traiter', label: 'À traiter' },
   { key: 'traitees', label: 'Traitées' },
+  { key: 'suspectes', label: 'Suspectes' },
   { key: 'toutes', label: 'Toutes' },
 ];
-const STATUSES: SiteRequestStatus[] = ['nouvelle', 'en_cours', 'traitee'];
+const STATUSES: SiteRequestStatus[] = ['nouvelle', 'en_cours', 'traitee', 'suspecte'];
 
 export default function AdminRequestsPage() {
   const [requests, setRequests] = useState<AdminSiteRequest[] | null>(null);
@@ -36,9 +37,11 @@ export default function AdminRequestsPage() {
   useEffect(() => { getSiteWebCatalogAdmin().then(setCatalog).catch(() => {}); }, []);
 
   const filtered = useMemo(() => (requests ?? []).filter((r) =>
-    filter === 'toutes' || (filter === 'traitees' ? r.status === 'traitee' : r.status !== 'traitee')), [requests, filter]);
+    filter === 'toutes' || (filter === 'traitees' ? r.status === 'traitee'
+      : filter === 'suspectes' ? r.status === 'suspecte'
+      : r.status !== 'traitee' && r.status !== 'suspecte')), [requests, filter]);
   const open = requests?.find((r) => r.id === openId) ?? null;
-  const pending = (requests ?? []).filter((r) => r.status !== 'traitee').length;
+  const pending = (requests ?? []).filter((r) => r.status !== 'traitee' && r.status !== 'suspecte').length;
 
   return (
     <div className="px-4 md:px-6 pb-8">

@@ -11,4 +11,5 @@ export const REQUEST_STATUS: Record<string, { label: string; cls: string }> = {
   nouvelle: { label: 'Nouvelle', cls: 'bg-primary-50 text-primary-700' },
   en_cours: { label: 'En cours', cls: 'bg-gray-100 text-gray-700' },
   traitee: { label: 'Traitée', cls: 'bg-sage-100 text-sage' },
+  suspecte: { label: 'Suspecte', cls: 'bg-gray-100 text-gray-500' },
 };
