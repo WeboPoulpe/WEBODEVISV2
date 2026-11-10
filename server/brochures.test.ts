@@ -588,3 +588,20 @@ describe('brochures : liens, accès et notifications', () => {
     expect(sent[0].html).not.toContain(`/b/${(await rowOf(id!)).share_token}`);
   });
 });
+
+
+describe('brochures : passage au Studio sans rien perdre', () => {
+  it('la composition (sections, mise en page avancée) n’est pas réécrite ; la base à jour ne manque de rien', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Garde tout' });
+    await br.saveBrochure(id!, { content: { sections: [{ id: 's1', title: 'Menus', items: [{ prestationId: PRESTATION }] }] } });
+    expect(await br.switchBrochureEditor(id!, 'advanced')).toEqual({ error: null });
+    const before = (await pg.query<{ content: unknown; layout: unknown }>(`select content, layout from brochures where id = $1`, [id])).rows[0];
+    expect(await br.switchBrochureEditor(id!, 'studio')).toEqual({ error: null });
+    const after = (await pg.query<{ content: unknown; layout: unknown; editor_mode: string }>(`select content, layout, editor_mode from brochures where id = $1`, [id])).rows[0];
+    expect(after.editor_mode).toBe('studio');
+    expect(after.content).toEqual(before.content);
+    expect(after.layout).toEqual(before.layout);
+    expect(await br.brochureDatabaseCheck()).toEqual([]);
+  });
+});

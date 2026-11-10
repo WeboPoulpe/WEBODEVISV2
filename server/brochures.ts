@@ -348,9 +348,10 @@ export async function switchBrochureEditor(id: string, to: EditorMode, opts: { r
   if (to === 'studio') {
     // Studio : on reprend ses pages gardées (sauf « repartir », resume = false), sinon on les compose depuis la brochure.
     if (row.editor_mode === 'studio' && opts.resume !== false) return { error: null };
+    // La composition de la brochure (sections, mise en page avancée) n'est jamais réécrite : le Studio garde ses
+    // pages à part, et revenir à l'éditeur d'avant retrouve tout tel quel.
     const layout = parseLayout(row.layout);
     const from = row.editor_mode === 'advanced' && layout ? { ...content, sections: sectionsFromLayout(layout) } : content;
-    if (from !== content) set.content = from;
     const saved = parseStudio(row.studio);
     if (!saved || opts.resume === false) {
       const company = await companyProfile(row.owner_user_id);
@@ -629,4 +630,26 @@ export async function getStudioPrint(id: string): Promise<{ name: string; langua
     brochureUrl: `${await appOrigin()}/b/${row.share_token}`,
   });
   return { name: row.name, language, pages: pages.filter((p) => !p.form), fontsHref: studioFontsHref(studioFonts(studio)) };
+}
+
+/**
+ * Ce qui manque à la base pour cette version de l'app (colonnes et tables des brochures), si les migrations n'ont
+ * pas été appliquées : les brochures ne sont pas effacées, mais elles ne se lisent plus tant que la base n'est pas
+ * à jour. Liste vide : tout est en place.
+ */
+export async function brochureDatabaseCheck(): Promise<string[]> {
+  await requireUser();
+  const needed: [string, string[]][] = [
+    ['brochures', ['studio', 'expires_at', 'access_code', 'notify', 'open_notified_at', 'form_notified_at', 'review_status', 'review_note', 'review_requested_by', 'review_by', 'review_at']],
+    ['prospect_requests', ['chosen', 'brochure_link_id']],
+    ['brochure_page_stats', ['page_id']],
+    ['brochure_links', ['token']],
+    ['brochure_versions', ['studio']],
+    ['brochure_comments', ['body']],
+    ['studio_templates', ['page']],
+  ];
+  const rows = await db.execute<{ table_name: string; column_name: string }>(sql`select table_name, column_name from information_schema.columns
+    where table_schema = 'public' and table_name in ('brochures', 'prospect_requests', 'brochure_page_stats', 'brochure_links', 'brochure_versions', 'brochure_comments', 'studio_templates')`);
+  const have = new Set((('rows' in rows ? rows.rows : rows) as { table_name: string; column_name: string }[]).map((r) => `${r.table_name}.${r.column_name}`));
+  return needed.flatMap(([t, cols]) => cols.filter((c) => !have.has(`${t}.${c}`)).map((c) => `${t}.${c}`));
 }

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { STYLE_LABELS } from '@/lib/brochure';
 import { BROCHURE_KINDS, type BrochureKind } from '@/lib/brochureStudio';
-import { createBrochure, deleteBrochure, duplicateBrochure, listBrochures, type BrochureSummary } from '@/server/brochures';
+import { brochureDatabaseCheck, createBrochure, deleteBrochure, duplicateBrochure, listBrochures, type BrochureSummary } from '@/server/brochures';
 
 // Brochures : le catalogue des prestations présenté comme un livre, envoyé par lien. Plusieurs brochures par
 // entreprise (mariages, entreprises…), chacune dans l'un des trois styles.
@@ -35,7 +35,13 @@ export default function BrochuresPage() {
   useUrlAction({ nouvelle: () => setCreating('') });
 
   const load = useCallback(() => {
-    listBrochures().then(setItems).catch(() => setError('Les brochures n’ont pas pu être chargées. Rechargez la page.'));
+    listBrochures().then(setItems).catch(async () => {
+      // Base pas à jour (migrations non appliquées) : les brochures ne sont pas effacées, elles ne se lisent plus.
+      const missing = await brochureDatabaseCheck().catch(() => [] as string[]);
+      setError(missing.length
+        ? `La base de données n’est pas à jour : vos brochures ne sont pas effacées, mais elles ne peuvent pas s’afficher tant que les migrations ne sont pas appliquées (npm run db:migrate). Manquant : ${missing.join(', ')}.`
+        : 'Les brochures n’ont pas pu être chargées. Rechargez la page.');
+    });
   }, []);
   useEffect(() => { load(); }, [load]);
 
