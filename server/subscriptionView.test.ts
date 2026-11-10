@@ -10,6 +10,7 @@ import { createTestDb } from '@/db/testDb';
 vi.mock('server-only', () => ({}));
 const OWNER = '00000000-0000-4000-8000-0000000000a1';
 const MEMBER = '00000000-0000-4000-8000-0000000000a2';
+const ADMIN = '00000000-0000-4000-8000-0000000000a9';
 let pg: PGlite;
 vi.mock('@/db', () => ({
   get db() { return drizzle(pg, { schema }); },
@@ -23,7 +24,8 @@ const settings = await import('./settings');
 beforeAll(async () => {
   pg = await createTestDb();
   await pg.exec(`
-    insert into users (id, email, password_hash) values ('${OWNER}', 'o@v.fr', 'x'), ('${MEMBER}', 'm@v.fr', 'x');
+    insert into users (id, email, password_hash) values ('${OWNER}', 'o@v.fr', 'x'), ('${MEMBER}', 'm@v.fr', 'x'), ('${ADMIN}', 'a@v.fr', 'x');
+    insert into profiles (id, email, company_name, role) values ('${ADMIN}', 'a@v.fr', 'WeboDevis', 'admin');
     insert into profiles (id, email, company_name) values ('${OWNER}', 'o@v.fr', 'Traiteur V');
     insert into profiles (id, email, parent_user_id, company_role) values ('${MEMBER}', 'm@v.fr', '${OWNER}', 'commercial');
   `);
@@ -52,6 +54,11 @@ describe('appGate', () => {
     await settings.setBillingEnforced(true);
     expect(await v.appGate(OWNER, true)).toBe('enter');
     expect(await v.appGate(MEMBER, true)).toBe('enter');
+  });
+
+  it("l'administrateur sans abonnement entre (pas de blocage sur /abonnement)", async () => {
+    await settings.setBillingEnforced(true);
+    expect(await v.appGate(ADMIN, false)).toBe('enter');
   });
 
   it('abonnement arrêté (lecture seule) : on entre', async () => {

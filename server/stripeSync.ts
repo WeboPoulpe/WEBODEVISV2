@@ -50,7 +50,7 @@ function bestSubscription(subs: Stripe.Subscription[]): Stripe.Subscription {
  * meilleur à l'entreprise. Une ligne déjà mise à jour par un événement plus récent que `eventCreated` (secondes
  * Stripe) n'est pas touchée. Renvoie null si l'entreprise est introuvable.
  */
-export async function applyStripeSubscription(subscriptionId: string, eventCreated?: number): Promise<{ companyId: string } | null> {
+export async function applyStripeSubscription(subscriptionId: string, eventCreated?: number): Promise<{ companyId: string; status: string } | null> {
   const trigger = await stripe().subscriptions.retrieve(subscriptionId);
   const customerId = idOf(trigger.customer);
   const companyId = await companyOf(trigger, customerId);
@@ -99,7 +99,7 @@ export async function applyStripeSubscription(subscriptionId: string, eventCreat
       : undefined,
   });
   invalidateAccess(companyId);
-  return { companyId };
+  return { companyId, status: sub.status };
 }
 
 /** Abonnement d'une facture : champ `parent` des versions récentes, ou ancien champ `subscription`. */
@@ -139,7 +139,8 @@ async function dispatch(event: Stripe.Event): Promise<void> {
       const subscriptionId = subscriptionOfInvoice(event.data.object);
       if (!subscriptionId) return;
       const applied = await applyStripeSubscription(subscriptionId);
-      if (applied && event.type === 'invoice.payment_failed') await mailPaymentFailed(applied.companyId);
+      // Seul un abonnement en relance (past_due) garde l'accès : un premier paiement raté (incomplete) n'a rien à « garder ».
+      if (applied && applied.status === 'past_due' && event.type === 'invoice.payment_failed') await mailPaymentFailed(applied.companyId);
       return;
     }
     default:

@@ -59,6 +59,16 @@ export async function startCheckout(plan: Plan): Promise<BillingResult> {
   try {
     const sub = await getSubscription(who.companyId);
     if (isLive(sub)) return { error: null, url: '/parametres/abonnement' };
+    // Un abonnement non terminé existe déjà : pas de nouvelle session (sinon doublon).
+    if (sub?.stripe_subscription_id && sub.status === 'incomplete') {
+      // Premier paiement à finir : page de paiement hébergée de sa dernière facture, à défaut une nouvelle session.
+      const open = await stripe().subscriptions.retrieve(sub.stripe_subscription_id, { expand: ['latest_invoice'] });
+      const invoice = open.latest_invoice;
+      const hosted = invoice && typeof invoice !== 'string' ? invoice.hosted_invoice_url : null;
+      if (hosted) return { error: null, url: hosted };
+    } else if (sub?.stripe_customer_id && (sub.status === 'unpaid' || sub.status === 'paused')) {
+      return openBillingPortal();
+    }
     const customer = await customerOf(who.companyId, who.email, sub?.stripe_customer_id ?? null);
     const origin = await appOrigin();
     const session = await stripe().checkout.sessions.create({

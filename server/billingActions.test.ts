@@ -103,6 +103,33 @@ describe('startCheckout', () => {
     expect(sessionsCreate).not.toHaveBeenCalled();
   });
 
+  it('premier paiement incomplet : rouvre la facture hébergée, sans nouvelle session', async () => {
+    await pg.exec(`insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status)
+      values ('${OWNER}', 'cus_1', 'sub_1', 'incomplete')`);
+    subRetrieve.mockResolvedValue({ ...stripeSub(), status: 'incomplete', latest_invoice: { id: 'in_1', hosted_invoice_url: 'https://invoice.stripe.test/i/1' } });
+    expect(await actions.startCheckout('mensuel')).toEqual({ error: null, url: 'https://invoice.stripe.test/i/1' });
+    expect(subRetrieve).toHaveBeenCalledWith('sub_1', { expand: ['latest_invoice'] });
+    expect(sessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('premier paiement incomplet sans facture hébergée : nouvelle session de paiement', async () => {
+    await pg.exec(`insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status)
+      values ('${OWNER}', 'cus_1', 'sub_1', 'incomplete')`);
+    subRetrieve.mockResolvedValue({ ...stripeSub(), status: 'incomplete', latest_invoice: null });
+    expect(await actions.startCheckout('mensuel')).toEqual({ error: null, url: 'https://checkout.stripe.test/s' });
+    expect(sessionsCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('abonnement impayé ou en pause : renvoyé vers le portail de facturation', async () => {
+    portalCreate.mockResolvedValue({ url: 'https://portal.stripe.test/p' });
+    for (const status of ['unpaid', 'paused']) {
+      await pg.exec(`delete from company_subscriptions; insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status)
+        values ('${OWNER}', 'cus_1', 'sub_1', '${status}')`);
+      expect(await actions.startCheckout('mensuel')).toEqual({ error: null, url: 'https://portal.stripe.test/p' });
+    }
+    expect(sessionsCreate).not.toHaveBeenCalled();
+  });
+
   it('refuse un collaborateur, un administrateur chez un client et la démo', async () => {
     sessionUser = { id: STAFF, email: 's@x.fr', actingAsAdmin: false };
     expect((await actions.startCheckout('mensuel')).error).toBeTruthy();

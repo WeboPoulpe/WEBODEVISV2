@@ -68,12 +68,19 @@ describe('admin abonnement', () => {
     expect(list.find((x) => x.id === ADMIN)?.subscription).toBeNull();
   });
 
-  it('abonnement obligatoire : refusé en production avec une clé de test, accepté ailleurs', async () => {
+  it('abonnement obligatoire : refusé avec une clé de test dans tous les environnements, accepté avec une clé live', async () => {
     vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_abc');
     vi.stubEnv('VERCEL_ENV', 'production');
     expect((await a.setBillingEnforcedAdmin(true)).error).toBe("Stripe est en mode test : passez les clés en Live d'abord.");
     expect(await getBillingEnforced()).toBe(false);
 
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    expect((await a.setBillingEnforcedAdmin(true)).error).toBe("Stripe est en mode test : passez les clés en Live d'abord.");
+    vi.stubEnv('VERCEL_ENV', '');
+    expect((await a.setBillingEnforcedAdmin(true)).error).toBe("Stripe est en mode test : passez les clés en Live d'abord.");
+    expect(await getBillingEnforced()).toBe(false);
+
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_abc');
     vi.stubEnv('VERCEL_ENV', 'preview');
     expect((await a.setBillingEnforcedAdmin(true)).error).toBeNull();
     expect(await getBillingEnforced()).toBe(true);

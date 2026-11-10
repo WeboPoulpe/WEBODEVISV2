@@ -82,7 +82,7 @@ beforeEach(async () => {
 describe('applyStripeSubscription', () => {
   it("recopie l'état : statut, formule, échéance, jour d'ancrage à Paris, déjà abonné", async () => {
     retrieve.mockResolvedValue(sub());
-    expect(await sync.applyStripeSubscription('sub_1')).toEqual({ companyId: OWNER });
+    expect(await sync.applyStripeSubscription('sub_1')).toEqual({ companyId: OWNER, status: 'active' });
     const r = await row();
     expect(r).toMatchObject({
       status: 'active', plan: 'mensuel', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1',
@@ -94,7 +94,7 @@ describe('applyStripeSubscription', () => {
   it("retrouve l'entreprise par le client Stripe quand la métadonnée manque", async () => {
     await pg.exec(`insert into company_subscriptions (company_id, stripe_customer_id) values ('${OWNER}', 'cus_1')`);
     retrieve.mockResolvedValue(sub({ company: null, price: 'price_a' }));
-    expect(await sync.applyStripeSubscription('sub_1')).toEqual({ companyId: OWNER });
+    expect(await sync.applyStripeSubscription('sub_1')).toEqual({ companyId: OWNER, status: 'active' });
     expect(await row()).toMatchObject({ status: 'active', plan: 'annuel' });
   });
 
@@ -204,6 +204,13 @@ describe('handleStripeEvent', () => {
     const mail = (sendMail.mock.calls[0] as unknown as [{ to: string; subject: string; html: string }])[0];
     expect(mail.to).toBe('titulaire@traiteur.fr');
     expect(mail.html).toContain('https://app.test/parametres/abonnement');
+  });
+
+  it('paiement échoué sur un premier paiement (incomplete) : aucun e-mail « accès conservé »', async () => {
+    retrieve.mockResolvedValue(sub({ status: 'incomplete' }));
+    await sync.handleStripeEvent(event('invoice.payment_failed', { id: 'in_1', object: 'invoice', parent: { subscription_details: { subscription: 'sub_1' } } }));
+    expect(await row()).toMatchObject({ status: 'incomplete' });
+    expect(sendMail).not.toHaveBeenCalled();
   });
 
   it('les événements sans effet sont seulement enregistrés', async () => {

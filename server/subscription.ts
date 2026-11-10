@@ -1,7 +1,7 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { company_subscriptions } from '@/db/schema';
+import { company_subscriptions, profiles } from '@/db/schema';
 import { accessFrom, type Access, type SubRow } from '@/lib/subscription';
 import { isDemoUser } from '@/lib/demo';
 import { getBillingEnforced, onBillingEnforcedChange } from './settings';
@@ -53,7 +53,11 @@ export async function accessOf(companyId: string): Promise<Access> {
   const hit = accessCache.get(companyId);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.access;
   try {
-    const access = accessFrom(await getSubscription(companyId), { demo: isDemoUser(companyId), enforced: await enforced() });
+    // Un compte administrateur n'est jamais soumis à l'abonnement (sinon il se verrouille lui-même).
+    const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
+    const access: Access = profile?.role === 'admin'
+      ? 'full'
+      : accessFrom(await getSubscription(companyId), { demo: isDemoUser(companyId), enforced: await enforced() });
     if (access === 'full') accessCache.set(companyId, { access, at: Date.now() });
     return access;
   } catch (e) {
