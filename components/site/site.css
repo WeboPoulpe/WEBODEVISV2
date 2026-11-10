@@ -337,3 +337,56 @@
   .site-lift { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s; }
   .site-lift:hover { transform: translateY(-6px); box-shadow: 0 24px 40px -28px rgb(var(--n-900) / 0.35); }
 }
+
+/* Calculateur de courses : la version d'un guide est plus petite que celle de l'accueil. */
+.site-figure-sm { font-size: clamp(3rem, 12vw, 5.5rem); }
+
+/* Curseur des couverts : rail rempli en terracotta jusqu'au pouce. */
+.site-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+}
+.site-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgb(var(--p-500)) var(--pct), rgb(var(--n-200)) var(--pct));
+}
+.site-range::-moz-range-track { height: 8px; border-radius: 999px; background: rgb(var(--n-200)); }
+.site-range::-moz-range-progress { height: 8px; border-radius: 999px; background: rgb(var(--p-500)); }
+.site-range-dark::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, rgb(var(--p-400)) var(--pct), rgb(255 255 255 / 0.15) var(--pct));
+}
+.site-range-dark::-moz-range-track { background: rgb(255 255 255 / 0.15); }
+.site-range-dark::-moz-range-progress { background: rgb(var(--p-400)); }
+.site-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid rgb(var(--p-600));
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s;
+}
+.site-range:active::-webkit-slider-thumb { transform: scale(1.12); }
+.site-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid rgb(var(--p-600));
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+}
+/* Dans un guide, le calculateur garde sa propre mise en page. */
+.site-prose .site-calc ul { list-style: none; padding-left: 0; }
+.site-prose .site-calc li + li { margin-top: 0; }
+
+/* Frise d'une affaire : l'étape qui s'affiche glisse en place. */
+@keyframes site-tab-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .site-tab-panel:not([hidden]) { animation: site-tab-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}

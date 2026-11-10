@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import CoursesCalculator from '@/components/site/CoursesCalculator';
 
 // Guide : calculer les quantités par convive.
 // Les grammages donnés sont des repères de métier à ajuster, pas des normes : le texte le dit.
@@ -65,6 +66,12 @@ export default function QuantitesParConvive() {
       <p>
         Fixez la marge de sécurité à un seul endroit, de préférence sur la quantité par convive de la fiche, et faites-la varier selon le produit. Elle a du sens sur ce qui ne se refait pas sur place, comme une viande longuement cuite. Elle en a beaucoup moins sur ce qui se complète facilement.
       </p>
+
+      <h2>Essayez le calcul</h2>
+      <p>
+        Choisissez un nombre de couverts&nbsp;: chaque quantité par convive est multipliée, comme le fait WeboDevis sur la liste de courses d’un événement.
+      </p>
+      <CoursesCalculator tone="light" className="site-calc" />
 
       <h2>Un exemple, du début à la fin</h2>
       <p>

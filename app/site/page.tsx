@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import CoursesCalculator from '@/components/site/CoursesCalculator';
 import DashboardPreview from '@/components/site/DashboardPreview';
 import EventMarquee from '@/components/site/EventMarquee';
 import EventPreview from '@/components/site/EventPreview';
@@ -8,6 +9,7 @@ import LinkList from '@/components/site/LinkList';
 import { PhoneChecklist, PhoneCourses, PhoneHome, PhoneMission, PhoneQuotes } from '@/components/site/Phone';
 import QuotePreview from '@/components/site/QuotePreview';
 import RequestPreview from '@/components/site/RequestPreview';
+import JourneyTabs, { type JourneyStep } from '@/components/site/JourneyTabs';
 import Testimonial from '@/components/site/Testimonial';
 import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
 import { RELEASE } from '@/lib/site/config';
@@ -33,6 +35,46 @@ const SCREENS = [
   { Screen: PhoneChecklist, href: '/fonctionnalites/evenements', title: 'L’événement', text: 'La checklist, le matériel, les courses, les extras.' },
   { Screen: PhoneCourses, href: '/fonctionnalites/liste-de-courses', title: 'Les courses', text: 'La liste à cocher, rayon par rayon.' },
   { Screen: PhoneMission, href: '/fonctionnalites/extras', title: 'La mission d’un extra', text: 'Ce que votre extra voit en ouvrant son lien.' },
+];
+
+// Une affaire, étape par étape : la frise de l'accueil.
+const JOURNEY: JourneyStep[] = [
+  {
+    key: 'demande',
+    label: 'Demande',
+    title: 'Plus aucune demande perdue dans vos mails.',
+    body: (
+      <p>
+        Vos futurs clients remplissent un formulaire à votre nom, à partager par lien ou à poser sur votre site. La demande arrive dans l’application avec la date, le type d’événement et le nombre de personnes, et chacun reçoit son email.
+      </p>
+    ),
+    link: { href: '/fonctionnalites/demandes-de-devis', label: 'Les demandes de devis, en détail' },
+    preview: <RequestPreview />,
+  },
+  {
+    key: 'devis',
+    label: 'Devis',
+    title: 'Un devis soigné, signé en ligne.',
+    body: (
+      <p>
+        Trois étapes pour le créer, vos modèles pour ne pas repartir de zéro. Votre client le reçoit par lien, le lit sur son téléphone et le signe en ligne. Le statut suit l’affaire jusqu’au paiement.
+      </p>
+    ),
+    link: { href: '/fonctionnalites/devis-traiteur', label: 'Les devis, en détail' },
+    preview: <QuotePreview />,
+  },
+  {
+    key: 'evenement',
+    label: 'Événement',
+    title: 'Devis signé, l’événement est prêt à préparer.',
+    body: (
+      <p>
+        Il arrive avec sa checklist, son matériel, sa liste de courses et ses extras. Chaque extra ouvre son lien et retrouve ses missions.
+      </p>
+    ),
+    link: { href: '/fonctionnalites/evenements', label: 'Les événements, en détail' },
+    preview: <EventPreview />,
+  },
 ];
 
 const FAQS: Faq[] = [
@@ -106,36 +148,13 @@ export default function SitePage() {
       <EventMarquee className="mt-14 md:mt-20" />
       <Testimonial className="pt-14 md:pt-20 lg:pt-24" />
 
-      {/* ── Le parcours d'une affaire : demande, devis, événement ── */}
-      <section id="demandes" aria-labelledby="titre-demandes" className={sectionGap}>
-        <div className={`${container} site-reveal ${two} lg:items-center`}>
-          <div>
-            <h2 id="titre-demandes" className="site-h2">Les demandes arrivent directement dans l’application.</h2>
-            <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
-              Vos futurs clients remplissent un formulaire à votre nom, à partager par lien ou à intégrer à votre site. Chaque demande s’enregistre avec la date, le type d’événement et le nombre de personnes&nbsp;: il ne reste plus qu’à en faire un devis.
-            </p>
-            <p className="site-body text-gray-700 mt-4 max-w-[52ch]">
-              Vous êtes prévenu par email, et la personne qui vous écrit reçoit un accusé de réception.
-            </p>
-            <p className="mt-6"><TextLink href="/fonctionnalites/demandes-de-devis">Les demandes de devis, en détail</TextLink></p>
+      {/* ── Une affaire en trois étapes, en frise : demande, devis, événement ── */}
+      <section id="parcours" aria-labelledby="titre-parcours" className={sectionGap}>
+        <div className={container}>
+          <h2 id="titre-parcours" className="site-h1 font-display max-w-[14ch]">Une affaire, de la demande au service.</h2>
+          <div className="site-reveal mt-10 md:mt-14">
+            <JourneyTabs steps={JOURNEY} />
           </div>
-          <RequestPreview />
-        </div>
-      </section>
-
-      <section id="devis" aria-labelledby="titre-devis" className={sectionGap}>
-        <div className={`${container} site-reveal grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
-          <div className="lg:order-2">
-            <h2 id="titre-devis" className="site-h2">Un devis soigné, envoyé en un lien.</h2>
-            <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
-              Trois étapes suffisent à créer le devis&nbsp;: l’événement, le client, le style. L’éditeur vous laisse ensuite reprendre le texte et la mise en page. Vos modèles évitent de repartir de zéro, et les dossiers gardent vos devis rangés.
-            </p>
-            <p className="site-body text-gray-700 mt-4 max-w-[52ch]">
-              Votre client reçoit un email avec un lien&nbsp;: il consulte le devis en ligne, l’imprime ou l’enregistre en PDF. De votre côté, le statut suit l’affaire, du devis à faire jusqu’au paiement.
-            </p>
-            <p className="mt-6"><TextLink href="/fonctionnalites/devis-traiteur">Les devis, en détail</TextLink></p>
-          </div>
-          <QuotePreview className="lg:order-1" />
         </div>
       </section>
 
@@ -143,7 +162,7 @@ export default function SitePage() {
       <section id="brochures" aria-labelledby="titre-brochures" className={sectionGap}>
         <div className={`${container} site-reveal ${two} lg:items-center`}>
           <div>
-            <h2 id="titre-brochures" className="site-h2">Votre carte, en brochure qui ramène des demandes.</h2>
+            <h2 id="titre-brochures" className="site-h2">Votre carte devient une brochure qui ramène des clients.</h2>
             <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
               La brochure se fait à partir de votre catalogue, avec ses photos et ses prix à jour. Votre client la feuillette sur son téléphone, et la dernière page est un formulaire&nbsp;: sa demande arrive dans vos prospects, prête à devenir un devis.
             </p>
@@ -172,46 +191,21 @@ export default function SitePage() {
         </div>
       </section>
 
-      <section id="evenements" aria-labelledby="titre-evenements" className={sectionGap}>
-        <div className={container}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-6 lg:items-start">
-            <h2 id="titre-evenements" className="site-h2 max-w-[18ch]">Devis validé&nbsp;: l’événement est prêt à préparer.</h2>
-            <div>
-              <p className="site-body text-gray-700 max-w-[56ch]">
-                Un devis validé devient un événement, avec sa checklist, son matériel et sa location, sa liste de courses et ses extras. Chaque extra dispose d’un lien où il retrouve ses missions.
-              </p>
-              <p className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
-                <TextLink href="/fonctionnalites/evenements">Les événements, en détail</TextLink>
-                <TextLink href="/fonctionnalites/extras">Les extras</TextLink>
-              </p>
-            </div>
-          </div>
-          <EventPreview className="site-reveal mt-10 lg:mt-14" />
-        </div>
-      </section>
-
       {/* ── Le calcul des courses : le moment fort du produit, en très grand ── */}
       <section aria-labelledby="titre-courses" className="site-dark mx-2 sm:mx-2.5 mt-20 md:mt-28 lg:mt-36 rounded-[28px] bg-forest text-white overflow-hidden">
-        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-x-16 pt-14 md:pt-20 lg:pt-24`}>
-          <div className="pb-12 md:pb-20 lg:pb-24">
-            <h2 id="titre-courses" className="site-h2 max-w-[16ch]">La liste de courses se calcule à partir du devis.</h2>
-            <p aria-label="180 grammes par personne, multipliés par 120 couverts, font 21,6 kilos." className="font-display mt-10 md:mt-14">
-              <span aria-hidden className="site-figure block text-white">180 g</span>
-              <span aria-hidden className="site-figure block text-white/40">× 120</span>
-              <span aria-hidden className="site-figure block text-primary-300">21,6 kg</span>
-            </p>
-            <p className="text-[15px] text-white/55 mt-5">Filet de bœuf, mariage de 120 couverts. Données d’exemple.</p>
-            <p className="site-body text-white/75 mt-8 max-w-[52ch]">
+        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-x-16 gap-y-10 py-14 md:py-20 lg:py-24 lg:items-center`}>
+          <div>
+            <h2 id="titre-courses" className="site-h2 max-w-[16ch]">Vos courses, calculées au gramme près.</h2>
+            <p className="site-body text-white/75 mt-6 max-w-[52ch]">
               Chaque prestation de votre catalogue porte ses ingrédients et leur quantité par personne. WeboDevis les multiplie par le nombre de couverts, additionne ce qui revient dans plusieurs plats, et range la liste par fournisseur.
             </p>
+            <p className="site-body text-white/75 mt-4 max-w-[52ch]">Faites varier les couverts&nbsp;: tout suit.</p>
             <p className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-base font-semibold">
               <Link href="/fonctionnalites/liste-de-courses" className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">La liste de courses, en détail</Link>
               <Link href="/guides/calculer-quantites-par-convive" className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Guide&nbsp;: les quantités par convive</Link>
             </p>
           </div>
-          <div className="hidden lg:flex items-end h-full">
-            <PhoneCourses className="-mb-24" />
-          </div>
+          <CoursesCalculator />
         </div>
       </section>
 

@@ -1,6 +1,7 @@
 import { Check, MapPin } from 'lucide-react';
 import DateBlock from '@/components/ui/DateBlock';
 import { cn } from '@/lib/utils';
+import { EXAMPLE_COURSES, courseTotal, type CourseLine } from '@/lib/site/coursesExample';
 import { Pill, Preview, previewCard } from './preview-kit';
 
 // La fiche d'un événement : ses onglets, la liste de courses calculée (quantité par convive × convives),
@@ -9,22 +10,8 @@ import { Pill, Preview, previewCard } from './preview-kit';
 
 const GUESTS = 120;
 
-// Quantité par convive, dans l'unité d'achat ; le total est calculé ici comme il l'est dans l'app.
-const COURSES = [
-  { name: 'Filet de bœuf', per: 180, unit: 'g' },
-  { name: 'Pommes grenaille', per: 200, unit: 'g' },
-  { name: 'Asperges vertes', per: 80, unit: 'g' },
-  { name: 'Fraises gariguette', per: 100, unit: 'g' },
-  { name: 'Crème liquide', per: 5, unit: 'cl' },
-];
-
-const fr = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
-
-/** 180 g × 120 = 21,6 kg ; 5 cl × 120 = 6 L. */
-function total(per: number, unit: string) {
-  const sum = per * GUESTS;
-  return unit === 'g' ? `${fr(sum / 1000)} kg` : `${fr(sum / 100)} L`;
-}
+const COURSES = EXAMPLE_COURSES;
+const total = (per: number, unit: CourseLine['unit']) => courseTotal(per, unit, GUESTS);
 
 const TASKS = [
   { label: 'Commander la vaisselle', done: true },
