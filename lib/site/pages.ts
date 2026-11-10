@@ -114,7 +114,7 @@ export interface SitemapEntry {
 }
 
 /** Date de la dernière entrée de la page des nouveautés. */
-export const RELEASES_UPDATED = '2026-10-20';
+export const RELEASES_UPDATED = '2026-11-10';
 
 /** Toutes les pages publiques à référencer (la démo et la connexion n'en font pas partie). */
 export const SITEMAP: SitemapEntry[] = [

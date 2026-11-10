@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import DashboardPreview from '@/components/site/DashboardPreview';
 import EventPreview from '@/components/site/EventPreview';
+import FeaturePreviewFor from '@/components/site/FeaturePreviews';
 import FaqList from '@/components/site/FaqList';
 import LinkList from '@/components/site/LinkList';
 import { PhoneChecklist, PhoneCourses, PhoneHome, PhoneMission, PhoneQuotes } from '@/components/site/Phone';
@@ -18,7 +19,7 @@ import { fr } from '@/lib/site/typo';
 // L'accueil du site (servi à l'adresse « / » pour un visiteur sans session).
 const TITLE = 'WeboDevis : le logiciel des traiteurs, du devis à l’événement';
 const DESCRIPTION =
-  'Logiciel pour traiteurs : demandes, devis, événements, liste de courses calculée par convive, extras, stock et marge. Sur téléphone, tablette et ordinateur.';
+  'Logiciel pour traiteurs : brochure en ligne, devis signés en ligne, événements, liste de courses calculée par convive, extras, factures et l’assistant Webo. Sur téléphone, tablette et ordinateur.';
 
 export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: HOME.href });
 
@@ -37,7 +38,9 @@ const FAQS: Faq[] = [
   { q: 'Quand WeboDevis sort-il ?', a: `La version ${RELEASE.version}, première version publique, sort le ${RELEASE.dateLabel}. La page Nouveautés détaille ce qu’elle contient.` },
   { q: 'Peut-on essayer le logiciel avant sa sortie ?', a: 'Oui. Vous laissez votre nom, votre email et votre téléphone, puis la démonstration s’ouvre sur un compte déjà rempli de données fictives, pour parcourir les devis, les événements et la liste de courses. Rien de ce que vous y modifiez n’est enregistré : ce compte ne sert pas à travailler sur vos vraies données.' },
   { q: 'Combien coûte WeboDevis ?', a: 'Les tarifs ne sont pas encore publiés. Vous pouvez demander un devis depuis la page Contact, en indiquant la taille de votre équipe.' },
-  { q: 'Faut-il installer quelque chose ?', a: 'Non. WeboDevis s’ouvre dans un navigateur, sur ordinateur, tablette et téléphone. Sur téléphone, vous pouvez l’ajouter à l’écran d’accueil pour l’ouvrir comme une application. Une connexion internet est nécessaire.' },
+  { q: 'Faut-il installer quelque chose ?', a: 'Non. WeboDevis s’ouvre dans un navigateur, sur ordinateur, tablette et téléphone. Sur téléphone, vous pouvez l’ajouter à l’écran d’accueil pour l’ouvrir comme une application. Une connexion internet est nécessaire, sauf pour consulter « Ma journée ».' },
+  { q: 'WeboDevis a-t-il une intelligence artificielle ?', a: 'Oui : Webo, l’assistant intégré. Il prépare un devis, une relance, une checklist ou une facture à partir d’une phrase, d’une dictée ou d’une photo, et vous le présente. Rien n’est enregistré ni envoyé sans votre validation.' },
+  { q: 'Puis-je travailler à plusieurs ?', a: 'Oui. Vous invitez vos collaborateurs, chacun avec son rôle : gérant, collaborateur ou consultation. Toute l’entreprise partage les devis, les clients, le catalogue et le stock.' },
   { q: 'Mon client doit-il créer un compte pour lire son devis ?', a: 'Non. Il reçoit un email avec un lien, ouvre le devis en ligne, et peut l’imprimer ou l’enregistrer en PDF.' },
   { q: 'Puis-je garder mes anciens devis ?', a: 'Oui. Un devis fait ailleurs s’importe avec son client, sa date, son montant et son fichier d’origine, conservé tel quel.' },
 ];
@@ -117,6 +120,39 @@ export default function SitePage() {
             <p className="mt-6"><TextLink href="/fonctionnalites/devis-traiteur">Les devis, en détail</TextLink></p>
           </div>
           <QuotePreview className="lg:order-1" />
+        </div>
+      </section>
+
+      {/* ── Les nouveautés fortes : la brochure qui attire, l'assistant qui prépare ── */}
+      <section id="brochures" aria-labelledby="titre-brochures" className={sectionGap}>
+        <div className={`${container} ${two} lg:items-center`}>
+          <div>
+            <h2 id="titre-brochures" className="site-h2">Votre carte, en brochure qui ramène des demandes.</h2>
+            <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
+              La brochure se fait à partir de votre catalogue, avec ses photos et ses prix à jour. Votre client la feuillette sur son téléphone, et la dernière page est un formulaire&nbsp;: sa demande arrive dans vos prospects, prête à devenir un devis.
+            </p>
+            <p className="site-body text-gray-700 mt-4 max-w-[52ch]">
+              Un lien par client ou par source, un QR code pour vos salons, des images pour Instagram&nbsp;: vous savez d’où viennent vos demandes.
+            </p>
+            <p className="mt-6"><TextLink href="/fonctionnalites/brochures-traiteur">Les brochures, en détail</TextLink></p>
+          </div>
+          <FeaturePreviewFor kind="brochure" />
+        </div>
+      </section>
+
+      <section id="webo" aria-labelledby="titre-webo" className={sectionGap}>
+        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
+          <div className="lg:order-2">
+            <h2 id="titre-webo" className="site-h2">Webo prépare. Vous validez.</h2>
+            <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
+              Webo, l’assistant de WeboDevis, prépare un devis, une relance, une checklist ou une facture à partir d’une phrase, d’une dictée ou de la photo d’un menu. Il prend vos prix dans votre catalogue et retient vos habitudes.
+            </p>
+            <p className="site-body text-gray-700 mt-4 max-w-[52ch]">
+              Chaque action vous est présentée avant d’être faite&nbsp;: rien ne s’enregistre et rien ne part sans votre accord.
+            </p>
+            <p className="mt-6"><TextLink href="/fonctionnalites/assistant-webo">Webo, en détail</TextLink></p>
+          </div>
+          <div className="lg:order-1"><FeaturePreviewFor kind="webo" /></div>
         </div>
       </section>
 
@@ -229,7 +265,7 @@ export default function SitePage() {
             </div>
             <div>
               <p className="site-body text-gray-700 max-w-[46ch]">
-                La première version publique couvre le métier d’un bout à l’autre&nbsp;: demandes, devis, événements, liste de courses, extras, stock, calendrier et suivi financier.
+                La première version publique couvre le métier d’un bout à l’autre&nbsp;: brochures, demandes, devis signés en ligne, événements, liste de courses, extras, stock, factures, et l’assistant Webo.
               </p>
               <p className="site-body text-gray-700 mt-4 max-w-[46ch]">
                 D’ici là, la démonstration est ouverte, sur un compte rempli de données fictives.

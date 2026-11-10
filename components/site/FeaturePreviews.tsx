@@ -1,4 +1,4 @@
-import { Building2, Check, Clock, Download, FileCode2, FileText, Paperclip, Truck } from 'lucide-react';
+import { Building2, Check, Clock, Download, FileCode2, FileText, Paperclip, Sparkles, Truck } from 'lucide-react';
 import DateBlock from '@/components/ui/DateBlock';
 import type { FeaturePreview } from '@/lib/site/features';
 import { cn } from '@/lib/utils';
@@ -510,6 +510,138 @@ function MobilePreview() {
   );
 }
 
+// ── Brochures ──────────────────────────────────────────────────────────────────
+const BROCHURE_DISHES = [
+  { name: 'Velouté de châtaigne, éclats de noisette', price: '9,50 €' },
+  { name: 'Filet de bœuf, jus corsé, pommes grenaille', price: '28,00 €' },
+  { name: 'Fraisier de saison', price: '8,50 €' },
+];
+const BROCHURE_LINKS = [
+  { name: 'Camille Roussel', kind: 'Lien client', opens: '4 ouvertures', requests: '1 demande' },
+  { name: 'Instagram', kind: 'Lien par source', opens: '86 ouvertures', requests: '5 demandes' },
+  { name: 'Salon du mariage', kind: 'Lien par source', opens: '41 ouvertures', requests: '3 demandes' },
+];
+
+function BrochurePreview() {
+  return (
+    <Preview label="Aperçu d’une brochure ouverte en double page : à gauche la couverture « Mariages 2027 » de Maison Verdier, à droite une page de carte avec trois prestations et leur prix par personne. À côté, trois liens de la brochure avec leurs ouvertures et leurs demandes. Données d’exemple." className="grid grid-cols-1 gap-3 max-w-[760px]">
+      <div className={cn(panel, 'p-3 sm:p-4')}>
+        <div className="grid grid-cols-2 rounded-xl overflow-hidden border border-gray-200">
+          <div className="bg-forest text-white flex flex-col justify-between gap-10 p-4 sm:p-6">
+            <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-white/60">Maison Verdier</p>
+            <div>
+              <p className="font-display text-xl sm:text-3xl font-semibold leading-[1.05] tracking-[-0.02em]">Mariages<br />2027</p>
+              <p className="text-[11px] sm:text-sm text-primary-300 mt-2">La carte des réceptions</p>
+            </div>
+          </div>
+          <div className="bg-[#FBF8F3] p-3 sm:p-5 flex flex-col">
+            <p className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-gray-500">Le dîner</p>
+            <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
+              {BROCHURE_DISHES.map((d) => (
+                <div key={d.name} className="border-b border-gray-200 pb-1.5 sm:pb-2.5">
+                  <p className="text-[11px] sm:text-sm leading-snug text-gray-900">{d.name}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{d.price} / pers.</p>
+                </div>
+              ))}
+            </div>
+            <span className="mt-4 self-start inline-flex items-center h-6 sm:h-8 px-2.5 sm:px-3.5 rounded-full bg-primary text-white text-[10px] sm:text-xs font-semibold">Je veux ce menu</span>
+          </div>
+        </div>
+      </div>
+      <div className={cn(panel, 'p-4 sm:p-5')}>
+        <p className="text-lg font-semibold text-gray-900">Liens de la brochure</p>
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 sm:gap-4 divide-y sm:divide-y-0 divide-gray-100">
+          {BROCHURE_LINKS.map((l) => (
+            <div key={l.name} className="py-3 sm:py-1 min-w-0">
+              <div className="flex sm:flex-col sm:items-start items-center justify-between gap-1.5 sm:gap-1">
+                <p className="font-medium text-gray-900 truncate max-w-full">{l.name}</p>
+                <Pill tone={l.kind === 'Lien client' ? 'terracotta' : 'neutral'}>{l.kind}</Pill>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">{l.opens} · {l.requests}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Preview>
+  );
+}
+
+// ── Webo ───────────────────────────────────────────────────────────────────────
+function WeboPreview() {
+  return (
+    <Preview label="Aperçu d’une conversation avec Webo : le traiteur demande un devis pour le mariage de Camille Roussel, 120 couverts, formule Prestige. Webo répond par une carte de proposition avec le client, la date, quatre lignes et le total, et trois boutons : Valider, Modifier, Annuler. Données d’exemple." className={cn(panel, 'p-4 sm:p-6 max-w-[640px]')}>
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 h-9 rounded-full bg-forest text-white flex items-center justify-center"><Sparkles className="h-4 w-4" /></span>
+        <p className="text-lg font-semibold text-gray-900">Webo</p>
+      </div>
+      <p className="mt-4 ml-auto max-w-[85%] w-fit rounded-2xl rounded-br-md bg-primary text-white px-4 py-2.5 text-[15px] leading-relaxed">
+        Fais un devis pour le mariage de Camille Roussel le 12 juin, 120 couverts, formule Prestige.
+      </p>
+      <p className="mt-4 max-w-[90%] text-[15px] leading-relaxed text-gray-800">
+        Voici le devis, avec vos prix du catalogue. Je n’envoie rien avant votre accord.
+      </p>
+      <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900">Nouveau devis</p>
+            <p className="text-sm text-gray-600">Camille Roussel · Mariage · 12 juin · 120 couverts</p>
+          </div>
+          <Pill tone="terracotta">Proposition</Pill>
+        </div>
+        <div className="mt-3 text-sm">
+          {[['Cocktail, 8 pièces', '14,00 €'], ['Velouté de châtaigne', '9,50 €'], ['Filet de bœuf, jus corsé', '28,00 €'], ['Fraisier de saison', '8,50 €']].map(([n, p]) => (
+            <p key={n} className="flex justify-between gap-4 py-2 border-t border-gray-200/70">
+              <span className="text-gray-700 truncate">{n}</span><span className="text-gray-900 tabular-nums whitespace-nowrap">{p} / pers.</span>
+            </p>
+          ))}
+          <p className="flex justify-between gap-4 pt-2.5 border-t border-gray-200 font-semibold text-gray-900">
+            <span>Total HT</span><span className="tabular-nums">7 200,00 €</span>
+          </p>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-sm font-semibold">
+          <span className="flex items-center justify-center h-10 rounded-xl bg-primary text-white">Valider</span>
+          <span className="flex items-center justify-center h-10 rounded-xl bg-white border border-gray-200 text-gray-900">Modifier</span>
+          <span className="flex items-center justify-center h-10 rounded-xl text-gray-600">Annuler</span>
+        </div>
+      </div>
+    </Preview>
+  );
+}
+
+// ── Équipe ─────────────────────────────────────────────────────────────────────
+const MEMBERS = [
+  { initials: 'CV', name: 'Claire Verdier', email: 'claire@maison-verdier.exemple', role: 'Titulaire', tone: 'solid' as const },
+  { initials: 'TM', name: 'Thomas Morel', email: 'thomas@maison-verdier.exemple', role: 'Gérant', tone: 'terracotta' as const },
+  { initials: 'LB', name: 'Léa Bernard', email: 'lea@maison-verdier.exemple', role: 'Collaborateur', tone: 'sage' as const },
+  { initials: 'JP', name: 'Julien Petit', email: 'julien@maison-verdier.exemple', role: 'Consultation', tone: 'neutral' as const },
+];
+
+function TeamPreview() {
+  return (
+    <Preview label="Aperçu de l’équipe d’une entreprise : quatre personnes, titulaire, gérant, collaborateur et consultation, et un bouton Inviter. Données d’exemple." className={cn(panel, 'p-4 sm:p-6 max-w-[680px]')}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="font-display text-[26px] font-bold text-gray-900 leading-tight tracking-[-0.015em]">Équipe</p>
+          <p className="text-sm text-gray-600">4 personnes</p>
+        </div>
+        <span className="flex items-center h-10 px-4 rounded-xl bg-primary text-white text-sm font-semibold">Inviter</span>
+      </div>
+      <div className="mt-4 divide-y divide-gray-100 border-t border-gray-100">
+        {MEMBERS.map((m) => (
+          <div key={m.name} className="flex items-center gap-3 py-3">
+            <span className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center flex-shrink-0 text-xs font-semibold">{m.initials}</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-900 truncate">{m.name}</p>
+              <p className="text-xs text-gray-500 truncate">{m.email}</p>
+            </div>
+            <Pill tone={m.tone}>{m.role}</Pill>
+          </div>
+        ))}
+      </div>
+    </Preview>
+  );
+}
+
 /** L'aperçu d'une page fonctionnalité, d'après la clé `preview` de sa fiche. */
 export default function FeaturePreviewFor({ kind }: { kind: FeaturePreview }) {
   switch (kind) {
@@ -527,5 +659,8 @@ export default function FeaturePreviewFor({ kind }: { kind: FeaturePreview }) {
     case 'factures': return <InvoicesPreview />;
     case 'facturx': return <FacturXPreview />;
     case 'allergenes': return <AllergensPreview />;
+    case 'brochure': return <BrochurePreview />;
+    case 'webo': return <WeboPreview />;
+    case 'equipe': return <TeamPreview />;
   }
 }

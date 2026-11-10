@@ -7,7 +7,7 @@ import { FEATURES_INDEX, GUIDES_INDEX, HOME } from '@/lib/site/pages';
 import { breadcrumbSchema } from '@/lib/site/schema';
 import { fr } from '@/lib/site/typo';
 
-const TITLE = 'Guides pratiques pour traiteurs : devis, quantités, marge | WeboDevis';
+const TITLE = 'Guides pour traiteurs : devis, quantités, marge | WeboDevis';
 const DESCRIPTION = 'Des guides écrits pour les traiteurs : le contenu d’un devis, les quantités par convive, la liste de courses, la marge, l’organisation d’un événement.';
 
 export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: GUIDES_INDEX.href });

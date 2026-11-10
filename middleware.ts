@@ -4,6 +4,14 @@ import { NextResponse, type NextRequest } from 'next/server';
 // Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
 const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
 
+// Écrans de l'application (dossiers de app/(app) et app/(print), et l'administration) : sans session, ils
+// renvoient vers la connexion. À compléter quand un écran s'ajoute à la racine de l'app.
+const APP_PREFIXES = [
+  '/admin', '/brochures', '/calendrier', '/clients', '/commandes', '/courses-globales', '/devis', '/evenements', '/extras',
+  '/factures', '/fournisseurs', '/ingredients', '/journee', '/location-globale', '/location-templates', '/materiel',
+  '/modeles', '/notifications', '/parametres', '/prestations', '/prospects', '/site-web', '/stock', '/tableau-de-bord', '/webo',
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
@@ -47,6 +55,12 @@ export async function middleware(request: NextRequest) {
     const res = NextResponse.rewrite(siteUrl);
     res.headers.set('Cache-Control', 'private, no-store');
     return res;
+  }
+
+  // Sans session, seuls les écrans de l'app renvoient vers la connexion. Une adresse inconnue reçoit la page 404
+  // (app/not-found.tsx) : une redirection vers /login serait lue par Google comme une page qui a déménagé.
+  if (!token && !isAuthRoute && !APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return NextResponse.next();
   }
 
   // Redirect unauthenticated users to /login

@@ -14,6 +14,21 @@ const DESCRIPTION = `La version ${RELEASE.version} de WeboDevis, le logiciel des
 
 export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: RELEASES.href });
 
+/** Entrée du 10 novembre 2026. */
+const NOVEMBER_POINTS = [
+  'Brochures : votre carte en brochure feuilletable, faite à partir du catalogue, avec un formulaire de demande en dernière page. Liens par client ou par source, code d’accès, PDF, QR code, images pour Instagram et version anglaise.',
+  'Webo, l’assistant : demandez un devis, une relance, une checklist ou une facture en une phrase, une dictée ou une photo. Webo prépare, vous validez.',
+  'Devis : plusieurs formules au choix, que le client choisit en signant ; envoi par WhatsApp, copie à cinq personnes, relances automatiques et historique de chaque devis.',
+  'Extras : réponse à la mission depuis leur lien, contrat d’extra signé en ligne, fiche DPAE préparée, heures faites et récapitulatif du mois pour la paie.',
+  'Équipe : invitez vos collaborateurs, en gérant, collaborateur ou consultation, sur le même catalogue, le même stock et les mêmes clients.',
+  'Et aussi : les dégustations dans l’agenda avec rappel au client, l’abonnement depuis Google Agenda ou Outlook, l’export comptable au format FEC, le coût matière calculé depuis la recette, l’envoi des commandes aux fournisseurs par email, et « Ma journée » lisible sans réseau.',
+];
+
+const NOVEMBER_LINKS: SiteLink[] = ['brochures-traiteur', 'assistant-webo', 'devis-traiteur', 'extras', 'equipe', 'calendrier'].flatMap((slug) => {
+  const f = featureBySlug(slug);
+  return f ? [{ href: f.href, label: f.label, blurb: f.blurb }] : [];
+});
+
 /** Entrée du 20 octobre 2026 : ce qui a été ajouté, en une phrase par point. */
 const UPDATE_POINTS = [
   'Signature en ligne : le client accepte le devis depuis son lien et le signe au doigt ou à la souris. Le devis passe en « Validé » et vous êtes prévenu.',
@@ -52,8 +67,29 @@ export default function ReleasesPage() {
         demo={false}
       />
 
-      {/* Entrée du 20 octobre 2026 : la plus récente, en premier. */}
-      <section aria-labelledby="titre-octobre-2026" className="pt-12 md:pt-20">
+      {/* Entrée du 10 novembre 2026 : la plus récente, en premier. */}
+      <section aria-labelledby="titre-novembre-2026" className="pt-12 md:pt-20">
+        <div className={container}>
+          <p className="text-base text-gray-600">
+            <time dateTime="2026-11-10">10 novembre 2026</time>
+          </p>
+          <h2 id="titre-novembre-2026" className="site-h1 font-display mt-2">Brochures, Webo, formules au choix</h2>
+          <p className="site-lead text-gray-700 mt-6 max-w-[58ch]">
+            Avant sa sortie, la version {RELEASE.version} gagne de quoi attirer les demandes et gagner du temps&nbsp;: la brochure en ligne, l’assistant Webo, et tout ce qu’il faut pour travailler à plusieurs, extras compris.
+          </p>
+          <ul className="mt-6 space-y-2.5 max-w-[60ch]">
+            {NOVEMBER_POINTS.map((pt) => (
+              <li key={pt} className="flex gap-3 text-base leading-relaxed text-gray-900">
+                <span className="flex-shrink-0 mt-[0.6em] w-1.5 h-1.5 rounded-full bg-primary" aria-hidden />
+                {fr(pt)}
+              </li>
+            ))}
+          </ul>
+          <LinkList links={NOVEMBER_LINKS} columns={2} className="mt-10" />
+        </div>
+      </section>
+
+      <section aria-labelledby="titre-octobre-2026" className="pt-14 md:pt-20">
         <div className={container}>
           <p className="text-base text-gray-600">
             <time dateTime="2026-10-20">20 octobre 2026</time>
