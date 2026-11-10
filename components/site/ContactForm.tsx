@@ -23,8 +23,10 @@ const field =
 const labelCls = 'block text-[15px] font-medium text-gray-800 mb-2';
 const optional = <span className="font-normal text-gray-500"> (facultatif)</span>;
 
-export default function ContactForm({ initialKind }: { initialKind: Kind }) {
+export default function ContactForm({ initialKind, initialMigration = false }: { initialKind: Kind; initialMigration?: boolean }) {
   const [kind, setKind] = useState<Kind>(initialKind);
+  // Option « reprise des données » : ajoutée en tête du message, pour être vue tout de suite dans la demande.
+  const [migration, setMigration] = useState(initialMigration);
   const [values, setValues] = useState({ name: '', email: '', phone: '', company: '', teamSize: '', message: '', website: '' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,9 @@ export default function ContactForm({ initialKind }: { initialKind: Kind }) {
       phone: values.phone || undefined,
       company: values.company || undefined,
       teamSize: kind === 'devis' ? values.teamSize || undefined : undefined,
-      message: values.message,
+      message: kind === 'devis' && migration ? `Option demandée : reprise de mes données existantes dans WeboDevis.
+
+${values.message}` : values.message,
       website: values.website,
     }).catch(() => ({ error: 'L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez.' }));
     setSending(false);
@@ -121,6 +125,17 @@ export default function ContactForm({ initialKind }: { initialKind: Kind }) {
               {TEAM_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+        )}
+
+        {kind === 'devis' && (
+          <label htmlFor="contact-reprise" className="sm:col-span-2 flex gap-3 items-start rounded-2xl border border-gray-200 bg-white p-4 cursor-pointer hover:border-gray-300">
+            <input id="contact-reprise" type="checkbox" checked={migration} onChange={(e) => setMigration(e.target.checked)}
+              className="mt-1 h-5 w-5 flex-shrink-0 rounded border-gray-300 accent-[rgb(var(--p-600))]" />
+            <span>
+              <span className="block text-[15px] font-medium text-gray-900">Reprise de mes données</span>
+              <span className="block text-[15px] text-gray-600 mt-0.5">Nous ajoutons vos clients, vos prestations et votre catalogue depuis votre logiciel actuel ou vos fichiers. Sur devis.</span>
+            </span>
+          </label>
         )}
 
         <div className="sm:col-span-2">

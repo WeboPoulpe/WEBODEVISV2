@@ -15,10 +15,11 @@ const crumbs = [
   { name: CONTACT.label, path: CONTACT.href },
 ];
 
-// /contact?objet=devis présélectionne la demande de devis.
+// /contact?objet=devis présélectionne la demande de devis ; ?objet=reprise y coche aussi la reprise des données.
 export default async function ContactPage({ searchParams }: { searchParams: Promise<{ objet?: string | string[] }> }) {
   const { objet } = await searchParams;
-  const initialKind = objet === 'devis' ? 'devis' : 'message';
+  const initialKind = objet === 'devis' || objet === 'reprise' ? 'devis' : 'message';
+  const initialMigration = objet === 'reprise';
 
   return (
     <>
@@ -45,7 +46,7 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
               Pour une demande de devis, indiquez la taille de votre équipe et le type d’événements que vous réalisez&nbsp;: la proposition sera plus juste.
             </p>
           </div>
-          <div className="order-1 lg:order-2"><ContactForm initialKind={initialKind} /></div>
+          <div className="order-1 lg:order-2"><ContactForm initialKind={initialKind} initialMigration={initialMigration} /></div>
         </div>
       </section>
     </>

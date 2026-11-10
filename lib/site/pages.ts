@@ -37,6 +37,9 @@ export const RELEASES: SiteLink = { href: '/nouveautes', label: 'Nouveautés' };
 export const CONTACT: SiteLink = { href: '/contact', label: 'Contact' };
 /** Demande de devis pour le logiciel : le formulaire de contact, avec l'objet présélectionné. */
 export const QUOTE_REQUEST: SiteLink = { href: '/contact?objet=devis', label: 'Demander un devis' };
+export const PRICING: SiteLink = { href: '/tarifs', label: 'Tarifs' };
+/** Demande de devis avec la reprise des données cochée. */
+export const MIGRATION_REQUEST: SiteLink = { href: '/contact?objet=reprise', label: 'Demander un devis de reprise' };
 export const LEGAL: SiteLink[] = [
   { href: '/mentions-legales', label: 'Mentions légales' },
   { href: '/confidentialite', label: 'Confidentialité' },
@@ -95,14 +98,14 @@ export const MENU: SiteMenuEntry[] = [
     all: { href: GUIDES_INDEX.href, label: 'Tous les guides' },
   },
 ];
-export const MENU_LINKS: SiteLink[] = [RELEASES, CONTACT];
+export const MENU_LINKS: SiteLink[] = [PRICING, RELEASES, CONTACT];
 
 /** Le pied de page : toute l'arborescence. */
 export const FOOTER: SiteLinkGroup[] = [
   { title: 'Fonctionnalités', links: [...FEATURES.map((f) => ({ href: f.href, label: f.label })), { href: FEATURES_INDEX.href, label: 'Vue d’ensemble' }] },
   { title: 'Pour qui', links: AUDIENCES.map((a) => ({ href: a.href, label: a.label })) },
   { title: 'Guides', links: [...GUIDES.map((g) => ({ href: g.href, label: g.title })), { href: GUIDES_INDEX.href, label: 'Tous les guides' }] },
-  { title: 'WeboDevis', links: [HOME, RELEASES, CONTACT, LOGIN, ...LEGAL] },
+  { title: 'WeboDevis', links: [HOME, PRICING, RELEASES, CONTACT, LOGIN, ...LEGAL] },
 ];
 
 export interface SitemapEntry {
@@ -124,6 +127,7 @@ export const SITEMAP: SitemapEntry[] = [
   ...AUDIENCES.map((a) => ({ path: a.href, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: a.updated })),
   { path: GUIDES_INDEX.href, priority: 0.7, changeFrequency: 'weekly' },
   ...GUIDES.map((g) => ({ path: g.href, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: g.published })),
+  { path: PRICING.href, priority: 0.8, changeFrequency: 'monthly' },
   { path: RELEASES.href, priority: 0.5, changeFrequency: 'weekly', lastModified: RELEASES_UPDATED },
   { path: CONTACT.href, priority: 0.5, changeFrequency: 'yearly' },
   ...LEGAL.map((l) => ({ path: l.href, priority: 0.2, changeFrequency: 'yearly' as const })),
