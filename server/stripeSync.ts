@@ -28,22 +28,41 @@ async function companyOf(subscription: Stripe.Subscription, customerId: string |
   return row?.id ?? null;
 }
 
+/** Fin de la période payée : portée par la ligne d'abonnement depuis 2025, par l'abonnement avant. */
+function periodEndOf(sub: Stripe.Subscription): number | null {
+  return sub.items?.data?.[0]?.current_period_end ?? (sub as unknown as { current_period_end?: number }).current_period_end ?? null;
+}
+
+const isLive = (sub: Stripe.Subscription) => sub.status === 'active' || sub.status === 'past_due';
+
 /**
- * Relit l'abonnement chez Stripe et l'applique à son entreprise. Une ligne déjà mise à jour par un événement plus
- * récent que `eventCreated` (secondes Stripe) n'est pas touchée. Renvoie null si l'entreprise est introuvable.
+ * L'abonnement qui fait foi pour un client : un abonnement actif (ou en relance) d'abord, celui dont la période va le
+ * plus loin s'il y en a plusieurs ; sinon le plus récent. Un doublon résilié ne passe donc jamais devant un abonnement payé.
+ */
+function bestSubscription(subs: Stripe.Subscription[]): Stripe.Subscription {
+  const live = subs.filter(isLive);
+  if (live.length) return live.reduce((a, b) => ((periodEndOf(b) ?? 0) > (periodEndOf(a) ?? 0) ? b : a));
+  return subs.reduce((a, b) => ((b.created ?? 0) > (a.created ?? 0) ? b : a));
+}
+
+/**
+ * Relit chez Stripe les abonnements du client de `subscriptionId` (qui n'est que le déclencheur) et applique le
+ * meilleur à l'entreprise. Une ligne déjà mise à jour par un événement plus récent que `eventCreated` (secondes
+ * Stripe) n'est pas touchée. Renvoie null si l'entreprise est introuvable.
  */
 export async function applyStripeSubscription(subscriptionId: string, eventCreated?: number): Promise<{ companyId: string } | null> {
-  const sub = await stripe().subscriptions.retrieve(subscriptionId);
-  const customerId = idOf(sub.customer);
-  const companyId = await companyOf(sub, customerId);
+  const trigger = await stripe().subscriptions.retrieve(subscriptionId);
+  const customerId = idOf(trigger.customer);
+  const companyId = await companyOf(trigger, customerId);
   if (!companyId) {
-    console.warn(`[stripe] abonnement ${sub.id} : entreprise introuvable, ignoré`);
+    console.warn(`[stripe] abonnement ${trigger.id} : entreprise introuvable, ignoré`);
     return null;
   }
+  const others = customerId ? (await stripe().subscriptions.list({ customer: customerId, status: 'all', limit: 10 })).data : [];
+  const sub = bestSubscription([trigger, ...others.filter((o) => o.id !== trigger.id)]);
 
   const item = sub.items?.data?.[0];
-  // Depuis 2025, l'échéance est portée par la ligne d'abonnement ; les anciennes versions la mettaient sur l'abonnement.
-  const periodEnd = item?.current_period_end ?? (sub as unknown as { current_period_end?: number }).current_period_end ?? null;
+  const periodEnd = periodEndOf(sub);
   const values = {
     stripe_customer_id: customerId,
     stripe_subscription_id: sub.id,
@@ -52,7 +71,7 @@ export async function applyStripeSubscription(subscriptionId: string, eventCreat
     current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
     cancel_at_period_end: !!sub.cancel_at_period_end,
     anchor_day: sub.billing_cycle_anchor ? parisYmd(new Date(sub.billing_cycle_anchor * 1000)).day : null,
-    ever_subscribed: sub.status === 'active' || sub.status === 'past_due',
+    ever_subscribed: isLive(sub),
     last_event_at: eventCreated ? new Date(eventCreated * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
   };
@@ -132,17 +151,13 @@ async function dispatch(event: Stripe.Event): Promise<void> {
 }
 
 /**
- * Traite un événement du webhook une seule fois. En cas d'erreur, l'événement est retiré de stripe_events et l'erreur
- * relancée : la route répond 500 et Stripe réessaie.
+ * Traite un événement du webhook une seule fois. Le traitement relit Stripe, il peut donc être rejoué sans risque :
+ * l'événement n'est marqué comme traité qu'après un succès. Une erreur, un délai dépassé ou un arrêt en cours de route
+ * ne laissent aucune marque, et Stripe le renvoie.
  */
 export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
-  const inserted = await db.insert(stripe_events).values({ id: event.id, type: event.type })
-    .onConflictDoNothing().returning({ id: stripe_events.id });
-  if (inserted.length === 0) return;
-  try {
-    await dispatch(event);
-  } catch (e) {
-    await db.delete(stripe_events).where(eq(stripe_events.id, event.id));
-    throw e;
-  }
+  const [seen] = await db.select({ id: stripe_events.id }).from(stripe_events).where(eq(stripe_events.id, event.id)).limit(1);
+  if (seen) return;
+  await dispatch(event);
+  await db.insert(stripe_events).values({ id: event.id, type: event.type }).onConflictDoNothing();
 }

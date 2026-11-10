@@ -17,8 +17,9 @@ vi.mock('@/db', () => ({
 }));
 
 const retrieve = vi.fn();
+const list = vi.fn();
 vi.mock('@/lib/stripe', () => ({
-  stripe: () => ({ subscriptions: { retrieve } }),
+  stripe: () => ({ subscriptions: { retrieve, list } }),
   planOfPrice: (id: string) => (id === 'price_m' ? 'mensuel' : id === 'price_a' ? 'annuel' : null),
 }));
 
@@ -36,16 +37,17 @@ const settings = await import('./settings');
 const ANCHOR = Math.floor(Date.parse('2026-11-17T09:00:00Z') / 1000);
 const PERIOD_END = Math.floor(Date.parse('2026-12-17T09:00:00Z') / 1000);
 
-function sub(over: Partial<{ status: string; cancel: boolean; company: string | null; price: string }> = {}): Stripe.Subscription {
+function sub(over: Partial<{ id: string; created: number; end: number; status: string; cancel: boolean; company: string | null; price: string }> = {}): Stripe.Subscription {
   return {
-    id: 'sub_1',
+    id: over.id ?? 'sub_1',
+    created: over.created ?? ANCHOR,
     object: 'subscription',
     customer: 'cus_1',
     status: over.status ?? 'active',
     cancel_at_period_end: over.cancel ?? false,
     billing_cycle_anchor: ANCHOR,
     metadata: over.company === null ? {} : { company_id: over.company ?? OWNER },
-    items: { object: 'list', data: [{ id: 'si_1', current_period_end: PERIOD_END, price: { id: over.price ?? 'price_m' } }] },
+    items: { object: 'list', data: [{ id: 'si_1', current_period_end: over.end ?? PERIOD_END, price: { id: over.price ?? 'price_m' } }] },
   } as unknown as Stripe.Subscription;
 }
 
@@ -72,6 +74,8 @@ beforeEach(async () => {
   await pg.exec(`delete from company_subscriptions; delete from stripe_events; delete from app_settings where key = 'billing_enforced';`);
   access.clearAccessCache();
   retrieve.mockReset();
+  list.mockReset();
+  list.mockResolvedValue({ object: 'list', data: [], has_more: false });
   sendMail.mockClear();
 });
 
@@ -100,6 +104,31 @@ describe('applyStripeSubscription', () => {
     retrieve.mockResolvedValue(sub({ company: '00000000-0000-4000-8000-0000000000ff' }));
     expect(await sync.applyStripeSubscription('sub_1')).toBeNull();
     expect((await pg.query('select * from company_subscriptions')).rows).toHaveLength(0);
+  });
+
+  it("les abonnements du client sont relus : un doublon résilié ne passe pas devant l'abonnement actif", async () => {
+    const active = sub({ id: 'sub_actif', created: ANCHOR - 100 });
+    const doublon = sub({ id: 'sub_doublon', status: 'canceled', created: ANCHOR + 100 });
+    retrieve.mockResolvedValue(doublon);
+    list.mockResolvedValue({ object: 'list', data: [doublon, active], has_more: false });
+    await sync.handleStripeEvent(event('customer.subscription.deleted', doublon, 500));
+    expect(list).toHaveBeenCalledWith({ customer: 'cus_1', status: 'all', limit: 10 });
+    expect(await row()).toMatchObject({ status: 'active', stripe_subscription_id: 'sub_actif' });
+  });
+
+  it("sans abonnement actif, c'est le plus récent qui fait foi ; entre deux actifs, la période la plus longue", async () => {
+    const ancien = sub({ id: 'sub_ancien', status: 'canceled', created: ANCHOR - 100 });
+    const recent = sub({ id: 'sub_recent', status: 'incomplete_expired', created: ANCHOR + 100 });
+    retrieve.mockResolvedValue(ancien);
+    list.mockResolvedValue({ object: 'list', data: [recent, ancien], has_more: false });
+    await sync.applyStripeSubscription('sub_ancien');
+    expect(await row()).toMatchObject({ status: 'incomplete_expired', stripe_subscription_id: 'sub_recent' });
+    const court = sub({ id: 'sub_court' });
+    const long = sub({ id: 'sub_long', status: 'past_due', end: PERIOD_END + 86400 });
+    retrieve.mockResolvedValue(court);
+    list.mockResolvedValue({ object: 'list', data: [court, long], has_more: false });
+    await sync.applyStripeSubscription('sub_court');
+    expect(await row()).toMatchObject({ status: 'past_due', stripe_subscription_id: 'sub_long' });
   });
 
   it('« déjà abonné » ne repasse jamais à faux', async () => {
@@ -184,7 +213,7 @@ describe('handleStripeEvent', () => {
     expect(await events()).toEqual([e.id]);
   });
 
-  it("une erreur dans le traitement retire l'événement, pour que Stripe réessaie", async () => {
+  it("un événement en échec n'est pas marqué comme traité : Stripe le renvoie et il est retraité", async () => {
     retrieve.mockRejectedValueOnce(new Error('Stripe injoignable'));
     const e = event('customer.subscription.updated', sub());
     await expect(sync.handleStripeEvent(e)).rejects.toThrow('Stripe injoignable');
