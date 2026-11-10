@@ -7,7 +7,7 @@ import { isDemoUser } from '@/lib/demo';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { haikuCostUsd, monthKeyParis } from '@/lib/webocoins';
 import { translateFicheFrToEn, weboAvailable, WEBO_MODEL } from '@/lib/webo/claude';
-import { requireUser } from './session';
+import { requireWriter } from './session';
 import { getWeboSettings } from './settings';
 import { companyIdFor, debitCoins, recordUsage, refundDebit, walletOf } from './weboWallet';
 
@@ -44,7 +44,7 @@ async function translationsThisMonth(companyId: string, now: Date): Promise<numb
 export async function translateWithWebo(
   fiches: { key: string; requestId: string; name: string; html: string }[],
 ): Promise<{ results: WeboResult[]; spent: number; balance: number }> {
-  const user = await requireUser();
+  const user = await requireWriter();
   const list = (Array.isArray(fiches) ? fiches : []).slice(0, MAX_FICHES)
     .filter((f) => f && typeof f.key === 'string' && typeof f.requestId === 'string' && typeof f.html === 'string')
     .map((f) => ({ key: f.key, requestId: f.requestId.slice(0, 100), name: String(f.name ?? '').slice(0, 200), html: f.html }));

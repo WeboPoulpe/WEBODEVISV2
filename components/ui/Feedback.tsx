@@ -7,6 +7,7 @@ import Modal from './Modal';
 import { btnPrimary, btnSecondary } from './kit';
 import { cn } from '@/lib/utils';
 import { addToast, toastDuration, toastRole, type FeedbackTone, type Toast } from '@/lib/feedback';
+import { opensSubscriptionDialog, signalSubscriptionRequired, SUBSCRIPTION_REQUIRED_MESSAGE } from '@/lib/subscription';
 
 // Fenêtres de confirmation et bandeaux de message de l'app, à la place des fenêtres du navigateur.
 // Le fournisseur est placé une fois dans la coque (AppShell, AdminShell) ; les pages appellent useFeedback().
@@ -60,9 +61,11 @@ interface ProviderProps {
   children: React.ReactNode;
   /** Les bandeaux se placent au-dessus de la barre d'onglets du téléphone (faux dans l'administration, qui n'en a pas). */
   aboveTabBar?: boolean;
+  /** Entreprise en lecture seule faute d'abonnement (AppShell) : une erreur ouvre la fenêtre « Abonnement inactif ». */
+  subscriptionReadonly?: boolean;
 }
 
-export function FeedbackProvider({ children, aboveTabBar = true }: ProviderProps) {
+export function FeedbackProvider({ children, aboveTabBar = true, subscriptionReadonly = false }: ProviderProps) {
   // Les demandes de confirmation passent une par une, dans l'ordre.
   const [queue, setQueue] = useState<PendingConfirm[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -80,10 +83,12 @@ export function FeedbackProvider({ children, aboveTabBar = true }: ProviderProps
 
   const notify = useCallback((message: string, options?: NotifyOptions) => {
     const tone = options?.tone ?? 'info';
+    // Écriture refusée faute d'abonnement : la fenêtre « Abonnement inactif » (AppShell) remplace le bandeau.
+    if (opensSubscriptionDialog(message, tone, subscriptionReadonly) && signalSubscriptionRequired(SUBSCRIPTION_REQUIRED_MESSAGE)) return;
     const id = nextId.current++;
     setToasts((list) => addToast(list, { id, message, tone }));
     timers.current.set(id, setTimeout(() => dismiss(id), toastDuration(tone)));
-  }, [dismiss]);
+  }, [dismiss, subscriptionReadonly]);
 
   const confirm = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => {
     setQueue((q) => [...q, { ...options, id: nextId.current++, resolve }]);

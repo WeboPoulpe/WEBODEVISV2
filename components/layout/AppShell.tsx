@@ -14,10 +14,14 @@ import { signOut as endSession } from 'next-auth/react';
 import { FeedbackProvider } from '@/components/ui/Feedback';
 import { WalletProvider } from '@/components/webo/WalletContext';
 import WeboAssistant from '@/components/webo/assistant/WeboAssistant';
+import SubscriptionBanner from '@/components/billing/SubscriptionBanner';
+import SubscriptionRequiredDialog from '@/components/billing/SubscriptionRequiredDialog';
 
 // Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
-export default function AppShell({ children }: { children: React.ReactNode }) {
+// readonly : l'abonnement de l'entreprise n'est plus actif (lu par le layout de l'app), on montre le bandeau.
+// Les erreurs y ouvrent la fenêtre « Abonnement inactif », sauf pour un administrateur entré dans le compte (il peut écrire).
+export default function AppShell({ children, readonly = false }: { children: React.ReactNode; readonly?: boolean }) {
   const [helpOpen, setHelpOpen] = useState(false);
   // Le centre d'aide s'ouvre aussi par l'événement « aide:ouvrir » (mégamenu de la barre latérale),
   // sur les guides d'une page précise ou directement sur un guide.
@@ -39,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const showOnboarding = !loading && !actingAsAdmin && user && profile && profile.has_completed_onboarding === false;
 
   return (
-    <FeedbackProvider>
+    <FeedbackProvider subscriptionReadonly={readonly && !actingAsAdmin}>
     <WalletProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       {showOnboarding && <OnboardingOverlay userId={user!.id} />}
@@ -72,6 +76,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         )}
+        {readonly && <SubscriptionBanner />}
         <Header onHelp={openHelp} />
         <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'var(--tabbar-h)' }}>
           {children}
@@ -80,6 +85,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <MobileTabBar badges={badges} onHelp={openHelp} />
       {!isDemoUser(user?.id) && <WeboAssistant />}
+      <SubscriptionRequiredDialog />
       <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} page={helpTarget.page ?? null} guideId={helpTarget.guide ?? null} />
     </div>
     </WalletProvider>

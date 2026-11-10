@@ -8,7 +8,7 @@ import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { missionInviteEmail, type MissionDetails } from '@/lib/mail/templates';
 import { forgetSubscription, pushEnabled, pushToExtra, saveSubscription, type BrowserSubscription } from '@/lib/push';
-import { getSessionUser } from './session';
+import { getSessionUser, requireWriter, UnauthorizedError } from './session';
 
 // Actions du traiteur sur son équipe : envoyer les missions, prévenir d'un changement, recevoir les réponses
 // en notification sur ses appareils. Seules les affectations de ses propres extras sont touchées.
@@ -37,8 +37,14 @@ export interface InviteResult { error: string | null; emailed: number; notified:
 
 /** Envoie la mission aux extras choisis : email (s'il en ont un) et notification sur leurs appareils. */
 export async function inviteToMissions(assignmentIds: string[]): Promise<InviteResult> {
-  const user = await getSessionUser();
-  if (!user) return { error: 'Votre session a expiré. Reconnectez-vous.', emailed: 0, notified: 0, unreachable: [] };
+  // Envoi : refusé en consultation seule et sans abonnement actif (le message de refus est renvoyé tel quel).
+  let user: { id: string };
+  try {
+    user = await requireWriter();
+  } catch (e) {
+    const error = e instanceof UnauthorizedError || !(e instanceof Error) ? 'Votre session a expiré. Reconnectez-vous.' : e.message;
+    return { error, emailed: 0, notified: 0, unreachable: [] };
+  }
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED, emailed: 0, notified: 0, unreachable: [] };
   const rows = await ownAssignments(user.id, assignmentIds);
   if (rows.length === 0) return { error: 'Aucune mission à envoyer.', emailed: 0, notified: 0, unreachable: [] };
@@ -67,7 +73,7 @@ export async function inviteToMissions(assignmentIds: string[]): Promise<InviteR
 
 /** Horaires ou consignes changés : l'extra est prévenu sur ses appareils. */
 export async function notifyMissionChanged(assignmentId: string): Promise<{ error: string | null }> {
-  const user = await getSessionUser();
+  const user = await requireWriter().catch(() => null);
   if (!user || isDemoUser(user.id)) return { error: null };
   const [r] = await ownAssignments(user.id, [assignmentId]);
   if (!r) return { error: null };

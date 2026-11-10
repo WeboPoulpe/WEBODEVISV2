@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Check, Building2, Upload, X, FileText, KeyRound, Eye, EyeOff, Bell } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, Check, Building2, Upload, X, FileText, KeyRound, Eye, EyeOff, Bell, CreditCard, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fileToWebp } from '@/lib/imageToWebp';
 import { useAuth } from '@/context/AuthContext';
@@ -543,7 +544,17 @@ export default function ParametresPage() {
         </>
       )}
 
-      {/* ── Relances automatiques et abonnement agenda ─────────────────────── */}
+      {/* ── Abonnement, Webo, relances automatiques et abonnement agenda ───── */}
+      {!isDemoUser(user?.id) && (
+        <Link href="/parametres/abonnement" className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-6 py-4 hover:border-gray-300 transition-colors">
+          <div className="p-2 bg-primary-50 rounded-lg"><CreditCard className="h-4 w-4 text-primary" /></div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 text-sm">Abonnement</p>
+            <p className="text-xs text-gray-400">Formule, échéance, carte et factures</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-gray-400" />
+        </Link>
+      )}
       <WeboSection />
       <RemindersSection />
       <CalendarFeedSection locked={isDemoUser(user?.id) ? 'L’abonnement agenda n’est pas disponible dans la démonstration.' : null} />

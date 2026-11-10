@@ -3,6 +3,7 @@ import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { del, list } from '@vercel/blob';
 import { db } from '@/db';
 import { profiles } from '@/db/schema';
+import { cancelNowBeforePurge } from './billingDeletion';
 
 // Purge définitive d'un compte : toutes ses lignes, dans toutes les tables, puis le compte lui-même.
 // Plutôt qu'une liste de tables écrite à la main (qui vieillirait à chaque nouvelle table), la purge suit les clés
@@ -56,6 +57,8 @@ async function deleteWithDependents(tx: Exec, fks: ForeignKey[], table: string, 
 /** Efface toutes les données du compte puis le compte. Ne touche à aucune ligne d'un autre compte. */
 export async function purgeAccount(userId: string): Promise<void> {
   if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new Error('Identifiant de compte invalide');
+  // Stripe d'abord : si la résiliation échoue, rien n'est effacé et l'erreur remonte (la tâche planifiée réessaie).
+  await cancelNowBeforePurge(userId);
   const uid = `'${userId}'::uuid`;
   await db.transaction(async (tx) => {
     // Autorise l'effacement des factures émises de ce compte (voir protect_issued_invoice).

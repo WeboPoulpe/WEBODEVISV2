@@ -2,12 +2,15 @@ import 'server-only';
 import { pool } from '@/db';
 import type { Filter, QueryDescriptor, QueryResult } from '@/lib/compat/builder';
 import { isDemoUser } from '@/lib/demo';
+import { SUBSCRIPTION_REQUIRED_MESSAGE, subscriptionAllowsWrite } from '../subscriptionGuard';
 import { RULES, type TableRule } from './rules';
 
 /** Qui exécute la requête. `bypass` est réservé au code serveur de confiance (pages à jeton). */
 export interface QueryContext {
   uid: string | null;
   bypass?: boolean;
+  /** Un administrateur est entré dans le compte : il peut écrire même sans abonnement (inscrit au journal). */
+  actingAsAdmin?: boolean;
 }
 
 interface ForeignKey { tbl: string; col: string; ref_tbl: string; ref_col: string }
@@ -254,6 +257,10 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
   try {
     if (d.op !== 'select' && !ctx.bypass && await isReadOnlyUser(ctx.uid)) {
       throw new QueryError('Votre accès est en consultation seule : demandez au gérant de modifier votre rôle.', '42501');
+    }
+    // Abonnement inactif : lecture seule (même message que requireWriter).
+    if (d.op !== 'select' && !ctx.bypass && ctx.uid && !(await subscriptionAllowsWrite(ctx.uid, ctx.actingAsAdmin))) {
+      throw new QueryError(SUBSCRIPTION_REQUIRED_MESSAGE, '42501');
     }
     const cat = await loadCatalog();
     const rule = RULES[d.table];

@@ -7,6 +7,7 @@ import { isValidEmail, splitEmails } from '@/lib/emailList';
 import { sendMail } from '@/lib/mail';
 import { invoiceReminderEmail, quoteReminderEmail } from '@/lib/mail/templates';
 import { PENDING_STATUSES } from '@/lib/quoteStatus';
+import { accessOf } from './subscription';
 
 // Relances automatiques, lancées une fois par jour par la tâche planifiée (voir app/api/cron/rappels-extras).
 // Pour chaque entreprise qui les a activées (Paramètres) :
@@ -166,7 +167,9 @@ export async function runReminders({ origin, now = new Date() }: { origin: strin
   const quoteDone = new Map<string, string[]>();
   const invoiceDone = new Map<string, string[]>();
 
+  // Entreprise sans abonnement actif : aucune relance n'est envoyée en son nom.
   for (const q of await quotesToRemind(today)) {
+    if (await accessOf(q.company) !== 'full') continue;
     const name = companyName(q);
     const mail = quoteReminderEmail({
       quote: {
@@ -188,6 +191,7 @@ export async function runReminders({ origin, now = new Date() }: { origin: strin
   }
 
   for (const i of await invoicesToRemind(today)) {
+    if (await accessOf(i.company) !== 'full') continue;
     const name = companyName(i);
     const mail = invoiceReminderEmail({
       invoice: { companyName: name, buyerName: i.buyer_name, number: i.number, remaining: i.remaining, dueDate: i.due_date, iban: i.iban, bic: i.bic, previous: i.reminders },

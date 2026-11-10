@@ -2203,6 +2203,36 @@ export const webo_ledger = pgTable("webo_ledger", {
 	index("idx_webo_ledger_company").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
 ]);
 
+// Abonnement Stripe (docs/superpowers/specs/2026-11-10-abonnement-stripe-design.md) : l'état d'abonnement d'une entreprise.
+// `comped` = compte offert (bêta, geste commercial) ; `status` suit Stripe ('none' tant qu'il n'y a jamais eu d'abonnement).
+export const company_subscriptions = pgTable("company_subscriptions", {
+	company_id: uuid().primaryKey().notNull(),
+	stripe_customer_id: text(),
+	stripe_subscription_id: text(),
+	plan: text(),
+	status: text().default('none').notNull(),
+	current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
+	cancel_at_period_end: boolean().default(false).notNull(),
+	anchor_day: integer(),
+	ever_subscribed: boolean().default(false).notNull(),
+	comped: boolean().default(false).notNull(),
+	comped_note: text().default('').notNull(),
+	last_event_at: timestamp({ withTimezone: true, mode: 'string' }),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "company_subscriptions_company_id_fkey" }).onDelete("cascade"),
+	unique("company_subscriptions_stripe_customer_id_key").on(table.stripe_customer_id),
+	check("company_subscriptions_plan_check", sql`plan IS NULL OR plan = ANY (ARRAY['mensuel'::text, 'annuel'::text])`),
+	check("company_subscriptions_anchor_day_check", sql`anchor_day IS NULL OR (anchor_day >= 1 AND anchor_day <= 31)`),
+]);
+
+// Évènements Stripe déjà traités (le webhook ne rejoue jamais deux fois le même).
+export const stripe_events = pgTable("stripe_events", {
+	id: text().primaryKey().notNull(),
+	type: text().notNull(),
+	received_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
 // Assistant Webo (docs/superpowers/specs/2026-10-23-assistant-webo-design.md) : une conversation d'un compte, avec son
 // historique lisible (questions, réponses, propositions, pièces dépensées).
 export const webo_conversations = pgTable("webo_conversations", {

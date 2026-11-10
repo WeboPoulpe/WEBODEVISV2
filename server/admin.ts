@@ -12,8 +12,10 @@ import { enabledModules } from '@/lib/modules';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { accountInviteEmail, passwordResetEmail } from '@/lib/mail/templates';
 import { revalidateTag } from 'next/cache';
-import { getAppSettings, SETTINGS_TAG, setAppSetting, type AppSettings } from './settings';
+import { getAppSettings, getBillingEnforced, SETTINGS_TAG, setAppSetting, setBillingEnforced, type AppSettings } from './settings';
 import { requireAdmin } from './session';
+import { setComped } from './subscription';
+import { isTestMode } from '@/lib/stripe';
 
 // Espace d'administration de la plateforme. Chaque action commence par requireAdmin() :
 // c'est la seule barrière, le navigateur n'est jamais cru sur parole.
@@ -119,19 +121,35 @@ export interface AdminAccount {
   deletion_requested_at: string | null;
   /** Dernière activité dans l'app. */
   last_seen_at: string | null;
+  /** Abonnement du titulaire ; null pour un collaborateur (il dépend de celui de son titulaire) ou sans ligne. */
+  subscription: { plan: string | null; status: string; current_period_end: string | null; cancel_at_period_end: boolean; comped: boolean; comped_note: string } | null;
+  is_collaborator: boolean;
 }
 
 export async function listAccounts(): Promise<AdminAccount[]> {
   const admin = await requireAdmin();
   const { rows } = await db.execute(sql`
     select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at, p.deletion_requested_at, p.last_seen_at,
+           p.parent_user_id is not null as is_collaborator,
+           cs.plan as sub_plan, cs.status as sub_status, cs.current_period_end as sub_period_end,
+           cs.cancel_at_period_end as sub_cancel, cs.comped as sub_comped, cs.comped_note as sub_note,
            (select count(*)::int from public.quotes q where q.owner_user_id = p.id) as quotes,
            (select count(*)::int from public.customers c where c.owner_user_id = p.id) as customers,
            (select max(q.updated_at) from public.quotes q where q.owner_user_id = p.id) as last_quote_at
     from public.profiles p
+    left join public.company_subscriptions cs on cs.company_id = p.id and p.parent_user_id is null
     order by p.created_at desc`);
-  return (rows as unknown as Omit<AdminAccount, 'is_demo' | 'is_self'>[]).map((r) => ({
+  type Row = Omit<AdminAccount, 'is_demo' | 'is_self' | 'subscription'> & {
+    sub_plan: string | null; sub_status: string | null; sub_period_end: string | null;
+    sub_cancel: boolean | null; sub_comped: boolean | null; sub_note: string | null;
+  };
+  return (rows as unknown as Row[]).map(({ sub_plan, sub_status, sub_period_end, sub_cancel, sub_comped, sub_note, ...r }) => ({
     ...r,
+    subscription: sub_status === null ? null : {
+      plan: sub_plan, status: sub_status,
+      current_period_end: sub_period_end ? new Date(sub_period_end).toISOString() : null,
+      cancel_at_period_end: !!sub_cancel, comped: !!sub_comped, comped_note: sub_note ?? '',
+    },
     modules: enabledModules(r.modules),
     created_at: new Date(r.created_at).toISOString(),
     last_quote_at: r.last_quote_at ? new Date(r.last_quote_at).toISOString() : null,
@@ -211,6 +229,19 @@ export async function updateAccount(id: string, patch: { firstName: string; last
   return { error: null };
 }
 
+/** Accès offert (bêta, geste commercial) : réservé au titulaire d'une entreprise, jamais au collaborateur ni à la démo. */
+export async function setAccountComped(id: string, comped: boolean, note: string): Promise<Result> {
+  const admin = await requireAdmin();
+  if (id === DEMO_USER_ID) return { error: 'Le compte de démonstration ne se modifie pas.' };
+  const [target] = await db.select({ parent: profiles.parent_user_id }).from(profiles).where(eq(profiles.id, id)).limit(1);
+  if (!target) return { error: 'Compte introuvable.' };
+  if (target.parent) return { error: 'Un collaborateur dépend de l’abonnement de son titulaire : offrez l’accès au titulaire.' };
+  const cleanNote = note.trim().slice(0, 500);
+  await setComped(id, !!comped, comped ? cleanNote : '');
+  await logAudit({ actor: admin.id, target: id, action: comped ? 'acces_offert' : 'acces_offert_retire', details: comped ? { note: cleanNote } : undefined });
+  return { error: null };
+}
+
 export async function sendAccountPasswordLink(id: string): Promise<Result> {
   const admin = await requireAdmin();
   if (id === DEMO_USER_ID) return { error: 'Le compte de démonstration n’a pas de mot de passe.' };
@@ -283,6 +314,25 @@ export async function setSignupOpen(open: boolean): Promise<Result> {
   await setAppSetting('signup_open', !!open);
   // Le site public affiche ou retire « Créer un compte » aussitôt.
   revalidateTag(SETTINGS_TAG);
+  return { error: null };
+}
+
+export async function getBillingEnforcedAdmin(): Promise<{ on: boolean; testMode: boolean }> {
+  await requireAdmin();
+  return { on: await getBillingEnforced(), testMode: isTestMode() };
+}
+
+/** « Abonnement obligatoire » : on n'active pas tant que Stripe est en mode test (quel que soit l'environnement : ils partagent la base de production) (l'éteindre reste toujours possible). */
+export async function setBillingEnforcedAdmin(on: boolean): Promise<Result> {
+  const admin = await requireAdmin();
+  if (on && !(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_MENSUEL && process.env.STRIPE_PRICE_ANNUEL)) {
+    return { error: 'Stripe n’est pas configuré : ajoutez la clé secrète et les deux prix d’abord.' };
+  }
+  if (on && isTestMode()) {
+    return { error: "Stripe est en mode test : passez les clés en Live d'abord." };
+  }
+  await setBillingEnforced(!!on);
+  await logAudit({ actor: admin.id, action: 'abonnement_obligatoire', details: { on: !!on } });
   return { error: null };
 }
 

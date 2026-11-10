@@ -10,6 +10,7 @@ import { runLifecycleEmails } from '@/server/lifecycle';
 import { runReminders } from '@/server/reminders';
 import { runTastingReminders } from '@/server/tastingReminders';
 import { runDpaeReminders } from '@/server/extraHrCore';
+import { companyAccessOfUser } from '@/server/subscriptionGuard';
 
 // Rappel de la veille aux extras confirmés : email et notification. Lancé chaque jour en fin d'après-midi par
 // Vercel (vercel.json), qui envoie « Authorization: Bearer CRON_SECRET ». Un rappel n'est envoyé qu'une fois.
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   for (const r of rows) {
     if (isDemoUser(r.owner)) continue;
+    // Entreprise sans abonnement actif : pas de rappel envoyé en son nom.
+    if (await companyAccessOfUser(r.owner) !== 'full') continue;
     const company = r.company || [r.first, r.last].filter(Boolean).join(' ') || 'Votre traiteur';
     const link = `${origin}/e/${r.token}`;
     const pushed = await pushToExtra(r.extraId, {

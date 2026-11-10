@@ -15,6 +15,7 @@ import { parseStudio } from '@/lib/brochureStudio';
 import { companyIdsOf } from './companyScope';
 import { openAccess } from './brochureAccess';
 import { notifyProspect } from './prospectMail';
+import { companyAccessOfUser, OWNER_UNAVAILABLE_MESSAGE } from './subscriptionGuard';
 
 /** Demandes acceptées par heure, pour une brochure, depuis une même connexion. */
 const MAX_REQUESTS_PER_HOUR = 5;
@@ -37,10 +38,12 @@ const MESSAGES = {
   fr: {
     gone: 'Cette brochure n’est plus disponible.', names: 'Indiquez votre prénom et votre nom.', email: 'L’adresse email n’est pas valide.',
     tooMany: 'Trop de demandes envoyées depuis cette connexion. Réessayez dans une heure.',
+    unavailable: OWNER_UNAVAILABLE_MESSAGE,
   },
   en: {
     gone: 'This brochure is no longer available.', names: 'Please enter your first and last name.', email: 'The email address is not valid.',
     tooMany: 'Too many requests sent from this connection. Please try again in an hour.',
+    unavailable: 'This caterer cannot receive replies online at the moment, please contact them directly.',
   },
 };
 
@@ -80,6 +83,8 @@ export async function submitBrochureRequest(token: string, fields: BrochureReque
   const linkId = access.link?.id ?? null;
   const language = b.language === 'en' ? 'en' : 'fr';
   const t = MESSAGES[language];
+  // Traiteur sans abonnement actif : la brochure reste consultable, mais la demande n'est pas reçue.
+  if (await companyAccessOfUser(b.owner) !== 'full') return { error: t.unavailable };
 
   const first = clean(fields.first_name, 80);
   const last = clean(fields.last_name, 80);

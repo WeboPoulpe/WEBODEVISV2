@@ -12,6 +12,7 @@ import { chosenFormula, parseFormulas, type QuoteFormula } from '@/lib/quoteForm
 import { formulaTotals, quoteDefaultRate, quoteTotalTTC, resolveGuestSplit } from '@/lib/quoteTotals';
 import { acceptanceFormulaName, quoteColumns } from './formulaColumns';
 import { getSessionUser } from './session';
+import { companyAccessOfUser, OWNER_UNAVAILABLE_MESSAGE } from './subscriptionGuard';
 
 // « Bon pour accord » en ligne : le client accepte et signe le devis depuis le lien reçu (/d/<jeton>).
 // Signature électronique simple : nom, case d'acceptation, signature tracée, horodatage serveur, adresse IP,
@@ -142,6 +143,8 @@ export async function acceptQuote(input: {
 }): Promise<{ error: string | null }> {
   const q = await quoteByToken(input.token);
   if (!q) return { error: 'Ce lien n’est plus valable. Demandez un nouveau lien à votre traiteur.' };
+  // Traiteur sans abonnement actif : le devis reste consultable, mais il ne peut pas être accepté en ligne.
+  if (await companyAccessOfUser(q.owner_user_id ?? q.user_id!) !== 'full') return { error: OWNER_UNAVAILABLE_MESSAGE };
 
   const name = (input.signerName ?? '').trim().replace(/\s+/g, ' ').slice(0, 120);
   const role = (input.signerRole ?? '').trim().slice(0, 120) || null;
