@@ -34,6 +34,22 @@ export function accountDeletionEmail({ firstName, purgeOn, contactUrl }: { first
   };
 }
 
+/** Au titulaire : le prélèvement de son abonnement a échoué (Stripe réessaie ; l'accès reste complet en attendant). */
+export function subscriptionPaymentFailedEmail({ settingsUrl }: { settingsUrl: string }): Email {
+  return {
+    subject: 'Le paiement de votre abonnement WeboDevis a échoué',
+    html: renderEmail({
+      preheader: 'Mettez à jour votre carte pour garder l’accès complet.',
+      title: 'Le paiement n’est pas passé',
+      paragraphs: [
+        'Nous n’avons pas pu prélever votre abonnement WeboDevis. Votre carte a peut-être expiré, ou votre banque a demandé une confirmation.',
+        'Vous gardez l’accès complet pendant que nous réessayons. Mettez à jour votre carte dès que possible : sans paiement, vos données resteront consultables et exportables, mais vous ne pourrez plus rien modifier.',
+      ],
+      button: { label: 'Mettre à jour ma carte', url: settingsUrl },
+    }),
+  };
+}
+
 /** À l'équipe : un titulaire a demandé la suppression de son compte. */
 export function accountDeletionAdminEmail({ email, purgeOn, appUrl }: { email: string; purgeOn: string; appUrl: string }): Email {
   return {

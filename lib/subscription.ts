@@ -26,7 +26,7 @@ export function accessFrom(row: SubRow | null, opts: { demo: boolean; enforced: 
 }
 
 /** Jour civil à Paris. */
-function parisYmd(d: Date): { year: number; month: number; day: number } {
+export function parisYmd(d: Date): { year: number; month: number; day: number } {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
   const n = (t: string) => Number(parts.find((p) => p.type === t)!.value);
   return { year: n('year'), month: n('month'), day: n('day') };
