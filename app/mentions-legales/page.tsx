@@ -17,7 +17,7 @@ const crumbs = [
 ];
 
 // Éditeur provisoire : Webomax, d'après les mentions légales de webomax.fr. La société qui exploitera WeboDevis
-// ouvre le 1er janvier 2027 : ces mentions seront alors mises à jour (raison sociale, immatriculation, TVA).
+// ouvre le 1er janvier 2027 : ces mentions seront alors mises à jour (raison sociale, SIRET, TVA).
 export default function MentionsLegalesPage() {
   return (
     <>
@@ -35,6 +35,7 @@ export default function MentionsLegalesPage() {
           <dl>
             <div><dt>Nom de l’entreprise</dt><dd>Webomax</dd></div>
             <div><dt>Forme juridique</dt><dd>Micro-entreprise</dd></div>
+            <div><dt>SIRET</dt><dd>925 205 767 00013</dd></div>
             <div><dt>Adresse</dt><dd>1 rue de la Haute Charme, 10000 Troyes</dd></div>
             <div><dt>Téléphone</dt><dd><a href="tel:+33644887039">06 44 88 70 39</a></dd></div>
             <div><dt>Email</dt><dd><a href="mailto:maxence@webomax.fr">maxence@webomax.fr</a></dd></div>
