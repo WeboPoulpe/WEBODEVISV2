@@ -14,6 +14,7 @@ import FirstSteps from '@/components/onboarding/FirstSteps';
 import { btnSecondary, cardCls, pill } from '@/components/ui/kit';
 import { useFeedback } from '@/components/ui/Feedback';
 import { syncCheckoutSession } from '@/server/billingActions';
+import { useRouter } from 'next/navigation';
 
 // Tableau de bord : d'abord ce qu'il faut faire, trié par échéance, puis le résumé de l'activité.
 // Tout vient d'une seule action serveur (server/dashboard.ts) ; l'en-tête s'affiche tout de suite.
@@ -96,10 +97,11 @@ export default function DashboardPage() {
 }
 
 // ── Retour de Stripe Checkout (« /?abonnement=ok&session_id=… ») ─────────────────
-// La session est appliquée tout de suite (sans attendre le webhook), puis l'adresse est nettoyée pour qu'un
-// rafraîchissement ne refasse pas l'appel.
+// La session est appliquée tout de suite (sans attendre le webhook ; le layout l'a souvent déjà fait), puis l'adresse
+// est nettoyée pour qu'un rafraîchissement ne refasse pas l'appel, et la coque est relue (bandeau de lecture seule).
 function useCheckoutReturn() {
   const { notify } = useFeedback();
+  const router = useRouter();
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get('abonnement') !== 'ok') return;
@@ -109,8 +111,11 @@ function useCheckoutReturn() {
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
     (sessionId ? syncCheckoutSession(sessionId) : Promise.resolve({ error: null }))
       .catch(() => ({ error: 'Le paiement n’a pas pu être vérifié. Réessayez dans un instant.' }))
-      .then((res) => notify(res.error ?? 'Merci, votre abonnement est actif', { tone: res.error ? 'error' : 'success' }));
-  }, [notify]);
+      .then((res) => {
+        notify(res.error ?? 'Merci, votre abonnement est actif', { tone: res.error ? 'error' : 'success' });
+        if (!res.error) router.refresh();
+      });
+  }, [notify, router]);
 }
 
 // ── À faire ───────────────────────────────────────────────────────────────────

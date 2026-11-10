@@ -108,3 +108,42 @@ describe('subscriptionView', () => {
     expect((await v.subscriptionView(OWNER)).testMode).toBe(false);
   });
 });
+
+describe('appEntryAfterCheckout (retour de Stripe Checkout avant le webhook)', () => {
+  // Fausse synchronisation : fait ce que ferait syncCheckoutSession, recopier un abonnement actif.
+  const paid = () => vi.fn(async () => {
+    await pg.exec(`insert into company_subscriptions (company_id, status, ever_subscribed, plan) values ('${OWNER}', 'active', true, 'mensuel')
+      on conflict (company_id) do update set status = 'active', ever_subscribed = true, plan = 'mensuel'`);
+  });
+
+  it('jamais abonnée : la session est appliquée, puis on entre', async () => {
+    await settings.setBillingEnforced(true);
+    const sync = paid();
+    expect(await v.appEntryAfterCheckout(OWNER, false, 'cs_1', sync)).toEqual({ gate: 'enter', access: 'full' });
+    expect(sync).toHaveBeenCalledWith('cs_1');
+  });
+
+  it('lecture seule (réabonnement) : la session est appliquée, plus de lecture seule', async () => {
+    await settings.setBillingEnforced(true);
+    await subscribe(`status, ever_subscribed|'canceled', true`);
+    const sync = paid();
+    expect(await v.appEntryAfterCheckout(OWNER, false, 'cs_2', sync)).toEqual({ gate: 'enter', access: 'full' });
+    expect(sync).toHaveBeenCalledOnce();
+  });
+
+  it('accès complet ou pas de session : aucun appel à Stripe', async () => {
+    const sync = paid();
+    expect(await v.appEntryAfterCheckout(OWNER, false, 'cs_3', sync)).toEqual({ gate: 'enter', access: 'full' });
+    await settings.setBillingEnforced(true);
+    expect(await v.appEntryAfterCheckout(OWNER, false, null, sync)).toEqual({ gate: 'pay', access: 'unpaid' });
+    expect(sync).not.toHaveBeenCalled();
+  });
+
+  it('synchronisation en échec : on garde la décision, le titulaire va payer', async () => {
+    await settings.setBillingEnforced(true);
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const sync = vi.fn(async () => { throw new Error('Stripe injoignable'); });
+    expect(await v.appEntryAfterCheckout(OWNER, false, 'cs_4', sync)).toEqual({ gate: 'pay', access: 'unpaid' });
+    err.mockRestore();
+  });
+});

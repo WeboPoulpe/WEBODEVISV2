@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   accessFrom, periodStart, nextPeriodStart, periodKey, statusLabel, type SubRow,
-  isSubscriptionRequired, signalSubscriptionRequired, SUBSCRIPTION_REQUIRED_EVENT, SUBSCRIPTION_REQUIRED_MESSAGE,
+  isSubscriptionRequired, opensSubscriptionDialog, signalSubscriptionRequired, SUBSCRIPTION_REQUIRED_EVENT, SUBSCRIPTION_REQUIRED_MESSAGE,
 } from './subscription';
 
 const row = (o: Partial<SubRow> = {}): SubRow => ({
@@ -90,5 +90,18 @@ describe('message « abonnement inactif » reconnu par le navigateur', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('fenêtre « Abonnement inactif » ou bandeau', () => {
+  const generic = 'Le dossier n’a pas pu être créé. Réessayez.';
+  it('lecture seule : une erreur ouvre la fenêtre, un succès ou une info reste un bandeau', () => {
+    expect(opensSubscriptionDialog(generic, 'error', true)).toBe(true);
+    expect(opensSubscriptionDialog('Enregistré', 'success', true)).toBe(false);
+    expect(opensSubscriptionDialog('Copié', 'info', true)).toBe(false);
+  });
+  it('accès complet : bandeau seulement, sauf le message d’abonnement lui-même', () => {
+    expect(opensSubscriptionDialog(generic, 'error', false)).toBe(false);
+    expect(opensSubscriptionDialog(SUBSCRIPTION_REQUIRED_MESSAGE, 'error', false)).toBe(true);
   });
 });

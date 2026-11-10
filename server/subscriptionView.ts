@@ -25,6 +25,26 @@ export async function appEntry(userId: string, actingAsAdmin: boolean): Promise<
   }
 }
 
+/**
+ * Comme appEntry, au retour de Stripe Checkout (session de paiement connue) : tant que l'accès n'est pas complet
+ * (jamais abonnée ou lecture seule), on applique d'abord la session, sans attendre le webhook, puis on relit l'accès.
+ * Ainsi quelqu'un qui vient de payer n'est ni renvoyé sur l'écran de paiement, ni laissé en lecture seule.
+ */
+export async function appEntryAfterCheckout(
+  userId: string, actingAsAdmin: boolean, checkoutSessionId: string | null,
+  sync: (sessionId: string) => Promise<unknown>,
+): Promise<{ gate: AppGate; access: Access }> {
+  const entry = await appEntry(userId, actingAsAdmin);
+  if (!checkoutSessionId || entry.access === 'full') return entry;
+  try {
+    await sync(checkoutSessionId);
+  } catch (e) {
+    console.error('appEntryAfterCheckout : session de paiement non appliquée', e);
+    return entry;
+  }
+  return appEntry(userId, actingAsAdmin);
+}
+
 export async function appGate(userId: string, actingAsAdmin: boolean): Promise<AppGate> {
   return (await appEntry(userId, actingAsAdmin)).gate;
 }

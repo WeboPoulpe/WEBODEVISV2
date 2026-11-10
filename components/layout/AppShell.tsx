@@ -20,6 +20,7 @@ import SubscriptionRequiredDialog from '@/components/billing/SubscriptionRequire
 // Coque de l'app : barre latérale (tablette et ordinateur), barre d'onglets (téléphone).
 // La largeur de la barre latérale vient de la variable CSS --shell-left (app/globals.css).
 // readonly : l'abonnement de l'entreprise n'est plus actif (lu par le layout de l'app), on montre le bandeau.
+// Les erreurs y ouvrent la fenêtre « Abonnement inactif », sauf pour un administrateur entré dans le compte (il peut écrire).
 export default function AppShell({ children, readonly = false }: { children: React.ReactNode; readonly?: boolean }) {
   const [helpOpen, setHelpOpen] = useState(false);
   // Le centre d'aide s'ouvre aussi par l'événement « aide:ouvrir » (mégamenu de la barre latérale),
@@ -42,7 +43,7 @@ export default function AppShell({ children, readonly = false }: { children: Rea
   const showOnboarding = !loading && !actingAsAdmin && user && profile && profile.has_completed_onboarding === false;
 
   return (
-    <FeedbackProvider>
+    <FeedbackProvider subscriptionReadonly={readonly && !actingAsAdmin}>
     <WalletProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       {showOnboarding && <OnboardingOverlay userId={user!.id} />}

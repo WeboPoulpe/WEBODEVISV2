@@ -22,6 +22,15 @@ export function isSubscriptionRequired(message: string | null | undefined): bool
 }
 
 /**
+ * Un message d'erreur doit-il ouvrir la fenêtre « Abonnement inactif » plutôt qu'un bandeau ? Oui s'il porte le
+ * message d'abonnement, ou si l'entreprise est en lecture seule et que c'est une erreur : en production, Next masque le
+ * message des erreurs levées par une action serveur (requireWriter), la page ne reçoit qu'un texte générique.
+ */
+export function opensSubscriptionDialog(message: string | null | undefined, tone: string, readonly: boolean): boolean {
+  return isSubscriptionRequired(message) || (readonly && tone === 'error');
+}
+
+/**
  * Si le message est celui d'un abonnement inactif, demande la fenêtre « Abonnement inactif ». Vrai si une fenêtre l'a
  * prise en charge (l'écouteur annule l'événement) : l'appelant n'affiche alors pas le message lui-même.
  */

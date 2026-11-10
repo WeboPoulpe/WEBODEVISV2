@@ -4,7 +4,7 @@ import AppShell from '@/components/layout/AppShell';
 import { CHECKOUT_SESSION_HEADER } from '@/lib/subscription';
 import { syncCheckoutSession } from '@/server/billingActions';
 import { getSessionUser } from '@/server/session';
-import { appEntry } from '@/server/subscriptionView';
+import { appEntryAfterCheckout } from '@/server/subscriptionView';
 
 // Durée maximale des actions serveur de l'application : une réponse de Webo (aiguilleur, outils, spécialiste) doit
 // pouvoir finir et être payée avant d'être coupée.
@@ -16,15 +16,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getSessionUser();
   let readonly = false;
   if (user) {
-    const actingAsAdmin = !!user.actingAsAdmin;
-    let entry = await appEntry(user.id, actingAsAdmin);
-    // Retour de Stripe Checkout avant le webhook : on applique la session tout de suite, pour ne jamais renvoyer
-    // sur l'écran de paiement quelqu'un qui vient de payer (session relue chez Stripe et vérifiée).
+    // Retour de Stripe Checkout avant le webhook : la session est appliquée tout de suite (relue chez Stripe et
+    // vérifiée), pour ne laisser ni sur l'écran de paiement ni en lecture seule quelqu'un qui vient de payer.
     const checkoutSession = (await headers()).get(CHECKOUT_SESSION_HEADER);
-    if (entry.gate === 'pay' && checkoutSession) {
-      await syncCheckoutSession(checkoutSession);
-      entry = await appEntry(user.id, actingAsAdmin);
-    }
+    const entry = await appEntryAfterCheckout(user.id, !!user.actingAsAdmin, checkoutSession, syncCheckoutSession);
     if (entry.gate !== 'enter') redirect('/abonnement');
     readonly = entry.access === 'readonly';
   }
