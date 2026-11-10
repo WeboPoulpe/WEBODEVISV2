@@ -5,6 +5,7 @@ import { DEMO, FOOTER, LOGIN, MENU, MENU_LINKS, RELEASES, SIGNUP } from '@/lib/s
 import { isSignupOpenCached } from '@/server/settings';
 import { menuAsides } from './MenuAsides';
 import SiteNav from './SiteNav';
+import CookieConsent, { CookieSettingsLink } from './CookieConsent';
 import { DemoButton, container } from './ui';
 import './site.css';
 
@@ -56,13 +57,16 @@ export default async function SiteShell({ children, actionBar = true }: { childr
             <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-12 pt-6 border-t border-white/10 text-[15px] text-white/50">
               <Wordmark className="text-[19px] text-white" />
               <span>Le logiciel des traiteurs.</span>
-              <Link href={RELEASES.href} className="sm:ml-auto rounded underline-offset-4 hover:text-white hover:underline">
+              <CookieSettingsLink className="sm:ml-auto rounded underline-offset-4 hover:text-white hover:underline" />
+              <Link href={RELEASES.href} className="rounded underline-offset-4 hover:text-white hover:underline">
                 Version {RELEASE.version}, sortie prévue le {RELEASE.dateLabel}
               </Link>
             </p>
           </footer>
         </div>
       </div>
+
+      <CookieConsent />
 
       {/* Téléphone : l'action principale, toujours sous le pouce (sauf sur la page du formulaire de contact). */}
       {actionBar && <div className="site-actionbar md:hidden fixed inset-x-3 z-40">

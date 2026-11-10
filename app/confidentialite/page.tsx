@@ -59,6 +59,7 @@ export default function ConfidentialitePage() {
             <li>Vercel&nbsp;: hébergement du site et de l’application, stockage des fichiers (logos, photos, devis importés).</li>
             <li>Neon&nbsp;: base de données.</li>
             <li>Resend&nbsp;: envoi des emails (devis, accusés de réception, mot de passe).</li>
+            <li>Google (Tag Manager)&nbsp;: mesure de fréquentation des pages de présentation, seulement avec votre accord.</li>
           </ul>
 
           <h2>Hébergement des données</h2>
@@ -68,9 +69,15 @@ export default function ConfidentialitePage() {
           <h2>Durées de conservation</h2>
           <p><Todo>durée de conservation de chaque catégorie de données, et ce qu’il advient des données à la fermeture d’un compte</Todo></p>
 
-          <h2>Cookies</h2>
+          <h2 id="cookies">Cookies</h2>
           <p>L’application utilise un cookie de session, nécessaire pour vous garder connecté.</p>
-          <p>Aucun cookie de publicité ni de mesure d’audience n’est déposé. Votre navigateur garde aussi, sans les transmettre, quelques préférences d’affichage et, si vous avez essayé la démonstration, de quoi la rouvrir sans ressaisir vos coordonnées.</p>
+          <p>
+            Sur les pages de présentation du site (pas dans le logiciel), nous mesurons la fréquentation avec Google Tag Manager,
+            uniquement si vous l’acceptez dans le bandeau qui s’affiche à votre première visite. Sans accord, aucun cookie de mesure
+            d’audience n’est déposé. Votre choix est gardé 6 mois, puis redemandé&nbsp;; vous pouvez en changer à tout moment avec le
+            lien «&nbsp;Cookies&nbsp;» en bas de chaque page du site.
+          </p>
+          <p>Aucun cookie de publicité n’est déposé dans le logiciel. Votre navigateur garde aussi, sans les transmettre, quelques préférences d’affichage et, si vous avez essayé la démonstration, de quoi la rouvrir sans ressaisir vos coordonnées.</p>
 
           <h2>Vos droits</h2>
           <p>

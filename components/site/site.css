@@ -178,6 +178,9 @@
 
 /* Barre d'action fixe du téléphone : laisse la place à la zone de geste du système. */
 .site-actionbar { bottom: max(12px, env(safe-area-inset-bottom)); }
+/* Bandeau des cookies : au-dessus de la barre d'action sur téléphone, en bas à droite ailleurs. */
+.site-cookies { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 768px) { .site-cookies { bottom: 16px; } }
 /* La page garde de la marge sous le pied de page pour que la barre ne recouvre rien. */
 @media (max-width: 767px) {
   .site-with-bar { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
