@@ -36,6 +36,7 @@ beforeEach(async () => {
   isAdmin = true;
   await pg.exec(`delete from company_subscriptions; delete from audit_log; delete from app_settings where key = 'billing_enforced';`);
 });
+beforeEach(() => { vi.stubEnv('STRIPE_PRICE_MENSUEL', 'price_m'); vi.stubEnv('STRIPE_PRICE_ANNUEL', 'price_a'); });
 afterEach(() => { vi.unstubAllEnvs(); });
 
 describe('admin abonnement', () => {
@@ -88,5 +89,16 @@ describe('admin abonnement', () => {
     vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_abc');
     vi.stubEnv('VERCEL_ENV', 'production');
     expect((await a.setBillingEnforcedAdmin(true)).error).toBeNull();
+  });
+
+  it('abonnement obligatoire : refusé si la clé ou un prix Stripe manque, même hors production', async () => {
+    const msg = 'Stripe n’est pas configuré : ajoutez la clé secrète et les deux prix d’abord.';
+    vi.stubEnv('STRIPE_SECRET_KEY', '');
+    expect((await a.setBillingEnforcedAdmin(true)).error).toBe(msg);
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_abc');
+    vi.stubEnv('STRIPE_PRICE_ANNUEL', '');
+    expect((await a.setBillingEnforcedAdmin(true)).error).toBe(msg);
+    expect(await getBillingEnforced()).toBe(false);
+    expect((await a.setBillingEnforcedAdmin(false)).error).toBeNull();
   });
 });

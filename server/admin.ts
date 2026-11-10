@@ -325,6 +325,9 @@ export async function getBillingEnforcedAdmin(): Promise<{ on: boolean; testMode
 /** « Abonnement obligatoire » : en production, on n'active pas tant que Stripe est en mode test (l'éteindre reste toujours possible). */
 export async function setBillingEnforcedAdmin(on: boolean): Promise<Result> {
   const admin = await requireAdmin();
+  if (on && !(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_MENSUEL && process.env.STRIPE_PRICE_ANNUEL)) {
+    return { error: 'Stripe n’est pas configuré : ajoutez la clé secrète et les deux prix d’abord.' };
+  }
   if (on && process.env.VERCEL_ENV === 'production' && isTestMode()) {
     return { error: "Stripe est en mode test : passez les clés en Live d'abord." };
   }

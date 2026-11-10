@@ -13,7 +13,8 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     getAdminSettings().then((s) => setOpen(s.signup_open));
-    getBillingEnforcedAdmin().then((b) => { setEnforced(b.on); setTestMode(b.testMode); });
+    getBillingEnforcedAdmin().then((b) => { setEnforced(b.on); setTestMode(b.testMode); })
+      .catch(() => setError('Le réglage « Abonnement obligatoire » n’a pas pu être lu. Rechargez la page.'));
   }, []);
 
   const toggleEnforced = async () => {
