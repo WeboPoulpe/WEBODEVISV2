@@ -6,6 +6,7 @@ import { isSignupOpenCached } from '@/server/settings';
 import { menuAsides } from './MenuAsides';
 import SiteNav from './SiteNav';
 import CookieConsent, { CookieSettingsLink } from './CookieConsent';
+import SiteAnalytics from './SiteAnalytics';
 import { DemoButton, container } from './ui';
 import './site.css';
 
@@ -67,6 +68,7 @@ export default async function SiteShell({ children, actionBar = true }: { childr
       </div>
 
       <CookieConsent />
+      <SiteAnalytics />
 
       {/* Téléphone : l'action principale, toujours sous le pouce (sauf sur la page du formulaire de contact). */}
       {actionBar && <div className="site-actionbar md:hidden fixed inset-x-3 z-40">

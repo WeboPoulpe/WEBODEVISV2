@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, unique, foreignKey, check, boolean, jsonb, index, date, integer, numeric, time, varchar, uniqueIndex, pgEnum, primaryKey, bigint } from "drizzle-orm/pg-core"
+import { pgTable, uuid, text, timestamp, unique, foreignKey, check, boolean, jsonb, index, date, integer, numeric, time, varchar, uniqueIndex, pgEnum, primaryKey, bigint, bigserial } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const customer_type = pgEnum("customer_type", ['particulier', 'entreprise'])
@@ -1988,6 +1988,25 @@ export const site_requests = pgTable("site_requests", {
 	index("idx_site_requests_user").using("btree", table.user_id.asc().nullsLast()).where(sql`(user_id IS NOT NULL)`),
 	check("site_requests_kind_check", sql`kind = ANY (ARRAY['devis'::text, 'message'::text, 'demo'::text, 'service'::text])`),
 	check("site_requests_status_check", sql`status = ANY (ARRAY['nouvelle'::text, 'en_cours'::text, 'traitee'::text, 'suspecte'::text])`),
+]);
+
+// Statistiques du site, sans cookie (lib/siteStats.ts, server/siteStats.ts) : une ligne par page vue ou conversion,
+// `visitor` = empreinte valable un jour, aucune adresse IP. Effacées après 13 mois.
+export const site_visits = pgTable("site_visits", {
+	id: bigserial({ mode: 'number' }).primaryKey().notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	day: date().notNull(),
+	path: text().notNull(),
+	event: text().default('view').notNull(),
+	source: text().default('direct').notNull(),
+	referrer_host: text(),
+	device: text().default('ordinateur').notNull(),
+	visitor: text().notNull(),
+}, (table) => [
+	index("idx_site_visits_day").using("btree", table.day.asc().nullsLast()),
+	check("site_visits_event_check", sql`event = ANY (ARRAY['view'::text, 'demo'::text, 'contact'::text, 'signup'::text])`),
+	check("site_visits_source_check", sql`source = ANY (ARRAY['direct'::text, 'recherche'::text, 'reseaux'::text, 'site'::text])`),
+	check("site_visits_device_check", sql`device = ANY (ARRAY['mobile'::text, 'tablette'::text, 'ordinateur'::text])`),
 ]);
 
 // Réglages de la plateforme, modifiables depuis l'espace d'administration (une ligne par réglage).

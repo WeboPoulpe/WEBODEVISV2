@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
 import { decode, encode } from 'next-auth/jwt';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { password_reset_tokens, profiles, users, type ProfileRow } from '@/db/schema';
@@ -14,6 +14,7 @@ import { appOrigin, sendMail } from '@/lib/mail';
 import { passwordChangedEmail, passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
 import { getSessionUser } from './session';
 import { isSignupOpen } from './settings';
+import { recordEventNow } from './siteStats';
 
 const MIN_PASSWORD = 6;
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -51,6 +52,11 @@ export async function registerUser(input: {
       has_completed_onboarding: false,
     });
   });
+  // Conversion pour les statistiques du site (la base vient d'écrire : pas de réveil en plus).
+  const h = await headers();
+  await recordEventNow('signup', '/register', {
+    ip: (h.get('x-forwarded-for') ?? '').split(',')[0].trim(), userAgent: h.get('user-agent') ?? '', ownHost: h.get('host') ?? '',
+  }).catch(() => {});
   // L'email de bienvenue ne bloque pas l'inscription s'il ne part pas.
   await sendMail({ to: email, ...welcomeEmail({ firstName: input.firstName.trim() || null, appUrl: await appOrigin() }) });
   return { error: null };

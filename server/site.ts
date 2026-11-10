@@ -8,6 +8,7 @@ import { profiles, site_requests } from '@/db/schema';
 import { appOrigin, isTestAddress, sendMail } from '@/lib/mail';
 import { siteRequestAckEmail, siteRequestNotificationEmail } from '@/lib/mail/templates';
 import { spamReason } from '@/lib/siteSpam';
+import { recordEventNow } from './siteStats';
 
 export interface SiteRequestInput {
   kind: 'devis' | 'message';
@@ -75,6 +76,8 @@ export async function submitSiteRequest(input: SiteRequestInput): Promise<{ erro
     ...(suspicious ? { status: 'suspecte', admin_notes: `Classée suspecte automatiquement : ${suspicious}.` } : {}),
   });
   if (suspicious) return { error: null };
+  // Conversion pour les statistiques du site, dans la foulée de l'écriture de la demande.
+  await recordEventNow('contact', '/contact', { ip, userAgent: h.get('user-agent') ?? '', ownHost: h.get('host') ?? '' }).catch(() => {});
 
   // Une adresse d'essai (tests automatiques) ne prévient personne.
   if (isTestAddress(email)) return { error: null };

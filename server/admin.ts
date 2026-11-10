@@ -396,3 +396,9 @@ export async function setErrorResolved(fingerprint: string, resolved: boolean): 
   await db.execute(sql`update public.error_groups set resolved_at = ${resolved ? sql`now()` : sql`null`} where fingerprint = ${fingerprint}`);
   return { error: null };
 }
+
+/** Statistiques du site de présentation (sans cookie), pour la page Statistiques de l'admin. */
+export async function adminSiteStats(days: number): Promise<import('./siteStats').SiteStats> {
+  const { getSiteStats } = await import('./siteStats');
+  return getSiteStats(days);
+}

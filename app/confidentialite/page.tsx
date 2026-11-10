@@ -77,6 +77,12 @@ export default function ConfidentialitePage() {
             d’audience n’est déposé. Votre choix est gardé 6 mois, puis redemandé&nbsp;; vous pouvez en changer à tout moment avec le
             lien «&nbsp;Cookies&nbsp;» en bas de chaque page du site.
           </p>
+          <p>
+            Nous comptons aussi les visites des pages de présentation avec notre propre outil, sans cookie et sans conserver
+            votre adresse IP&nbsp;: un visiteur n’est reconnu que le temps d’une journée, par une empreinte qui ne permet pas de
+            l’identifier ni de le suivre sur d’autres sites. Ces statistiques anonymes (pages vues, provenance, type d’appareil)
+            sont conservées 13 mois.
+          </p>
           <p>Aucun cookie de publicité n’est déposé dans le logiciel. Votre navigateur garde aussi, sans les transmettre, quelques préférences d’affichage et, si vous avez essayé la démonstration, de quoi la rouvrir sans ressaisir vos coordonnées.</p>
 
           <h2>Vos droits</h2>
