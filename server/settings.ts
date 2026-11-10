@@ -96,3 +96,25 @@ export async function setWeboSettings(patch: Partial<WeboSettings>): Promise<voi
       .onConflictDoUpdate({ target: app_settings.key, set: { value: v, updated_at: new Date().toISOString() } });
   }
 }
+
+// ── Abonnement ───────────────────────────────────────────────────────────────
+
+const BILLING_KEY = 'billing_enforced';
+const billingListeners: Array<() => void> = [];
+
+/** Appelé à chaque changement du réglage (le cache d'accès s'y abonne, sans import circulaire). */
+export function onBillingEnforcedChange(fn: () => void): void {
+  billingListeners.push(fn);
+}
+
+/** « Abonnement obligatoire » : éteint par défaut, tout le monde a alors l'accès complet. */
+export async function getBillingEnforced(): Promise<boolean> {
+  const [row] = await db.select({ value: app_settings.value }).from(app_settings).where(eq(app_settings.key, BILLING_KEY)).limit(1);
+  return row?.value === true;
+}
+
+export async function setBillingEnforced(v: boolean): Promise<void> {
+  await db.insert(app_settings).values({ key: BILLING_KEY, value: v })
+    .onConflictDoUpdate({ target: app_settings.key, set: { value: v, updated_at: new Date().toISOString() } });
+  for (const fn of billingListeners) fn();
+}
