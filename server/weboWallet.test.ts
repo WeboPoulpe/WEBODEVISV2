@@ -229,4 +229,33 @@ describe('pièces du mois et abonnement', () => {
     expect(r).toMatchObject({ month: 200, monthKey: '2026-11' });
     expect(r.renewsAt).toBe('2026-11-30T23:00:00.000Z');
   });
+
+  it('retour au mois civil dans un mois déjà alloué : pas de nouvelle remise, ni dans un sens ni dans l’autre', async () => {
+    await pg.query(`delete from app_settings where key = 'billing_enforced'`);
+    clearAccessCache();
+    await w.walletOf(OWNER, new Date('2026-11-10T10:00:00Z'));
+    await pg.query(`insert into app_settings (key, value) values ('billing_enforced', 'true'::jsonb)`);
+    await sub(OWNER, { anchor: 17 });
+    clearAccessCache();
+    await w.walletOf(OWNER, new Date('2026-11-17T10:00:00Z'));
+    await pg.query(`update webo_wallets set month_coins = 40 where company_id = $1`, [OWNER]);
+    await pg.query(`delete from app_settings where key = 'billing_enforced'`);
+    clearAccessCache();
+    const off = await w.walletOf(OWNER, new Date('2026-11-20T10:00:00Z'));
+    expect(off).toMatchObject({ month: 40, monthKey: '2026-11' });
+    await pg.query(`insert into app_settings (key, value) values ('billing_enforced', 'true'::jsonb)`);
+    clearAccessCache();
+    const on = await w.walletOf(OWNER, new Date('2026-11-21T10:00:00Z'));
+    expect(on).toMatchObject({ month: 40, monthKey: 's:2026-11-17' });
+    expect(await allocations(OWNER)).toBe(2);
+  });
+
+  it('abonnement en retard de paiement (past_due) : remis à la date anniversaire', async () => {
+    await sub(OWNER, { status: 'past_due', anchor: 17 });
+    expect(await w.walletOf(OWNER, new Date('2026-11-17T10:00:00Z'))).toMatchObject({ month: 200, monthKey: 's:2026-11-17' });
+  });
+
+  it('compte de démo sous abonnement obligatoire : toujours 0', async () => {
+    expect(await w.walletOf(DEMO_USER_ID, new Date('2026-11-17T10:00:00Z'))).toMatchObject({ month: 0, total: 0 });
+  });
 });

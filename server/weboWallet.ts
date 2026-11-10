@@ -65,16 +65,24 @@ export async function walletOf(companyId: string, now: Date = new Date()): Promi
   if (mayAllocate && shouldAllocate(row.month_key, key)) {
     const settings = await getWeboSettings();
     const coins = isDemoUser(companyId) ? 0 : (row.monthly_override ?? settings.monthlyCoins);
-    // Conditionnel sur l'ancien mois : deux premiers usages simultanés ne donnent qu'une allocation.
-    const [renewed] = await db.update(webo_wallets)
-      .set({ month_key: key, month_coins: coins, updated_at: now.toISOString() })
-      .where(and(eq(webo_wallets.company_id, companyId), eq(webo_wallets.month_key, row.month_key)))
-      .returning();
-    if (renewed && coins > 0) {
-      await db.insert(webo_ledger).values({
+    // Conditionnel sur l'ancien mois : deux premiers usages simultanés ne donnent qu'une allocation. Les pièces ne sont
+    // remises que si la ligne du journal est vraiment créée : une clé déjà allouée (retour d'un calendrier à l'autre dans
+    // la même période) ne déplace que la clé, le solde reste.
+    await db.transaction(async (tx) => {
+      const [renewed] = await tx.update(webo_wallets)
+        .set({ month_key: key, updated_at: now.toISOString() })
+        .where(and(eq(webo_wallets.company_id, companyId), eq(webo_wallets.month_key, row.month_key)))
+        .returning({ id: webo_wallets.company_id });
+      if (!renewed) return;
+      if (coins <= 0) {
+        await tx.update(webo_wallets).set({ month_coins: 0 }).where(eq(webo_wallets.company_id, companyId));
+        return;
+      }
+      const [line] = await tx.insert(webo_ledger).values({
         company_id: companyId, kind: 'allocation', coins, reason: 'Pièces du mois', idempotency_key: `alloc:${companyId}:${key}`,
-      }).onConflictDoNothing();
-    }
+      }).onConflictDoNothing().returning({ id: webo_ledger.id });
+      if (line) await tx.update(webo_wallets).set({ month_coins: coins }).where(eq(webo_wallets.company_id, companyId));
+    });
     [row] = await db.select().from(webo_wallets).where(eq(webo_wallets.company_id, companyId)).limit(1);
   }
   return {
