@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { company_subscriptions, profiles } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { appOrigin } from '@/lib/mail';
+import { SETUP_HT } from '@/lib/pricing';
 import { priceFor, stripe, type Plan } from '@/lib/stripe';
 import { requireUser } from './session';
 import { applyStripeSubscription } from './stripeSync';
@@ -71,11 +72,22 @@ export async function startCheckout(plan: Plan): Promise<BillingResult> {
     }
     const customer = await customerOf(who.companyId, who.email, sub?.stripe_customer_id ?? null);
     const origin = await appOrigin();
+    // Mise en service au premier abonnement seulement : une entreprise qui a déjà eu un abonnement ne la repaie pas.
+    // Prix unique sur la première facture, à côté du premier mois ou de la première année.
+    const setup = sub?.stripe_subscription_id ? [] : [{
+      price_data: {
+        currency: 'eur',
+        unit_amount: SETUP_HT * 100,
+        tax_behavior: 'exclusive' as const,
+        product_data: { name: 'Mise en service WeboDevis', description: 'Formation, modèles de devis, prestations et import de vos clients' },
+      },
+      quantity: 1,
+    }];
     const session = await stripe().checkout.sessions.create({
       mode: 'subscription',
       customer,
       client_reference_id: who.companyId,
-      line_items: [{ price: priceFor(plan), quantity: 1 }],
+      line_items: [{ price: priceFor(plan), quantity: 1 }, ...setup],
       subscription_data: { metadata: { company_id: who.companyId } },
       automatic_tax: { enabled: true },
       tax_id_collection: { enabled: true },

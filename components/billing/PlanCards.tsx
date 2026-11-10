@@ -1,17 +1,17 @@
 'use client';
 
-// Les deux formules d'abonnement et le bouton « S'abonner » (vers Stripe Checkout). Les prix ne s'affichent que dans
-// l'app, jamais sur le site public.
+// Les deux formules d'abonnement et le bouton « S'abonner » (vers Stripe Checkout). Montants : lib/pricing.
 
 import { useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
+import { FIRST_MONTH_HT, MONTHLY_HT, SETUP_HT, YEARLY_HT, euros, ttc } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 import type { Plan } from '@/lib/stripe';
 import { startCheckout } from '@/server/billingActions';
 
 export const PLANS: { value: Plan; label: string; price: string; detail: string }[] = [
-  { value: 'mensuel', label: 'Mensuel', price: '100 € HT / mois', detail: '120 € TTC' },
-  { value: 'annuel', label: 'Annuel', price: '1 100 € HT / an', detail: '1 320 € TTC · 1 mois offert' },
+  { value: 'mensuel', label: 'Mensuel', price: `${euros(MONTHLY_HT)} HT / mois`, detail: `${euros(ttc(MONTHLY_HT))} TTC` },
+  { value: 'annuel', label: 'Annuel', price: `${euros(YEARLY_HT)} HT / an`, detail: `${euros(ttc(YEARLY_HT))} TTC · 1 mois offert` },
 ];
 
 /** Montant d'une formule, pour la page Abonnement : « 100 € HT / mois (120 € TTC) ». */
@@ -24,11 +24,13 @@ interface PlanCardsProps {
   /** Seul le titulaire voit le bouton de paiement. */
   canSubscribe: boolean;
   testMode: boolean;
+  /** Premier abonnement : la mise en service s'ajoute au premier paiement. */
+  setupDue: boolean;
   /** Bouton plein largeur, comme sur les écrans de connexion. */
   buttonClassName: string;
 }
 
-export default function PlanCards({ canSubscribe, testMode, buttonClassName }: PlanCardsProps) {
+export default function PlanCards({ canSubscribe, testMode, setupDue, buttonClassName }: PlanCardsProps) {
   const [plan, setPlan] = useState<Plan>('mensuel');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,13 @@ export default function PlanCards({ canSubscribe, testMode, buttonClassName }: P
           );
         })}
       </div>
+      {setupDue && (
+        <p className="mt-4 text-sm text-gray-600">
+          {plan === 'mensuel'
+            ? <>Premier mois&nbsp;: <strong className="font-semibold text-gray-900 tabular-nums">{euros(FIRST_MONTH_HT)} HT</strong>, mise en service comprise (formation, modèles de devis, prestations, import de vos clients). Ensuite {euros(MONTHLY_HT)} HT par mois.</>
+            : <>Premier paiement&nbsp;: <strong className="font-semibold text-gray-900 tabular-nums">{euros(YEARLY_HT + SETUP_HT)} HT</strong>, soit l’année et la mise en service ({euros(SETUP_HT)} HT, formation, modèles de devis, prestations, import de vos clients). Une heure de formation en plus et un SAV prioritaire.</>}
+        </p>
+      )}
       {canSubscribe && (
         <>
           {error && <p role="alert" className="mt-4 rounded-2xl border border-danger/30 bg-white px-4 py-3 text-sm text-danger">{error}</p>}

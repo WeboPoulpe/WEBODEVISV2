@@ -92,7 +92,7 @@ export default function SubscriptionManager({ view, canManage }: { view: Subscri
         )}
         {!canManage && <p className="mt-3 text-sm text-gray-600">Seul le titulaire du compte peut gérer l’abonnement.</p>}
         <div className="mt-5">
-          <PlanCards canSubscribe={canManage} testMode={view.testMode} buttonClassName={cn(btnPrimary, 'w-full sm:w-auto')} />
+          <PlanCards canSubscribe={canManage} testMode={view.testMode} setupDue={view.setupDue} buttonClassName={cn(btnPrimary, 'w-full sm:w-auto')} />
         </div>
       </section>
     );

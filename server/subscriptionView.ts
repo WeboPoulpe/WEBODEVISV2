@@ -62,6 +62,8 @@ export interface SubscriptionView {
   /** Abonnement Stripe en cours (actif ou en relance de paiement). */
   subscribed: boolean;
   testMode: boolean;
+  /** Jamais abonnée : la mise en service s'ajoute au premier paiement (même règle que startCheckout). */
+  setupDue: boolean;
 }
 
 export async function subscriptionView(userId: string): Promise<SubscriptionView> {
@@ -83,5 +85,6 @@ export async function subscriptionView(userId: string): Promise<SubscriptionView
     comped: sub?.comped ?? false,
     subscribed: status === 'active' || status === 'past_due',
     testMode: isTestMode(),
+    setupDue: !sub?.stripe_subscription_id,
   };
 }

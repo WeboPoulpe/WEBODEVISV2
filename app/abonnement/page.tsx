@@ -50,7 +50,7 @@ export default async function AbonnementPage() {
         : 'Votre compte est prêt. Abonnez-vous pour ouvrir WeboDevis.'}
       footer={footer}
     >
-      <PlanCards canSubscribe={!user.actingAsAdmin} testMode={view.testMode} buttonClassName={authButton} />
+      <PlanCards canSubscribe={!user.actingAsAdmin} testMode={view.testMode} setupDue={view.setupDue} buttonClassName={authButton} />
     </AuthShell>
   );
 }

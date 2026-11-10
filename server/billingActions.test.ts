@@ -97,6 +97,20 @@ describe('startCheckout', () => {
     expect(sessionsCreate.mock.calls[1][0].line_items[0].price).toBe('price_a');
   });
 
+  it('premier abonnement : la mise en service (1 150 € HT, hors taxe) s’ajoute au premier paiement', async () => {
+    await actions.startCheckout('mensuel');
+    const items = sessionsCreate.mock.calls[0][0].line_items;
+    expect(items).toHaveLength(2);
+    expect(items[1]).toMatchObject({ quantity: 1, price_data: { currency: 'eur', unit_amount: 115000, tax_behavior: 'exclusive' } });
+  });
+
+  it('réabonnement après un abonnement terminé : pas de nouvelle mise en service', async () => {
+    await pg.exec(`insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status)
+      values ('${OWNER}', 'cus_1', 'sub_1', 'canceled')`);
+    await actions.startCheckout('annuel');
+    expect(sessionsCreate.mock.calls[0][0].line_items).toEqual([{ price: 'price_a', quantity: 1 }]);
+  });
+
   it('renvoie un abonné actif vers la page', async () => {
     await makeActive();
     expect(await actions.startCheckout('annuel')).toEqual({ error: null, url: '/parametres/abonnement' });
