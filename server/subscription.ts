@@ -44,13 +44,22 @@ async function enforced(): Promise<boolean> {
   return value;
 }
 
-/** Accès d'une entreprise, gardé 60 s en mémoire. */
+/**
+ * Accès d'une entreprise. Seul « full » est gardé 60 s en mémoire : le cache est propre à chaque instance, donc un refus
+ * est toujours relu en base (un client qui vient de payer ne reste pas bloqué sur une autre instance).
+ * Dans le doute (base injoignable), on laisse l'accès, sans le garder.
+ */
 export async function accessOf(companyId: string): Promise<Access> {
   const hit = accessCache.get(companyId);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.access;
-  const access = accessFrom(await getSubscription(companyId), { demo: isDemoUser(companyId), enforced: await enforced() });
-  accessCache.set(companyId, { access, at: Date.now() });
-  return access;
+  try {
+    const access = accessFrom(await getSubscription(companyId), { demo: isDemoUser(companyId), enforced: await enforced() });
+    if (access === 'full') accessCache.set(companyId, { access, at: Date.now() });
+    return access;
+  } catch (e) {
+    console.error('accessOf : lecture de l’abonnement impossible, accès laissé', e);
+    return 'full';
+  }
 }
 
 export async function accessOfUser(userId: string): Promise<Access> {

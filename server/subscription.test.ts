@@ -60,16 +60,40 @@ describe("accès selon l'abonnement", () => {
 
   it('invalidateAccess rend un changement visible sans attendre le cache', async () => {
     await settings.setBillingEnforced(true);
-    expect(await s.accessOf(OWNER)).toBe('unpaid');
     await pg.exec(`insert into company_subscriptions (company_id, status, ever_subscribed) values ('${OWNER}', 'active', true)`);
-    expect(await s.accessOf(OWNER)).toBe('unpaid'); // encore en cache
-    s.invalidateAccess(OWNER);
     expect(await s.accessOf(OWNER)).toBe('full');
+    await pg.exec(`update company_subscriptions set status = 'canceled' where company_id = '${OWNER}'`);
+    expect(await s.accessOf(OWNER)).toBe('full'); // « full » gardé 60 s
+    s.invalidateAccess(OWNER);
+    expect(await s.accessOf(OWNER)).toBe('readonly');
   });
 
   it('changer le réglage vide le cache', async () => {
     expect(await s.accessOf(OWNER)).toBe('full');
     await settings.setBillingEnforced(true);
+    expect(await s.accessOf(OWNER)).toBe('unpaid');
+  });
+
+  it("un refus n'est jamais gardé : un accès offert en base se voit tout de suite", async () => {
+    await settings.setBillingEnforced(true);
+    await s.setComped(OWNER, true, '');
+    await s.setComped(OWNER, false, '');
+    expect(await s.accessOf(OWNER)).toBe('readonly');
+    await pg.exec(`update company_subscriptions set comped = true where company_id = '${OWNER}'`);
+    expect(await s.accessOf(OWNER)).toBe('full');
+  });
+
+  it('base en panne : accès laissé, journalisé, non gardé', async () => {
+    await settings.setBillingEnforced(true);
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await pg.exec('alter table company_subscriptions rename to company_subscriptions_off');
+    try {
+      expect(await s.accessOf(OWNER)).toBe('full');
+      expect(err).toHaveBeenCalled();
+    } finally {
+      await pg.exec('alter table company_subscriptions_off rename to company_subscriptions');
+      err.mockRestore();
+    }
     expect(await s.accessOf(OWNER)).toBe('unpaid');
   });
 });
