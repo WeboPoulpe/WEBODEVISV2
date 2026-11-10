@@ -1,13 +1,16 @@
 // Purge d'un compte sur le vrai schéma en mémoire : toutes ses données partent, celles des autres restent.
 import { drizzle } from 'drizzle-orm/pglite';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schema from '@/db/schema';
 import { createTestDb } from '@/db/testDb';
 
 vi.mock('server-only', () => ({}));
 let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); } }));
+
+const subCancel = vi.fn();
+vi.mock('@/lib/stripe', () => ({ stripe: () => ({ subscriptions: { cancel: subCancel } }) }));
 
 const { purgeAccount } = await import('./accountPurge');
 
@@ -83,5 +86,38 @@ describe('purge d’un compte', () => {
 
   it('la protection des factures émises reste entière hors purge', async () => {
     await expect(pg.query(`delete from customer_invoices where number = 'F-B'`)).rejects.toThrow(/supprimée/);
+  });
+});
+
+describe('purge et abonnement Stripe', () => {
+  const C = '00000000-0000-4000-8000-00000000dddd';
+  const D = '00000000-0000-4000-8000-00000000eeee';
+  beforeAll(async () => {
+    await pg.exec(`
+      insert into users (id, email, password_hash) values ('${C}', 'c@t.fr', 'x'), ('${D}', 'd@t.fr', 'x');
+      insert into profiles (id, email) values ('${C}', 'c@t.fr'), ('${D}', 'd@t.fr');
+      insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status) values ('${C}', 'cus_c', 'sub_c', 'active'), ('${D}', 'cus_d', 'sub_d', 'canceled');
+    `);
+  });
+  beforeEach(() => subCancel.mockReset());
+
+  it('si Stripe est en panne, rien n’est effacé et l’erreur remonte', async () => {
+    subCancel.mockRejectedValueOnce(new Error('stripe en panne'));
+    await expect(purgeAccount(C)).rejects.toThrow(/stripe en panne/);
+    expect((await pg.query(`select 1 from users where id = $1`, [C])).rows).toHaveLength(1);
+    expect((await pg.query(`select 1 from company_subscriptions where company_id = $1`, [C])).rows).toHaveLength(1);
+  });
+
+  it('résilie tout de suite chez Stripe puis efface', async () => {
+    subCancel.mockResolvedValue({});
+    await purgeAccount(C);
+    expect(subCancel).toHaveBeenCalledWith('sub_c');
+    expect((await pg.query(`select 1 from users where id = $1`, [C])).rows).toHaveLength(0);
+  });
+
+  it('n’appelle pas Stripe pour un abonnement déjà terminé', async () => {
+    await purgeAccount(D);
+    expect(subCancel).not.toHaveBeenCalled();
+    expect((await pg.query(`select 1 from users where id = $1`, [D])).rows).toHaveLength(0);
   });
 });

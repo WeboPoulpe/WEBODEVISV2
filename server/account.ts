@@ -12,6 +12,7 @@ import { accountDeletionAdminEmail, accountDeletionEmail } from '@/lib/mail/temp
 import { DELETION_DELAY_DAYS, purgeAccountNow } from './accountPurge';
 import { requireAdmin } from './session';
 import { logAudit } from '@/lib/audit';
+import { scheduleCancelForDeletion, undoCancelForDeletion } from './billingDeletion';
 
 // Suppression du compte par son titulaire (droit à l'effacement, art. 17 du RGPD). La demande désactive le compte
 // tout de suite ; les données sont purgées 30 jours plus tard (tâche planifiée), le temps de revenir sur une erreur.
@@ -37,6 +38,9 @@ export async function requestAccountDeletion(input: { password: string; confirmT
   await db.update(profiles).set({ is_active: false, deletion_requested_at: now.toISOString() }).where(eq(profiles.id, userId));
   const purgeOn = new Date(now.getTime() + DELETION_DELAY_DAYS * 86400_000).toISOString().slice(0, 10);
   await logAudit({ actor: userId, target: userId, action: 'suppression_demandee', details: { purgeOn } });
+  // L'abonnement s'arrête à la fin de la période payée. Une panne Stripe ne bloque pas la demande : la purge
+  // résiliera de toute façon l'abonnement avant d'effacer.
+  await scheduleCancelForDeletion(userId).catch((e) => console.error('[suppression] résiliation Stripe', userId, e));
 
   const origin = await appOrigin();
   await sendMail({ to: me.email, ...accountDeletionEmail({ firstName: me.first, purgeOn, contactUrl: `${origin}/contact` }) });
@@ -53,6 +57,7 @@ export async function requestAccountDeletion(input: { password: string; confirmT
 export async function cancelAccountDeletion(userId: string): Promise<{ error: string | null }> {
   const admin = await requireAdmin();
   await db.update(profiles).set({ deletion_requested_at: null, is_active: true }).where(eq(profiles.id, userId));
+  await undoCancelForDeletion(userId).catch((e) => console.error('[suppression] retrait de la résiliation Stripe', userId, e));
   await logAudit({ actor: admin.id, target: userId, action: 'suppression_annulee' });
   return { error: null };
 }

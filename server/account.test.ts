@@ -2,22 +2,31 @@
 import bcrypt from 'bcryptjs';
 import { drizzle } from 'drizzle-orm/pglite';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schema from '@/db/schema';
 import { createTestDb } from '@/db/testDb';
 
 vi.mock('server-only', () => ({}));
 const OWNER = '00000000-0000-4000-8000-00000000d001';
+const ADMIN = '00000000-0000-4000-8000-00000000d003';
 const MEMBER = '00000000-0000-4000-8000-00000000d002';
 let current = OWNER;
 vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { id: current } }) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 const mails: string[] = [];
 vi.mock('@/lib/mail', () => ({ appOrigin: async () => 'https://webodevis.fr', sendMail: async (m: { to: string }) => { mails.push(m.to); return { error: null }; } }));
+vi.mock('./session', () => ({ requireAdmin: async () => ({ id: ADMIN }) }));
+const subUpdate = vi.fn();
+const subRetrieve = vi.fn();
+const subList = vi.fn();
+vi.mock('@/lib/stripe', () => ({
+  stripe: () => ({ subscriptions: { update: subUpdate, retrieve: subRetrieve, list: subList } }),
+  planOfPrice: () => 'mensuel',
+}));
 let pg: PGlite;
 vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); } }));
 
-const { requestAccountDeletion } = await import('./account');
+const { requestAccountDeletion, cancelAccountDeletion } = await import('./account');
 const { accountsDueForPurge } = await import('./accountPurge');
 
 beforeAll(async () => {
@@ -50,5 +59,61 @@ describe('suppression du compte', () => {
     expect(await accountsDueForPurge()).toEqual([]);
     await pg.query(`update profiles set deletion_requested_at = now() - interval '31 days' where id = $1`, [OWNER]);
     expect(await accountsDueForPurge()).toEqual([OWNER]);
+  });
+});
+
+describe('suppression du compte et abonnement Stripe', () => {
+  const PERIOD_END = Math.floor(Date.parse('2026-12-17T09:00:00Z') / 1000);
+  const stripeSub = (cancel: boolean) => ({
+    id: 'sub_1', created: 1000, object: 'subscription', customer: 'cus_1', status: 'active', cancel_at_period_end: cancel,
+    billing_cycle_anchor: 1000, metadata: { company_id: OWNER },
+    items: { object: 'list', data: [{ id: 'si_1', current_period_end: PERIOD_END, price: { id: 'price_m' } }] },
+  });
+  const flag = async () => (await pg.query<{ c: boolean }>(`select cancel_at_period_end as c from company_subscriptions where company_id = $1`, [OWNER])).rows[0].c;
+
+  beforeEach(async () => {
+    subUpdate.mockReset(); subRetrieve.mockReset(); subList.mockReset();
+    subList.mockResolvedValue({ data: [] });
+    await pg.query(`update profiles set is_active = true, deletion_requested_at = null where id = $1`, [OWNER]);
+    await pg.query(`delete from company_subscriptions where company_id = $1`, [OWNER]);
+    await pg.query(`insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status) values ($1, 'cus_1', 'sub_1', 'active')`, [OWNER]);
+    current = OWNER;
+  });
+
+  it('la demande de suppression programme la résiliation en fin de période', async () => {
+    subUpdate.mockResolvedValue({});
+    subRetrieve.mockResolvedValue(stripeSub(true));
+    expect((await requestAccountDeletion({ password: 'secret123', confirmText: 'SUPPRIMER' })).error).toBeNull();
+    expect(subUpdate).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: true });
+    expect(await flag()).toBe(true);
+  });
+
+  it('une panne Stripe ne bloque pas la demande', async () => {
+    subUpdate.mockRejectedValue(new Error('stripe en panne'));
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await requestAccountDeletion({ password: 'secret123', confirmText: 'SUPPRIMER' })).error).toBeNull();
+    err.mockRestore();
+    const { rows } = await pg.query<{ is_active: boolean }>(`select is_active from profiles where id = $1`, [OWNER]);
+    expect(rows[0].is_active).toBe(false);
+  });
+
+  it('sans abonnement Stripe, rien n’est appelé', async () => {
+    await pg.query(`update company_subscriptions set stripe_subscription_id = null, status = 'none' where company_id = $1`, [OWNER]);
+    expect((await requestAccountDeletion({ password: 'secret123', confirmText: 'SUPPRIMER' })).error).toBeNull();
+    expect(subUpdate).not.toHaveBeenCalled();
+  });
+
+  it('l’annulation de la suppression retire la résiliation programmée', async () => {
+    await pg.query(`update company_subscriptions set cancel_at_period_end = true where company_id = $1`, [OWNER]);
+    subUpdate.mockResolvedValue({});
+    subRetrieve.mockResolvedValue(stripeSub(false));
+    expect((await cancelAccountDeletion(OWNER)).error).toBeNull();
+    expect(subUpdate).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: false });
+    expect(await flag()).toBe(false);
+  });
+
+  it('l’annulation de la suppression n’appelle pas Stripe si rien n’est programmé', async () => {
+    expect((await cancelAccountDeletion(OWNER)).error).toBeNull();
+    expect(subUpdate).not.toHaveBeenCalled();
   });
 });
