@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 import { LOGO_VIEWBOX, logoDataUri } from '@/lib/brand/logo';
 
-// Image de partage (Open Graph) : le logo, la promesse et le prix sur le vert sapin, dans les polices du site
+// Image de partage (Open Graph) : le logo, la promesse et la démo gratuite sur le vert sapin, dans les polices du site
 // (Outfit pour le nom, Bricolage Grotesque pour le titre, Instrument Sans pour le texte). Générée au build.
 export const alt = 'WeboDevis, le logiciel des traiteurs : du premier devis au dernier couvert servi.';
 export const size = { width: 1200, height: 630 };
@@ -49,7 +49,7 @@ export default async function OpengraphImage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 40 }}>
             <div style={{ display: 'flex', fontSize: 34, color: '#E5AE92' }}>Du premier devis au dernier couvert servi.</div>
-            <div style={{ display: 'flex', fontSize: 26, color: 'rgba(255,255,255,0.75)' }}>100 € HT / mois</div>
+            <div style={{ display: 'flex', fontSize: 26, color: 'rgba(255,255,255,0.75)' }}>Démonstration gratuite</div>
           </div>
         </div>
       </div>
