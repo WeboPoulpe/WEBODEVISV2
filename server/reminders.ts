@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { document_reminders, notifications } from '@/db/schema';
 import { isDemoUser } from '@/lib/demo';
 import { isValidEmail, splitEmails } from '@/lib/emailList';
+import { cleanPaymentUrl } from '@/lib/paymentLink';
 import { sendMail } from '@/lib/mail';
 import { invoiceReminderEmail, quoteReminderEmail } from '@/lib/mail/templates';
 import { PENDING_STATUSES } from '@/lib/quoteStatus';
@@ -109,6 +110,8 @@ export interface InvoiceToRemind extends Company {
   remaining: number;
   iban: string | null;
   bic: string | null;
+  /** Lien de paiement en ligne du traiteur, tel qu'il est réglé aujourd'hui. */
+  payment_url: string | null;
   reminders: number;
 }
 
@@ -119,6 +122,7 @@ export async function invoicesToRemind(today: string): Promise<InvoiceToRemind[]
       coalesce((select sum(p.amount) from public.customer_invoice_payments p where p.invoice_id = i.id), 0) as paid,
       (select count(*)::int from public.document_reminders r where r.invoice_id = i.id) as reminders,
       (select max(r.sent_at) from public.document_reminders r where r.invoice_id = i.id) as last_reminder,
+      cp.company_payment_url as payment_url,
       ${companyColumns}
     from public.customer_invoices i
     join public.profiles cp on cp.id = i.owner_user_id
@@ -132,7 +136,7 @@ export async function invoicesToRemind(today: string): Promise<InvoiceToRemind[]
   const out: InvoiceToRemind[] = [];
   for (const r of rows as Record<string, unknown>[]) {
     const c = r as unknown as Company & {
-      id: string; number: string; due_date: string; total_ttc: unknown; paid: unknown; reminders: number; last_reminder: unknown;
+      id: string; number: string; due_date: string; total_ttc: unknown; paid: unknown; reminders: number; last_reminder: unknown; payment_url: string | null;
       buyer: { name?: string | null; email?: string | null } | null; seller: { iban?: string | null; bic?: string | null } | null;
     };
     if (isDemoUser(c.company)) continue;
@@ -145,7 +149,8 @@ export async function invoicesToRemind(today: string): Promise<InvoiceToRemind[]
       company: c.company, company_name: c.company_name, first_name: c.first_name, last_name: c.last_name,
       company_email: c.company_email, account_email: c.account_email, delay,
       id: c.id, number: c.number, due_date: c.due_date, to, buyer_name: c.buyer?.name?.trim() || null, remaining,
-      iban: c.seller?.iban?.trim() || null, bic: c.seller?.bic?.trim() || null, reminders: Number(c.reminders),
+      iban: c.seller?.iban?.trim() || null, bic: c.seller?.bic?.trim() || null,
+      payment_url: cleanPaymentUrl(c.payment_url), reminders: Number(c.reminders),
     });
   }
   return out;
@@ -194,7 +199,7 @@ export async function runReminders({ origin, now = new Date() }: { origin: strin
     if (await accessOf(i.company) !== 'full') continue;
     const name = companyName(i);
     const mail = invoiceReminderEmail({
-      invoice: { companyName: name, buyerName: i.buyer_name, number: i.number, remaining: i.remaining, dueDate: i.due_date, iban: i.iban, bic: i.bic, previous: i.reminders },
+      invoice: { companyName: name, buyerName: i.buyer_name, number: i.number, remaining: i.remaining, dueDate: i.due_date, iban: i.iban, bic: i.bic, paymentUrl: i.payment_url, previous: i.reminders },
     });
     try {
       const { error } = await sendMail({ to: i.to, fromName: name, replyTo: replyTo(i), ...mail });

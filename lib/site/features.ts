@@ -764,6 +764,7 @@ export const FEATURES: Feature[] = [
         body: [
           'Vous enregistrez chaque paiement reçu : date, montant, moyen de paiement (virement, chèque, espèces, carte) et une note. La facture passe à « Payée en partie », puis à « Payée ». Le devis suit : « Acompte reçu » quand l’acompte est réglé, « Payé » quand le solde l’est.',
           'Si vous les activez, les relances des factures échues partent toutes seules, trois au plus, avec le reste à payer et votre IBAN. Chaque facture émise se télécharge en PDF au format Factur-X.',
+          'Si vous avez une page de paiement en ligne (SumUp, PayPal, votre banque), collez son lien dans vos paramètres : il s’affiche sur le devis accepté, les factures et les relances. Le paiement se fait chez votre prestataire, WeboDevis n’encaisse rien.',
         ],
       },
       {

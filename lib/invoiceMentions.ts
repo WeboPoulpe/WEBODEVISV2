@@ -6,6 +6,7 @@
 // invoiceMentions dans l'ordre. La mention de franchise de TVA (art. 293 B) fait partie de la ligne d'identité.
 
 import type { Invoice, Seller } from '@/server/invoices';
+import { cleanPaymentUrl } from './paymentLink';
 
 /** « 2026-10-19 » → « 19/10/2026 », sans passer par le fuseau horaire. */
 export function frDate(iso: string | null | undefined): string {
@@ -43,6 +44,8 @@ export function invoiceMentions(inv: Pick<Invoice, 'kind' | 'status' | 'seller' 
     const bic = clean(inv.seller.bic);
     if (iban) out.push(`Règlement par virement : IBAN ${iban}${bic ? ` · BIC ${bic}` : ''}.`);
     else if (bic) out.push(`BIC ${bic}.`);
+    const payUrl = cleanPaymentUrl(inv.seller.paymentUrl);
+    if (payUrl) out.push(`Paiement en ligne : ${payUrl}`);
     out.push('Pas d’escompte pour paiement anticipé.');
     if (inv.buyer.isCompany) {
       out.push('En cas de retard de paiement, pénalités au taux de trois fois le taux d’intérêt légal et indemnité forfaitaire pour frais de recouvrement de 40 € (art. L441-10 du Code de commerce).');

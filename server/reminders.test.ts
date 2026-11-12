@@ -52,6 +52,7 @@ beforeAll(async () => {
     insert into profiles (id, email, company_name, company_email, auto_reminders, reminder_delay_days) values ('${A}', 'a@t.fr', 'Traiteur A', 'contact@traiteur-a.fr', true, 7);
     insert into profiles (id, email, parent_user_id) values ('${M}', 'm@t.fr', '${A}');
     insert into profiles (id, email, company_name) values ('${B}', 'b@t.fr', 'Traiteur B');
+    update profiles set company_payment_url = 'https://pay.sumup.com/b2c/TRAITEURA' where id = '${A}';
   `);
   await quote(A, 'Dupont', {});                                         // envoyé il y a 10 jours : à relancer
   await quote(M, 'Leroy', {});                                          // devis d'un collaborateur : réglage de l'entreprise
@@ -82,6 +83,8 @@ describe('relances automatiques', () => {
     expect(facture.subject).toContain('F-2026-001');
     expect(facture.html).toMatch(/600,00\s€/);
     expect(facture.html).toContain('FR76 3000 6000 0112 3456 7890 189');
+    expect(facture.html).toContain('https://pay.sumup.com/b2c/TRAITEURA');
+    expect(facture.html).toContain('Payer en ligne');
     expect(facture.html).not.toContain('/api/factures');
   });
 

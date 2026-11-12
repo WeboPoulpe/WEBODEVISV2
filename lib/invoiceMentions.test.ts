@@ -25,6 +25,16 @@ describe('mentions légales des factures', () => {
       .toEqual(['Catégorie de l’opération : prestation de services.']);
   });
 
+  it('lien de paiement du traiteur : affiché s’il est valable, jamais sur un avoir', () => {
+    const withLink = { ...seller, paymentUrl: 'https://pay.sumup.com/b2c/ABC' };
+    const m = invoiceMentions({ kind: 'facture', status: 'emise', seller: withLink, buyer: { name: 'Jean' }, due_date: null });
+    expect(m).toContain('Paiement en ligne : https://pay.sumup.com/b2c/ABC');
+    const bad = invoiceMentions({ kind: 'facture', status: 'emise', seller: { ...seller, paymentUrl: 'javascript:alert(1)' }, buyer: { name: 'Jean' }, due_date: null });
+    expect(bad.some((s) => s.startsWith('Paiement en ligne'))).toBe(false);
+    const avoir = invoiceMentions({ kind: 'avoir', status: 'emise', seller: withLink, buyer: { name: 'Jean' }, due_date: null });
+    expect(avoir.some((s) => s.startsWith('Paiement en ligne'))).toBe(false);
+  });
+
   it('dates au format français', () => {
     expect(frDate('2026-01-05')).toBe('05/01/2026');
     expect(frDate(null)).toBe('');

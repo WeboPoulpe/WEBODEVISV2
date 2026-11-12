@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { customer_invoice_payments, customer_invoices, profiles, quotes } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
+import { cleanPaymentUrl } from '@/lib/paymentLink';
 import {
   addDays, balanceLines, cents, creditLines, depositLines, invoiceTotals, linesFromQuote, paymentStatus,
   PAYMENT_METHODS, type InvoiceKind, type InvoiceLine, type InvoiceStatus, type PaymentMethod, type RateTotal,
@@ -32,6 +33,8 @@ export interface Seller extends Party {
   vatExempt?: boolean;
   iban?: string | null;
   bic?: string | null;
+  /** Lien de paiement en ligne du traiteur (lib/paymentLink.ts). */
+  paymentUrl?: string | null;
   logoUrl?: string | null;
 }
 
@@ -95,6 +98,7 @@ async function sellerSnapshot(company: string): Promise<{ seller: Seller; paymen
       rcs: p?.rcs ?? null,
       iban: p?.company_iban ?? null,
       bic: p?.company_bic ?? null,
+      paymentUrl: cleanPaymentUrl(p?.company_payment_url),
       logoUrl: p?.logo_url || p?.company_logo_url || null,
       isCompany: true,
     },

@@ -7,6 +7,7 @@ import { Check, Hash, Loader2, Scale } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { cleanPrefix, formatDocumentNumber, KIND_LABELS, numberFormat, type DocumentKind, type NumberFormat, type NumberingSettings } from '@/lib/numbering';
+import { cleanPaymentUrl } from '@/lib/paymentLink';
 import { getLastDocumentNumbers } from '@/server/numbering';
 
 const inputCls = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors';
@@ -57,12 +58,12 @@ function SaveRow({ state, onSave, error }: { state: 'idle' | 'saving' | 'saved';
 
 interface Legal {
   legal_form: string; share_capital: string; rcs: string; vat_number: string; vat_exempt: boolean;
-  company_iban: string; company_bic: string;
+  company_iban: string; company_bic: string; company_payment_url: string;
   payment_terms_days: string; deposit_percent: string; quote_validity_days: string;
 }
 
 const EMPTY: Legal = {
-  legal_form: '', share_capital: '', rcs: '', vat_number: '', vat_exempt: false, company_iban: '', company_bic: '',
+  legal_form: '', share_capital: '', rcs: '', vat_number: '', vat_exempt: false, company_iban: '', company_bic: '', company_payment_url: '',
   payment_terms_days: '30', deposit_percent: '30', quote_validity_days: '30',
 };
 
@@ -89,7 +90,7 @@ export default function DocumentSettings() {
   useEffect(() => {
     if (!user) return;
     createClient().from('profiles')
-      .select('legal_form, share_capital, rcs, vat_number, vat_exempt, company_iban, company_bic, payment_terms_days, deposit_percent, quote_validity_days, numbering')
+      .select('legal_form, share_capital, rcs, vat_number, vat_exempt, company_iban, company_bic, company_payment_url, payment_terms_days, deposit_percent, quote_validity_days, numbering')
       .eq('id', user.id).maybeSingle()
       .then(({ data }) => {
         if (data) {
@@ -97,6 +98,7 @@ export default function DocumentSettings() {
             legal_form: data.legal_form ?? '', share_capital: data.share_capital ?? '', rcs: data.rcs ?? '',
             vat_number: data.vat_number ?? '', vat_exempt: !!data.vat_exempt,
             company_iban: data.company_iban ?? '', company_bic: data.company_bic ?? '',
+            company_payment_url: data.company_payment_url ?? '',
             payment_terms_days: String(data.payment_terms_days ?? 30), deposit_percent: String(data.deposit_percent ?? 30),
             quote_validity_days: String(data.quote_validity_days ?? 30),
           });
@@ -113,6 +115,11 @@ export default function DocumentSettings() {
 
   const saveLegal = async () => {
     if (!user) return;
+    const paymentUrl = cleanPaymentUrl(legal.company_payment_url);
+    if (legal.company_payment_url.trim() && !paymentUrl) {
+      setLegalError('Le lien de paiement doit être une adresse complète en https, par exemple https://pay.sumup.com/…');
+      return;
+    }
     setLegalState('saving'); setLegalError(null);
     const t = (v: string) => v.trim() || null;
     const { error } = await createClient().from('profiles').update({
@@ -120,6 +127,7 @@ export default function DocumentSettings() {
       vat_number: legal.vat_exempt ? null : t(legal.vat_number.toUpperCase().replace(/\s+/g, '')),
       vat_exempt: legal.vat_exempt,
       company_iban: t(legal.company_iban.toUpperCase().replace(/\s+/g, ' ')), company_bic: t(legal.company_bic.toUpperCase()),
+      company_payment_url: paymentUrl,
       payment_terms_days: intIn(legal.payment_terms_days, 0, 120, 30),
       deposit_percent: intIn(legal.deposit_percent, 0, 100, 30),
       quote_validity_days: intIn(legal.quote_validity_days, 1, 365, 30),
@@ -155,6 +163,10 @@ export default function DocumentSettings() {
           </div>
           <Field label="IBAN" value={legal.company_iban} onChange={(v) => set('company_iban', v)} placeholder="FR76 3000 6000 0112 3456 7890 189" />
           <Field label="BIC" value={legal.company_bic} onChange={(v) => set('company_bic', v)} placeholder="AGRIFRPP" />
+          <div className="sm:col-span-2">
+            <Field label="Lien de paiement en ligne" type="url" value={legal.company_payment_url} onChange={(v) => set('company_payment_url', v)}
+              placeholder="https://pay.sumup.com/…" hint="Facultatif. Le lien de votre page de paiement (SumUp, PayPal, votre banque…). Il s’affiche sur le devis accepté, les factures et les relances. Le paiement se fait chez votre prestataire : WeboDevis n’encaisse rien." />
+          </div>
         </div>
         <div className="grid sm:grid-cols-3 gap-4 pt-2 border-t border-gray-100">
           <Field label="Paiement des factures" type="number" value={legal.payment_terms_days} onChange={(v) => set('payment_terms_days', v)} suffix="jours" hint="Délai avant l’échéance" />

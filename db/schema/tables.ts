@@ -1003,6 +1003,7 @@ export const profiles = pgTable("profiles", {
 	company_bank_name: text(),
 	company_iban: text(),
 	company_bic: text(),
+	company_payment_url: text(),
 	company_bank_account_holder: text(),
 	preferred_payment_method: text().default('virement'),
 	custom_vat_rate: numeric().default('20'),

@@ -284,14 +284,17 @@ export function quoteAcceptedOwnerEmail({ acceptance, link }: { acceptance: Acce
 }
 
 /** Au client : confirmation de son acceptation. */
-export function quoteAcceptedClientEmail({ acceptance, link }: { acceptance: AcceptanceDetails; link: string }): Email {
+export function quoteAcceptedClientEmail({ acceptance, link, paymentUrl }: { acceptance: AcceptanceDetails; link: string; paymentUrl?: string | null }): Email {
   return {
     subject: `Votre accord pour le devis ${acceptance.companyName}`,
     html: renderEmail({
       brand: acceptance.companyName,
       preheader: 'Votre acceptation est bien enregistrée.',
       title: 'Merci, votre accord est enregistré',
-      paragraphs: [`${esc(acceptance.companyName)} a bien reçu votre acceptation du devis. Vous pouvez le consulter à tout moment avec le lien ci-dessous.`],
+      paragraphs: [
+        `${esc(acceptance.companyName)} a bien reçu votre acceptation du devis. Vous pouvez le consulter à tout moment avec le lien ci-dessous.`,
+        ...(paymentUrl ? [`Pour régler votre acompte par carte : <a href="${esc(paymentUrl)}">page de paiement de ${esc(acceptance.companyName)}</a>.`] : []),
+      ],
       facts: acceptanceFacts(acceptance),
       button: { label: 'Revoir le devis', url: link },
       footer: `Envoyé par ${acceptance.companyName} avec WeboDevis.`,
@@ -536,6 +539,8 @@ export interface InvoiceReminderDetails {
   dueDate: string;
   iban: string | null;
   bic: string | null;
+  /** Lien de paiement en ligne du traiteur, déjà vérifié (cleanPaymentUrl). */
+  paymentUrl?: string | null;
   /** Nombre de relances déjà envoyées pour cette facture (0 pour la première). */
   previous: number;
 }
@@ -551,9 +556,13 @@ export function invoiceReminderEmail({ invoice }: { invoice: InvoiceReminderDeta
       title: invoice.buyerName ? `Bonjour ${invoice.buyerName}` : 'Bonjour',
       paragraphs: [
         `Sauf erreur de notre part, la facture <strong>${esc(invoice.number)}</strong>, arrivée à échéance le ${esc(longDate(invoice.dueDate))}, n’est pas encore entièrement réglée. Il reste <strong>${esc(amount)}</strong> à payer.`,
-        invoice.iban
-          ? 'Vous pouvez régler par virement avec les coordonnées ci-dessous, en indiquant le numéro de la facture.'
-          : 'Merci de nous indiquer quand le règlement sera fait.',
+        invoice.paymentUrl && invoice.iban
+          ? 'Vous pouvez régler en ligne avec le bouton ci-dessous, ou par virement avec les coordonnées indiquées, en rappelant le numéro de la facture.'
+          : invoice.paymentUrl
+            ? 'Vous pouvez régler en ligne avec le bouton ci-dessous, en rappelant le numéro de la facture.'
+            : invoice.iban
+              ? 'Vous pouvez régler par virement avec les coordonnées ci-dessous, en indiquant le numéro de la facture.'
+              : 'Merci de nous indiquer quand le règlement sera fait.',
         'Si le paiement vient d’être fait, ne tenez pas compte de ce message. Une question ? Répondez simplement à cet email.',
       ],
       facts: [
@@ -564,6 +573,7 @@ export function invoiceReminderEmail({ invoice }: { invoice: InvoiceReminderDeta
         ['IBAN', invoice.iban ?? ''],
         ['BIC', invoice.bic ?? ''],
       ],
+      ...(invoice.paymentUrl ? { button: { label: 'Payer en ligne', url: invoice.paymentUrl } } : {}),
       footer: `Envoyé par ${invoice.companyName} avec WeboDevis.`,
     }),
   };

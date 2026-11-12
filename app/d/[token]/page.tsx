@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { notFound } from 'next/navigation';
-import { CheckCircle2, Clock } from 'lucide-react';
+import { CheckCircle2, Clock, CreditCard } from 'lucide-react';
 import { adminSupabase } from '@/lib/supabase/admin';
 import QuoteRender from '@/components/devis/QuoteRender';
 import { LEGAL_PROFILE_COLUMNS } from '@/components/devis/weboword/printHelpers';
+import { cleanPaymentUrl } from '@/lib/paymentLink';
 import { acceptanceState, recordQuoteView } from '@/server/acceptance';
 import PrintButton from './PrintButton';
 import AcceptQuote from './AcceptQuote';
@@ -18,7 +19,7 @@ const frDateTime = (iso: string) => new Date(iso).toLocaleString('fr-FR', { date
 /** Profil de l'entreprise du devis : celui du titulaire, même si le devis a été fait par un collaborateur. */
 async function companyProfile(userId: string) {
   const { data: me } = await adminSupabase.from('profiles').select('parent_user_id').eq('id', userId).maybeSingle();
-  return adminSupabase.from('profiles').select(`company_phone, logo_url, cgv, ${LEGAL_PROFILE_COLUMNS}`)
+  return adminSupabase.from('profiles').select(`company_phone, logo_url, cgv, company_payment_url, ${LEGAL_PROFILE_COLUMNS}`)
     .eq('id', (me as { parent_user_id?: string | null } | null)?.parent_user_id ?? userId).maybeSingle();
 }
 
@@ -37,6 +38,8 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
     recordQuoteView(token).catch(() => {}),
   ]);
   const companyName = profile?.company_name || 'Votre traiteur';
+  // Lien de paiement du traiteur : proposé une fois le devis accepté. Le paiement se fait chez lui, pas ici.
+  const paymentUrl = cleanPaymentUrl((profile as { company_payment_url?: string | null } | null)?.company_payment_url);
 
   return (
     <div className="min-h-[100dvh] bg-page print:bg-white">
@@ -53,6 +56,20 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
               {state.acceptance.signerRole ? ` (${state.acceptance.signerRole})` : ''}
               {state.acceptance.formulaName ? `, formule « ${state.acceptance.formulaName} »` : ''}. Merci, {companyName} a bien reçu votre accord.
             </p>
+          </div>
+        )}
+        {state?.acceptance && paymentUrl && (
+          <div className="mx-4 sm:mx-auto sm:max-w-[210mm] my-4 sm:mt-0 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-2xl bg-white border border-gray-200 print:hidden">
+            <div className="flex-1">
+              <h2 className="font-display text-lg font-semibold text-gray-900">Régler en ligne</h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Vous pouvez régler votre acompte par carte, sur la page de paiement de {companyName}. Le montant à verser figure dans le devis.
+              </p>
+            </div>
+            <a href={paymentUrl} target="_blank" rel="noopener noreferrer nofollow"
+              className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-primary text-white text-[15px] font-semibold hover:bg-primary-dark transition-colors">
+              <CreditCard className="h-4 w-4" /> Payer en ligne
+            </a>
           </div>
         )}
         {state?.canAccept && (

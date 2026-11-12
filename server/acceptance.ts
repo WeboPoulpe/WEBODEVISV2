@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { notifications, profiles, quote_acceptances, quotes } from '@/db/schema';
 import { appOrigin, sendMail } from '@/lib/mail';
 import { quoteAcceptedClientEmail, quoteAcceptedOwnerEmail, type AcceptanceDetails } from '@/lib/mail/templates';
+import { cleanPaymentUrl } from '@/lib/paymentLink';
 import { isPending, PENDING_STATUSES } from '@/lib/quoteStatus';
 import { chosenFormula, parseFormulas, type QuoteFormula } from '@/lib/quoteFormulas';
 import { formulaTotals, quoteDefaultRate, quoteTotalTTC, resolveGuestSplit } from '@/lib/quoteTotals';
@@ -217,7 +218,7 @@ export async function acceptQuote(input: {
   if (accepted === null) return { error: 'Ce devis vient d’être modifié ou accepté. Rechargez la page pour voir sa dernière version.' };
 
   // Emails : ils ne bloquent pas l'acceptation s'ils ne partent pas.
-  const [p] = await db.select({ company: profiles.company_name, email: profiles.email, companyEmail: profiles.company_email })
+  const [p] = await db.select({ company: profiles.company_name, email: profiles.email, companyEmail: profiles.company_email, paymentUrl: profiles.company_payment_url })
     .from(profiles).where(eq(profiles.id, owner)).limit(1);
   const origin = await appOrigin();
   const details: AcceptanceDetails = {
@@ -228,7 +229,7 @@ export async function acceptQuote(input: {
   if (q.client_email) {
     await sendMail({
       to: q.client_email, fromName: details.companyName, replyTo: p?.companyEmail || p?.email || undefined,
-      ...quoteAcceptedClientEmail({ acceptance: details, link: `${origin}/d/${input.token}` }),
+      ...quoteAcceptedClientEmail({ acceptance: details, link: `${origin}/d/${input.token}`, paymentUrl: cleanPaymentUrl(p?.paymentUrl) }),
     });
   }
   return { error: null };
