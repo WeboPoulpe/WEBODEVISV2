@@ -35,6 +35,7 @@ const APP_ROUTES = [
   '/journee',
   '/materiel',
   '/site-web',
+  '/ma-fiche',
   '/webo',
   // Pages ouvertes par un lien personnel
   '/b/',

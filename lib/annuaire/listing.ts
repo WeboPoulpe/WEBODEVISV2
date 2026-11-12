@@ -72,11 +72,11 @@ export interface ListingFields {
   siret: string | null;
 }
 
-const NAME_MIN = 2;
-const NAME_MAX = 80;
-const TAGLINE_MAX = 140;
-const DESCRIPTION_MAX = 3000;
-const DESCRIPTION_MIN_TO_SUBMIT = 80;
+export const NAME_MIN = 2;
+export const NAME_MAX = 80;
+export const TAGLINE_MAX = 140;
+export const DESCRIPTION_MAX = 3000;
+export const DESCRIPTION_MIN_TO_SUBMIT = 80;
 const CITY_MAX = 80;
 
 /** Texte brut : balises retirées, espaces superflus réduits, sauts de ligne gardés. */

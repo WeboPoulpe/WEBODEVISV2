@@ -10,7 +10,7 @@ const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouvea
 // /abonnement : l'écran de paiement, hors de app/(app) mais réservé aux comptes connectés.
 const APP_PREFIXES = [
   '/abonnement', '/admin', '/brochures', '/calendrier', '/clients', '/commandes', '/courses-globales', '/devis', '/evenements', '/extras',
-  '/factures', '/fournisseurs', '/ingredients', '/journee', '/location-globale', '/location-templates', '/materiel',
+  '/factures', '/fournisseurs', '/ingredients', '/journee', '/location-globale', '/location-templates', '/ma-fiche', '/materiel',
   '/modeles', '/notifications', '/parametres', '/prestations', '/prospects', '/site-web', '/stock', '/tableau-de-bord', '/webo',
 ];
 
