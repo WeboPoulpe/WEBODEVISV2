@@ -13,3 +13,11 @@ export const REQUEST_STATUS: Record<string, { label: string; cls: string }> = {
   traitee: { label: 'Traitée', cls: 'bg-sage-100 text-sage' },
   suspecte: { label: 'Suspecte', cls: 'bg-gray-100 text-gray-500' },
 };
+
+export const LISTING_STATUS: Record<string, { label: string; cls: string }> = {
+  brouillon: { label: 'Brouillon', cls: 'bg-gray-100 text-gray-500' },
+  en_attente: { label: 'À valider', cls: 'bg-primary-50 text-primary-700' },
+  publiee: { label: 'Publiée', cls: 'bg-sage-100 text-sage' },
+  refusee: { label: 'Refusée', cls: 'bg-gray-100 text-gray-700' },
+  suspendue: { label: 'Suspendue', cls: 'bg-gray-100 text-gray-700' },
+};

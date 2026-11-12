@@ -20,6 +20,10 @@ export const AUDIT_LABELS = {
   acces_offert: 'Accès offert accordé',
   acces_offert_retire: 'Accès offert retiré',
   abonnement_obligatoire: 'Réglage « Abonnement obligatoire » modifié',
+  annuaire_fiche_validee: 'Fiche de l’annuaire validée',
+  annuaire_fiche_refusee: 'Fiche de l’annuaire refusée',
+  annuaire_fiche_suspendue: 'Fiche de l’annuaire suspendue',
+  annuaire_fiche_republiee: 'Fiche de l’annuaire republiée',
   ecriture_admin_compte_inactif: 'Modification par un administrateur dans un compte sans abonnement',
 } as const;
 

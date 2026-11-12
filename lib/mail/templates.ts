@@ -1,4 +1,5 @@
 import { esc, renderEmail } from './layout';
+import { SITE_URL } from '../site/config';
 import { answerSections, projectLabel, type SiteAnswers, type SiteCatalog } from '../siteWeb';
 
 // Un email = un objet et un corps. Les textes saisis par les utilisateurs sont toujours échappés.
@@ -862,6 +863,46 @@ export function tastingEmail({ kind, tasting }: { kind: TastingMailKind; tasting
       paragraphs: c.paragraphs,
       facts: kind === 'annulation' ? undefined : tastingFacts(tasting),
       footer: `Envoyé par ${tasting.companyName} avec WeboDevis.`,
+    }),
+  };
+}
+
+// ── Annuaire ──────────────────────────────────────────────────────────────────
+export type ListingDecisionMail = 'valider' | 'refuser' | 'suspendre' | 'republier';
+
+/** Au titulaire : l'équipe a statué sur sa fiche de l'annuaire Choisir Mon Traiteur. */
+export function listingDecisionEmail({ decision, reason }: { decision: ListingDecisionMail; reason?: string | null }): Email {
+  const copy: Record<ListingDecisionMail, { subject: string; title: string; sentence: string }> = {
+    valider: {
+      subject: 'Votre fiche est en ligne sur Choisir Mon Traiteur',
+      title: 'Votre fiche est publiée',
+      sentence: 'Votre fiche vient d’être validée : elle est maintenant visible dans l’annuaire Choisir Mon Traiteur.',
+    },
+    refuser: {
+      subject: 'Votre fiche Choisir Mon Traiteur n’a pas été validée',
+      title: 'Votre fiche n’a pas été validée',
+      sentence: 'Nous n’avons pas pu publier votre fiche dans l’annuaire Choisir Mon Traiteur. Corrigez-la, puis renvoyez-la pour une nouvelle vérification.',
+    },
+    suspendre: {
+      subject: 'Votre fiche Choisir Mon Traiteur est suspendue',
+      title: 'Votre fiche est suspendue',
+      sentence: 'Votre fiche n’est plus visible dans l’annuaire Choisir Mon Traiteur. Écrivez-nous si vous souhaitez en discuter.',
+    },
+    republier: {
+      subject: 'Votre fiche est de nouveau en ligne sur Choisir Mon Traiteur',
+      title: 'Votre fiche est de nouveau publiée',
+      sentence: 'Votre fiche est de nouveau visible dans l’annuaire Choisir Mon Traiteur.',
+    },
+  };
+  const c = copy[decision];
+  const why = reason?.trim();
+  return {
+    subject: c.subject,
+    html: renderEmail({
+      preheader: c.title,
+      title: c.title,
+      paragraphs: [c.sentence, ...(why ? [`Motif : « ${multiline(why)} »`] : [])],
+      button: { label: 'Ouvrir ma fiche', url: `${SITE_URL}/ma-fiche` },
     }),
   };
 }

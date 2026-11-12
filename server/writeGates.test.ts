@@ -20,6 +20,7 @@ const ALLOWED: Record<string, string> = {
   // Administration : requireAdmin, hors abonnement du client.
   'admin.ts:*': 'administration',
   'adminWebo.ts:*': 'administration de Webo',
+  'adminDirectory.ts:*': 'administration de l’annuaire',
   // Lecture qui tient un compteur à jour : consultation d'un devis par le client final (lien public, sans abonnement requis).
   'acceptance.ts:recordQuoteView': 'compteur de consultations du lien public',
   // Faux positif : « .delete( » vide le cache mémoire des recherches, rien n'est écrit en base.

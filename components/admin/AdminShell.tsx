@@ -1,17 +1,20 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeft, Bug, FolderTree, Inbox, LayoutDashboard, LogOut, ScrollText, Settings2, Users, Coins, Sparkles, Globe, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Bug, FolderTree, Inbox, LayoutDashboard, LogOut, ScrollText, Settings2, Users, Coins, Sparkles, Globe, BarChart3, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import Wordmark from '@/components/brand/Wordmark';
 import { FeedbackProvider } from '@/components/ui/Feedback';
+import { pendingListingCount } from '@/server/adminDirectory';
 
 const NAV = [
   { href: '/admin', icon: LayoutDashboard, label: 'Vue d’ensemble', exact: true },
   { href: '/admin/comptes', icon: Users, label: 'Comptes', exact: false },
   { href: '/admin/demandes', icon: Inbox, label: 'Demandes', exact: false },
+  { href: '/admin/annuaire', icon: Store, label: 'Annuaire', exact: false },
   { href: '/admin/statistiques', icon: BarChart3, label: 'Statistiques', exact: false },
   { href: '/admin/categories', icon: FolderTree, label: 'Catégories', exact: false },
   { href: '/admin/journal', icon: ScrollText, label: 'Journal', exact: false },
@@ -26,6 +29,12 @@ const NAV = [
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { signOut } = useAuth();
+  // Fiches de l'annuaire à valider : la pastille n'apparaît que s'il y en a.
+  const [pendingListings, setPendingListings] = useState(0);
+  useEffect(() => { pendingListingCount().then(setPendingListings).catch(() => {}); }, [pathname]);
+  const badge = (item: (typeof NAV)[number]) => (item.href === '/admin/annuaire' && pendingListings > 0
+    ? <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-primary text-white text-xs font-semibold flex items-center justify-center" aria-label={`${pendingListings} à valider`}>{pendingListings}</span>
+    : null);
   const isActive = (item: (typeof NAV)[number]) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
   const leave = async () => { await signOut(); window.location.assign('/login'); };
 
@@ -44,6 +53,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 isActive(item) ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white')}>
               <item.icon className="h-[18px] w-[18px]" />
               {item.label}
+              {badge(item)}
             </Link>
           ))}
         </nav>
@@ -74,6 +84,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 className={cn('flex-shrink-0 h-10 px-3.5 flex items-center rounded-full text-sm font-medium whitespace-nowrap transition-colors',
                   isActive(item) ? 'bg-white text-forest' : 'text-white/75 hover:text-white')}>
                 {item.label}
+                {badge(item)}
               </Link>
             ))}
           </nav>
