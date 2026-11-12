@@ -1361,6 +1361,8 @@ export const prospect_requests = pgTable("prospect_requests", {
 	chosen: jsonb(),
 	// Lien de la brochure par lequel la demande est arrivée (source ou client), sinon null.
 	brochure_link_id: uuid(),
+	// Origine de la demande (« annuaire » pour Choisir Mon Traiteur), sinon null.
+	source: text(),
 }, (table) => [
 	foreignKey({
 			columns: [table.brochure_id],
@@ -2008,6 +2010,85 @@ export const site_visits = pgTable("site_visits", {
 	check("site_visits_event_check", sql`event = ANY (ARRAY['view'::text, 'demo'::text, 'contact'::text, 'signup'::text])`),
 	check("site_visits_source_check", sql`source = ANY (ARRAY['direct'::text, 'recherche'::text, 'reseaux'::text, 'site'::text])`),
 	check("site_visits_device_check", sql`device = ANY (ARRAY['mobile'::text, 'tablette'::text, 'ordinateur'::text])`),
+]);
+
+// Annuaire public « Choisir Mon Traiteur » (lib/annuaire) : une fiche par traiteur, ses photos et les brochures exposées.
+export const directory_listings = pgTable("directory_listings", {
+	company_id: uuid().primaryKey().notNull(),
+	slug: text().notNull(),
+	status: text().default('brouillon').notNull(),
+	siret: text(),
+	check_result: jsonb(),
+	display_name: text().notNull(),
+	tagline: text(),
+	description: text(),
+	city: text(),
+	postal_code: text(),
+	departments: text().array().default(sql`'{}'`).notNull(),
+	event_types: text().array().default(sql`'{}'`).notNull(),
+	website_url: text(),
+	guests_min: integer(),
+	guests_max: integer(),
+	price_from: numeric(),
+	cover_photo_id: uuid(),
+	refused_reason: text(),
+	submitted_at: timestamp({ withTimezone: true, mode: 'string' }),
+	published_at: timestamp({ withTimezone: true, mode: 'string' }),
+	validated_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("directory_listings_slug_key").on(table.slug),
+	index("idx_directory_listings_departments").using("gin", table.departments),
+	index("idx_directory_listings_status").using("btree", table.status.asc().nullsLast()),
+	index("idx_directory_listings_siret").using("btree", table.siret.asc().nullsLast()),
+	check("directory_listings_status_check", sql`status = ANY (ARRAY['brouillon'::text, 'en_attente'::text, 'publiee'::text, 'refusee'::text, 'suspendue'::text])`),
+	foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [profiles.id],
+			name: "directory_listings_company_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const directory_photos = pgTable("directory_photos", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	url: text().notNull(),
+	path: text().notNull(),
+	alt: text(),
+	position: integer().default(0).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_directory_photos_company").using("btree", table.company_id.asc().nullsLast(), table.position.asc().nullsLast()),
+	foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [directory_listings.company_id],
+			name: "directory_photos_company_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const directory_listing_brochures = pgTable("directory_listing_brochures", {
+	company_id: uuid().notNull(),
+	brochure_id: uuid().notNull(),
+	link_id: uuid().notNull(),
+	position: integer().default(0).notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.company_id, table.brochure_id], name: "directory_listing_brochures_pkey" }),
+	foreignKey({
+			columns: [table.company_id],
+			foreignColumns: [directory_listings.company_id],
+			name: "directory_listing_brochures_company_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.brochure_id],
+			foreignColumns: [brochures.id],
+			name: "directory_listing_brochures_brochure_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.link_id],
+			foreignColumns: [brochure_links.id],
+			name: "directory_listing_brochures_link_id_fkey"
+		}).onDelete("cascade"),
 ]);
 
 // Réglages de la plateforme, modifiables depuis l'espace d'administration (une ligne par réglage).
