@@ -290,6 +290,18 @@ describe('fiche de l’annuaire : serveur', () => {
     expect((await row(A)).published_at).toEqual(published);
   });
 
+  it('une fiche refusée qu’on resoumet repasse en attente, même si le contrôle réussit', async () => {
+    current = D;
+    await pg.query(`update directory_listings set status = 'refusee', refused_reason = 'Photos floues.' where company_id = $1`, [D]);
+    lookup = company({ name: 'TRAITEUR D', siret: '92520576700047' });
+    expect(await d.submitListing()).toEqual({ error: null, status: 'en_attente' });
+    const r = await row(D);
+    expect(r.status).toBe('en_attente');
+    expect(r.published_at).toBeNull();
+    expect(r.refused_reason).toBe('Photos floues.');
+    expect(r.check_result).toMatchObject({ ok: true });
+  });
+
   it('démonstration : refusé', async () => {
     current = DEMO_USER_ID;
     expect(await d.saveListing(valid)).toEqual({ error: DEMO_BLOCKED });

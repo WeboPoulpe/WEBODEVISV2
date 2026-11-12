@@ -308,10 +308,13 @@ export async function submitListing(): Promise<{ error: string | null; status?: 
   const check = companyCheck({ siret: fields.siret!, displayName: fields.displayName, postalCode: fields.postalCode }, found, { duplicate: !!other, now });
 
   const at = now.toISOString();
-  // Une fiche déjà en ligne le reste (ses modifications sont libres) ; sinon elle est publiée si le contrôle réussit, mise en attente sinon.
-  const status: ListingStatus = row.status === 'publiee' || check.ok ? 'publiee' : 'en_attente';
+  // Une fiche déjà en ligne le reste (ses modifications sont libres) ; une fiche refusée par l'équipe est toujours revue à la
+  // main (le refus peut viser le contenu, pas l'entreprise) ; sinon elle est publiée si le contrôle réussit, mise en attente sinon.
+  const status: ListingStatus = row.status === 'publiee' || (row.status !== 'refusee' && check.ok) ? 'publiee' : 'en_attente';
   await db.update(directory_listings).set({
-    status, check_result: check, submitted_at: at, refused_reason: null, updated_at: at,
+    status, check_result: check, submitted_at: at, updated_at: at,
+    // Le motif du refus reste affiché jusqu'à la décision de l'équipe.
+    ...(row.status === 'refusee' ? {} : { refused_reason: null }),
     ...(status === 'publiee' && row.status !== 'publiee' ? { validated_at: at, published_at: row.published_at ?? at } : {}),
   }).where(eq(directory_listings.company_id, companyId));
   return { error: null, status };
