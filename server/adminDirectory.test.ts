@@ -80,6 +80,26 @@ describe('liste', () => {
     expect(b.check?.reason).toBe('Nom différent');
     expect(b.check?.legalName).toBe('SARL Autre');
     expect(list.find((l) => l.companyId === C)!.ownerEmail).toBe('c@t.fr');
+    expect(list.find((l) => l.companyId === C)).toMatchObject({
+      tagline: null, description: null, departments: [], eventTypes: [], websiteUrl: null, guestsMin: null, guestsMax: null, priceFrom: null, photos: [],
+    });
+  });
+
+  it('donne le contenu de la fiche à relire : textes, départements, types, repères et toutes les photos dans l’ordre', async () => {
+    await pg.exec(`
+      update directory_listings set tagline = 'Cuisine de saison', description = 'Nous cuisinons <b>tout</b> maison.',
+        departments = '{54,57}', event_types = '{Mariage,Cocktail}', website_url = 'https://traiteur-b.fr',
+        guests_min = 20, guests_max = 300, price_from = 42.5
+      where company_id = '${B}';
+      insert into directory_photos (id, company_id, url, path, alt, position) values
+        ('${id(93)}', '${B}', 'https://x.test/b2.jpg', 'p/b2', null, 1), ('${id(94)}', '${B}', 'https://x.test/b1.jpg', 'p/b1', 'Buffet', 0),
+        ('${id(95)}', '${A}', 'https://x.test/a.jpg', 'p/a', null, 0);`);
+    const b = (await a.listAdminListings()).find((l) => l.companyId === B)!;
+    expect(b).toMatchObject({
+      tagline: 'Cuisine de saison', description: 'Nous cuisinons <b>tout</b> maison.', departments: ['54', '57'],
+      eventTypes: ['Mariage', 'Cocktail'], websiteUrl: 'https://traiteur-b.fr', guestsMin: 20, guestsMax: 300, priceFrom: 42.5,
+    });
+    expect(b.photos).toEqual([{ url: 'https://x.test/b1.jpg', alt: 'Buffet' }, { url: 'https://x.test/b2.jpg', alt: null }]);
   });
 
   it('donne la photo de couverture et le nombre de photos', async () => {
@@ -191,6 +211,16 @@ describe('décisions', () => {
     expect((await a.decideListing(E, 'suspendre', 'x')).error).not.toBeNull();
     expect((await a.decideListing(F, 'valider')).error).not.toBeNull(); // brouillon
     expect((await a.decideListing(id(99), 'valider')).error).not.toBeNull(); // inconnue
+    expect(sent).toHaveLength(0);
+    expect(await audits()).toEqual([]);
+  });
+
+  it('décision inconnue ou identifiant illisible : une erreur, sans exception ni écriture', async () => {
+    expect((await a.decideListing(B, 'toString' as never)).error).toBe('Cette décision n’existe pas.');
+    expect((await a.decideListing(B, 'n_importe_quoi' as never)).error).toBe('Cette décision n’existe pas.');
+    expect((await a.decideListing('pas-un-uuid', 'valider')).error).toBe('Cette fiche est introuvable.');
+    expect((await a.decideListing('pas-un-uuid', 'refuser', 'x')).error).toBe('Cette fiche est introuvable.');
+    expect((await row(B)).status).toBe('en_attente');
     expect(sent).toHaveLength(0);
     expect(await audits()).toEqual([]);
   });

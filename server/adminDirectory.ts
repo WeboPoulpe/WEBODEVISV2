@@ -31,6 +31,17 @@ export interface AdminListing {
   coverUrl: string | null;
   photoCount: number;
   refusedReason: string | null;
+  // Contenu de la fiche, à relire avant de décider.
+  tagline: string | null;
+  description: string | null;
+  departments: string[];
+  eventTypes: string[];
+  websiteUrl: string | null;
+  guestsMin: number | null;
+  guestsMax: number | null;
+  priceFrom: number | null;
+  /** Toutes les photos, dans l'ordre de la fiche. */
+  photos: { url: string; alt: string | null }[];
 }
 
 export type ListingDecision = 'valider' | 'refuser' | 'suspendre' | 'republier';
@@ -44,8 +55,11 @@ export async function listAdminListings(): Promise<AdminListing[]> {
     select l.company_id, l.slug, l.status, l.display_name, l.city, l.postal_code, l.siret, l.check_result,
       coalesce(p.company_email, p.email) as owner_email,
       l.submitted_at, l.published_at, l.validated_at, l.updated_at, l.refused_reason,
+      l.tagline, l.description, l.departments, l.event_types, l.website_url, l.guests_min, l.guests_max, l.price_from,
       (select url from public.directory_photos where id = l.cover_photo_id) as cover_url,
-      (select count(*)::int from public.directory_photos ph where ph.company_id = l.company_id) as photo_count
+      (select count(*)::int from public.directory_photos ph where ph.company_id = l.company_id) as photo_count,
+      coalesce((select json_agg(json_build_object('url', ph.url, 'alt', ph.alt) order by ph.position, ph.created_at)
+        from public.directory_photos ph where ph.company_id = l.company_id), '[]'::json) as photos
     from public.directory_listings l
     left join public.profiles p on p.id = l.company_id
     where l.status <> 'brouillon'
@@ -54,7 +68,10 @@ export async function listAdminListings(): Promise<AdminListing[]> {
     company_id: string; slug: string; status: ListingStatus; display_name: string; city: string | null; postal_code: string | null;
     siret: string | null; check_result: CheckResult | null; owner_email: string | null; submitted_at: string | null; published_at: string | null;
     validated_at: string | null; updated_at: string; refused_reason: string | null; cover_url: string | null; photo_count: number;
+    tagline: string | null; description: string | null; departments: string[] | null; event_types: string[] | null; website_url: string | null;
+    guests_min: number | null; guests_max: number | null; price_from: string | number | null; photos: { url: string; alt: string | null }[] | string;
   };
+  const num = (v: string | number | null) => (v === null || v === undefined ? null : Number(v));
   const iso = (v: string | Date | null) => (v ? new Date(v).toISOString() : null);
   return (rows as unknown as Raw[]).map((r) => ({
     companyId: r.company_id,
@@ -73,6 +90,16 @@ export async function listAdminListings(): Promise<AdminListing[]> {
     coverUrl: r.cover_url,
     photoCount: Number(r.photo_count),
     refusedReason: r.refused_reason,
+    tagline: r.tagline,
+    description: r.description,
+    departments: r.departments ?? [],
+    eventTypes: r.event_types ?? [],
+    websiteUrl: r.website_url,
+    guestsMin: num(r.guests_min),
+    guestsMax: num(r.guests_max),
+    priceFrom: num(r.price_from),
+    photos: (typeof r.photos === 'string' ? JSON.parse(r.photos) as { url: string; alt: string | null }[] : r.photos)
+      .map((p) => ({ url: p.url, alt: p.alt ?? null })),
   }));
 }
 
@@ -96,15 +123,18 @@ const AUDIT: Record<ListingDecision, AuditAction> = {
   republier: 'annuaire_fiche_republiee',
 };
 const REASON_MAX = 500;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NOT_FOUND = 'Cette fiche est introuvable.';
 
 export async function decideListing(companyId: string, decision: ListingDecision, reason?: string): Promise<{ error: string | null }> {
   const admin = await requireAdmin();
-  if (!(decision in FROM)) return { error: 'Cette décision n’existe pas.' };
+  if (typeof decision !== 'string' || !Object.hasOwn(FROM, decision)) return { error: 'Cette décision n’existe pas.' };
+  if (typeof companyId !== 'string' || !UUID.test(companyId)) return { error: NOT_FOUND };
   const why = String(reason ?? '').trim().slice(0, REASON_MAX);
   if ((decision === 'refuser' || decision === 'suspendre') && !why) return { error: 'Indiquez le motif : il sera transmis au traiteur.' };
 
   const [current] = await db.select({ status: directory_listings.status }).from(directory_listings).where(eq(directory_listings.company_id, companyId)).limit(1);
-  if (!current) return { error: 'Cette fiche est introuvable.' };
+  if (!current) return { error: NOT_FOUND };
   if (!FROM[decision].includes(current.status as ListingStatus)) {
     return { error: 'Cette décision n’est pas possible pour l’état actuel de la fiche. Rechargez la page.' };
   }

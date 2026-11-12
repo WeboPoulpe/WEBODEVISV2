@@ -6,6 +6,7 @@ import { decideListing, listAdminListings, type AdminListing, type ListingDecisi
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import { departmentByCode } from '@/lib/annuaire/departments';
 import { LISTING_STATUS } from '../labels';
 import { useFeedback } from '@/components/ui/Feedback';
 
@@ -120,6 +121,50 @@ function Check({ l, compact }: { l: AdminListing; compact?: boolean }) {
   );
 }
 
+const guests = (l: AdminListing) =>
+  l.guestsMin !== null && l.guestsMax !== null ? `De ${l.guestsMin} à ${l.guestsMax} convives`
+    : l.guestsMin !== null ? `À partir de ${l.guestsMin} convives`
+      : l.guestsMax !== null ? `Jusqu’à ${l.guestsMax} convives` : null;
+
+/** Ce que le public verra : textes (en texte brut), zones, événements, repères, site web et toutes les photos. */
+function Content({ l }: { l: AdminListing }) {
+  const dt = 'text-sm text-gray-500';
+  const dd = 'text-gray-900 whitespace-pre-wrap break-words';
+  const g = guests(l);
+  return (
+    <div className="space-y-4">
+      <h3 className="text-[15px] font-semibold text-gray-900">Contenu de la fiche</h3>
+      <dl className="grid gap-1.5 sm:grid-cols-[9rem_minmax(0,1fr)] text-[15px]">
+        <dt className={dt}>Accroche</dt><dd className={dd}>{l.tagline ?? 'Non renseignée'}</dd>
+        <dt className={dt}>Présentation</dt><dd className={dd}>{l.description ?? 'Non renseignée'}</dd>
+        <dt className={dt}>Départements</dt>
+        <dd className={dd}>{l.departments.length ? l.departments.map((c) => { const d = departmentByCode(c); return d ? `${d.name} (${c})` : c; }).join(', ') : 'Aucun'}</dd>
+        <dt className={dt}>Événements</dt><dd className={dd}>{l.eventTypes.length ? l.eventTypes.join(', ') : 'Aucun'}</dd>
+        <dt className={dt}>Convives</dt><dd className={dd}>{g ?? 'Non renseigné'}</dd>
+        <dt className={dt}>Prix de départ</dt>
+        <dd className={dd}>{l.priceFrom !== null ? `${l.priceFrom.toLocaleString('fr-FR')} € par personne` : 'Non renseigné'}</dd>
+        <dt className={dt}>Site web</dt>
+        <dd className={dd}>
+          {l.websiteUrl && /^https?:\/\//i.test(l.websiteUrl)
+            ? <a href={l.websiteUrl} target="_blank" rel="nofollow noopener noreferrer" className="text-primary underline underline-offset-2 break-all">{l.websiteUrl}</a>
+            : l.websiteUrl ?? 'Non renseigné'}
+        </dd>
+      </dl>
+      {l.photos.length > 0 ? (
+        <ul className="grid grid-cols-3 sm:grid-cols-4 gap-2" aria-label="Photos de la fiche">
+          {l.photos.map((p, i) => (
+            <li key={`${p.url}-${i}`} className="min-w-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt={p.alt ?? ''} className="aspect-square w-full rounded-lg object-cover bg-gray-100" />
+              <p className="mt-1 text-xs text-gray-500 break-words">{p.alt ?? 'Sans texte alternatif'}</p>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-gray-500">Aucune photo.</p>}
+    </div>
+  );
+}
+
 const ACTIONS: Record<ListingDecision, { label: string; reason: boolean; confirm: string }> = {
   valider: { label: 'Valider et publier', reason: false, confirm: 'Publier cette fiche dans l’annuaire ?' },
   refuser: { label: 'Refuser', reason: true, confirm: 'Refuser cette fiche ?' },
@@ -191,6 +236,8 @@ function ListingDialog({ listing: l, onClose, onChanged }: { listing: AdminListi
           <dt className="text-sm text-gray-500">Modifiée le</dt><dd className="text-gray-900">{when(l.updatedAt)}</dd>
           {l.refusedReason && <><dt className="text-sm text-gray-500">Motif</dt><dd className="text-gray-900 whitespace-pre-wrap break-words">{l.refusedReason}</dd></>}
         </dl>
+
+        <Content l={l} />
 
         {l.status === 'publiee' && (
           <a href={`/annuaire/traiteur/${l.slug}`} target="_blank" rel="noreferrer" className={btnSecondary}>
