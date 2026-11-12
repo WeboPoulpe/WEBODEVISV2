@@ -7,7 +7,8 @@ import { useAuth } from '@/context/AuthContext';
 import { requestPasswordReset } from '@/server/auth';
 import { authButton, authError, authInfo, authInput, authLabel } from './AuthShell';
 
-export default function LoginForm() {
+/** `destination` : où aller une fois connecté (un chemin fixe de l'application, « / » par défaut). */
+export default function LoginForm({ destination = '/' }: { destination?: '/' | '/ma-fiche' } = {}) {
   const { signIn } = useAuth();
   const router = useRouter();
 
@@ -49,7 +50,7 @@ export default function LoginForm() {
       return;
     }
 
-    router.push('/');
+    router.push(destination);
     router.refresh();
   };
 
