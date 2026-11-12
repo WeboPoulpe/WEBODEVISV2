@@ -215,6 +215,20 @@ Les visites de l'annuaire passent par l'outil sans cookie existant (`site_visits
 `/annuaire/…`. Le traiteur voit sur « Ma fiche » le nombre de vues et de demandes des 30 derniers jours. Aucune écriture
 de plus en base : les mêmes paquets, au plus une fois par heure.
 
+### Deux marques, un partenariat
+
+**[M, 12 novembre]** Choisir Mon Traiteur et WeboDevis sont deux entités distinctes, même si elles appartiennent au
+même groupe. Le site public se présente comme un annuaire indépendant, **« en partenariat avec WeboDevis »** :
+
+- En pied de page : « En partenariat avec WeboDevis, le logiciel des traiteurs », avec un lien. Jamais « propulsé
+  par », « un service de » ni « édité par WeboDevis ».
+- Sur la page pour les traiteurs : WeboDevis est le logiciel partenaire ; ses abonnés ont leur fiche offerte.
+- Le site public ne reprend ni le logo, ni les couleurs, ni le ton de WeboDevis.
+- Dans WeboDevis, l'écran « Ma fiche » présente Choisir Mon Traiteur comme un annuaire partenaire.
+- Les mentions légales nomment l'éditeur réel (voir les textes légaux) : le partenariat est une présentation
+  commerciale, pas une dissimulation de qui édite le site.
+- À revoir au lot 3 : où se connecte un traiteur « fiche seule », qui n'est pas client de WeboDevis.
+
 ### Apparence
 
 Direction « B — Marché », choisie par Maxence le 12 novembre parmi trois maquettes. Le modèle à suivre est
@@ -231,7 +245,7 @@ n'est pas un composant à importer).
 - La recherche de l'accueil est une phrase en très grand : « Je cherche un traiteur pour [un mariage] dans [l'Aube] »,
   les deux choix étant des listes déroulantes soulignées en rouge.
 - Aucune couleur ni police de WeboDevis sur le site public. L'écran « Ma fiche », lui, reste dans l'apparence de
-  WeboDevis. Mention discrète « Propulsé par WeboDevis » en pied de page.
+  WeboDevis. En pied de page : « En partenariat avec WeboDevis ».
 
 ## Précisions après relecture
 
