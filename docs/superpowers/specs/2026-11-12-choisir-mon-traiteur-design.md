@@ -34,7 +34,8 @@ Pourquoi :
 2. Un abonné WeboDevis publie sa fiche en quelques minutes, à partir de ce qu'il a déjà (logo, brochures, photos).
 3. Un traiteur sans le logiciel peut s'inscrire, remplir sa fiche, payer et recevoir des demandes, sans accès au reste.
 4. Les avis sont crédibles : déposés sur invitation seulement, les négatifs publiés comme les positifs.
-5. Maxence valide chaque fiche avant qu'elle soit visible.
+5. Une fiche n'est publiée que si l'entreprise existe vraiment : contrôle automatique du SIRET, validation de
+   Maxence pour les seuls cas douteux, et droit de suspendre toute fiche après coup.
 
 ## Hors périmètre
 
@@ -45,7 +46,8 @@ Pourquoi :
 - Avis ouverts à tout visiteur.
 - Récupération automatique des photos du site web du traiteur.
 - Autres métiers que traiteur (lieux, photographes, fleuristes).
-- Compte pour les visiteurs.
+- Compte ou espace client pour les visiteurs **[M, 12 novembre]**. À la place : des favoris gardés dans le navigateur
+  et un e-mail de confirmation qui récapitule la demande et le traiteur contacté.
 
 ## À éviter absolument
 
@@ -142,17 +144,39 @@ l'abonnement « fiche seule » est résilié, le compte devient `logiciel`, la f
 
 ### Parcours d'inscription « fiche seule »
 
-**[C]** Dans cet ordre, pour ne jamais avoir à rembourser :
+**[M, 12 novembre]** La vérification est automatique ; Maxence n'intervient que sur les cas douteux. Le paiement vient
+toujours après la vérification, pour ne jamais avoir à rembourser une fiche refusée.
 
-1. Création du compte depuis `/referencer-mon-entreprise` (`account_kind = 'annuaire'`).
-2. Le traiteur remplit sa fiche et la soumet.
-3. Maxence la valide ou la refuse (avec un motif) dans l'administration. Un e-mail prévient le traiteur.
+1. Création du compte depuis `/referencer-mon-entreprise` (`account_kind = 'annuaire'`), e-mail confirmé par un lien.
+2. Le traiteur saisit son SIRET, remplit sa fiche et la soumet.
+3. Contrôle automatique (voir ci-dessous).
+   - Réussi : la fiche est validée tout de suite.
+   - Douteux : elle passe en `en_attente` ; Maxence la valide ou la refuse (avec un motif), un e-mail prévient le
+     traiteur.
 4. Fiche validée : le traiteur paie (Stripe Checkout, prix `STRIPE_PRICE_ANNUAIRE`). La fiche est publiée dès le
-   paiement.
+   paiement. Maxence reçoit une notification et peut la suspendre.
 5. Résiliation ou impayé : la fiche est retirée à la fin de la période payée ; ses données sont gardées.
 
-Pour un abonné du logiciel : il remplit sa fiche dans l'application, la soumet, elle est publiée dès la validation. Si
-son abonnement s'arrête, la fiche est retirée.
+Pour un abonné du logiciel : il remplit sa fiche dans l'application et la soumet ; le même contrôle s'applique, avec le
+SIRET de ses mentions légales. Si son abonnement s'arrête, la fiche est retirée.
+
+### Contrôle automatique de l'entreprise
+
+À la soumission, le serveur interroge l'annuaire public des entreprises de l'État (API « Recherche d'entreprises »,
+`recherche-entreprises.api.gouv.fr`, gratuite et sans clé ; à confirmer au moment de construire) avec le SIRET saisi.
+Le contrôle réussit si toutes ces conditions sont vraies :
+
+- l'établissement existe et il est en activité ;
+- son code d'activité est dans une liste fermée : traiteurs (56.21Z), restauration (56.10A, 56.10C), charcuterie et
+  boucherie (10.13B, 47.22Z), boulangerie-pâtisserie (10.71C, 10.71D, 47.24Z) ;
+- le nom saisi ressemble à la dénomination, au nom commercial ou à l'enseigne déclarés ;
+- le code postal de la fiche est celui de l'établissement, ou du même département ;
+- ce SIRET n'a pas déjà une fiche.
+
+Sinon, ou si l'annuaire de l'État ne répond pas, la fiche passe en validation manuelle : jamais de refus automatique.
+Le résultat du contrôle (date, code d'activité, dénomination trouvée, raison du doute) est gardé avec la fiche et
+affiché dans l'administration. Le contrôle ne voit ni les photos volées ni les textes mensongers : d'où le droit de
+suspendre après coup.
 
 ### Une fiche est visible si
 
@@ -168,7 +192,7 @@ existants servent tels quels ; seule la traduction prix → formule s'étend.
 ### Données
 
 - `directory_listings` : une ligne par entreprise. Slug unique, statut (`brouillon`, `en_attente`, `publiee`,
-  `refusee`, `suspendue`), nom affiché, accroche, présentation, ville, code postal, départements desservis, types
+  `refusee`, `suspendue`), SIRET, résultat du contrôle automatique, nom affiché, accroche, présentation, ville, code postal, départements desservis, types
   d'événements, site web, convives min et max, prix de départ, photo de couverture, motif de refus, dates.
 - `directory_photos` : photos de la fiche, ordonnées, avec texte de remplacement. Fichiers envoyés par `/api/files`.
 - `directory_listing_brochures` : brochures choisies pour la fiche, chacune avec un lien de brochure dédié
@@ -182,8 +206,8 @@ Migrations additives, testées sur PGlite, puis `db:migrate` avant l'envoi sur `
 
 ### Administration
 
-Nouvel écran `/admin/annuaire` : fiches en attente (aperçu, valider, refuser avec motif), toutes les fiches (suspendre,
-republier), avis signalés (garder, retirer avec motif). Un compteur dans le menu, comme pour les demandes du site.
+Nouvel écran `/admin/annuaire` : fiches en attente parce que le contrôle automatique a un doute (aperçu, raison du
+doute, valider, refuser avec motif), fiches publiées récemment, toutes les fiches (suspendre, republier), avis signalés (garder, retirer avec motif). Un compteur dans le menu, comme pour les demandes du site.
 
 ### Statistiques
 
