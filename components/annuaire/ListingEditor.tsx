@@ -174,7 +174,10 @@ export default function ListingEditor({ listing, reload }: { listing: MyListing;
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <form noValidate onSubmit={(e) => { e.preventDefault(); if (!saving) void save(); }} className="min-w-0 space-y-4">
+      {/* Entrée dans un champ d'une ligne (la recherche de département comprise) n'envoie pas la fiche : seul le bouton le fait. */}
+      <form noValidate onSubmit={(e) => { e.preventDefault(); if (!saving) void save(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && e.target instanceof HTMLInputElement) e.preventDefault(); }}
+        className="min-w-0 space-y-4">
         <StatusBanner listing={listing} />
 
         {missing && <p className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">{missing}</p>}
@@ -319,7 +322,7 @@ export default function ListingEditor({ listing, reload }: { listing: MyListing;
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button type="submit" disabled={saving} className={cn(btnPrimary, 'w-full sm:w-auto')}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {publishes ? 'Enregistrer et publier' : 'Enregistrer'}
+            {!publishes ? 'Enregistrer' : status === 'refusee' ? 'Enregistrer et renvoyer' : 'Enregistrer et publier'}
           </button>
           {(status === 'publiee' || status === 'en_attente') && (
             <button type="button" onClick={withdraw} disabled={saving}

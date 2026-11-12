@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import PageHead from '@/components/annuaire/PageHead';
-import { container } from '@/components/site/ui';
+import { Todo, container } from '@/components/site/ui';
 import { directoryBase } from '@/lib/annuaire/base';
 import { DIRECTORY_NAME } from '@/lib/annuaire/config';
 import { directoryMetadata } from '@/lib/annuaire/metadata';
 import { directoryHref } from '@/lib/annuaire/routing';
 
 // Confidentialité de l'annuaire : la demande de contact (transmise au seul traiteur choisi), l'empreinte de l'adresse
-// IP, les statistiques sans cookie, les favoris gardés dans le navigateur. À relire par Maxence avant l'ouverture.
+// IP, les statistiques sans cookie, les favoris gardés dans le navigateur, le cookie des brochures protégées.
+// À relire par Maxence avant l'ouverture : les durées de conservation sont marquées « à compléter ».
 
 export const metadata = directoryMetadata({
   title: 'Confidentialité',
@@ -50,10 +51,19 @@ export default async function ConfidentialitePage() {
 
           <h2>Contre les envois abusifs</h2>
           <p>
-            Pour limiter le nombre de demandes envoyées depuis une même connexion, une empreinte de votre adresse IP est gardée avec
-            la demande. C’est un code calculé à partir de l’adresse, qui ne permet pas de la retrouver&nbsp;; l’adresse elle-même
-            n’est pas conservée. Base légale&nbsp;: notre intérêt légitime à protéger les traiteurs des messages indésirables.
+            Pour limiter les envois abusifs, une empreinte de votre adresse IP est gardée avec chaque demande&nbsp;: c’est un code
+            calculé à partir de l’adresse, qui sert seulement à compter les demandes envoyées depuis une même connexion.
+            L’adresse elle-même n’est pas conservée. Cette empreinte n’est pas anonyme pour autant&nbsp;: c’est une donnée
+            pseudonyme, traitée comme une donnée personnelle. Base légale&nbsp;: notre intérêt légitime à protéger les traiteurs
+            des messages indésirables.
           </p>
+
+          <h2>Durées de conservation</h2>
+          <p>
+            Votre demande de contact est transmise au traiteur que vous avez choisi, qui la garde dans son fichier clients pour
+            vous répondre et suivre votre projet. Elle est conservée <Todo>durée de conservation des demandes de contact</Todo>.
+          </p>
+          <p>L’empreinte de l’adresse IP est conservée avec la demande, <Todo>durée de conservation de l’empreinte IP</Todo>.</p>
 
           <h2>Mesure d’audience, sans cookie</h2>
           <p>
@@ -71,7 +81,14 @@ export default async function ConfidentialitePage() {
           </p>
 
           <h2>Cookies</h2>
-          <p>{DIRECTORY_NAME} ne dépose aucun cookie, ni de mesure d’audience, ni de publicité. Il n’y a donc pas de bandeau à accepter.</p>
+          <p>
+            {DIRECTORY_NAME} lui-même ne dépose aucun cookie et n’utilise aucun cookie de publicité ni de mesure d’audience.
+          </p>
+          <p>
+            Un seul cookie technique peut être posé, et seulement si vous ouvrez une brochure protégée par un code&nbsp;: il retient
+            que vous avez saisi le code, pour ne pas vous le redemander, pendant 30 jours. Ce cookie est nécessaire à la consultation
+            que vous demandez&nbsp;: il ne demande pas votre accord, d’où l’absence de bandeau.
+          </p>
 
           <h2>Prestataires</h2>
           <ul>

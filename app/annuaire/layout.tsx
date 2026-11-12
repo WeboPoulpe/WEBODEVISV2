@@ -6,7 +6,7 @@ import { DirectoryBaseProvider } from '@/components/annuaire/BaseContext';
 import DirectoryAnalytics from '@/components/annuaire/DirectoryAnalytics';
 import { directoryBase } from '@/lib/annuaire/base';
 import { DIRECTORY_NAME, DIRECTORY_URL } from '@/lib/annuaire/config';
-import { DIRECTORY_SHARE_IMAGE } from '@/lib/annuaire/metadata';
+import { DIRECTORY_SHARE_IMAGE, directoryRobots } from '@/lib/annuaire/metadata';
 
 // Layout de l'annuaire « Choisir Mon Traiteur » : ses propres métadonnées, polices, couleurs et gabarit. Il remplace
 // tout ce que le layout racine pose pour WeboDevis (titre, icônes, app installable). Aucun cookie, aucun Google Tag Manager.
@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   icons: { icon: [{ url: '/annuaire/icone.svg', type: 'image/svg+xml' }] },
   openGraph: { siteName: DIRECTORY_NAME, locale: 'fr_FR', type: 'website', images: [DIRECTORY_SHARE_IMAGE] },
   formatDetection: { telephone: false },
+  // Sans domaine propre, rien n'est indexé (vaut aussi pour les pages sans métadonnées à elles, comme une fiche introuvable).
+  robots: directoryRobots(false, process.env.DIRECTORY_HOST),
 };
 
 export const viewport: Viewport = { themeColor: '#011B3D' };

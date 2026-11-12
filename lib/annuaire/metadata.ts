@@ -17,14 +17,23 @@ interface DirectoryPageMeta {
   image?: string | null;
 }
 
+/** Consigne aux moteurs de recherche. Tant que l'annuaire n'a pas son propre domaine (DIRECTORY_HOST absent : local,
+ *  aperçu, ou webodevis.fr avant le branchement), aucune page n'est indexée ni suivie ; sinon seules les pages marquées
+ *  `noindex` sont écartées (leurs liens restent suivis). */
+export function directoryRobots(noindex: boolean, directoryHost: string | undefined): Metadata['robots'] | undefined {
+  if (!(directoryHost ?? '').trim()) return { index: false, follow: false };
+  return noindex ? { index: false, follow: true } : undefined;
+}
+
 export function directoryMetadata({ title, description, path, noindex = false, image }: DirectoryPageMeta): Metadata {
   const images = image ? [{ url: image, alt: title }] : [DIRECTORY_SHARE_IMAGE];
+  const robots = directoryRobots(noindex, process.env.DIRECTORY_HOST);
   return {
     title,
     description,
     alternates: { canonical: path },
     openGraph: { title, description, url: path, siteName: DIRECTORY_NAME, locale: 'fr_FR', type: 'website', images },
     twitter: { card: image ? 'summary_large_image' : 'summary', title, description, images: images.map((i) => i.url) },
-    ...(noindex ? { robots: { index: false, follow: true } } : {}),
+    ...(robots ? { robots } : {}),
   };
 }

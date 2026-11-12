@@ -64,8 +64,9 @@ export default async function MentionsLegalesPage() {
 
           <h2>Données personnelles et cookies</h2>
           <p>
-            {DIRECTORY_NAME} ne dépose aucun cookie et n’utilise aucun outil de publicité. Le traitement des demandes envoyées aux
-            traiteurs, la mesure d’audience sans cookie et vos droits sont décrits dans la page{' '}
+            {DIRECTORY_NAME} lui-même ne dépose aucun cookie et n’utilise aucun outil de publicité&nbsp;; seule l’ouverture d’une
+            brochure protégée par un code pose un cookie technique. Ce cookie, le traitement des demandes envoyées aux traiteurs,
+            la mesure d’audience sans cookie et vos droits sont décrits dans la page{' '}
             <Link href={href('/confidentialite')}>Confidentialité</Link>.
           </p>
 

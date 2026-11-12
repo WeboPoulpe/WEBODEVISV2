@@ -43,6 +43,8 @@ const APP_ROUTES = [
   '/p/',
   '/e/',
   '/embed',
+  // L'annuaire Choisir Mon Traiteur a son propre domaine (et son propre robots.txt) : jamais indexé sous webodevis.fr.
+  '/annuaire',
 ];
 
 export default function robots(): MetadataRoute.Robots {
