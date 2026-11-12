@@ -127,7 +127,7 @@ const prospectFacts = (p: ProspectDetails): [string, string][] => [
 ];
 
 /** Au traiteur : une nouvelle demande vient d'arriver. */
-export function prospectNotificationEmail({ prospect, appUrl, brochureName }: { prospect: ProspectDetails; appUrl: string; /** Demande envoyée depuis une brochure. */ brochureName?: string | null }): Email {
+export function prospectNotificationEmail({ prospect, appUrl, brochureName, source }: { prospect: ProspectDetails; appUrl: string; /** Demande envoyée depuis une brochure. */ brochureName?: string | null; /** Demande envoyée depuis la fiche de l'annuaire Choisir Mon Traiteur. */ source?: 'annuaire' }): Email {
   const name = `${prospect.firstName} ${prospect.lastName}`.trim();
   return {
     subject: `Nouvelle demande de devis : ${name}`,
@@ -137,7 +137,9 @@ export function prospectNotificationEmail({ prospect, appUrl, brochureName }: { 
       paragraphs: [
         brochureName
           ? `<strong style="color:#1B1A17;">${esc(name)}</strong> vous écrit depuis votre brochure « ${esc(brochureName)} ».`
-          : `<strong style="color:#1B1A17;">${esc(name)}</strong> vient de remplir votre formulaire.`,
+          : source === 'annuaire'
+            ? `<strong style="color:#1B1A17;">${esc(name)}</strong> vient de vous contacter depuis votre fiche Choisir Mon Traiteur.`
+            : `<strong style="color:#1B1A17;">${esc(name)}</strong> vient de remplir votre formulaire.`,
         ...(prospect.message ? [`« ${multiline(prospect.message)} »`] : []),
       ],
       facts: [['Email', prospect.email], ['Téléphone', prospect.phone ?? ''], ...prospectFacts(prospect)],

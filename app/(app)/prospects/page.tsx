@@ -59,6 +59,8 @@ interface Prospect {
   chosen?: unknown;
   /** Lien de la brochure par lequel la demande est arrivée. */
   brochure_link_id?: string | null;
+  /** Provenance : « annuaire » pour une demande venue de la fiche Choisir Mon Traiteur. */
+  source?: string | null;
   created_at: string;
 }
 
@@ -921,6 +923,11 @@ function ProspectCard({
         {brochureName && (
           <span className="flex items-center gap-1 text-gray-600">
             <BookOpen className="h-3 w-3" /> Brochure « {brochureName} »
+          </span>
+        )}
+        {prospect.source === 'annuaire' && (
+          <span className="bg-primary-50 text-primary px-2 py-0.5 rounded-full font-medium">
+            Choisir Mon Traiteur
           </span>
         )}
         {prospect.event_type && (
