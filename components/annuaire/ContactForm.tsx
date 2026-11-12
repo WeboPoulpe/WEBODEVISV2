@@ -27,6 +27,7 @@ export default function ContactForm({ slug, name, eventTypes }: { slug: string; 
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!startedAt) return;
     const f = new FormData(e.currentTarget);
     const v = (k: string) => String(f.get(k) ?? '');
     setError(null);
@@ -53,7 +54,9 @@ export default function ContactForm({ slug, name, eventTypes }: { slug: string; 
 
   const f = (k: string) => `${id}-${k}`;
   return (
-    <form className="cmt-form" onSubmit={onSubmit}>
+    // method="post" : un envoi natif (avant que la page soit prête) ne mettrait jamais les champs dans l'adresse. Le seul
+    // bouton d'envoi reste désactivé tant que le formulaire n'est pas monté : ni clic ni touche Entrée ne l'envoient avant.
+    <form className="cmt-form" method="post" onSubmit={onSubmit}>
       <div className="cmt-field">
         <label htmlFor={f('first')}>Prénom</label>
         <input id={f('first')} name="firstName" autoComplete="given-name" required maxLength={80} />
@@ -99,8 +102,11 @@ export default function ContactForm({ slug, name, eventTypes }: { slug: string; 
         <input id={f('website')} name="website" tabIndex={-1} autoComplete="off" />
       </div>
       {error && <p role="alert" className="cmt-alert">{error}</p>}
+      <noscript>
+        <p className="cmt-alert">Pour envoyer votre demande, activez JavaScript dans votre navigateur, puis rechargez la page.</p>
+      </noscript>
       <div className="cmt-form__foot">
-        <button type="submit" className="cmt-btn cmt-btn--primary cmt-btn--big" disabled={pending}>
+        <button type="submit" className="cmt-btn cmt-btn--primary cmt-btn--big" disabled={pending || !startedAt}>
           {pending ? 'Envoi en cours' : 'Envoyer ma demande'}
         </button>
         <p>
