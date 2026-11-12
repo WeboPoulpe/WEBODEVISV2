@@ -231,19 +231,26 @@ même groupe. Le site public se présente comme un annuaire indépendant, **« e
 
 ### Apparence
 
-Direction « B — Marché », choisie par Maxence le 12 novembre parmi trois maquettes. Le modèle à suivre est
-`docs/annuaire/maquette-direction-b.html` (accueil, cartes, extrait de fiche ; à lire comme une référence de styles, ce
-n'est pas un composant à importer).
+Direction « B — Marché », en « moderne pop vintage » (les mots de Maxence), validée le 12 novembre sur maquette. Le
+modèle à suivre est `docs/annuaire/maquette-direction-b.html` (accueil, cartes, extrait de fiche ; à lire comme une
+référence de styles, ce n'est pas un composant à importer ; son adresse `/_blob/…` est celle du logo).
 
-- Couleurs : fond blanc `#FFFFFF`, bleu nuit `#1B1B3A` (texte, bordures, boutons sombres), rouge tomate `#D3381F`
-  (bouton principal, mots choisis dans la phrase de recherche), jaune beurre `#FFD34E` (pastilles de prix, bouton
-  « Référencer mon entreprise »), jaune pâle `#FFF4D6` (bandes de fond, citations).
-- Polices : Gabarito (titres, graisse 800, minuscules pour la marque « choisir mon traiteur. » avec le point rouge) et
-  DM Sans (texte). Chargées par `next/font/google` dans le layout de l'annuaire seulement.
-- Formes : bordures bleu nuit de 2 px, coins de 8 px (boutons, pastilles de texte) à 12 px (cartes, photos), pas
-  d'ombre. Pastille ronde jaune pour le prix, posée à cheval sur la photo d'une carte.
+- Logo fourni par Maxence : `public/annuaire/logo-choisir-mon-traiteur.png`, « Choisir mon Traiteur » en écriture
+  cursive jaune sur fond bleu nuit, sur une ligne. C'est une image avec son fond : elle ne se pose que sur le bleu nuit
+  exact de l'en-tête et du pied de page. Version transparente et icône carrée à venir ; d'ici là, l'icône de l'onglet
+  est une étoile à quatre branches jaune sur bleu nuit, dessinée en SVG.
+- Couleurs, calées sur le logo : bleu nuit `#011B3D` (en-tête, texte, bordures), jaune `#F8D04F` (pastilles, bouton
+  « Référencer mon entreprise », rayures), rouge tomate `#D3381F` (bouton principal, mots choisis dans la phrase de
+  recherche), jaune pâle `#FFF4D6` (bandes de fond, citations), blanc `#FFFFFF` (fond).
+- Polices : Gabarito (titres, graisse 800) et DM Sans (texte) ; Lobster, cursive, pour un seul accent par page (la
+  pastille dentelée). Chargées par `next/font/google` dans le layout de l'annuaire seulement.
+- Formes : en-tête bleu nuit, puis une fine bande rayée jaune et crème (un store de commerçant) ; bordures bleu nuit
+  de 2 px ; coins de 8 px (boutons) à 12 px (cartes, photos) ; ombres franches décalées, sans flou (`7px 7px 0` sous
+  les cartes, `5px 5px 0` sous les boutons) ; pastille ronde jaune pour le prix, à cheval sur la photo d'une carte ;
+  pastille dentelée et étoile à quatre branches en décor, avec parcimonie.
 - La recherche de l'accueil est une phrase en très grand : « Je cherche un traiteur pour [un mariage] dans [l'Aube] »,
   les deux choix étant des listes déroulantes soulignées en rouge.
+- Le vintage reste un accent : titres épais sans fioriture, beaucoup de blanc, une seule touche cursive.
 - Aucune couleur ni police de WeboDevis sur le site public. L'écran « Ma fiche », lui, reste dans l'apparence de
   WeboDevis. En pied de page : « En partenariat avec WeboDevis ».
 
