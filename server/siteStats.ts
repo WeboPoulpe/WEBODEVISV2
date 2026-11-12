@@ -85,31 +85,33 @@ export async function getSiteStats(days: number): Promise<SiteStats> {
   const n = [7, 30, 90].includes(days) ? days : 30;
   const since = sql`current_date - ${n - 1}::int`;
   const q = async <T,>(query: ReturnType<typeof sql>) => (await db.execute(query)).rows as T[];
+  // Les visites de l'annuaire (chemins /annuaire…) ont leurs propres chiffres, sur « Ma fiche » : pas ici.
+  const site = sql`path not like '/annuaire%'`;
 
   const [totals] = await q<SiteStats['totals']>(sql`
     select
-      (select count(*)::int from (select distinct day, visitor from public.site_visits where day >= ${since} and event = 'view') v) as visitors,
+      (select count(*)::int from (select distinct day, visitor from public.site_visits where day >= ${since} and ${site} and event = 'view') v) as visitors,
       count(*) filter (where event = 'view')::int as views,
       count(*) filter (where event = 'demo')::int as demo,
       count(*) filter (where event = 'contact')::int as contact,
       count(*) filter (where event = 'signup')::int as signup
-    from public.site_visits where day >= ${since}`);
+    from public.site_visits where day >= ${since} and ${site}`);
   const daily = await q<{ day: string; visitors: number; views: number }>(sql`
     select to_char(d, 'YYYY-MM-DD') as day,
-      coalesce((select count(distinct visitor)::int from public.site_visits where day = d and event = 'view'), 0) as visitors,
-      coalesce((select count(*)::int from public.site_visits where day = d and event = 'view'), 0) as views
+      coalesce((select count(distinct visitor)::int from public.site_visits where day = d and event = 'view' and ${site}), 0) as visitors,
+      coalesce((select count(*)::int from public.site_visits where day = d and event = 'view' and ${site}), 0) as views
     from generate_series(${since}, current_date, interval '1 day') d order by d`);
   const pages = await q<{ path: string; views: number }>(sql`
-    select path, count(*)::int as views from public.site_visits where day >= ${since} and event = 'view'
+    select path, count(*)::int as views from public.site_visits where day >= ${since} and ${site} and event = 'view'
     group by path order by views desc limit 10`);
   const sources = await q<{ source: Source; visitors: number }>(sql`
-    select source, count(distinct (day, visitor))::int as visitors from public.site_visits where day >= ${since} and event = 'view'
+    select source, count(distinct (day, visitor))::int as visitors from public.site_visits where day >= ${since} and ${site} and event = 'view'
     group by source order by visitors desc`);
   const referrers = await q<{ host: string; visitors: number }>(sql`
     select referrer_host as host, count(distinct (day, visitor))::int as visitors from public.site_visits
-    where day >= ${since} and event = 'view' and referrer_host is not null group by referrer_host order by visitors desc limit 8`);
+    where day >= ${since} and ${site} and event = 'view' and referrer_host is not null group by referrer_host order by visitors desc limit 8`);
   const devices = await q<{ device: Device; visitors: number }>(sql`
-    select device, count(distinct (day, visitor))::int as visitors from public.site_visits where day >= ${since} and event = 'view'
+    select device, count(distinct (day, visitor))::int as visitors from public.site_visits where day >= ${since} and ${site} and event = 'view'
     group by device order by visitors desc`);
 
   return { days: n, totals, daily, pages, sources, referrers, devices };

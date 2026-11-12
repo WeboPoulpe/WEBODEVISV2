@@ -1,6 +1,7 @@
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
 import { CHECKOUT_SESSION_HEADER } from '@/lib/subscription';
+import { directoryAuthBlock, directoryRewrite } from '@/lib/annuaire/routing';
 
 // Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
 const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
@@ -16,6 +17,26 @@ const APP_PREFIXES = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Annuaire « Choisir Mon Traiteur » : avant tout le reste (sinon « / » sans session serait réécrit vers /site).
+  // Sur son hôte, chaque adresse est servie depuis app/annuaire/, sans session ; sur webodevis.fr, /annuaire/… y renvoie.
+  const host = request.headers.get('host');
+  const authBlock = directoryAuthBlock(host, pathname, process.env.DIRECTORY_HOST);
+  if (authBlock === 'empty-session') return NextResponse.json({});
+  if (authBlock === 'not-found') return new NextResponse(null, { status: 404 });
+  const directory = directoryRewrite(host, pathname, process.env.DIRECTORY_HOST);
+  if (directory?.kind === 'rewrite') {
+    const url = request.nextUrl.clone();
+    url.pathname = directory.to;
+    return NextResponse.rewrite(url);
+  }
+  if (directory?.kind === 'redirect') {
+    const url = directory.to.startsWith('https://') ? new URL(directory.to) : request.nextUrl.clone();
+    if (!directory.to.startsWith('https://')) url.pathname = directory.to;
+    url.search = request.nextUrl.search;
+    return NextResponse.redirect(url, 308);
+  }
+
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
   // /e/ : page de mission envoyée aux extras, qui n'ont pas de compte.
   const isPublicRoute =
@@ -30,6 +51,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/reset-password') ||
     // /invitation/ : lien reçu par un collaborateur invité, qui n'a pas encore de compte.
     pathname.startsWith('/invitation/') ||
+    // /annuaire : l'annuaire public, consulté tel quel en local et sur les aperçus.
+    pathname === '/annuaire' ||
+    pathname.startsWith('/annuaire/') ||
     // /site : le site de présentation, ouvert à tous.
     SITE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
     pathname === '/sitemap.xml' ||

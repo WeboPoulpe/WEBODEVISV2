@@ -77,4 +77,17 @@ describe('chiffres de l’admin', () => {
     expect(st.referrers).toEqual([{ host: 'google.fr', visitors: 1 }]);
     expect(st.devices.map((d) => d.device).sort()).toEqual(['mobile', 'ordinateur']);
   });
+
+  it('laisse de côté les visites de l’annuaire Choisir Mon Traiteur', async () => {
+    await s.recordHit(s.buildRow({ path: '/tarifs' }, ctx('a'))!);
+    await s.recordHit(s.buildRow({ path: '/annuaire' }, ctx('b'))!);
+    await s.recordHit(s.buildRow({ path: '/annuaire/traiteur/a-troyes', referrer: 'https://www.google.fr/' }, ctx('b'))!);
+    await s.recordEventNow('contact', '/annuaire/traiteur/a-troyes', ctx('b'));
+    const st = await s.getSiteStats(7);
+    expect(st.totals).toEqual({ visitors: 1, views: 1, demo: 0, contact: 0, signup: 0 });
+    expect(st.daily.at(-1)).toMatchObject({ visitors: 1, views: 1 });
+    expect(st.pages).toEqual([{ path: '/tarifs', views: 1 }]);
+    expect(st.referrers).toEqual([]);
+    expect(st.devices).toEqual([{ device: 'ordinateur', visitors: 1 }]);
+  });
 });
