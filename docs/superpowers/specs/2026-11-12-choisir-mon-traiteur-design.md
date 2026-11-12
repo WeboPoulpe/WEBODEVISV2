@@ -217,9 +217,21 @@ de plus en base : les mêmes paquets, au plus une fois par heure.
 
 ### Apparence
 
-Un site pour particuliers, avec son propre nom et son propre logo, dans la même famille de couleurs que WeboDevis
-(crème, vert sapin, terracotta). De grandes photos, peu de texte. Pas de logo carré, pas de bouton en double, rien qui
-fasse « trop IA ». Mention discrète « Propulsé par WeboDevis » en pied de page.
+Direction « B — Marché », choisie par Maxence le 12 novembre parmi trois maquettes. Le modèle à suivre est
+`docs/annuaire/maquette-direction-b.html` (accueil, cartes, extrait de fiche ; à lire comme une référence de styles, ce
+n'est pas un composant à importer).
+
+- Couleurs : fond blanc `#FFFFFF`, bleu nuit `#1B1B3A` (texte, bordures, boutons sombres), rouge tomate `#D3381F`
+  (bouton principal, mots choisis dans la phrase de recherche), jaune beurre `#FFD34E` (pastilles de prix, bouton
+  « Référencer mon entreprise »), jaune pâle `#FFF4D6` (bandes de fond, citations).
+- Polices : Gabarito (titres, graisse 800, minuscules pour la marque « choisir mon traiteur. » avec le point rouge) et
+  DM Sans (texte). Chargées par `next/font/google` dans le layout de l'annuaire seulement.
+- Formes : bordures bleu nuit de 2 px, coins de 8 px (boutons, pastilles de texte) à 12 px (cartes, photos), pas
+  d'ombre. Pastille ronde jaune pour le prix, posée à cheval sur la photo d'une carte.
+- La recherche de l'accueil est une phrase en très grand : « Je cherche un traiteur pour [un mariage] dans [l'Aube] »,
+  les deux choix étant des listes déroulantes soulignées en rouge.
+- Aucune couleur ni police de WeboDevis sur le site public. L'écran « Ma fiche », lui, reste dans l'apparence de
+  WeboDevis. Mention discrète « Propulsé par WeboDevis » en pied de page.
 
 ## Précisions après relecture
 

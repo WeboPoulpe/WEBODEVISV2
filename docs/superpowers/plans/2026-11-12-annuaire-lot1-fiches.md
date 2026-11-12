@@ -23,7 +23,7 @@
 - Textes visibles : français, pas de jargon. Le nom du site est « Choisir Mon Traiteur ». Dans l'application, l'écran des demandes s'appelle « Prospects ».
 - Adresse canonique de l'annuaire : `https://choisirmontraiteur.fr`. Liens des e-mails envoyés au traiteur : toujours `SITE_URL` (webodevis.fr), jamais l'hôte de la requête.
 - L'annuaire ne dépose aucun cookie et ne charge pas Google Tag Manager : pas de bandeau.
-- Apparence : crème, panneaux vert sapin, accent terracotta, cartes blanches ; pas de logo carré, pas de bouton en double, rien de « trop IA » ; à vérifier à 360 px de large. Charger la compétence `frontend-design:frontend-design` pour les tâches 6 et 7.
+- Apparence du site public : direction « B — Marché », d'après `docs/annuaire/maquette-direction-b.html` et la section « Apparence » de la conception : fond blanc, bleu nuit `#1B1B3A`, rouge tomate `#D3381F`, jaune beurre `#FFD34E`, jaune pâle `#FFF4D6`, polices Gabarito (titres, 800) et DM Sans, bordures bleu nuit de 2 px, coins de 8 à 12 px, pas d'ombre, recherche en phrase, prix sur pastille ronde. Aucune couleur ni police de WeboDevis sur le site public. L'écran « Ma fiche » (tâche 6) garde l'apparence de WeboDevis (crème, vert sapin, terracotta). Pas de logo carré, pas de bouton en double, rien de « trop IA » ; à vérifier à 360 px de large. Charger la compétence `frontend-design:frontend-design` pour les tâches 6 et 7.
 - Une fiche d'un compte dont l'accès n'est pas `full` n'apparaît nulle part en public.
 - Aucun classement payant. Ordre des résultats du lot 1 : date de publication, la plus récente d'abord.
 
