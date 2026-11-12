@@ -1,18 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ClocheMotif, FourStar, Scallop } from '@/components/annuaire/AnnuaireMark';
 import ListingCard from '@/components/annuaire/ListingCard';
 import SearchBar from '@/components/annuaire/SearchBar';
 import { container, JsonLd } from '@/components/site/ui';
 import { directoryBase } from '@/lib/annuaire/base';
 import { DIRECTORY_NAME } from '@/lib/annuaire/config';
+import type { EventType } from '@/lib/annuaire/eventTypes';
 import { directoryMetadata } from '@/lib/annuaire/metadata';
 import { directoryHref } from '@/lib/annuaire/routing';
 import { directoryWebsiteJsonLd } from '@/lib/annuaire/schema';
 import { searchListings } from '@/server/directoryPublic';
 
-// Accueil de l'annuaire : la recherche en phrase, les dernières fiches publiées (jamais de compteur), le principe en
-// trois étapes et un mot pour les traiteurs.
+// Accueil de l'annuaire : la recherche en phrase et sa mosaïque de photos, les pastilles d'événements, les dernières
+// fiches publiées (jamais de compteur), puis la bande pourpre qui s'adresse aux traiteurs.
 
 export const dynamic = 'force-dynamic';
 
@@ -27,47 +27,43 @@ export const metadata: Metadata = {
 
 const RECENT = 6;
 
-function Collage({ covers }: { covers: string[] }) {
-  // Les photos des dernières fiches quand il y en a trois, sinon des aplats dessinés.
-  const photo = (i: number) => covers.length >= 3
-    // eslint-disable-next-line @next/next/no-img-element
-    ? <img src={covers[i]} alt="" loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />
-    : null;
+// Photos de l'accueil (public/annuaire/accueil/) : la même adresse sur l'hôte de l'annuaire et sous /annuaire.
+const PHOTO = (file: string) => `/annuaire/accueil/${file}.webp`;
+
+// Une pastille par type d'événement, dans l'ordre de la maquette (les plus demandés d'abord), avec sa vignette ronde.
+const EVENTS: [EventType, string][] = [
+  ['Mariage', 'table-mariage'], ['Cocktail', 'cocktail'], ['Séminaire', 'buffet'], ['Anniversaire', 'barbecue'],
+  ['Baptême', 'piece-montee'], ['Gala', 'assiette'], ['Communion', 'brasero'], ['Autre', 'tournebroche-terrasse'],
+];
+
+function Mosaic() {
   return (
-    <div className="cmt-collage" aria-hidden="true">
-      <div className="cmt-tile cmt-tile--a">{photo(0) ?? <ClocheMotif size={150} />}</div>
-      <div className="cmt-tile cmt-tile--b" style={{ color: '#FFFFFF' }}>
-        {photo(1) ?? (
-          <svg width="96" height="96" viewBox="0 0 96 96" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 18h22c0 14-4.5 22-11 22s-11-8-11-22z" /><path d="M33 40v30" /><path d="M24 72h18" />
-            <path d="M52 26h22c0 14-4.5 22-11 22s-11-8-11-22z" /><path d="M63 48v22" /><path d="M54 72h18" />
-          </svg>
-        )}
+    <div className="cmt-mosaic">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className="cmt-mosaic__tall"
+        src={PHOTO('tournebroche-terrasse')}
+        alt="Cochons rôtis au tournebroche, vus depuis une table dressée en terrasse"
+        width={933}
+        height={1200}
+        fetchPriority="high"
+        decoding="async"
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={PHOTO('table-mariage')} alt="Table de mariage dressée, fleurs et rubans roses" width={1200} height={900} decoding="async" />
+      <div className="cmt-mosaic__free">
+        <p className="cmt-mosaic__zero">0&nbsp;€</p>
+        <p>pour chercher, comparer et contacter</p>
       </div>
-      <div className="cmt-tile cmt-tile--c" style={{ color: '#F8D04F' }}>
-        {photo(2) ?? (
-          <div style={{ display: 'flex', gap: 18 }}>
-            <FourStar size={34} /><FourStar size={48} /><FourStar size={34} />
-          </div>
-        )}
-      </div>
-      <Scallop>des traiteurs d’ici</Scallop>
-      <FourStar className="cmt-star" style={{ left: '38%', bottom: -6 }} />
     </div>
   );
 }
-
-const STEPS = [
-  { title: 'Dites ce que vous préparez', text: 'Votre département et le type d’événement : mariage, anniversaire, cocktail, séminaire.' },
-  { title: 'Comparez les traiteurs', text: 'Les photos, les cartes à feuilleter, le nombre de convives et le prix de départ.' },
-  { title: 'Écrivez à celui qui vous plaît', text: 'Votre demande va droit au traiteur, qui vous répond par e-mail ou par téléphone.' },
-];
 
 export default async function AnnuaireHome() {
   const base = await directoryBase();
   const href = (p: string) => directoryHref(base, p);
   const recent = (await searchListings({})).slice(0, RECENT);
-  const covers = recent.map((l) => l.coverUrl).filter((u): u is string => !!u).slice(0, 3);
+  const byType = (t: EventType) => href(`/traiteurs?${new URLSearchParams({ type: t })}`);
 
   return (
     <>
@@ -76,21 +72,33 @@ export default async function AnnuaireHome() {
         <section className="cmt-hero" aria-labelledby="accueil-titre">
           <div>
             <h1 id="accueil-titre" className="sr-only">Trouver un traiteur pour votre événement, dans votre département</h1>
-            <SearchBar aside="Comparez les fiches, puis écrivez directement au traiteur. C’est gratuit pour vous." />
+            <SearchBar aside="Photos, cartes à feuilleter et prix de départ. Vous écrivez directement au traiteur, sans intermédiaire." />
           </div>
-          <Collage covers={covers} />
+          <Mosaic />
         </section>
-      </div>
 
-      <section className="cmt-band" aria-labelledby="recentes-titre">
-        <div className={container}>
+        <nav aria-label="Chercher par type d’événement">
+          <ul className="cmt-events">
+            {EVENTS.map(([t, photo]) => (
+              <li key={t}>
+                <Link href={byType(t)} className="cmt-event">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={PHOTO(`${photo}-petit`)} alt="" width={44} height={44} decoding="async" />
+                  {t === 'Autre' ? 'Autres événements' : t}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <section className="cmt-section cmt-section--first" aria-labelledby="recentes-titre">
           {recent.length > 0 ? (
             <>
               <div className="cmt-section-head">
                 <h2 id="recentes-titre" className="cmt-h2">Les derniers traiteurs arrivés</h2>
                 <Link href={href('/traiteurs')} className="cmt-link">Voir tous les traiteurs</Link>
               </div>
-              <div className="cmt-grid">
+              <div className="cmt-grid cmt-grid--home">
                 {recent.map((l) => <ListingCard key={l.slug} listing={l} href={href(`/traiteur/${l.slug}`)} />)}
               </div>
             </>
@@ -101,36 +109,31 @@ export default async function AnnuaireHome() {
                 {DIRECTORY_NAME} ouvre ses portes : les traiteurs y publient leur fiche en ce moment, département par département.
                 Gardez l’adresse, les premières fiches seront bientôt en ligne.
               </p>
-              <p>Vous êtes traiteur ? La vôtre peut être parmi les premières, voyez plus bas comment faire.</p>
+              <p>Vous êtes traiteur ? La vôtre peut être parmi les premières, voyez juste en dessous comment faire.</p>
             </div>
           )}
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section className={`${container} cmt-section`} aria-labelledby="etapes-titre">
-        <h2 id="etapes-titre" className="cmt-h2">Trouver votre traiteur, en trois temps</h2>
-        <ol className="cmt-steps">
-          {STEPS.map((s, i) => (
-            <li key={s.title}>
-              <span className="cmt-step__num" aria-hidden="true">{i + 1}</span>
-              <h3>{s.title}</h3>
-              <p>{s.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className={`${container} cmt-section`} aria-labelledby="traiteurs-titre">
-        <div className="cmt-pitch">
-          <div>
-            <h2 id="traiteurs-titre" className="cmt-h2">Vous êtes traiteur ?</h2>
-            <p>
-              Présentez votre maison à ceux qui cherchent un traiteur près de chez eux : vos photos, vos cartes, les événements que
-              vous servez. Les demandes arrivent directement chez vous. La fiche est offerte aux abonnés de WeboDevis, le logiciel
-              des traiteurs, partenaire de {DIRECTORY_NAME}.
-            </p>
+      <section className="cmt-purple" aria-labelledby="traiteurs-titre">
+        <div className={`${container} cmt-purple__inner`}>
+          <div className="cmt-purple__text">
+            <h2 id="traiteurs-titre" className="cmt-purple__title">Vous êtes traiteur&nbsp;? Faites-vous connaître ici.</h2>
+            <div className="cmt-purple__row">
+              <p>Votre fiche est incluse si vous êtes équipé de WeboDevis, le logiciel partenaire de {DIRECTORY_NAME}.</p>
+              <Link href={href('/referencer-mon-entreprise')} className="cmt-btn cmt-btn--light cmt-btn--big">Référencer mon entreprise</Link>
+            </div>
           </div>
-          <Link href={href('/referencer-mon-entreprise')} className="cmt-btn cmt-btn--primary">Voir ce que comprend la fiche</Link>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="cmt-purple__photo"
+            src={PHOTO('brasero')}
+            alt="Un traiteur cuisine pommes de terre, champignons et poivrons au brasero, devant les invités"
+            width={1200}
+            height={800}
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </section>
     </>

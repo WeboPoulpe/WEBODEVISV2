@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ClocheMotif } from './AnnuaireMark';
 
 // Galerie d'une fiche : une grande photo et trois vignettes ; la dernière annonce les photos restantes. Chaque photo
 // s'agrandit dans une fenêtre (<dialog> natif : focus gardé, Échap pour fermer, flèches pour passer de l'une à l'autre).
+// Sans photo, un aplat rose pâle porte le nom du traiteur.
 
 type Photo = { url: string; alt: string };
 const SHOWN = 4;
 
-export default function ListingGallery({ photos, name, overlay }: { photos: Photo[]; name: string; overlay?: React.ReactNode }) {
+export default function ListingGallery({ photos, name }: { photos: Photo[]; name: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [index, setIndex] = useState(0);
   const altOf = (p: Photo, i: number) => p.alt || `Photo ${i + 1} de ${name}`;
@@ -35,8 +35,7 @@ export default function ListingGallery({ photos, name, overlay }: { photos: Phot
   if (!photos.length) {
     return (
       <div className="cmt-gallery">
-        <div className="cmt-gallery__empty"><ClocheMotif size={120} /></div>
-        {overlay}
+        <p className="cmt-gallery__empty" aria-hidden="true">{name}</p>
       </div>
     );
   }
@@ -62,7 +61,6 @@ export default function ListingGallery({ photos, name, overlay }: { photos: Phot
             </button>
           );
         })}
-        {overlay}
       </div>
 
       <dialog ref={dialog} className="cmt-lightbox" aria-label={`Photos de ${name}`} onClick={(e) => { if (e.target === dialog.current) dialog.current?.close(); }}>

@@ -1,4 +1,3 @@
-import { Scallop } from '@/components/annuaire/AnnuaireMark';
 import PageHead from '@/components/annuaire/PageHead';
 import { container } from '@/components/site/ui';
 import { directoryBase } from '@/lib/annuaire/base';
@@ -32,10 +31,12 @@ const STEPS = [
   { title: 'Votre fiche est en ligne', text: 'Les fiches sont classées par date de publication. Personne ne paie pour passer devant.' },
 ];
 
+/** Coche blanche sur un rond pourpre. */
 function Check() {
   return (
-    <svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 54 54">
-      <path d="M27 0 L31 23 L54 27 L31 31 L27 54 L23 31 L0 27 L23 23 Z" fill="currentColor" />
+    <svg aria-hidden="true" focusable="false" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="16" fill="#6B1235" />
+      <path d="M10 16.5l4 4 8-9" fill="none" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -51,7 +52,7 @@ export default async function ReferencerPage() {
         lead="Présentez votre maison à ceux qui cherchent un traiteur près de chez eux, et recevez leurs demandes directement."
       />
 
-      <section className={`${container} cmt-section`} style={{ paddingTop: 40 }} aria-labelledby="fiche-contenu">
+      <section className={`${container} cmt-section cmt-section--near`} aria-labelledby="fiche-contenu">
         <h2 id="fiche-contenu" className="cmt-h2">Ce que comprend votre fiche</h2>
         <ul className="cmt-includes">
           {INCLUDED.map((i) => (
@@ -73,18 +74,27 @@ export default async function ReferencerPage() {
         </ol>
       </section>
 
-      <section className={`${container} cmt-section`} style={{ paddingTop: 96 }} aria-labelledby="fiche-acces">
-        <div className="cmt-pitch">
-          <Scallop>offerte</Scallop>
-          <div>
-            <h2 id="fiche-acces" className="cmt-h2">Gratuite pour les abonnés WeboDevis</h2>
+      <section className="cmt-purple" aria-labelledby="fiche-acces">
+        <div className={`${container} cmt-purple__inner`}>
+          <div className="cmt-purple__text">
+            <h2 id="fiche-acces" className="cmt-purple__title">Gratuite pour les abonnés WeboDevis</h2>
             <p>
               WeboDevis, le logiciel des traiteurs, est le partenaire de {DIRECTORY_NAME}. Ses abonnés créent leur fiche depuis
               l’écran « Ma fiche », sans rien payer de plus : connectez-vous à votre compte WeboDevis pour commencer.
             </p>
+            <a href={LOGIN} className="cmt-btn cmt-btn--light cmt-btn--big">Créer ma fiche avec WeboDevis</a>
             <p className="cmt-soon">Pas abonné à WeboDevis ? Une fiche seule, sans le logiciel, arrive bientôt.</p>
           </div>
-          <a href={LOGIN} className="cmt-btn cmt-btn--primary">Créer ma fiche avec WeboDevis</a>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="cmt-purple__photo"
+            src="/annuaire/accueil/assiette.webp"
+            alt="Filet mignon aux morilles et gratin, servi à l’assiette"
+            width={1200}
+            height={800}
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </section>
     </>

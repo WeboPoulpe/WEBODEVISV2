@@ -23,7 +23,7 @@ export default async function FavorisPage() {
         title="Mes favoris"
         lead="Les traiteurs que vous avez mis de côté. Ils restent sur cet appareil, dans votre navigateur : aucun compte, rien d’envoyé ailleurs."
       />
-      <section className={`${container} cmt-section`} style={{ paddingTop: 36 }} aria-label="Traiteurs gardés">
+      <section className={`${container} cmt-section cmt-section--near`} aria-label="Traiteurs gardés">
         <FavoritesList />
       </section>
     </>

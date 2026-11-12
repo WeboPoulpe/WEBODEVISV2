@@ -9,8 +9,8 @@ import { SITE_URL } from '@/lib/site/config';
 import { AnnuaireLogo } from './AnnuaireMark';
 import { useDirectoryHref } from './BaseContext';
 
-// Gabarit de Choisir Mon Traiteur : en-tête bleu nuit et store rayé, pied de page avec les liens légaux, la règle
-// de classement et le partenariat avec WeboDevis. Rien de la présentation de WeboDevis (ni logo, ni couleurs).
+// Gabarit de Choisir Mon Traiteur : menu flottant en pilule, pied de page avec les liens légaux, la règle de classement
+// et le partenariat avec WeboDevis. Rien de la présentation de WeboDevis (ni logo, ni couleurs, ni polices).
 
 const NAV = [
   { path: '/traiteurs', label: 'Trouver un traiteur' },
@@ -48,38 +48,38 @@ export default function AnnuaireShell({ children }: { children: React.ReactNode 
 
   return (
     <>
-      <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-bold">
+      <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:font-bold">
         Aller au contenu
       </a>
       <header className="cmt-header">
-        <div className={`${container} cmt-header__bar`}>
-          <Link href={href('/')} className="cmt-logo">
-            <AnnuaireLogo />
-          </Link>
-          <button type="button" className="cmt-menu-btn" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen((v) => !v)}>
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              {open ? <path d="M4 4l10 10M14 4L4 14" /> : <path d="M2 4.5h14M2 9h14M2 13.5h14" />}
-            </svg>
-            Menu
-          </button>
-          <nav id={menuId} className="cmt-nav" aria-label="Menu principal" data-open={open}>
-            {NAV.map((n) => (
-              <Link key={n.path} href={href(n.path)} aria-current={isCurrent(n.path) ? 'page' : undefined}>{n.label}</Link>
-            ))}
-            <Link href={href(CTA.path)} className="cmt-nav__cta" aria-current={isCurrent(CTA.path) ? 'page' : undefined}>{CTA.label}</Link>
-          </nav>
+        <div className={container}>
+          <div className="cmt-header__bar">
+            <Link href={href('/')} className="cmt-brand">
+              <AnnuaireLogo eager />
+            </Link>
+            <button type="button" className="cmt-menu-btn" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen((v) => !v)}>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                {open ? <path d="M4 4l10 10M14 4L4 14" /> : <path d="M2 4.5h14M2 9h14M2 13.5h14" />}
+              </svg>
+              <span className="cmt-menu-btn__word">Menu</span>
+            </button>
+            <nav id={menuId} className="cmt-nav" aria-label="Menu principal" data-open={open}>
+              {NAV.map((n) => (
+                <Link key={n.path} href={href(n.path)} aria-current={isCurrent(n.path) ? 'page' : undefined}>{n.label}</Link>
+              ))}
+              <Link href={href(CTA.path)} className="cmt-nav__cta" aria-current={isCurrent(CTA.path) ? 'page' : undefined}>{CTA.label}</Link>
+            </nav>
+          </div>
         </div>
       </header>
-      <div className="cmt-awning" aria-hidden="true" />
 
       <main id="contenu" className="cmt-main">{children}</main>
 
       <footer className="cmt-footer">
-        <div className="cmt-awning cmt-awning--top" aria-hidden="true" />
         <div className={container}>
           <div className="cmt-footer__grid">
             <div className="grid content-start gap-5">
-              <Link href={href('/')} className="cmt-logo">
+              <Link href={href('/')} className="cmt-brand">
                 <AnnuaireLogo />
               </Link>
               <p className="cmt-footer__note">

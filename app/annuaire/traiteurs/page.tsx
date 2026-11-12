@@ -56,7 +56,7 @@ export default async function TraiteursPage({ searchParams }: { searchParams: Se
           <SearchBar compact department={department} eventType={eventType} />
         </div>
       </PageHead>
-      <section className={`${container} cmt-section`} style={{ paddingTop: 40 }} aria-label="Résultats">
+      <section className={`${container} cmt-section cmt-section--near`} aria-label="Résultats">
         <Results listings={listings} base={base} department={department} eventType={eventType} covered={covered.map((c) => c.code)} />
       </section>
     </>

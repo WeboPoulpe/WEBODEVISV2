@@ -8,7 +8,8 @@ import { readFavorites, writeFavorites } from '@/lib/annuaire/favorites';
 import { useDirectoryHref } from './BaseContext';
 import ListingCard from './ListingCard';
 
-// Les fiches gardées dans ce navigateur. Une fiche qui n'est plus en ligne sort de la liste.
+// Les fiches gardées dans ce navigateur. Une fiche qui n'est plus en ligne sort de la liste, comme celle dont on décoche
+// le cœur.
 
 export default function FavoritesList() {
   const href = useDirectoryHref();
@@ -27,10 +28,8 @@ export default function FavoritesList() {
       .catch(() => setFailed(true));
   }, []);
 
-  const remove = (slug: string) => {
-    writeFavorites(readFavorites().filter((s) => s !== slug));
-    setCards((c) => (c ?? []).filter((l) => l.slug !== slug));
-  };
+  // Le cœur de la carte a déjà retiré la fiche du navigateur : elle sort aussi de la page.
+  const removed = (slug: string) => setCards((c) => (c ?? []).filter((l) => l.slug !== slug));
 
   if (failed) {
     return <p role="alert" className="cmt-alert">Vos favoris n’ont pas pu s’afficher. Vérifiez votre connexion, puis rechargez la page.</p>;
@@ -41,7 +40,8 @@ export default function FavoritesList() {
       <div className="cmt-empty">
         <h2>Aucun favori pour l’instant</h2>
         <p>
-          Sur la fiche d’un traiteur, « Garder en favori » le met de côté ici, pour le retrouver au moment de choisir.{' '}
+          Le cœur d’une carte, ou « Garder en favori » sur la fiche d’un traiteur, le met de côté ici, pour le retrouver au
+          moment de choisir.{' '}
           <Link href={href('/traiteurs')} className="cmt-link">Parcourir les traiteurs</Link>
         </p>
       </div>
@@ -50,11 +50,13 @@ export default function FavoritesList() {
   return (
     <div className="cmt-grid">
       {cards.map((l) => (
-        <ListingCard key={l.slug} listing={l} href={href(`/traiteur/${l.slug}`)} headingLevel={2}>
-          <button type="button" className="cmt-btn" style={{ minHeight: 44, padding: '8px 16px', fontSize: 15 }} onClick={() => remove(l.slug)}>
-            Retirer de mes favoris<span className="sr-only"> : {l.name}</span>
-          </button>
-        </ListingCard>
+        <ListingCard
+          key={l.slug}
+          listing={l}
+          href={href(`/traiteur/${l.slug}`)}
+          headingLevel={2}
+          onFavoriteChange={(saved) => { if (!saved) removed(l.slug); }}
+        />
       ))}
     </div>
   );

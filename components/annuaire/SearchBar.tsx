@@ -7,9 +7,9 @@ import { EVENT_TYPES, isEventType } from '@/lib/annuaire/eventTypes';
 import { eventPhrase, inDepartment } from '@/lib/annuaire/phrases';
 import { useDirectoryHref } from './BaseContext';
 
-// La recherche en phrase : « Je cherche un traiteur pour [un mariage] [dans l’Aube] ». Chaque choix est une vraie
-// liste déroulante (clavier, lecteur d'écran), invisible, posée sur le texte souligné qui l'affiche. Sans JavaScript,
-// le formulaire part quand même vers /traiteurs.
+// La recherche en phrase : « Un traiteur pour [un mariage] dans [l’Aube] ». Chaque choix est une vraie liste
+// déroulante (clavier, lecteur d'écran), invisible, posée sur la pastille rose pâle qui affiche le choix. Sans
+// JavaScript, le formulaire part quand même vers /traiteurs.
 
 const typographic = (s: string) => s.replace(/'/g, '’');
 
@@ -24,15 +24,18 @@ function Choice({ label, name, value, onChange, display, options }: {
   return (
     <label className="cmt-choice">
       <span className="sr-only">{label}</span>
-      <span className="cmt-choice__text" aria-hidden="true">
-        {display}
-        <svg className="cmt-choice__caret" viewBox="0 0 10 10" focusable="false"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </span>
+      <span aria-hidden="true">{display}</span>
       <select className="cmt-choice__select" name={name} value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map(([v, text]) => <option key={v} value={v}>{text}</option>)}
       </select>
     </label>
   );
+}
+
+/** « dans l’Aube » se lit « dans » puis la pastille « l’Aube » ; « partout en France » tient dans la pastille. */
+function splitPlace(phrase: string): [string, string] {
+  const m = /^(dans|à|en) (.+)$/.exec(phrase);
+  return m ? [m[1], m[2]] : ['', phrase];
 }
 
 const TYPE_OPTIONS: [string, string][] = [['', 'Tous les événements'], ...EVENT_TYPES.map((t): [string, string] => [t, t])];
@@ -51,6 +54,8 @@ export default function SearchBar({ department = '', eventType = '', compact = f
   const [type, setType] = useState(isEventType(eventType) ? eventType : '');
   const [dept, setDept] = useState(departmentByCode(department) ? department : '');
 
+  const [preposition, place] = splitPlace(inDepartment(dept));
+
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Un département seul a sa propre page, celle que Google connaît.
@@ -66,12 +71,13 @@ export default function SearchBar({ department = '', eventType = '', compact = f
   return (
     <form role="search" aria-label="Chercher un traiteur" action={href('/traiteurs')} method="get" onSubmit={onSubmit}>
       <p className={`cmt-sentence ${compact ? 'cmt-sentence--compact' : ''}`}>
-        Je cherche un traiteur pour{' '}
+        Un traiteur pour{' '}
         <Choice label="Type d’événement" name="type" value={type} onChange={setType} display={eventPhrase(type)} options={TYPE_OPTIONS} />{' '}
-        <Choice label="Département" name="departement" value={dept} onChange={setDept} display={inDepartment(dept)} options={DEPARTMENT_OPTIONS} />
+        {preposition && <>{preposition}{' '}</>}
+        <Choice label="Département" name="departement" value={dept} onChange={setDept} display={place} options={DEPARTMENT_OPTIONS} />
       </p>
       <div className="cmt-search__foot">
-        <button type="submit" className={`cmt-btn cmt-btn--primary ${compact ? '' : 'cmt-btn--big'}`}>Voir les traiteurs</button>
+        <button type="submit" className={`cmt-btn cmt-btn--dark ${compact ? '' : 'cmt-btn--big'}`}>Voir les traiteurs</button>
         {aside && <p className="cmt-search__aside">{aside}</p>}
       </div>
     </form>

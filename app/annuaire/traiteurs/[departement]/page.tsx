@@ -49,7 +49,7 @@ export default async function DepartementPage({ params }: { params: Params }) {
           <SearchBar compact department={d.code} />
         </div>
       </PageHead>
-      <section className={`${container} cmt-section`} style={{ paddingTop: 40 }} aria-label={`Traiteurs ${inDepartment(d.code)}`}>
+      <section className={`${container} cmt-section cmt-section--near`} aria-label={`Traiteurs ${inDepartment(d.code)}`}>
         <Results listings={listings} base={base} department={d.code} covered={covered.map((c) => c.code)} />
       </section>
     </>

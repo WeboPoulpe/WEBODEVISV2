@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import { ClocheMotif, Scallop } from '@/components/annuaire/AnnuaireMark';
 import ContactForm from '@/components/annuaire/ContactForm';
 import FavoriteButton from '@/components/annuaire/FavoriteButton';
 import ListingGallery from '@/components/annuaire/ListingGallery';
-import { PriceSticker, formatPrice } from '@/components/annuaire/ListingCard';
+import { formatPrice } from '@/components/annuaire/ListingCard';
 import { Crumbs } from '@/components/annuaire/PageHead';
 import { container, JsonLd } from '@/components/site/ui';
 import { directoryBase } from '@/lib/annuaire/base';
@@ -77,14 +76,14 @@ export default async function ListingPage({ params }: { params: Params }) {
           </header>
 
           <div className="cmt-listing__gallery">
-            <ListingGallery photos={l.photos} name={l.name} overlay={price !== null ? <PriceSticker price={price} /> : undefined} />
+            <ListingGallery photos={l.photos} name={l.name} />
           </div>
 
           <div className="cmt-listing__info">
             {l.tagline && <p className="cmt-listing__tagline">{l.tagline}</p>}
             {l.eventTypes.length > 0 && (
               <ul className="cmt-chips" aria-label="Événements servis">
-                {l.eventTypes.map((t) => <li key={t}><span className="cmt-chip">{t}</span></li>)}
+                {l.eventTypes.map((t) => <li key={t}><span className="cmt-tag">{t}</span></li>)}
               </ul>
             )}
             {(people || price !== null || website) && (
@@ -123,12 +122,10 @@ export default async function ListingPage({ params }: { params: Params }) {
                     {b.coverUrl
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={b.coverUrl} alt="" loading="lazy" decoding="async" />
-                      : <ClocheMotif />}
+                      : <p className="cmt-brochure__name" aria-hidden="true">{b.name}</p>}
                   </div>
-                  <div className="cmt-brochure__body">
-                    <a href={`/b/${encodeURIComponent(b.token)}`} target="_blank" rel="noopener">{b.name}</a>
-                    <span>S’ouvre dans un nouvel onglet</span>
-                  </div>
+                  <a href={`/b/${encodeURIComponent(b.token)}`} target="_blank" rel="noopener">{b.name}</a>
+                  <span>S’ouvre dans un nouvel onglet</span>
                 </li>
               ))}
             </ul>
@@ -147,17 +144,17 @@ export default async function ListingPage({ params }: { params: Params }) {
         )}
       </div>
 
-      <section id="contact" className="cmt-band" style={{ marginTop: 72, scrollMarginTop: 16 }} aria-labelledby="contact-titre">
-        <div className={container}>
-          <div className="cmt-contact-head">
+      <div className={`${container} cmt-section`}>
+        <section id="contact" className="cmt-contact" aria-labelledby="contact-titre">
+          <div className="cmt-contact__head">
             <h2 id="contact-titre" className="cmt-h2">Écrire à {l.name}</h2>
-            <Scallop>c’est gratuit</Scallop>
+            <p className="cmt-pill">Gratuit pour vous</p>
           </div>
-          <div style={{ maxWidth: 860 }}>
+          <div className="cmt-contact__body">
             <ContactForm slug={l.slug} name={l.name} eventTypes={l.eventTypes} />
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </>
   );
 }

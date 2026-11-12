@@ -5,15 +5,19 @@ import { FAVORITES_EVENT, readFavorites, toggleFavorite, writeFavorites } from '
 
 // Garder une fiche dans ses favoris : la liste vit dans ce navigateur (localStorage « cmt:favoris »), sans compte.
 
-export function HeartIcon() {
+export function HeartIcon({ size = 20 }: { size?: number }) {
   return (
-    <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round">
-      <path d="M12 20.5s-7.5-4.6-9.2-9.3C1.6 7.8 3.9 4.5 7.3 4.5c2 0 3.6 1.1 4.7 2.8 1.1-1.7 2.7-2.8 4.7-2.8 3.4 0 5.7 3.3 4.5 6.7-1.7 4.7-9.2 9.3-9.2 9.3z" />
+    <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
     </svg>
   );
 }
 
-export default function FavoriteButton({ slug }: { slug: string }) {
+/**
+ * `name` donné : le bouton rond du cœur posé sur une carte (son nom dit quelle fiche il garde). Sans `name` : le bouton
+ * avec son texte, sur la page d'une fiche. `onChange` prévient la liste des favoris qu'une fiche en sort.
+ */
+export default function FavoriteButton({ slug, name, onChange }: { slug: string; name?: string; onChange?: (saved: boolean) => void }) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -27,17 +31,22 @@ export default function FavoriteButton({ slug }: { slug: string }) {
     };
   }, [slug]);
 
+  const toggle = () => {
+    const next = toggleFavorite(readFavorites(), slug);
+    writeFavorites(next);
+    setSaved(next.includes(slug));
+    onChange?.(next.includes(slug));
+  };
+
+  if (name) {
+    return (
+      <button type="button" className="cmt-heart" aria-pressed={saved} aria-label={`Garder ${name} en favori`} onClick={toggle}>
+        <HeartIcon size={22} />
+      </button>
+    );
+  }
   return (
-    <button
-      type="button"
-      className="cmt-btn cmt-fav"
-      data-saved={saved}
-      onClick={() => {
-        const next = toggleFavorite(readFavorites(), slug);
-        writeFavorites(next);
-        setSaved(next.includes(slug));
-      }}
-    >
+    <button type="button" className="cmt-btn cmt-btn--quiet cmt-fav" data-saved={saved} onClick={toggle}>
       <HeartIcon />
       {saved ? 'Dans mes favoris' : 'Garder en favori'}
     </button>
