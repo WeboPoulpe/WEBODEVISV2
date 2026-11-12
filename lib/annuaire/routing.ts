@@ -29,7 +29,7 @@ export function isDirectoryHost(host: string | null | undefined, directoryHost: 
 
 const hasPrefix = (pathname: string) => pathname === DIRECTORY_PREFIX || pathname.startsWith(`${DIRECTORY_PREFIX}/`);
 const withoutPrefix = (pathname: string) => pathname.slice(DIRECTORY_PREFIX.length) || '/';
-// Un fichier statique : le dernier segment porte une extension (logo.png, x.js, icone.svg…).
+// Un fichier statique : le dernier segment porte une extension (logo-pourpre.png, x.js, icone-192.png…).
 const isStaticFile = (pathname: string) => /\/[^/]*\.[a-z0-9]+$/i.test(pathname) && !DIRECTORY_FILES.includes(pathname);
 
 export function directoryRewrite(host: string | null, pathname: string, directoryHost: string | undefined): DirectoryRoute {

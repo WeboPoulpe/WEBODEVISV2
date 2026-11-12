@@ -2,6 +2,7 @@ import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
 import { CHECKOUT_SESSION_HEADER } from '@/lib/subscription';
 import { directoryAuthBlock, directoryRewrite } from '@/lib/annuaire/routing';
+import { signedInLoginRedirect } from '@/lib/annuaire/login';
 
 // Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
 const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
@@ -96,10 +97,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users away from /login
+  // Redirect authenticated users away from /login (exactement /login?source=annuaire : vers « Ma fiche »)
   if (token && isAuthRoute) {
     const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = '/';
+    const target = signedInLoginRedirect(pathname, request.nextUrl.searchParams);
+    dashboardUrl.pathname = target;
+    if (target === '/ma-fiche') dashboardUrl.search = '';
     return NextResponse.redirect(dashboardUrl);
   }
 

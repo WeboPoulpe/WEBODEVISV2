@@ -4,7 +4,7 @@ import { DIRECTORY_NAME } from './config';
 // Métadonnées d'une page de l'annuaire. Les chemins sont ceux de l'adresse publique (sans /annuaire) : le layout de
 // l'annuaire pose metadataBase sur https://choisirmontraiteur.fr, l'adresse canonique est donc toujours celle-là.
 
-// Image de partage par défaut : une photo de l'accueil, en attendant le nouveau logo.
+// Image de partage par défaut : une photo de l'accueil (le logo, sur fond transparent, rendrait mal en aperçu).
 export const DIRECTORY_SHARE_IMAGE = { url: '/annuaire/accueil/table-mariage.webp', width: 1200, height: 900, alt: `${DIRECTORY_NAME} : une table de mariage dressée` };
 
 interface DirectoryPageMeta {

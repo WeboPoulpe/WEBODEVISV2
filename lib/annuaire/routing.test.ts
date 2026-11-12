@@ -16,8 +16,8 @@ describe('directoryRewrite', () => {
   it('laisse passer l’API, les fichiers et les brochures', () => {
     for (const p of ['/api/stats', '/_next/static/x.js', '/icons/a.png', '/b/abc', '/embed/b/abc', '/sw.js']) expect(directoryRewrite(H, p, H)).toBeNull();
     expect(directoryRewrite(H, '/manifest.webmanifest', H)).toBeNull();
-    expect(directoryRewrite(H, '/annuaire/logo-choisir-mon-traiteur.png', H)).toBeNull();
-    expect(directoryRewrite(H, '/annuaire/icone.svg', H)).toBeNull();
+    expect(directoryRewrite(H, '/annuaire/logo-pourpre.png', H)).toBeNull();
+    expect(directoryRewrite(H, '/annuaire/icone-192.png', H)).toBeNull();
   });
 
   it('retire le préfixe en double et renvoie webodevis.fr vers l’annuaire', () => {

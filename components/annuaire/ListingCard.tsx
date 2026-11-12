@@ -12,7 +12,7 @@ const cents = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR
 
 /** « 45 € », « 37,50 € » (espaces insécables, identiques côté serveur et navigateur). */
 export function formatPrice(n: number): string {
-  return (Number.isInteger(n) ? whole : cents).format(n).replace(/[  ]/g, ' ');
+  return (Number.isInteger(n) ? whole : cents).format(n).replace(/[\u202f\u00a0]/g, '\u00a0');
 }
 
 export default function ListingCard({ listing, href, headingLevel = 3, onFavoriteChange }: {

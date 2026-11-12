@@ -30,6 +30,7 @@ export const metadata: Metadata = {
       { url: '/annuaire/icone-32.png', type: 'image/png', sizes: '32x32' },
       { url: '/annuaire/icone-48.png', type: 'image/png', sizes: '48x48' },
       { url: '/annuaire/icone-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/annuaire/icone-512.png', type: 'image/png', sizes: '512x512' },
     ],
     apple: [{ url: '/annuaire/icone-180.png', sizes: '180x180' }],
   },

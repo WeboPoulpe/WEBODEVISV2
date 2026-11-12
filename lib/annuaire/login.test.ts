@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromDirectory, loginDestination } from './login';
+import { fromDirectory, loginDestination, signedInLoginRedirect } from './login';
 
 describe('connexion d’un traiteur venu de l’annuaire', () => {
   it('mène à « Ma fiche » quand la connexion vient de l’annuaire', () => {
@@ -13,5 +13,16 @@ describe('connexion d’un traiteur venu de l’annuaire', () => {
       expect(fromDirectory(source)).toBe(false);
       expect(loginDestination(source)).toBe('/');
     }
+  });
+
+  it('renvoie un compte déjà connecté vers « Ma fiche » pour /login?source=annuaire seulement', () => {
+    const q = (s: string) => new URLSearchParams(s);
+    expect(signedInLoginRedirect('/login', q('source=annuaire'))).toBe('/ma-fiche');
+    expect(signedInLoginRedirect('/login', q(''))).toBe('/');
+    expect(signedInLoginRedirect('/login', q('source=pwa'))).toBe('/');
+    expect(signedInLoginRedirect('/login', q('source=annuaire&next=/x'))).toBe('/');
+    expect(signedInLoginRedirect('/login', q('source=annuaire&source=annuaire'))).toBe('/');
+    expect(signedInLoginRedirect('/register', q('source=annuaire'))).toBe('/');
+    expect(signedInLoginRedirect('/login/x', q('source=annuaire'))).toBe('/');
   });
 });

@@ -36,6 +36,7 @@ export default async function MentionsLegalesPage() {
             <div><dt>Forme juridique</dt><dd>Micro-entreprise</dd></div>
             <div><dt>SIRET</dt><dd>925 205 767 00013</dd></div>
             <div><dt>Adresse</dt><dd>1 rue de la Haute Charme, 10000 Troyes</dd></div>
+            <div><dt>Téléphone</dt><dd><a href="tel:+33644887039">06 44 88 70 39</a></dd></div>
             <div><dt>E-mail</dt><dd><a href="mailto:maxence@webomax.fr">maxence@webomax.fr</a></dd></div>
           </dl>
 

@@ -12,6 +12,8 @@
   --cmt-line: #E7DCE1;
   --cmt-muted: #5A4650;
   --cmt-hairline: 1.5px solid var(--cmt-line);
+  /* Bord des champs de saisie : 3,64:1 sur blanc, 3,22:1 sur #F6EFF2. */
+  --cmt-field: #978089;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -364,10 +366,10 @@
 .cmt .cmt-field label { font-weight: 700; font-size: 15px; }
 .cmt .cmt-field label span { font-weight: 400; color: var(--cmt-muted); }
 .cmt .cmt-field input, .cmt .cmt-field select, .cmt .cmt-field textarea {
-  width: 100%; min-height: 52px; padding: 12px 16px; border: var(--cmt-hairline); border-radius: 16px; background: var(--cmt-white);
+  width: 100%; min-height: 52px; padding: 12px 16px; border: 1.5px solid var(--cmt-field); border-radius: 16px; background: var(--cmt-white);
   color: var(--cmt-ink); font: 400 16px/1.4 var(--cmt-text), sans-serif;
 }
-.cmt .cmt-field input:hover, .cmt .cmt-field select:hover, .cmt .cmt-field textarea:hover { border-color: var(--cmt-muted); }
+.cmt .cmt-field input:hover, .cmt .cmt-field select:hover, .cmt .cmt-field textarea:hover { border-color: var(--cmt-ink); }
 .cmt .cmt-field textarea { min-height: 150px; resize: vertical; }
 .cmt .cmt-field input:focus-visible, .cmt .cmt-field select:focus-visible, .cmt .cmt-field textarea:focus-visible { outline: 2px solid var(--cmt-purple); outline-offset: 2px; border-color: var(--cmt-purple); }
 .cmt .cmt-form__foot { grid-column: 1 / -1; display: grid; gap: 14px; justify-items: start; margin-top: 4px; }

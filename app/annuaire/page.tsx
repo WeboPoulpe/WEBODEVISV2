@@ -83,7 +83,7 @@ export default async function AnnuaireHome() {
               <li key={t}>
                 <Link href={byType(t)} className="cmt-event">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={PHOTO(`${photo}-petit`)} alt="" width={44} height={44} decoding="async" />
+                  <img src={PHOTO(`${photo}-petit`)} alt="" width={44} height={44} loading="lazy" decoding="async" />
                   {t === 'Autre' ? 'Autres événements' : t}
                 </Link>
               </li>
