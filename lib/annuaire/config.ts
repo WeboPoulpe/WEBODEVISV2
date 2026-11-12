@@ -6,6 +6,11 @@ export const DIRECTORY_PREFIX = '/annuaire';
 export const MAX_PHOTOS = 20;
 // Demandes qu'un même visiteur peut envoyer par heure.
 export const REQUESTS_PER_HOUR = 5;
+// Demandes qu'une même connexion peut envoyer par heure, toutes fiches confondues.
+export const REQUESTS_PER_HOUR_ALL = 15;
+// Demandes venues de l'annuaire pour une même adresse e-mail, sur 24 heures, au-delà desquelles l'accusé de réception
+// n'est plus envoyé (le traiteur est toujours prévenu).
+export const ACKS_PER_DAY = 5;
 
 // Adresse complète d'une page de l'annuaire (`path` commence par « / »).
 export function directoryUrl(path: string): string {

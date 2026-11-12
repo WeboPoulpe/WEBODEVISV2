@@ -8,8 +8,9 @@ import { REQUESTS_PER_HOUR } from '@/lib/annuaire/config';
 // Demande de contact depuis une fiche de l'annuaire, sur le vrai schéma en mémoire.
 
 vi.mock('server-only', () => ({}));
+let visitorIp = '203.0.113.9';
 vi.mock('next/headers', () => ({
-  headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.9', 'user-agent': 'Test', host: 'choisirmontraiteur.fr' }),
+  headers: async () => new Headers({ 'x-forwarded-for': visitorIp, 'user-agent': 'Test', host: 'choisirmontraiteur.fr' }),
   cookies: async () => ({ get: () => undefined, set: () => {} }),
 }));
 const sent: { to: string; subject: string; html: string }[] = [];
@@ -57,6 +58,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await pg.exec('delete from prospect_requests');
+  visitorIp = '203.0.113.9';
   sent.length = 0;
   events.length = 0;
 });
@@ -95,6 +97,72 @@ describe('annuaire : demande de contact', () => {
     for (let i = 0; i < REQUESTS_PER_HOUR; i++) expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: null });
     expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: 'Vous avez déjà envoyé plusieurs demandes. Réessayez dans une heure.' });
     expect(await count()).toBe(REQUESTS_PER_HOUR);
+  });
+
+  it('l’accusé de réception est signé Choisir Mon Traiteur', async () => {
+    expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: null });
+    const ack = sent.find((m) => m.to === 'marie@exemple.fr')!;
+    expect(ack.html).toContain('Votre demande a été transmise à Traiteur A par Choisir Mon Traiteur.');
+    expect(ack.html).not.toContain('WeboDevis');
+  });
+
+  it('un type d’événement hors de la liste n’est pas gardé', async () => {
+    expect(await r.submitDirectoryRequest('a-troyes', { ...ok, eventType: 'Gagnez 1000 € sur https://x.example' })).toEqual({ error: null });
+    expect((await pg.query(`select event_type from prospect_requests`)).rows).toEqual([{ event_type: null }]);
+    expect(sent.map((m) => m.to).sort()).toEqual(['contact@traiteur-a.fr', 'marie@exemple.fr']);
+    expect(sent.every((m) => !m.html.includes('Gagnez'))).toBe(true);
+    await r.submitDirectoryRequest('a-troyes', { ...ok, eventType: 'Cocktail' });
+    expect((await pg.query(`select event_type from prospect_requests order by created_at`)).rows.map((x) => (x as { event_type: string }).event_type)).toContain('Cocktail');
+  });
+
+  it('un lien dans le prénom, le nom ou le lieu : demande gardée, aucun e-mail', async () => {
+    expect(await r.submitDirectoryRequest('a-troyes', { ...ok, firstName: 'Gagnez sur https://spam.example' })).toEqual({ error: null });
+    expect(await r.submitDirectoryRequest('a-troyes', { ...ok, lastName: 'www.spam.example' })).toEqual({ error: null });
+    expect(await r.submitDirectoryRequest('a-troyes', { ...ok, location: 'spam.example/promo' })).toEqual({ error: null });
+    const { rows } = await pg.query(`select status, source from prospect_requests`);
+    expect(rows).toEqual(Array(3).fill({ status: 'nouveau', source: 'annuaire' }));
+    expect(sent).toEqual([]);
+  });
+
+  it('heure d’ouverture absente ou illisible : traité comme trop rapide', async () => {
+    const { startedAt: _drop, ...noStart } = ok;
+    expect(await r.submitDirectoryRequest('a-troyes', noStart as typeof ok)).toEqual({ error: null });
+    expect(await r.submitDirectoryRequest('a-troyes', { ...ok, startedAt: 'hier' as unknown as number })).toEqual({ error: null });
+    expect(await r.submitDirectoryRequest('a-troyes', { ...ok, startedAt: Number.NaN })).toEqual({ error: null });
+    expect(await count()).toBe(0);
+    expect(sent).toEqual([]);
+  });
+
+  it('16e demande dans l’heure depuis la même connexion, toutes fiches confondues : refusée', async () => {
+    expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: null });
+    const { ip_hash: ipHash } = (await pg.query<{ ip_hash: string }>(`select ip_hash from prospect_requests`)).rows[0];
+    // 14 autres demandes de la même connexion, adressées à d'autres traiteurs.
+    for (let i = 0; i < 14; i++) {
+      await pg.query(`insert into prospect_requests (first_name, last_name, email, owner_user_id, ip_hash, source) values ('X', 'Y', $1, $2, $3, 'annuaire')`,
+        [`v${i}@exemple.fr`, i % 2 ? C : D, ipHash]);
+    }
+    sent.length = 0;
+    expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: 'Vous avez déjà envoyé plusieurs demandes. Réessayez dans une heure.' });
+    expect(await count()).toBe(15);
+    expect(sent).toEqual([]);
+    // Une autre connexion passe.
+    visitorIp = '198.51.100.7';
+    expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: null });
+  });
+
+  it('au-delà de 5 demandes par jour pour une même adresse : le traiteur est prévenu, sans accusé de réception', async () => {
+    const earlier = (n: number, source: string | null) => pg.query(
+      `insert into prospect_requests (first_name, last_name, email, owner_user_id, ip_hash, source)
+       select 'Marie', 'Dupont', 'marie@exemple.fr', $1, 'autre-connexion-' || g, $2 from generate_series(1, $3::int) g`, [D, source, n]);
+    await earlier(4, 'annuaire');
+    await earlier(3, null);
+    expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: null });
+    expect(sent.map((m) => m.to).sort()).toEqual(['contact@traiteur-a.fr', 'marie@exemple.fr']);
+    sent.length = 0;
+    // La demande ci-dessus est la 5e venue de l'annuaire : la suivante n'a plus d'accusé.
+    expect(await r.submitDirectoryRequest('a-troyes', ok)).toEqual({ error: null });
+    expect(sent.map((m) => m.to)).toEqual(['contact@traiteur-a.fr']);
+    expect(await count()).toBe(9);
   });
 
   it('fiche qui n’est plus visible : refusée avec un message', async () => {

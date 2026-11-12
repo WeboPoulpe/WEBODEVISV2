@@ -8,6 +8,11 @@ export const MIN_FILL_MS = 4000;
 // Un lien : http(s)://, www., ou un domaine suivi d'un chemin (une adresse email seule n'en est pas un).
 const LINK = /(https?:\/\/|\bwww\.)\S+|\b[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}\/\S*/i;
 
+/** Le texte contient-il un lien (même règle que le tri ci-dessous) ? */
+export function hasLink(text: string | null | undefined): boolean {
+  return LINK.test(text ?? '');
+}
+
 export function spamReason(input: { message: string; name: string; company?: string | null; elapsedMs?: number | null }): string | null {
   if (LINK.test(input.message) || LINK.test(input.name) || LINK.test(input.company ?? '')) return 'le message contient un lien';
   if (typeof input.elapsedMs === 'number' && input.elapsedMs >= 0 && input.elapsedMs < MIN_FILL_MS) return 'formulaire rempli en moins de 4 secondes';

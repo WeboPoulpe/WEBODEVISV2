@@ -8,7 +8,7 @@ import { prospectAckEmail, prospectNotificationEmail, type ProspectDetails } fro
 // Emails d'une nouvelle demande de prospect (formulaire du site, fin de brochure) : alerte au traiteur, accusé de
 // réception à la personne, au nom du traiteur. Un envoi raté ne perd pas la demande.
 
-export async function notifyProspect({ ownerId, prospect, brochureName = null, language = 'fr', source, appUrl }: { ownerId: string; prospect: ProspectDetails; brochureName?: string | null; /** Langue de l'accusé de réception. */ language?: 'fr' | 'en'; /** Fiche de l'annuaire d'où vient la demande. */ source?: 'annuaire'; /** Adresse de l'application dans le lien du mail, sinon celle de la requête. */ appUrl?: string }): Promise<void> {
+export async function notifyProspect({ ownerId, prospect, brochureName = null, language = 'fr', source, appUrl, ack = true }: { ownerId: string; prospect: ProspectDetails; brochureName?: string | null; /** Langue de l'accusé de réception. */ language?: 'fr' | 'en'; /** Fiche de l'annuaire d'où vient la demande. */ source?: 'annuaire'; /** Adresse de l'application dans le lien du mail, sinon celle de la requête. */ appUrl?: string; /** Envoyer l'accusé de réception à la personne (oui par défaut). */ ack?: boolean }): Promise<void> {
   const [owner] = await db
     .select({ email: profiles.email, company_name: profiles.company_name, company_email: profiles.company_email })
     .from(profiles).where(eq(profiles.id, ownerId)).limit(1);
@@ -17,6 +17,6 @@ export async function notifyProspect({ ownerId, prospect, brochureName = null, l
   const companyName = owner.company_name || 'Votre traiteur';
   await Promise.all([
     sendMail({ to: catererEmail, replyTo: prospect.email, ...prospectNotificationEmail({ prospect, appUrl: appUrl ?? await appOrigin(), brochureName, source }) }),
-    sendMail({ to: prospect.email, fromName: companyName, replyTo: catererEmail, ...prospectAckEmail({ companyName, prospect, language }) }),
+    ...(ack ? [sendMail({ to: prospect.email, fromName: companyName, replyTo: catererEmail, ...prospectAckEmail({ companyName, prospect, language, source }) })] : []),
   ]);
 }

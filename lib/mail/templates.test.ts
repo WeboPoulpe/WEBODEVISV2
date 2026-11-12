@@ -53,6 +53,13 @@ describe('emails', () => {
     expect(mail.html).toContain('Envoyé par Dupuis Traiteur avec WeboDevis.');
   });
 
+  it('accusé de réception d’une demande venue de l’annuaire : signé Choisir Mon Traiteur, sans WeboDevis', () => {
+    const mail = prospectAckEmail({ companyName: 'Dupuis Traiteur', prospect, source: 'annuaire' });
+    expect(mail.subject).toBe('Dupuis Traiteur a bien reçu votre demande');
+    expect(mail.html).toContain('Votre demande a été transmise à Dupuis Traiteur par Choisir Mon Traiteur.');
+    expect(mail.html).not.toContain('WeboDevis');
+  });
+
   it('devis : message du traiteur, lien du devis', () => {
     const mail = quoteProposalEmail({
       companyName: 'Dupuis Traiteur', clientName: 'Claire', eventType: 'Mariage', eventDate: '2027-06-12',

@@ -151,7 +151,7 @@ export function prospectNotificationEmail({ prospect, appUrl, brochureName, sour
 }
 
 /** À la personne qui a rempli le formulaire : accusé de réception, au nom du traiteur. */
-export function prospectAckEmail({ companyName, prospect, language = 'fr' }: { companyName: string; prospect: ProspectDetails; /** Langue de la page d'où vient la demande (brochure en anglais). */ language?: 'fr' | 'en' }): Email {
+export function prospectAckEmail({ companyName, prospect, language = 'fr', source }: { companyName: string; prospect: ProspectDetails; /** Langue de la page d'où vient la demande (brochure en anglais). */ language?: 'fr' | 'en'; /** Demande envoyée depuis la fiche de l'annuaire Choisir Mon Traiteur : signé par l'annuaire, pas par WeboDevis. */ source?: 'annuaire' }): Email {
   if (language === 'en') {
     return {
       subject: `${companyName} has received your request`,
@@ -186,7 +186,9 @@ export function prospectAckEmail({ companyName, prospect, language = 'fr' }: { c
       ],
       facts: prospectFacts(prospect),
       note: 'Pour compléter ou corriger votre demande, répondez simplement à cet email.',
-      footer: `Envoyé par ${companyName} avec WeboDevis.`,
+      footer: source === 'annuaire'
+        ? `Votre demande a été transmise à ${companyName} par Choisir Mon Traiteur.`
+        : `Envoyé par ${companyName} avec WeboDevis.`,
     }),
   };
 }
