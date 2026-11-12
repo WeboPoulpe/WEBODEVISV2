@@ -27,6 +27,8 @@ const C = '00000000-0000-4000-8000-0000000000a4';
 const E = '00000000-0000-4000-8000-0000000000a5';
 const F = '00000000-0000-4000-8000-0000000000a6';
 const D = '00000000-0000-4000-8000-0000000000a7';
+const G = '00000000-0000-4000-8000-0000000000a8';
+const H = '00000000-0000-4000-8000-0000000000a9';
 let current = A;
 vi.mock('./session', () => ({
   getSessionUser: async () => ({ id: current, email: 'x@y.fr' }),
@@ -63,20 +65,25 @@ const found = company();
 const photo = (owner: string, name = 'a') => ({ url: `https://x.public.blob.vercel-storage.com/${name}.webp`, path: `${owner}/annuaire/${name}.webp` });
 const photoB = photo(B);
 
+// Le délai de 30 secondes entre deux envois est levé pour les tests qui renvoient une fiche.
+const unthrottle = (id: string) => pg.query(`update directory_listings set submitted_at = now() - interval '1 minute' where company_id = $1`, [id]);
 const row = async (id: string) => (await pg.query<Record<string, any>>(`select * from directory_listings where company_id = $1`, [id])).rows[0];
 
 beforeAll(async () => {
+  delete process.env.DIRECTORY_HOST;
   pg = await createTestDb();
   await pg.exec(`
     insert into users (id, email, password_hash) values
       ('${A}', 'a@t.fr', 'x'), ('${M}', 'm@t.fr', 'x'), ('${B}', 'b@t.fr', 'x'), ('${C}', 'c@t.fr', 'x'),
-      ('${E}', 'e@t.fr', 'x'), ('${F}', 'f@t.fr', 'x'), ('${D}', 'd@t.fr', 'x');
+      ('${E}', 'e@t.fr', 'x'), ('${F}', 'f@t.fr', 'x'), ('${D}', 'd@t.fr', 'x'), ('${G}', 'g@t.fr', 'x'), ('${H}', 'h@t.fr', 'x');
     insert into profiles (id, email, company_name, siret, company_website, parent_user_id) values
       ('${A}', 'a@t.fr', 'Traiteur A', '92520576700013', 'https://traiteur-a.fr', null);
     insert into profiles (id, email, company_name, parent_user_id) values ('${M}', 'm@t.fr', 'Traiteur A', '${A}');
     insert into profiles (id, email, company_name, company_siret) values
       ('${B}', 'b@t.fr', 'Traiteur B', '925 205 767 00021'), ('${C}', 'c@t.fr', 'Traiteur A', null),
-      ('${E}', 'e@t.fr', 'Dupont Traiteur', null), ('${F}', 'f@t.fr', 'Dupont Traiteur', null), ('${D}', 'd@t.fr', 'Traiteur D', null);
+      ('${E}', 'e@t.fr', 'Dupont Traiteur', null), ('${F}', 'f@t.fr', 'Dupont Traiteur', null), ('${D}', 'd@t.fr', 'Traiteur D', null),
+      ('${H}', 'h@t.fr', 'Traiteur H', null);
+    insert into profiles (id, email, company_name, siret) values ('${G}', 'g@t.fr', 'Traiteur G', '925 205 767 00054');
   `);
 });
 
@@ -106,7 +113,8 @@ describe('fiche de l’annuaire : serveur', () => {
     expect(await d.submitListing()).toEqual({ error: null, status: 'publiee' });
     const l = await d.getMyListing();
     expect(l.slug).toBe('traiteur-a-troyes');
-    expect(l.publicUrl).toBe('https://choisirmontraiteur.fr/annuaire/traiteur/traiteur-a-troyes');
+    // Sans DIRECTORY_HOST, l'adresse de la fiche est relative (local, préversions, avant le branchement du domaine).
+    expect(l.publicUrl).toBe('/annuaire/traiteur/traiteur-a-troyes');
     const r = await row(A);
     expect(r.validated_at).not.toBeNull();
     expect(r.published_at).not.toBeNull();
@@ -139,6 +147,45 @@ describe('fiche de l’annuaire : serveur', () => {
     expect((await row(C)).check_result).toMatchObject({ ok: false, reason: expect.stringMatching(/déjà utilisé/) });
   });
 
+  it('un autre SIRET sur une fiche en attente la remet en brouillon et efface le contrôle', async () => {
+    current = C;
+    expect((await d.saveListing(input({ displayName: 'Traiteur A bis', siret: '92520576700070' }))).error).toBeNull();
+    const r = await row(C);
+    expect(r.status).toBe('brouillon');
+    expect(r.check_result).toBeNull();
+  });
+
+  it('un SIRET différent de celui du profil passe en attente, même si la recherche officielle réussit', async () => {
+    current = G;
+    expect((await d.saveListing(input({ displayName: 'Traiteur G', siret: '92520576700062' }))).error).toBeNull();
+    await d.addListingPhoto(photo(G));
+    lookup = company({ name: 'TRAITEUR G', siret: '92520576700062' });
+    expect(await d.submitListing()).toEqual({ error: null, status: 'en_attente' });
+    const r = await row(G);
+    expect(r.check_result).toMatchObject({ ok: false, reason: 'Le SIRET de la fiche n’est pas celui de vos mentions légales.' });
+    expect(r.published_at).toBeNull();
+  });
+
+  it('deux envois à moins de 30 secondes : le second est refusé', async () => {
+    current = G;
+    expect((await d.submitListing()).error).toBe('Votre fiche vient d’être envoyée. Patientez quelques secondes avant de recommencer.');
+    await unthrottle(G);
+    expect((await d.submitListing()).error).toBeNull();
+  });
+
+  it('un brouillon qui garde un motif de refus repasse en attente, même si le contrôle réussit', async () => {
+    current = H;
+    expect((await d.saveListing(input({ displayName: 'Traiteur H', siret: '92520576700088' }))).error).toBeNull();
+    await d.addListingPhoto(photo(H));
+    await pg.query(`update directory_listings set refused_reason = 'Photos floues.' where company_id = $1`, [H]);
+    lookup = company({ name: 'TRAITEUR H', siret: '92520576700088' });
+    expect(await d.submitListing()).toEqual({ error: null, status: 'en_attente' });
+    const r = await row(H);
+    expect(r.status).toBe('en_attente');
+    expect(r.published_at).toBeNull();
+    expect(r.refused_reason).toBe('Photos floues.');
+  });
+
   it('le slug ne change plus après publication, même si le nom change', async () => {
     current = A;
     const before = await row(A);
@@ -154,6 +201,7 @@ describe('fiche de l’annuaire : serveur', () => {
     current = A;
     expect((await d.saveListing(input({ displayName: 'Nouveau Nom', siret: '92520576700039' }))).error).toBeNull();
     expect((await row(A)).status).toBe('brouillon');
+    expect((await row(A)).check_result).toBeNull();
     expect((await row(A)).slug).toBe('traiteur-a-troyes');
   });
 
@@ -172,12 +220,22 @@ describe('fiche de l’annuaire : serveur', () => {
     expect((await row(E)).slug).toBe('dupont-traiteur-reims');
   });
 
-  it('20 photos au plus, adresse https obligatoire', async () => {
+  it('20 photos au plus, venues de l’espace de stockage du traiteur', async () => {
     current = D;
     expect((await d.addListingPhoto(photo(D))).error).toMatch(/Enregistrez d’abord/);
     await d.saveListing(input({ displayName: 'Traiteur D', siret: '92520576700047' }));
-    expect((await d.addListingPhoto({ url: 'http://x.fr/a.webp', path: `${D}/annuaire/a.webp` })).error).toMatch(/adresse/);
-    expect((await d.addListingPhoto({ url: 'pas une adresse', path: `${D}/annuaire/a.webp` })).error).toMatch(/adresse/);
+    const refused = 'Cette photo ne vient pas de votre espace. Renvoyez-la depuis cet écran.';
+    const blob = 'https://x.public.blob.vercel-storage.com/a.webp';
+    expect((await d.addListingPhoto({ url: 'http://x.public.blob.vercel-storage.com/a.webp', path: `${D}/annuaire/a.webp` })).error).toBe(refused);
+    expect((await d.addListingPhoto({ url: 'pas une adresse', path: `${D}/annuaire/a.webp` })).error).toBe(refused);
+    // Une adresse https d'un autre site.
+    expect((await d.addListingPhoto({ url: 'https://exemple.fr/a.webp', path: `${D}/annuaire/a.webp` })).error).toBe(refused);
+    expect((await d.addListingPhoto({ url: 'https://public.blob.vercel-storage.com.exemple.fr/a.webp', path: `${D}/annuaire/a.webp` })).error).toBe(refused);
+    // Un chemin hors de l'espace du traiteur.
+    expect((await d.addListingPhoto({ url: blob, path: `${A}/annuaire/a.webp` })).error).toBe(refused);
+    expect((await d.addListingPhoto({ url: blob, path: `${D}/annuaire/../../${A}/a.webp` })).error).toBe(refused);
+    expect((await d.addListingPhoto({ url: blob, path: `${D}/autre/a.webp` })).error).toBe(refused);
+    expect((await d.getMyListing()).photos).toHaveLength(0);
     const first = await d.addListingPhoto(photo(D, 'p0'));
     expect(first.id).toBeTruthy();
     expect((await row(D)).cover_photo_id).toBe(first.id);
@@ -277,15 +335,24 @@ describe('fiche de l’annuaire : serveur', () => {
     expect((await row(B)).status).toBe('suspendue');
   });
 
+  it('une fiche refusée ne peut pas se retirer (elle repasserait par le brouillon)', async () => {
+    current = H;
+    await pg.query(`update directory_listings set status = 'refusee', refused_reason = 'Photos floues.' where company_id = $1`, [H]);
+    expect((await d.withdrawListing()).error).toBe('Votre fiche a été refusée : corrigez-la puis renvoyez-la, ou écrivez-nous.');
+    expect((await row(H)).status).toBe('refusee');
+  });
+
   it('une fiche déjà publiée qu’on renvoie reste publiée', async () => {
     current = A;
     // Le SIRET est libéré : l'autre fiche qui le portait en attente est retirée.
     await pg.query(`update directory_listings set status = 'brouillon' where company_id = $1`, [C]);
     await d.saveListing(input({ displayName: 'Traiteur A' }));
     lookup = found;
+    await unthrottle(A);
     expect((await d.submitListing()).status).toBe('publiee');
     const published = (await row(A)).published_at;
     lookup = 'unavailable';
+    await unthrottle(A);
     expect(await d.submitListing()).toEqual({ error: null, status: 'publiee' });
     expect((await row(A)).published_at).toEqual(published);
   });

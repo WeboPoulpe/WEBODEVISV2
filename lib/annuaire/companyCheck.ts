@@ -26,10 +26,13 @@ function similarNames(a: string, b: string): boolean {
   return words(fa).some((w) => wb.has(w));
 }
 
+const digits = (s: string) => s.replace(/\D/g, '');
+
 export function companyCheck(
   input: { siret: string; displayName: string; postalCode: string | null },
   found: CompanyResult | null | 'unavailable',
-  opts: { duplicate: boolean; now: Date },
+  /** `profileSirets` : les SIRET des mentions légales du compte ; s'il y en a, celui de la fiche doit être l'un d'eux. */
+  opts: { duplicate: boolean; now: Date; profileSirets?: string[] },
 ): CheckResult {
   const checkedAt = opts.now.toISOString();
   const result = (reason: string | null, company?: CompanyResult): CheckResult => ({
@@ -42,6 +45,9 @@ export function companyCheck(
 
   if (found === 'unavailable') return result('Le service de recherche des entreprises ne répond pas : le contrôle sera refait par l’équipe.');
   if (!found) return result('SIRET introuvable dans la base officielle des entreprises.');
+  // Le SIRET d'un autre traiteur, saisi sur sa propre fiche : l'équipe regarde avant toute publication.
+  const own = (opts.profileSirets ?? []).map(digits).filter(Boolean);
+  if (own.length && !own.includes(digits(input.siret))) return result('Le SIRET de la fiche n’est pas celui de vos mentions légales.', found);
   if (!found.active) return result('Cet établissement n’est plus en activité d’après la base officielle.', found);
   if (!found.activity || !ALLOWED_ACTIVITIES.includes(found.activity)) {
     return result(`L’activité déclarée de l’entreprise (${found.activity ?? 'inconnue'}) n’est pas un métier de bouche.`, found);

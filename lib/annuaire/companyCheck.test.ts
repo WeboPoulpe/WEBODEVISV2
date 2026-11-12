@@ -36,6 +36,18 @@ describe('annuaire : contrôle de l’entreprise', () => {
     expect(run({ ...found, postalCode: '75011' }, {}, { ...input, postalCode: null }).ok).toBe(true);
   });
 
+  it('le SIRET doit être l’un de ceux du profil, s’il en a un (chiffres seuls comparés)', () => {
+    const mismatch = 'Le SIRET de la fiche n’est pas celui de vos mentions légales.';
+    expect(run(found, { profileSirets: ['925 205 767 00013'] }).ok).toBe(true);
+    expect(run(found, { profileSirets: ['12345678900011', '925.205.767.00013'] }).ok).toBe(true);
+    expect(run(found, { profileSirets: ['12345678900011'] })).toMatchObject({ ok: false, reason: mismatch, legalName: 'CONVIVIAL EVENT' });
+    expect(run(found, { profileSirets: ['12345678900011', ''] }).reason).toBe(mismatch);
+    // Un profil sans SIRET ne lève aucun doute sur ce critère.
+    expect(run(found, { profileSirets: [] }).ok).toBe(true);
+    expect(run(found, { profileSirets: ['', '  '] }).ok).toBe(true);
+    expect(run(found).ok).toBe(true);
+  });
+
   it('liste les activités de bouche admises', () => {
     expect(ALLOWED_ACTIVITIES).toContain('56.21Z');
     expect(ALLOWED_ACTIVITIES).toHaveLength(8);

@@ -11,3 +11,10 @@ export const REQUESTS_PER_HOUR = 5;
 export function directoryUrl(path: string): string {
   return `${DIRECTORY_URL}${path}`;
 }
+
+/** Adresse publique d'une fiche : sur l'hôte de l'annuaire quand il est branché (DIRECTORY_HOST), sinon le chemin relatif
+ *  sous /annuaire, qui marche en local, sur un aperçu et avant le branchement du domaine. */
+export function listingPublicUrl(slug: string, directoryHost: string | undefined): string {
+  const host = (directoryHost ?? '').trim();
+  return host ? `https://${host}/traiteur/${slug}` : `${DIRECTORY_PREFIX}/traiteur/${slug}`;
+}

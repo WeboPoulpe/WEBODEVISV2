@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEPARTMENTS, departmentByCode, departmentBySlug, departmentOfPostalCode } from './departments';
 import { isEventType } from './eventTypes';
-import { directoryUrl, DIRECTORY_URL } from './config';
+import { directoryUrl, DIRECTORY_URL, listingPublicUrl } from './config';
 
 describe('listes fermées de l’annuaire', () => {
   it('101 départements, codes et slugs uniques', () => {
@@ -35,5 +35,10 @@ describe('listes fermées de l’annuaire', () => {
   });
   it('adresse de l’annuaire', () => {
     expect(directoryUrl('/annuaire/aube-10')).toBe(`${DIRECTORY_URL}/annuaire/aube-10`);
+  });
+  it('adresse publique d’une fiche : sur l’hôte de l’annuaire s’il est branché, relative sinon', () => {
+    expect(listingPublicUrl('traiteur-a-troyes', 'choisirmontraiteur.fr')).toBe('https://choisirmontraiteur.fr/traiteur/traiteur-a-troyes');
+    expect(listingPublicUrl('traiteur-a-troyes', undefined)).toBe('/annuaire/traiteur/traiteur-a-troyes');
+    expect(listingPublicUrl('traiteur-a-troyes', '  ')).toBe('/annuaire/traiteur/traiteur-a-troyes');
   });
 });

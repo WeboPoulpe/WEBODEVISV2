@@ -147,6 +147,8 @@ export default function ListingEditor({ listing, reload }: { listing: MyListing;
       const fresh = await reload();
       if (status === 'publiee' && fresh?.status === 'brouillon') {
         notify('Fiche enregistrée. Comme le SIRET a changé, elle n’est plus en ligne tant qu’elle n’est pas vérifiée de nouveau : publiez-la quand elle est prête.');
+      } else if (status === 'en_attente' && fresh?.status === 'brouillon') {
+        notify('Fiche enregistrée. Comme le SIRET a changé, elle doit être vérifiée de nouveau : publiez-la quand elle est prête.');
       } else {
         notify('Fiche enregistrée.', { tone: 'success' });
       }

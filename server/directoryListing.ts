@@ -9,7 +9,7 @@ import { db } from '@/db';
 import { brochure_links, brochures, directory_listing_brochures, directory_listings, directory_photos, profiles } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { cleanSiret } from '@/lib/companies';
-import { DIRECTORY_PREFIX, MAX_PHOTOS, directoryUrl } from '@/lib/annuaire/config';
+import { DIRECTORY_PREFIX, MAX_PHOTOS, listingPublicUrl } from '@/lib/annuaire/config';
 import { companyCheck } from '@/lib/annuaire/companyCheck';
 import {
   cleanListing, listingSlug, readyToSubmit, slugify,
@@ -26,6 +26,12 @@ const LINK_LABEL = 'Choisir Mon Traiteur';
 const ALT_MAX = 160;
 const NO_LISTING = 'Enregistrez d’abord votre fiche.';
 const SUSPENDED = 'Votre fiche est suspendue. Écrivez-nous pour en savoir plus.';
+const REFUSED = 'Votre fiche a été refusée : corrigez-la puis renvoyez-la, ou écrivez-nous.';
+const NOT_YOUR_PHOTO = 'Cette photo ne vient pas de votre espace. Renvoyez-la depuis cet écran.';
+const TOO_SOON = 'Votre fiche vient d’être envoyée. Patientez quelques secondes avant de recommencer.';
+// Délai minimal entre deux envois à la validation (chaque envoi interroge l'annuaire des entreprises de l'État).
+const SUBMIT_GAP_MS = 30_000;
+const BLOB_HOST_SUFFIX = '.public.blob.vercel-storage.com';
 const NO_PHOTO = 'Photo introuvable.';
 const NO_BROCHURE = 'Brochure introuvable.';
 
@@ -118,7 +124,7 @@ export async function getMyListing(): Promise<MyListing> {
     refusedReason: row?.refused_reason ?? null,
     publishedAt: row?.published_at ?? null,
     missing: readyToSubmit(fields, photos.length),
-    publicUrl: row?.status === 'publiee' && row.slug ? directoryUrl(pathOf(row.slug)) : null,
+    publicUrl: row?.status === 'publiee' && row.slug ? listingPublicUrl(row.slug, process.env.DIRECTORY_HOST) : null,
     stats: { views30, requests30: Number((reqRows[0] as { n: number } | undefined)?.n ?? 0) },
   };
 }
@@ -157,9 +163,12 @@ export async function saveListing(input: ListingInput): Promise<{ error: string 
 
   // L'adresse suit le nom et la ville tant que la fiche n'a jamais été publiée, puis ne bouge plus.
   const slug = row.published_at || row.status === 'publiee' ? row.slug : await freeSlug(fields.displayName, fields.city, companyId);
-  // Un autre SIRET sur une fiche publiée : le contrôle est à refaire, la fiche repasse en brouillon.
-  const status = row.status === 'publiee' && (row.siret ?? null) !== fields.siret ? 'brouillon' : row.status;
-  await db.update(directory_listings).set({ ...values, slug, status }).where(eq(directory_listings.company_id, companyId));
+  // Un autre SIRET sur une fiche envoyée : le contrôle est à refaire. Une fiche en ligne ou en attente repasse en
+  // brouillon (il faut la renvoyer) ; une fiche refusée ou suspendue garde son état.
+  const siretChanged = row.status !== 'brouillon' && (row.siret ?? null) !== fields.siret;
+  const status = siretChanged && (row.status === 'publiee' || row.status === 'en_attente') ? 'brouillon' : row.status;
+  await db.update(directory_listings).set({ ...values, slug, status, ...(siretChanged ? { check_result: null } : {}) })
+    .where(eq(directory_listings.company_id, companyId));
   return { error: null };
 }
 
@@ -179,9 +188,14 @@ export async function addListingPhoto(photo: { url: string; path: string; alt?: 
   if (!row) return { error: NO_LISTING };
   const url = String(photo?.url ?? '').trim();
   const path = String(photo?.path ?? '').trim();
-  let https = false;
-  try { https = new URL(url).protocol === 'https:'; } catch { /* adresse illisible */ }
-  if (!https || !path) return { error: 'Cette photo n’a pas pu être ajoutée : son adresse est invalide.' };
+  // Seule une photo déposée par cet écran est admise : stockage de l'application, dossier « annuaire » de l'utilisateur.
+  let ours = false;
+  try {
+    const u = new URL(url);
+    ours = u.protocol === 'https:' && u.hostname.endsWith(BLOB_HOST_SUFFIX);
+  } catch { /* adresse illisible */ }
+  const ownPath = path.startsWith(`${user.id}/annuaire/`) && path.length > `${user.id}/annuaire/`.length && !path.includes('..');
+  if (!ours || !ownPath) return { error: NOT_YOUR_PHOTO };
 
   const [{ n, last }] = await db.select({ n: sql<number>`count(*)::int`, last: sql<number>`coalesce(max(${directory_photos.position}), -1)::int` })
     .from(directory_photos).where(eq(directory_photos.company_id, companyId));
@@ -293,6 +307,7 @@ export async function submitListing(): Promise<{ error: string | null; status?: 
   const row = await listingOf(companyId);
   if (!row) return { error: NO_LISTING };
   if (row.status === 'suspendue') return { error: SUSPENDED };
+  if (row.submitted_at && Date.now() - new Date(row.submitted_at).getTime() < SUBMIT_GAP_MS) return { error: TOO_SOON };
 
   const fields = fieldsOf(row);
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(directory_photos).where(eq(directory_photos.company_id, companyId));
@@ -304,17 +319,22 @@ export async function submitListing(): Promise<{ error: string | null; status?: 
   const found = await findCompanyBySiret(fields.siret!);
   const [other] = await db.select({ id: directory_listings.company_id }).from(directory_listings)
     .where(and(eq(directory_listings.siret, fields.siret!), ne(directory_listings.company_id, companyId), inArray(directory_listings.status, ['publiee', 'en_attente']))).limit(1);
+  // Le SIRET de la fiche doit être celui des mentions légales du compte, quand le profil en porte un.
+  const [profile] = await db.select({ siret: profiles.siret, companySiret: profiles.company_siret }).from(profiles)
+    .where(eq(profiles.id, companyId)).limit(1);
+  const profileSirets = [profile?.siret, profile?.companySiret].filter((s): s is string => !!s);
   const now = new Date();
-  const check = companyCheck({ siret: fields.siret!, displayName: fields.displayName, postalCode: fields.postalCode }, found, { duplicate: !!other, now });
+  const check = companyCheck({ siret: fields.siret!, displayName: fields.displayName, postalCode: fields.postalCode }, found, { duplicate: !!other, now, profileSirets });
 
   const at = now.toISOString();
-  // Une fiche déjà en ligne le reste (ses modifications sont libres) ; une fiche refusée par l'équipe est toujours revue à la
-  // main (le refus peut viser le contenu, pas l'entreprise) ; sinon elle est publiée si le contrôle réussit, mise en attente sinon.
-  const status: ListingStatus = row.status === 'publiee' || (row.status !== 'refusee' && check.ok) ? 'publiee' : 'en_attente';
+  // Une fiche qui porte un motif de refus est toujours revue à la main (le refus peut viser le contenu, pas l'entreprise),
+  // quel que soit son état ; sinon une fiche déjà en ligne le reste (ses modifications sont libres), et une autre est
+  // publiée si le contrôle réussit, mise en attente sinon.
+  const refused = row.refused_reason !== null;
+  const status: ListingStatus = !refused && (row.status === 'publiee' || check.ok) ? 'publiee' : 'en_attente';
   await db.update(directory_listings).set({
-    status, check_result: check, submitted_at: at, updated_at: at,
     // Le motif du refus reste affiché jusqu'à la décision de l'équipe.
-    ...(row.status === 'refusee' ? {} : { refused_reason: null }),
+    status, check_result: check, submitted_at: at, updated_at: at,
     ...(status === 'publiee' && row.status !== 'publiee' ? { validated_at: at, published_at: row.published_at ?? at } : {}),
   }).where(eq(directory_listings.company_id, companyId));
   return { error: null, status };
@@ -327,6 +347,8 @@ export async function withdrawListing(): Promise<{ error: string | null }> {
   const row = await listingOf(companyId);
   if (!row) return { error: NO_LISTING };
   if (row.status === 'suspendue') return { error: SUSPENDED };
+  // Une fiche refusée qui repasserait par le brouillon se croirait neuve : elle se corrige et se renvoie.
+  if (row.status === 'refusee') return { error: REFUSED };
   await db.update(directory_listings).set({ status: 'brouillon', updated_at: new Date().toISOString() }).where(eq(directory_listings.company_id, companyId));
   return { error: null };
 }
