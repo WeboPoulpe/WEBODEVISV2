@@ -231,26 +231,28 @@ même groupe. Le site public se présente comme un annuaire indépendant, **« e
 
 ### Apparence
 
-Direction « B — Marché », en « moderne pop vintage » (les mots de Maxence), validée le 12 novembre sur maquette. Le
-modèle à suivre est `docs/annuaire/maquette-direction-b.html` (accueil, cartes, extrait de fiche ; à lire comme une
-référence de styles, ce n'est pas un composant à importer ; son adresse `/_blob/…` est celle du logo).
+Direction « D — Moderne, en pourpre », validée par Maxence le 12 novembre au soir sur maquette, après avoir vu le
+site construit dans une première direction (« B », pop vintage) qu'il a finalement écartée. Le modèle à suivre est
+`docs/annuaire/maquette-direction-d.html` (accueil, pastilles d'événements, cartes, bande pourpre ; à lire comme une
+référence de styles, ce n'est pas un composant à importer ; ses adresses `/_blob/…` sont des photos).
 
-- Logo fourni par Maxence : `public/annuaire/logo-choisir-mon-traiteur.png`, « Choisir mon Traiteur » en écriture
-  cursive jaune sur fond bleu nuit, sur une ligne. C'est une image avec son fond : elle ne se pose que sur le bleu nuit
-  exact de l'en-tête et du pied de page. Version transparente et icône carrée à venir ; d'ici là, l'icône de l'onglet
-  est une étoile à quatre branches jaune sur bleu nuit, dessinée en SVG.
-- Couleurs, calées sur le logo : bleu nuit `#011B3D` (en-tête, texte, bordures), jaune `#F8D04F` (pastilles, bouton
-  « Référencer mon entreprise », rayures), rouge tomate `#D3381F` (bouton principal, mots choisis dans la phrase de
-  recherche), jaune pâle `#FFF4D6` (bandes de fond, citations), blanc `#FFFFFF` (fond).
-- Polices : Gabarito (titres, graisse 800) et DM Sans (texte) ; Lobster, cursive, pour un seul accent par page (la
-  pastille dentelée). Chargées par `next/font/google` dans le layout de l'annuaire seulement.
-- Formes : en-tête bleu nuit, puis une fine bande rayée jaune et crème (un store de commerçant) ; bordures bleu nuit
-  de 2 px ; coins de 8 px (boutons) à 12 px (cartes, photos) ; ombres franches décalées, sans flou (`7px 7px 0` sous
-  les cartes, `5px 5px 0` sous les boutons) ; pastille ronde jaune pour le prix, à cheval sur la photo d'une carte ;
-  pastille dentelée et étoile à quatre branches en décor, avec parcimonie.
-- La recherche de l'accueil est une phrase en très grand : « Je cherche un traiteur pour [un mariage] dans [l'Aube] »,
-  les deux choix étant des listes déroulantes soulignées en rouge.
-- Le vintage reste un accent : titres épais sans fioriture, beaucoup de blanc, une seule touche cursive.
+- Couleurs : fond blanc `#FFFFFF` ; pourpre `#6B1235` (aplats, boutons, mots choisis, pastilles) ; encre `#1A0B12`
+  (texte, bouton sombre) ; rose très pâle `#F6E3EA` (fond des choix de la phrase de recherche) et `#F6EFF2` (menu,
+  surfaces) ; filet `#E7DCE1` ; texte secondaire `#5A4650`. Ni crème, ni doré, ni vert, ni terracotta.
+- Polices : Gabarito (titres, graisse 800, interlettrage serré, très grandes tailles ; la marque « choisir mon
+  traiteur » en minuscules) et DM Sans (texte). Chargées par `next/font/google` dans le layout de l'annuaire seulement.
+- Formes : menu flottant en forme de pilule ; boutons tout ronds ; coins de 24 à 32 px sur les photos et les cartes ;
+  aucune ombre, aucun contour épais, aucun dégradé ; pas de bande rayée, de pastille dentelée ni d'étoile.
+- La recherche de l'accueil est une phrase en très grand : « Un traiteur pour [un mariage] dans [l'Aube] », les deux
+  choix étant des listes déroulantes posées sur une pastille rose pâle.
+- Les photos prennent toute la carte d'un traiteur ; son nom, son accroche et son prix sont posés dessus dans un
+  cartouche blanc aux coins arrondis ; un bouton rond en forme de cœur pour les favoris.
+- Les types d'événements sont une rangée de pastilles avec une petite photo ronde.
+- Une bande pourpre pleine largeur ferme l'accueil.
+- Logo : Maxence en fournira un nouveau. D'ici là, la marque est écrite en toutes lettres (Gabarito 800, minuscules) et
+  l'icône de l'onglet est un simple rond pourpre. L'ancien logo cursif jaune sur bleu nuit n'est plus utilisé.
+- Photos d'accueil : `public/annuaire/accueil/` contient huit photos de Convivial Event (et leur vignette carrée
+  `-petit`), utilisées pour l'accueil tant que l'annuaire a peu de fiches. À faire valider par Francis avant l'ouverture.
 - Aucune couleur ni police de WeboDevis sur le site public. L'écran « Ma fiche », lui, reste dans l'apparence de
   WeboDevis. En pied de page : « En partenariat avec WeboDevis ».
 
