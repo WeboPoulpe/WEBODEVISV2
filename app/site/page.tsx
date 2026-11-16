@@ -16,10 +16,10 @@ import { RELEASE } from '@/lib/site/config';
 import { FEATURE_LIST } from '@/lib/site/features';
 import { pageMetadata } from '@/lib/site/metadata';
 import { GUIDES } from '@/lib/site/guides';
-import { AUDIENCE_LINKS, FEATURES_INDEX, FEATURE_COLUMNS, GUIDES_INDEX, HOME, PRICING, QUOTE_REQUEST, RELEASES } from '@/lib/site/pages';
+import { AUDIENCE_LINKS, FEATURES_INDEX, FEATURE_COLUMNS, GUIDES_INDEX, HOME, PRICING, QUOTE_REQUEST } from '@/lib/site/pages';
 import { breadcrumbSchema, faqSchema, organizationSchema, softwareSchema, websiteSchema, type Faq } from '@/lib/site/schema';
 import { fr } from '@/lib/site/typo';
-import { FIRST_MONTH_HT, MONTHLY_HT, YEARLY_HT, euros } from '@/lib/pricing';
+import { PRICE_LINE } from '@/lib/pricing';
 
 // L'accueil du site (servi à l'adresse « / » pour un visiteur sans session).
 const TITLE = 'WeboDevis : le logiciel des traiteurs, du devis à l’événement';
@@ -80,9 +80,9 @@ const JOURNEY: JourneyStep[] = [
 
 const FAQS: Faq[] = [
   { q: 'À qui s’adresse WeboDevis ?', a: 'Aux traiteurs, qu’ils travaillent seuls ou en équipe : mariages, réceptions privées, événements d’entreprise, séminaires. Le logiciel suit une affaire de la demande reçue jusqu’à l’événement servi.' },
-  { q: 'Quand WeboDevis sort-il ?', a: `La version ${RELEASE.version}, première version publique, sort le ${RELEASE.dateLabel}. La page Nouveautés détaille ce qu’elle contient.` },
+  { q: 'Quand WeboDevis sort-il ?', a: `La version ${RELEASE.version}, première version publique, sort le ${RELEASE.dateLabel}.` },
   { q: 'Peut-on essayer le logiciel avant sa sortie ?', a: 'Oui. Vous laissez votre nom, votre email et votre téléphone, puis la démonstration s’ouvre sur un compte déjà rempli de données fictives, pour parcourir les devis, les événements et la liste de courses. Rien de ce que vous y modifiez n’est enregistré : ce compte ne sert pas à travailler sur vos vraies données.' },
-  { q: 'Combien coûte WeboDevis ?', a: `${euros(FIRST_MONTH_HT)} HT le premier mois, mise en service comprise (formation, modèles de devis, import de vos clients), puis ${euros(MONTHLY_HT)} HT par mois sans engagement. À l’année : ${euros(YEARLY_HT)} HT avec un mois offert. La démonstration est gratuite. La page Tarifs détaille tout.` },
+  { q: 'Combien coûte WeboDevis ?', a: `${PRICE_LINE}. La démonstration est gratuite. La page Tarifs détaille tout.` },
   { q: 'Faut-il installer quelque chose ?', a: 'Non. WeboDevis s’ouvre dans un navigateur, sur ordinateur, tablette et téléphone. Sur téléphone, vous pouvez l’ajouter à l’écran d’accueil pour l’ouvrir comme une application. Une connexion internet est nécessaire, sauf pour consulter « Ma journée ».' },
   { q: 'WeboDevis a-t-il une intelligence artificielle ?', a: 'Oui : Webo, l’assistant intégré. Il prépare un devis, une relance, une checklist ou une facture à partir d’une phrase, d’une dictée ou d’une photo, et vous le présente. Rien n’est enregistré ni envoyé sans votre validation.' },
   { q: 'Puis-je travailler à plusieurs ?', a: 'Oui. Vous invitez vos collaborateurs, chacun avec son rôle : gérant, collaborateur ou consultation. Toute l’entreprise partage les devis, les clients, le catalogue et le stock.' },
@@ -124,8 +124,7 @@ export default function SitePage() {
               </p>
               <DemoButton className="mt-7" />
               <p className="text-[15px] leading-relaxed text-white/60 mt-5 md:mt-6 max-w-[46ch]">
-                Sortie de la version {RELEASE.version} le {RELEASE.dateLabel}.{' '}
-                <Link href={RELEASES.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">Voir ce qu’elle contient</Link>
+                Sortie de la version {RELEASE.version} le {RELEASE.dateLabel}.
               </p>
               <p className="text-[15px] leading-relaxed text-white/60 mt-2 max-w-[46ch]">
                 Mise en service avec vous, puis <span className="font-semibold text-white">100&nbsp;€&nbsp;HT par mois</span>, sans engagement.{' '}
@@ -283,7 +282,6 @@ export default function SitePage() {
               </p>
               <p className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <DemoButton />
-                <TextLink href={RELEASES.href}>Ce que contient la version {RELEASE.version}</TextLink>
               </p>
             </div>
           </div>
