@@ -85,15 +85,25 @@ export default function SitePage() {
         <div className={`${container} relative site-dark`}>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-x-12 gap-y-9 lg:items-end pt-7 sm:pt-12 lg:pt-16 pb-10 lg:pb-14">
             <div>
-              <h1 id="titre-lun" className="text-white">
-                <span className="block text-base font-medium text-white/60">WeboDevis, le logiciel des traiteurs<span className="sr-only">.</span></span>{' '}
-                <span className={`${when} mt-6 block text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30<span className="sr-only">.</span></span>{' '}
-                <span className="site-page-title font-display mt-3 block max-w-[13ch]">Six demandes sont arrivées ce week-end.</span>
+              <h1 id="titre-lun" className="site-hero-title font-display text-white">
+                Le logiciel des&nbsp;<span className="site-swoosh">traiteurs
+                  <svg aria-hidden viewBox="0 0 300 24" preserveAspectRatio="none">
+                    <path d="M4 16 C 70 4, 160 2, 296 12" pathLength="1" fill="none" stroke="rgb(var(--p-400))" strokeWidth="9" strokeLinecap="round" />
+                  </svg>
+                </span>.
               </h1>
-              <p className="site-lead text-white/75 mt-6 max-w-[44ch]">
-                Moi, c’est Julien, traiteur à Troyes. Je dormais. Ma brochure, elle, a travaillé. Voici ma semaine avec WeboDevis.
+              <p className="site-lead text-white/75 mt-6 lg:mt-8 max-w-[44ch]">
+                Pour comprendre ce qu’il change, suivez Julien, traiteur à Troyes, pendant une semaine. Elle commence un lundi matin, avant le premier café.
               </p>
-              <DemoButton className="mt-7" />
+              {/* Le début de l'histoire, en plus petit : la voix de Julien. */}
+              <div className="mt-8 border-l-[3px] border-primary-400 pl-5">
+                <p className={`${when} text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30</p>
+                <p className="site-tagline font-display text-white mt-2 max-w-[20ch]">Six demandes sont arrivées ce week-end.</p>
+                <p className="text-base leading-relaxed text-white/70 mt-3 max-w-[42ch]">
+                  «&nbsp;Je dormais. Ma brochure, elle, a travaillé. Voici ma semaine avec WeboDevis.&nbsp;»
+                </p>
+              </div>
+              <DemoButton className="mt-8" />
               <p className="text-[15px] leading-relaxed text-white/65 mt-5 max-w-[46ch]">
                 {PRICE_LINE}.{' '}
                 <Link href={PRICING.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">Les tarifs</Link>
