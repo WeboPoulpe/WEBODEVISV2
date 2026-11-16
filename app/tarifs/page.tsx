@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Check } from 'lucide-react';
 import FaqList from '@/components/site/FaqList';
 import HeroPanel from '@/components/site/HeroPanel';
+import Julien from '@/components/site/story/Julien';
 import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
 import { pageMetadata } from '@/lib/site/metadata';
 import { DEMO, HOME, QUOTE_REQUEST, PRICING } from '@/lib/site/pages';
@@ -87,7 +88,8 @@ export default function TarifsPage() {
               <Amount value="Gratuit" />
               <p className="text-[15px] text-gray-600">Sans carte bancaire</p>
               <Included items={DEMO_INCLUDES} />
-              <p className="mt-auto pt-7">
+              <Julien pose="cafe" disc="none" className="mx-auto mt-6 w-[120px]" />
+              <p className="mt-auto pt-5">
                 <DemoButton className="w-full" />
                 <TextLink href={DEMO.href} className="md:hidden">{DEMO.label}</TextLink>
               </p>

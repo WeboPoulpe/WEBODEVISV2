@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import HeroPanel from '@/components/site/HeroPanel';
 import LinkList from '@/components/site/LinkList';
+import Julien from '@/components/site/story/Julien';
 import SiteShell from '@/components/site/SiteShell';
 import { container } from '@/components/site/ui';
 import { SHOW_RELEASES } from '@/lib/site/config';
@@ -25,7 +26,9 @@ export default function NotFound() {
         title="Cette page n’existe pas."
         lead="L’adresse a peut-être changé, ou une lettre s’est glissée de travers. Voici où reprendre."
         demo={false}
-      />
+      >
+        <Julien pose="perdu" disc="dark" className="mt-9 w-[124px] md:w-[150px]" />
+      </HeroPanel>
       <section aria-label="Pages du site" className="pt-12 md:pt-20">
         <div className={container}>
           <LinkList links={LINKS} columns={2} />

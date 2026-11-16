@@ -411,6 +411,8 @@
   40% { opacity: 0.9; }
   100% { opacity: 0; transform: translateY(-8px); }
 }
+@keyframes julien-wave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(7deg); } }
+@keyframes julien-mark { 50% { transform: translateY(-4px); } }
 @keyframes story-notif { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
 @keyframes story-van-in { from { transform: translateX(-70vw); } }
 @keyframes story-van-idle { 50% { transform: translateY(-1.5px); } }
@@ -419,6 +421,8 @@
   .julien-eye { animation: julien-blink 4.6s infinite; }
   .julien-steam { animation: julien-steam 2.4s ease-in-out infinite; }
   .julien-steam-2 { animation-delay: 1.2s; }
+  .julien-wave { animation: julien-wave 1.1s ease-in-out infinite; }
+  .julien-mark { animation: julien-mark 2.2s ease-in-out infinite; }
   .story-notif { animation: story-notif 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
   .story-van-body { animation: story-van-idle 0.9s ease-in-out infinite; }
   @supports (animation-timeline: view()) {

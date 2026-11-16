@@ -35,6 +35,14 @@ describe('visuels de l’histoire, sans script', () => {
     for (const c of CREW) expect(html).toContain(c.name);
   });
 
+  it('dessine les poses du reste du site : le salut, le téléphone, l’air perdu', () => {
+    for (const pose of ['salut', 'telephone', 'perdu'] as const) {
+      expect(renderToStaticMarkup(<Julien pose={pose} />)).toContain('julien-body');
+    }
+    expect(renderToStaticMarkup(<Julien pose="perdu" />)).toContain('julien-mark');
+    expect(renderToStaticMarkup(<Julien pose="salut" />)).toContain('julien-wave');
+  });
+
   it('cache Julien aux lecteurs d’écran, sauf quand on le décrit', () => {
     expect(renderToStaticMarkup(<Julien pose="bureau" />)).toContain('aria-hidden="true"');
     const named = renderToStaticMarkup(<Julien pose="cafe" title="Julien, traiteur" />);

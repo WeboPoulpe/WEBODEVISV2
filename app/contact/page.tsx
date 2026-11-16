@@ -1,5 +1,6 @@
 import ContactForm from '@/components/site/ContactForm';
 import HeroPanel from '@/components/site/HeroPanel';
+import Julien from '@/components/site/story/Julien';
 import { JsonLd, TextLink, container } from '@/components/site/ui';
 import { pageMetadata } from '@/lib/site/metadata';
 import { CONTACT, DEMO, GUIDES_INDEX, HOME } from '@/lib/site/pages';
@@ -45,6 +46,7 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
             <p className="site-body text-gray-700 mt-4 max-w-[40ch]">
               Pour une demande de devis, indiquez la taille de votre équipe et le type d’événements que vous réalisez&nbsp;: la proposition sera plus juste.
             </p>
+            <Julien pose="telephone" className="mt-8 w-[130px] md:w-[150px]" />
           </div>
           <div className="order-1 lg:order-2"><ContactForm initialKind={initialKind} initialMigration={initialMigration} /></div>
         </div>

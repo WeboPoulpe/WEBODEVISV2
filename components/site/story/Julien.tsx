@@ -5,7 +5,11 @@ import { cn } from '@/lib/utils';
 // Le mouvement (respiration, clignement, vapeur du café) est dans site.css, et s'arrête si la personne
 // a demandé moins d'animations.
 
-export type JulienPose = 'cafe' | 'bureau' | 'caisse' | 'detente' | 'plateau' | 'victoire';
+export type JulienPose =
+  // la semaine racontée sur l'accueil
+  | 'cafe' | 'bureau' | 'caisse' | 'detente' | 'plateau' | 'victoire'
+  // le reste du site : la clôture des pages, le contact, la page introuvable
+  | 'salut' | 'telephone' | 'perdu';
 
 const SKIN = '#e3b08c';
 const SKIN_SHADE = '#cf9873';
@@ -34,17 +38,17 @@ function ArmShape({ shoulder, arm }: { shoulder: number; arm: Arm }) {
 }
 
 /** La tête, réutilisée en petit au volant du camion. */
-export function JulienHead({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
+export function JulienHead({ x, y, scale = 1, puzzled = false }: { x: number; y: number; scale?: number; puzzled?: boolean }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
       <circle cx="-30" cy="5" r="5.5" fill={SKIN_SHADE} />
       <circle cx="30" cy="5" r="5.5" fill={SKIN_SHADE} />
       <circle r="30" fill={SKIN} />
       <path d="M-31 2 Q-34 -34 0 -35 Q34 -34 31 2 Q25 -15 4 -17 Q-18 -19 -31 2Z" fill={HAIR} />
-      <path d="M-17 -5 q6 -4 12 0 M5 -5 q6 -4 12 0" fill="none" stroke={HAIR} strokeWidth="2.4" strokeLinecap="round" />
+      <path d={puzzled ? 'M-17 -4 q6 -4 12 0 M5 -9 q6 -5 12 -1' : 'M-17 -5 q6 -4 12 0 M5 -5 q6 -4 12 0'} fill="none" stroke={HAIR} strokeWidth="2.4" strokeLinecap="round" />
       <ellipse className="julien-eye" cx="-11" cy="5" rx="3" ry="3.4" fill={INK} />
       <ellipse className="julien-eye" cx="11" cy="5" rx="3" ry="3.4" fill={INK} />
-      <path d="M-11 15 Q0 25 11 15" fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />
+      <path d={puzzled ? 'M-8 19 Q-2 14 3 18 T12 16' : 'M-11 15 Q0 25 11 15'} fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />
     </g>
   );
 }
@@ -69,6 +73,10 @@ interface Pose {
   held?: React.ReactNode;
   /** Dessiné par-dessus tout : ce qui est devant lui. */
   front?: React.ReactNode;
+  /** Le bras droit salue (site.css). */
+  wave?: boolean;
+  /** L'air perplexe : un sourcil levé, la bouche de travers. */
+  puzzled?: boolean;
 }
 
 const POSES: Record<JulienPose, Pose> = {
@@ -135,6 +143,23 @@ const POSES: Record<JulienPose, Pose> = {
     right: [158, 122, 150, 84],
     front: <Mug x={40} y={132} />,
   },
+  // À la fin de chaque page : il fait signe de la main.
+  salut: { left: [48, 162, 66, 184], right: [160, 122, 168, 84], wave: true },
+  // Page Contact : le téléphone à l'oreille.
+  telephone: {
+    left: [44, 142, 64, 90],
+    right: [152, 162, 134, 184],
+    front: <rect x="56" y="62" width="13" height="32" rx="4" fill={INK} transform="rotate(-8 62 78)" />,
+  },
+  // Page introuvable : il se gratte la tête.
+  perdu: {
+    left: [54, 164, 60, 194],
+    right: [166, 104, 128, 42],
+    puzzled: true,
+    front: (
+      <text className="julien-mark" x="150" y="34" fontFamily="var(--font-display), Georgia, serif" fontSize="40" fontWeight="700" fill="rgb(var(--p-400))">?</text>
+    ),
+  },
 };
 
 /**
@@ -145,10 +170,11 @@ export default function Julien({
   pose, className, title, disc = 'light',
 }: { pose: JulienPose; className?: string; title?: string; disc?: 'light' | 'dark' | 'sage' | 'none' }) {
   const p = POSES[pose];
+  const rightArm = <ArmShape shoulder={128} arm={p.right} />;
   const arms = (
     <>
       <ArmShape shoulder={72} arm={p.left} />
-      <ArmShape shoulder={128} arm={p.right} />
+      {p.wave ? <g className="julien-wave" style={{ transformOrigin: '128px 132px' }}>{rightArm}</g> : rightArm}
     </>
   );
   const discFill = { light: 'rgb(var(--p-100))', dark: 'rgb(255 255 255 / 0.08)', sage: '#cfdcc0', none: 'none' }[disc];
@@ -169,7 +195,7 @@ export default function Julien({
         <path d="M84 130 L92 110 M116 130 L108 110" stroke={APRON} strokeWidth="4" strokeLinecap="round" />
         <path d="M82 128 H118 L124 152 Q140 160 138 216 H62 Q60 160 76 152Z" fill={APRON} />
         <rect x="88" y="170" width="24" height="18" rx="4" fill={APRON_DARK} />
-        <JulienHead x={100} y={70} />
+        <JulienHead x={100} y={70} puzzled={p.puzzled} />
         {p.held}
         {!p.behind && arms}
         {p.front}

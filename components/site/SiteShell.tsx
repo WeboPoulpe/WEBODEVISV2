@@ -6,6 +6,7 @@ import { isSignupOpenCached } from '@/server/settings';
 import { menuAsides } from './MenuAsides';
 import SiteNav from './SiteNav';
 import CookieConsent, { CookieSettingsLink } from './CookieConsent';
+import Julien from './story/Julien';
 import SiteAnalytics from './SiteAnalytics';
 import { DemoButton, container } from './ui';
 import './site.css';
@@ -37,7 +38,11 @@ export default async function SiteShell({ children, actionBar = true }: { childr
                 La démonstration s’ouvre sur un compte déjà rempli, avec des données fictives&nbsp;: des devis, des événements, une liste de courses.
               </p>
             </div>
-            <DemoButton className="lg:mb-2" />
+            {/* Julien, le traiteur de l'accueil, fait signe à côté du bouton. */}
+            <div className="flex items-end gap-5 md:gap-7">
+              <Julien pose="salut" disc="dark" className="w-[104px] md:w-[136px]" />
+              <DemoButton className="mb-3 lg:mb-5" />
+            </div>
           </section>
 
           <footer className="border-t border-white/10 pt-10 pb-8">
