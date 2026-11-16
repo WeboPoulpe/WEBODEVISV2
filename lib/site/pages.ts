@@ -1,5 +1,5 @@
 import { AUDIENCES } from './audiences';
-import { DEMO_HREF, LOGIN_HREF, REGISTER_HREF, RELEASE } from './config';
+import { DEMO_HREF, LOGIN_HREF, REGISTER_HREF, RELEASE, SHOW_RELEASES } from './config';
 import { FEATURES, FEATURE_GROUPS } from './features';
 import { GUIDES } from './guides';
 
@@ -34,6 +34,8 @@ export const HOME: SiteLink = { href: '/', label: 'Accueil' };
 export const FEATURES_INDEX: SiteLink = { href: '/fonctionnalites', label: 'Fonctionnalités' };
 export const GUIDES_INDEX: SiteLink = { href: '/guides', label: 'Guides' };
 export const RELEASES: SiteLink = { href: '/nouveautes', label: 'Nouveautés' };
+/** La page Nouveautés dans une liste de liens : rien tant qu'elle est masquée (SHOW_RELEASES). */
+const RELEASES_LINKS: SiteLink[] = SHOW_RELEASES ? [RELEASES] : [];
 export const CONTACT: SiteLink = { href: '/contact', label: 'Contact' };
 /** Demande de devis pour le logiciel : le formulaire de contact, avec l'objet présélectionné. */
 export const QUOTE_REQUEST: SiteLink = { href: '/contact?objet=devis', label: 'Demander un devis' };
@@ -65,8 +67,10 @@ export const FEATURE_COLUMNS: SiteLinkGroup[] = FEATURE_GROUPS.map((g) => ({
 export const AUDIENCE_LINKS: SiteLink[] = AUDIENCES.map((a) => ({ href: a.href, label: a.label, blurb: a.blurb, icon: a.icon }));
 export const GUIDE_LINKS: SiteLink[] = GUIDES.map((g) => ({ href: g.href, label: g.title, blurb: g.blurb, icon: g.icon, meta: `${g.minutes} min de lecture` }));
 
-/** La date de sortie, telle qu'elle s'affiche en pied de menu. */
-export const RELEASE_NOTE: SiteLink = { href: RELEASES.href, label: `Version ${RELEASE.version} le ${RELEASE.dateLabel}` };
+/** La date de sortie, telle qu'elle s'affiche en pied de menu : seulement quand la page Nouveautés est visible. */
+export const RELEASE_NOTE: SiteLink | undefined = SHOW_RELEASES
+  ? { href: RELEASES.href, label: `Version ${RELEASE.version} le ${RELEASE.dateLabel}` }
+  : undefined;
 /** Le guide mis en avant dans le menu. */
 export const FEATURED_GUIDE = GUIDES[0];
 
@@ -98,14 +102,14 @@ export const MENU: SiteMenuEntry[] = [
     all: { href: GUIDES_INDEX.href, label: 'Tous les guides' },
   },
 ];
-export const MENU_LINKS: SiteLink[] = [PRICING, RELEASES, CONTACT];
+export const MENU_LINKS: SiteLink[] = [PRICING, ...RELEASES_LINKS, CONTACT];
 
 /** Le pied de page : toute l'arborescence. */
 export const FOOTER: SiteLinkGroup[] = [
   { title: 'Fonctionnalités', links: [...FEATURES.map((f) => ({ href: f.href, label: f.label })), { href: FEATURES_INDEX.href, label: 'Vue d’ensemble' }] },
   { title: 'Pour qui', links: AUDIENCES.map((a) => ({ href: a.href, label: a.label })) },
   { title: 'Guides', links: [...GUIDES.map((g) => ({ href: g.href, label: g.title })), { href: GUIDES_INDEX.href, label: 'Tous les guides' }] },
-  { title: 'WeboDevis', links: [HOME, PRICING, RELEASES, CONTACT, LOGIN, ...LEGAL] },
+  { title: 'WeboDevis', links: [HOME, PRICING, ...RELEASES_LINKS, CONTACT, LOGIN, ...LEGAL] },
 ];
 
 export interface SitemapEntry {
@@ -128,7 +132,7 @@ export const SITEMAP: SitemapEntry[] = [
   { path: GUIDES_INDEX.href, priority: 0.7, changeFrequency: 'weekly' },
   ...GUIDES.map((g) => ({ path: g.href, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: g.published })),
   { path: PRICING.href, priority: 0.8, changeFrequency: 'monthly' },
-  { path: RELEASES.href, priority: 0.5, changeFrequency: 'weekly', lastModified: RELEASES_UPDATED },
+  ...(SHOW_RELEASES ? [{ path: RELEASES.href, priority: 0.5, changeFrequency: 'weekly' as const, lastModified: RELEASES_UPDATED }] : []),
   { path: CONTACT.href, priority: 0.5, changeFrequency: 'yearly' },
   ...LEGAL.map((l) => ({ path: l.href, priority: 0.2, changeFrequency: 'yearly' as const })),
 ];

@@ -68,7 +68,7 @@ export default function FactureElectronique() {
 
       <h2>Dans WeboDevis</h2>
       <p>
-        Vos <Link href="/fonctionnalites/facturation">factures</Link> partent du devis, avec des numéros qui se suivent, la TVA ventilée par taux et vos mentions légales. Chaque facture émise se télécharge au <Link href="/fonctionnalites/facture-electronique">format Factur-X</Link>, au profil EN 16931. Le raccordement à une plateforme agréée est prévu, mais pas encore disponible&nbsp;: nous l’annoncerons sur la page des <Link href="/nouveautes">nouveautés</Link>.
+        Vos <Link href="/fonctionnalites/facturation">factures</Link> partent du devis, avec des numéros qui se suivent, la TVA ventilée par taux et vos mentions légales. Chaque facture émise se télécharge au <Link href="/fonctionnalites/facture-electronique">format Factur-X</Link>, au profil EN 16931. Le raccordement à une plateforme agréée est prévu, mais pas encore disponible&nbsp;: nous l’annoncerons sur ce site.
       </p>
     </>
   );

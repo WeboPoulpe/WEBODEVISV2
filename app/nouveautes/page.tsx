@@ -1,7 +1,8 @@
 import HeroPanel from '@/components/site/HeroPanel';
+import { notFound } from 'next/navigation';
 import LinkList from '@/components/site/LinkList';
 import { JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
-import { RELEASE } from '@/lib/site/config';
+import { RELEASE, SHOW_RELEASES } from '@/lib/site/config';
 import { featureBySlug } from '@/lib/site/features';
 import { guideBySlug } from '@/lib/site/guides';
 import { pageMetadata } from '@/lib/site/metadata';
@@ -56,6 +57,8 @@ const crumbs = [
 ];
 
 export default function ReleasesPage() {
+  // Page masquée tant qu'il n'y a pas de vraies nouveautés (lib/site/config).
+  if (!SHOW_RELEASES) notFound();
   return (
     <>
       <JsonLd data={breadcrumbSchema(crumbs)} />

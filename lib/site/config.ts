@@ -11,6 +11,12 @@ export const DEMO_HREF = '/demo';
 export const LOGIN_HREF = '/login';
 export const REGISTER_HREF = '/register';
 
+/**
+ * La page Nouveautés. Éteinte jusqu'aux premières vraies nouveautés après la sortie : à `false`, elle répond
+ * « introuvable » et disparaît du menu, du pied de page et du sitemap. La rallumer tient à cette ligne.
+ */
+export const SHOW_RELEASES: boolean = false;
+
 /** Première version publique. */
 export const RELEASE = {
   version: '0.1',

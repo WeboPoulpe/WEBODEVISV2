@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Wordmark from '@/components/brand/Wordmark';
-import { RELEASE } from '@/lib/site/config';
+import { RELEASE, SHOW_RELEASES } from '@/lib/site/config';
 import { DEMO, FOOTER, LOGIN, MENU, MENU_LINKS, RELEASES, SIGNUP } from '@/lib/site/pages';
 import { isSignupOpenCached } from '@/server/settings';
 import { menuAsides } from './MenuAsides';
@@ -59,9 +59,13 @@ export default async function SiteShell({ children, actionBar = true }: { childr
               <Wordmark className="text-[19px] text-white" />
               <span>Le logiciel des traiteurs.</span>
               <CookieSettingsLink className="sm:ml-auto rounded underline-offset-4 hover:text-white hover:underline" />
-              <Link href={RELEASES.href} className="rounded underline-offset-4 hover:text-white hover:underline">
-                Version {RELEASE.version}, sortie prévue le {RELEASE.dateLabel}
-              </Link>
+              {SHOW_RELEASES ? (
+                <Link href={RELEASES.href} className="rounded underline-offset-4 hover:text-white hover:underline">
+                  Version {RELEASE.version}, sortie prévue le {RELEASE.dateLabel}
+                </Link>
+              ) : (
+                <span>Version {RELEASE.version}, sortie prévue le {RELEASE.dateLabel}</span>
+              )}
             </p>
           </footer>
         </div>
