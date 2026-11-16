@@ -2,6 +2,7 @@ import 'server-only';
 import { pool } from '@/db';
 import type { Filter, QueryDescriptor, QueryResult } from '@/lib/compat/builder';
 import { isDemoUser } from '@/lib/demo';
+import { activitySummary, TRACKED_TABLES, type ActivityAction, type TrackedTable } from '@/lib/activity';
 import { SUBSCRIPTION_REQUIRED_MESSAGE, subscriptionAllowsWrite } from '../subscriptionGuard';
 import { RULES, type TableRule } from './rules';
 
@@ -253,6 +254,48 @@ async function isReadOnlyUser(uid: string | null): Promise<boolean> {
   return readOnly;
 }
 
+const OP_ACTION: Record<string, ActivityAction> = { insert: 'creation', upsert: 'modification', update: 'modification', delete: 'suppression' };
+/** Au-delà, une seule ligne d'historique résume l'écriture (« 214 clients créés »). */
+const MAX_DETAILED = 20;
+
+type Client = { query: (sql: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
+
+/**
+ * Note dans l'historique les lignes qu'une écriture vient de toucher, dans sa transaction (une écriture annulée n'y
+ * laisse rien). Un échec ici n'annule jamais l'écriture : le point de sauvegarde est abandonné, l'écriture continue.
+ */
+async function logWrites(client: Client, d: QueryDescriptor, ctx: QueryContext, t: TrackedTable, written: unknown[]): Promise<void> {
+  try {
+    await client.query('savepoint activity');
+    try {
+      const action = t.forceAction ?? OP_ACTION[d.op];
+      const { rows } = await client.query(
+        `select distinct on (k.id) k.id, k.label from (
+           select (${t.id})::uuid as id, coalesce((${t.label})::text, '') as label
+           from json_populate_recordset(null::public.${qi(d.table)}, $1::json) t0) k
+         where k.id is not null`,
+        [JSON.stringify(written)],
+      );
+      const items = rows as { id: string; label: string }[];
+      const log = (id: string | null, label: string, summary: string, details: unknown) => client.query(
+        'select public.log_activity(null, $1, $2, $3, $4, $5, $6, $7, $8::jsonb)',
+        [ctx.uid, !!ctx.actingAsAdmin, action, t.entity, id, label, summary, details ? JSON.stringify(details) : null],
+      );
+      if (items.length > MAX_DETAILED) {
+        await log(null, '', activitySummary(action, t.entity, '', items.length), { ids: items.slice(0, 200).map((i) => i.id) });
+      } else {
+        for (const i of items) await log(i.id, i.label, activitySummary(action, t.entity, i.label), null);
+      }
+      await client.query('release savepoint activity');
+    } catch (e) {
+      await client.query('rollback to savepoint activity');
+      throw e;
+    }
+  } catch (e) {
+    console.error(`[historique] ${d.op} ${d.table} : ${(e as Error).message}`);
+  }
+}
+
 export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promise<QueryResult> {
   try {
     if (d.op !== 'select' && !ctx.bypass && await isReadOnlyUser(ctx.uid)) {
@@ -323,9 +366,12 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
     // Les lignes écrites doivent rester dans le périmètre de l'utilisateur (WITH CHECK).
     const check = d.op === 'delete' ? 'true' : c.writeScope(d.table, 't0', d.op === 'update' ? 'update' : 'insert');
     const list = d.returning ? c.selectList(d.table, 't0', d.select ?? '*') : null;
+    // Historique : les lignes écrites d'une table suivie, pour les noter avant la validation.
+    const tracked = ctx.uid && !ctx.bypass && !isDemoUser(ctx.uid) ? TRACKED_TABLES[d.table] : undefined;
     const sql = `with m as (${mutation})
       select (select coalesce(bool_and(${check}), true) from m t0) as ok,
-             ${list ? `(select coalesce(json_agg(row_to_json(q)), '[]'::json) from (select ${list} from m t0) q)` : 'null::json'} as data`;
+             ${list ? `(select coalesce(json_agg(row_to_json(q)), '[]'::json) from (select ${list} from m t0) q)` : 'null::json'} as data,
+             ${tracked ? '(select json_agg(row_to_json(t0)) from m t0)' : 'null::json'} as written`;
 
     const client = await pool.connect();
     try {
@@ -337,6 +383,7 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
         await client.query('rollback');
         return { data: null, count: null, error: { code: '42501', message: `new row violates row-level security policy for table "${d.table}"` } };
       }
+      if (tracked && res.rows[0].written) await logWrites(client, d, ctx, tracked, res.rows[0].written);
       // Compte de démonstration : l'écriture est jouée pour de vrai (mêmes contrôles, même réponse) puis annulée.
       await client.query(isDemoUser(ctx.uid) ? 'rollback' : 'commit');
       return finish(d, d.returning ? res.rows[0].data : null, null);
