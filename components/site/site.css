@@ -390,3 +390,42 @@
 @media (prefers-reduced-motion: no-preference) {
   .site-tab-panel:not([hidden]) { animation: site-tab-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
 }
+
+/* ── L'accueil raconté : la semaine de Julien ─────────────────────────────────────────── */
+
+/* La barre de la semaine se colle sous l'en-tête (collé à 8 ou 10 px, haut de 64 ou 72 px). */
+.story-weekbar { top: 76px; }
+@media (min-width: 640px) { .story-weekbar { top: 78px; } }
+@media (min-width: 1024px) { .story-weekbar { top: 86px; } }
+.story-weekbar-list { scrollbar-width: none; }
+.story-weekbar-list::-webkit-scrollbar { display: none; }
+/* Sous l'en-tête et la barre : une ancre de jour ne se cache pas derrière. */
+.site .story { --anchor-offset: 152px; }
+
+/* Julien : il respire, cligne des yeux, son café fume. Le camion entre par la gauche et ronronne. */
+.julien-eye { transform-box: fill-box; transform-origin: center; }
+@keyframes julien-breathe { 50% { transform: translateY(-3px); } }
+@keyframes julien-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes julien-steam {
+  0% { opacity: 0; transform: translateY(4px); }
+  40% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes story-notif { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+@keyframes story-van-in { from { transform: translateX(-70vw); } }
+@keyframes story-van-idle { 50% { transform: translateY(-1.5px); } }
+@media (prefers-reduced-motion: no-preference) {
+  .julien-body { animation: julien-breathe 3.4s ease-in-out infinite; }
+  .julien-eye { animation: julien-blink 4.6s infinite; }
+  .julien-steam { animation: julien-steam 2.4s ease-in-out infinite; }
+  .julien-steam-2 { animation-delay: 1.2s; }
+  .story-notif { animation: story-notif 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+  .story-van-body { animation: story-van-idle 0.9s ease-in-out infinite; }
+  @supports (animation-timeline: view()) {
+    .story-van {
+      animation: story-van-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 35%;
+    }
+  }
+}
