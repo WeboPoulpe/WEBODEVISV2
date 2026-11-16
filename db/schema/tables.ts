@@ -586,6 +586,8 @@ export const extras = pgTable("extras", {
 	unavailable_dates: date({ mode: 'string' }).array().default(sql`'{}'::date[]`).notNull(),
 	// Taux horaire brut habituel de l'extra, repris sur chaque mission.
 	hourly_rate: numeric({ precision: 8, scale: 2, mode: 'number' }),
+	// Forfait brut habituel par mission, pour un extra payé au forfait plutôt qu'à l'heure.
+	flat_fee: numeric({ precision: 8, scale: 2, mode: 'number' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.user_id],
@@ -615,6 +617,8 @@ export const event_extras = pgTable("event_extras", {
 	// Heures réellement faites et taux appliqué à cette mission (coût du personnel de l'événement).
 	hours_worked: numeric({ precision: 6, scale: 2, mode: 'number' }),
 	hourly_rate: numeric({ precision: 8, scale: 2, mode: 'number' }),
+	// Forfait brut de cette mission : quand il est renseigné, il remplace heures × taux.
+	flat_fee: numeric({ precision: 8, scale: 2, mode: 'number' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.extra_id],

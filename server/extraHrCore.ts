@@ -9,6 +9,7 @@ import {
   type ExtraHrDetails, type MissionHrStatus, type MissionInfo,
 } from '@/lib/extraContract';
 import { sendMail } from '@/lib/mail';
+import { missionPay } from '@/lib/staffCost';
 import { dpaeReminderEmail } from '@/lib/mail/extraContracts';
 import { companyIdsOf, companyOf } from './companyScope';
 import { addDays, parisDate } from './reminders';
@@ -141,11 +142,12 @@ export async function missionOf(uid: string, assignmentId: string): Promise<Miss
   if (!isUuid(assignmentId)) return null;
   const { rows } = await db.execute<{
     id: string; extra_id: string; name: string; email: string | null; access_token: string | null; role: string | null; status: string;
-    arrival_time: string | null; departure_time: string | null; mission_notes: string | null; rate: string | number | null;
+    arrival_time: string | null; departure_time: string | null; mission_notes: string | null;
+    hourly_rate: string | number | null; flat_fee: string | number | null; extra_rate: string | number | null; extra_flat: string | number | null;
     event_type: string | null; event_date: string | null; event_location: string | null; company_id: string;
   }>(sql`
     select ee.id, ee.extra_id, x.name, x.email, x.access_token, x.role, ee.status, ee.arrival_time, ee.departure_time, ee.mission_notes,
-      coalesce(ee.hourly_rate, x.hourly_rate) as rate, q.event_type, q.event_date::text as event_date, q.event_location,
+      ee.hourly_rate, ee.flat_fee, x.hourly_rate as extra_rate, x.flat_fee as extra_flat, q.event_type, q.event_date::text as event_date, q.event_location,
       ${companyOf(uid)} as company_id
     from public.event_extras ee
     join public.extras x on x.id = ee.extra_id
@@ -164,13 +166,15 @@ export async function missionOf(uid: string, assignmentId: string): Promise<Miss
     if (!isMissingHrTable(e)) throw e;
     available = false;
   }
-  const rate = r.rate == null || r.rate === '' ? null : Number(r.rate);
+  // Forfait ou taux : ce qui est réglé sur la mission, sinon l'habitude de l'extra (même règle que le coût du personnel).
+  const pay = missionPay(r, { hourly_rate: r.extra_rate, flat_fee: r.extra_flat });
   return {
     assignmentId: r.id, extraId: r.extra_id, extraEmail: r.email?.trim() || null, extraToken: r.access_token, status: r.status,
     companyId: r.company_id, contract, available,
     mission: {
       extraName: r.name, role: r.role, eventType: r.event_type, eventDate: r.event_date, location: r.event_location,
-      arrival: r.arrival_time, departure: r.departure_time, notes: r.mission_notes, hourlyRate: Number.isFinite(rate) ? rate : null,
+      arrival: r.arrival_time, departure: r.departure_time, notes: r.mission_notes,
+      hourlyRate: pay?.mode === 'heure' ? pay.rate : null, flatFee: pay?.mode === 'forfait' ? pay.amount : null,
     },
   };
 }
@@ -179,10 +183,14 @@ export async function missionOf(uid: string, assignmentId: string): Promise<Miss
 export function termsOf(ctx: Pick<MissionContext, 'mission' | 'contract'>): ContractTerms {
   const base = defaultTerms(ctx.mission);
   const saved = ctx.contract?.terms ?? {};
+  // Rémunération ajustée pour ce contrat (forfait, sinon taux), sinon celle de la mission.
+  const pay = typeof saved.flat_fee === 'number' ? { hourly_rate: null, flat_fee: saved.flat_fee }
+    : typeof saved.hourly_rate === 'number' ? { hourly_rate: saved.hourly_rate, flat_fee: null }
+    : { hourly_rate: base.hourly_rate, flat_fee: base.flat_fee };
   return {
     position: typeof saved.position === 'string' && saved.position.trim() ? saved.position : base.position,
     classification: typeof saved.classification === 'string' ? saved.classification || null : base.classification,
-    hourly_rate: typeof saved.hourly_rate === 'number' ? saved.hourly_rate : base.hourly_rate,
+    ...pay,
     location: typeof saved.location === 'string' ? saved.location || null : base.location,
     start: saved.start !== undefined ? hhmm(saved.start) : base.start,
     end: saved.end !== undefined ? hhmm(saved.end) : base.end,

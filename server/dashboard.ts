@@ -76,11 +76,11 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
   const paris = (col: SQL) => sql`(${col} at time zone 'Europe/Paris')::date::text`;
   const none = Promise.resolve([] as never[]);
 
-  // Coût du personnel des événements confirmés de l'année : heures faites × taux (colonnes de la migration 0023).
+  // Coût du personnel des événements confirmés de l'année : heures faites × taux, ou forfait (migrations 0023 et 0055).
   // Lu à part : tant que la base n'a pas ces colonnes, la requête échoue et le personnel n'est pas compté.
   const staffQuery = rows<StaffRow & { quote_id: string }>(sql`
     select ee.quote_id, ee.status, ee.arrival_time, ee.departure_time, ee.hours_worked::text as hours_worked, ee.hourly_rate::text as hourly_rate,
-      e.hourly_rate::text as extra_rate
+      e.hourly_rate::text as extra_rate, ee.flat_fee::text as flat_fee, e.flat_fee::text as extra_flat
     from public.event_extras ee
     join public.extras e on e.id = ee.extra_id
     join public.quotes q on q.id = ee.quote_id

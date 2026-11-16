@@ -35,12 +35,17 @@ beforeAll(async () => {
     insert into profiles (id, email, company_name) values ('${ME}', 'me@t.fr', 'Traiteur Test');
     insert into prestations (user_id, name, unit_price, cost_price) values ('${ME}', 'Menu mariage', 45, 12);
   `);
-  // Ce mois : 50 × 45 = 2 250 HT, coût 50 × 12 + 150 de transport + personnel (8 h × 15 + 6 h × 14 du taux de l'extra).
+  // Ce mois : 50 × 45 = 2 250 HT, coût 50 × 12 + 150 de transport + personnel (8 h × 15 + 6 h × 14 du taux de l'extra
+  // + un forfait habituel de 100 + un forfait de mission de 60 pour un extra payé d'habitude à l'heure).
   const withCost = await quote('valide', '2026-10-25', [{ name: 'Menu mariage', quantity: 50, unitPrice: 45 }], [{ id: 'a', label: 'Transport', amount: 150 }]);
   const { rows: [x1] } = await pg.query<{ id: string }>(`insert into extras (user_id, name, hourly_rate) values ($1, 'Léa', 14) returning id`, [ME]);
   const { rows: [x2] } = await pg.query<{ id: string }>(`insert into extras (user_id, name) values ($1, 'Tom') returning id`, [ME]);
   await pg.query(`insert into event_extras (quote_id, extra_id, status, hours_worked) values ($1, $2, 'present', 6)`, [withCost, x1.id]);
   await pg.query(`insert into event_extras (quote_id, extra_id, status, hours_worked, hourly_rate) values ($1, $2, 'present', 8, 15)`, [withCost, x2.id]);
+  const { rows: [x3] } = await pg.query<{ id: string }>(`insert into extras (user_id, name, flat_fee) values ($1, 'Farid', 100) returning id`, [ME]);
+  const { rows: [x4] } = await pg.query<{ id: string }>(`insert into extras (user_id, name, hourly_rate) values ($1, 'Inès', 14) returning id`, [ME]);
+  await pg.query(`insert into event_extras (quote_id, extra_id, status, hours_worked) values ($1, $2, 'present', 9)`, [withCost, x3.id]);
+  await pg.query(`insert into event_extras (quote_id, extra_id, status, hours_worked, flat_fee) values ($1, $2, 'confirme', 7, 60)`, [withCost, x4.id]);
   // Ce mois aussi, sans aucun coût connu : 1 000 HT, compté à part.
   await quote('acompte', '2026-10-02', [{ name: 'Buffet libre', quantity: 1, unitPrice: 1000 }]);
   // Plus tôt dans l'année : 20 × 45 = 900 HT, coût 240.
@@ -53,10 +58,10 @@ describe('tableau de bord : marge estimée', () => {
   it('compte prestations, frais annexes et personnel ; les devis sans coût à part', async () => {
     const { margin } = await getDashboard(TODAY);
     expect(margin.staffCounted).toBe(true);
-    // Coût : 600 + 150 + 120 + 84 = 954 ; marge 2 250 − 954 = 1 296.
-    expect(margin.month).toMatchObject({ revenueHT: 2250, cost: 954, margin: 1296, costed: 1, uncosted: 1 });
-    expect(margin.month.rate).toBeCloseTo(57.6, 1);
-    expect(margin.year).toMatchObject({ revenueHT: 3150, cost: 1194, margin: 1956, costed: 2, uncosted: 1 });
+    // Coût : 600 + 150 + 120 + 84 + 100 + 60 = 1 114 ; marge 2 250 − 1 114 = 1 136.
+    expect(margin.month).toMatchObject({ revenueHT: 2250, cost: 1114, margin: 1136, costed: 1, uncosted: 1 });
+    expect(margin.month.rate).toBeCloseTo(50.5, 1);
+    expect(margin.year).toMatchObject({ revenueHT: 3150, cost: 1354, margin: 1796, costed: 2, uncosted: 1 });
   });
 
   it('panier moyen : CA HT moyen par devis confirmé', async () => {

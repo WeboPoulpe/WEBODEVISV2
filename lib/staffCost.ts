@@ -1,5 +1,5 @@
 // Heures et coût du personnel (extras) : heures prévues d'après l'arrivée et la fin, heures retenues,
-// taux appliqué, coût d'un événement, et récapitulatif mensuel par extra pour la paie (export CSV
+// taux horaire ou forfait appliqué, coût d'un événement, et récapitulatif mensuel par extra pour la paie (export CSV
 // pour Excel : séparateur « ; », décimales à virgule, BOM UTF-8, comme lib/accountingExport.ts).
 // Fonctions pures, sans accès à la base.
 
@@ -43,6 +43,8 @@ export interface MissionHours {
   departure_time?: string | null;
   hours_worked?: number | string | null;
   hourly_rate?: number | string | null;
+  /** Forfait brut de la mission : il remplace le calcul à l'heure. */
+  flat_fee?: number | string | null;
 }
 
 /** Heures retenues : les heures saisies, sinon les heures prévues, sinon 0. */
@@ -55,26 +57,57 @@ export function appliedRate(m: MissionHours, extraRate: number | string | null |
   return toNumber(m.hourly_rate) ?? toNumber(extraRate);
 }
 
-/** Coût brut d'une mission ; null tant qu'aucun taux n'est connu. */
-export function missionCost(m: MissionHours, extraRate: number | string | null | undefined): number | null {
-  const rate = appliedRate(m, extraRate);
-  return rate === null ? null : round2(retainedHours(m) * rate);
+/** Ce que l'extra a d'habitude : un taux horaire ou un forfait par mission. */
+export interface ExtraPay {
+  hourly_rate?: number | string | null;
+  flat_fee?: number | string | null;
+}
+
+/** Rémunération d'une mission : à l'heure (taux) ou au forfait (montant fixe). */
+export type MissionPay = { mode: 'heure'; rate: number } | { mode: 'forfait'; amount: number };
+
+/**
+ * Rémunération appliquée : ce qui est réglé sur la mission (forfait, sinon taux), sinon l'habitude de l'extra
+ * (forfait, sinon taux) ; null si rien n'est connu.
+ */
+export function missionPay(m: MissionHours, extra: ExtraPay | null | undefined): MissionPay | null {
+  const flat = toNumber(m.flat_fee);
+  if (flat !== null) return { mode: 'forfait', amount: flat };
+  const rate = toNumber(m.hourly_rate);
+  if (rate !== null) return { mode: 'heure', rate };
+  const extraFlat = toNumber(extra?.flat_fee);
+  if (extraFlat !== null) return { mode: 'forfait', amount: extraFlat };
+  const extraRate = toNumber(extra?.hourly_rate);
+  return extraRate === null ? null : { mode: 'heure', rate: extraRate };
+}
+
+/** Montant brut d'une mission selon sa rémunération ; null si elle n'est pas connue. */
+export function payAmount(pay: MissionPay | null, hours: number): number | null {
+  if (!pay) return null;
+  return round2(pay.mode === 'forfait' ? pay.amount : hours * pay.rate);
+}
+
+/** Coût brut d'une mission (forfait, sinon heures × taux) ; null tant que ni taux ni forfait n'est connu. */
+export function missionCost(
+  m: MissionHours, extraRate: number | string | null | undefined, extraFlat?: number | string | null,
+): number | null {
+  return payAmount(missionPay(m, { hourly_rate: extraRate, flat_fee: extraFlat }), retainedHours(m));
 }
 
 export interface StaffTotals {
   hours: number;
   cost: number;
-  /** Missions comptées dont le taux n'est pas connu (leur coût n'est pas dans le total). */
+  /** Missions comptées sans taux ni forfait connu (leur coût n'est pas dans le total). */
   missingRate: number;
 }
 
 /** Total des heures et du coût d'un ensemble de missions (statuts confirmé et présent seulement). */
-export function staffTotals(missions: readonly (MissionHours & { status?: string | null; extraRate?: number | string | null })[]): StaffTotals {
+export function staffTotals(missions: readonly (MissionHours & { status?: string | null; extraRate?: number | string | null; extraFlat?: number | string | null })[]): StaffTotals {
   let hours = 0, cost = 0, missingRate = 0;
   for (const m of missions) {
     if (m.status !== undefined && !isPaidStatus(m.status)) continue;
     hours += retainedHours(m);
-    const c = missionCost(m, m.extraRate);
+    const c = missionCost(m, m.extraRate, m.extraFlat);
     if (c === null) missingRate++;
     else cost += c;
   }
@@ -97,6 +130,8 @@ export interface PayrollExtraInput {
   name: string;
   role?: string | null;
   hourly_rate?: number | string | null;
+  /** Forfait brut habituel par mission. */
+  flat_fee?: number | string | null;
 }
 
 export interface PayrollLine {
@@ -105,7 +140,10 @@ export interface PayrollLine {
   event: string;
   client: string;
   hours: number;
+  /** Taux horaire de la mission ; null au forfait ou s'il n'est pas connu. */
   rate: number | null;
+  /** Mission payée au forfait. */
+  flat: boolean;
   amount: number | null;
 }
 
@@ -115,10 +153,12 @@ export interface PayrollRow {
   role: string;
   missions: number;
   hours: number;
-  /** Taux unique de la période ; null s'il varie d'une mission à l'autre ou n'est pas connu. */
+  /** Taux unique de la période ; null s'il varie d'une mission à l'autre, n'est pas connu, ou au forfait. */
   rate: number | null;
-  /** Le taux change selon les missions. */
+  /** La rémunération change selon les missions (plusieurs taux, ou des forfaits et des heures). */
   mixedRates: boolean;
+  /** Missions payées au forfait. */
+  flatMissions: number;
   amount: number;
   missingRate: number;
   lines: PayrollLine[];
@@ -151,13 +191,15 @@ export function payrollByExtra(
     if (!extra) continue;
     const row = rows.get(extra.id) ?? {
       extraId: extra.id, name: extra.name, role: extra.role ?? '', missions: 0, hours: 0,
-      rate: null, mixedRates: false, amount: 0, missingRate: 0, lines: [],
+      rate: null, mixedRates: false, flatMissions: 0, amount: 0, missingRate: 0, lines: [],
     };
     const hours = retainedHours(m);
-    const rate = appliedRate(m, extra.hourly_rate);
-    const amount = rate === null ? null : round2(hours * rate);
-    row.lines.push({ missionId: m.id, date: day, event: m.event_type ?? '', client: m.client_name ?? '', hours, rate, amount });
+    const pay = missionPay(m, extra);
+    const flat = pay?.mode === 'forfait';
+    const amount = payAmount(pay, hours);
+    row.lines.push({ missionId: m.id, date: day, event: m.event_type ?? '', client: m.client_name ?? '', hours, rate: pay?.mode === 'heure' ? pay.rate : null, flat, amount });
     row.missions++;
+    if (flat) row.flatMissions++;
     row.hours = round2(row.hours + hours);
     if (amount === null) row.missingRate++;
     else row.amount = round2(row.amount + amount);
@@ -165,8 +207,8 @@ export function payrollByExtra(
   }
   for (const row of rows.values()) {
     const rates = [...new Set(row.lines.map((l) => l.rate).filter((r): r is number => r !== null))];
-    row.rate = rates.length === 1 ? rates[0] : null;
-    row.mixedRates = rates.length > 1;
+    row.mixedRates = rates.length > 1 || (rates.length === 1 && row.flatMissions > 0);
+    row.rate = rates.length === 1 && !row.mixedRates ? rates[0] : null;
   }
   return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 }
@@ -185,19 +227,19 @@ export function monthLabel(month: string): string {
 
 /**
  * CSV à transmettre au comptable : un récapitulatif par extra, puis le détail des missions.
- * Taux « variable » quand il change d'une mission à l'autre.
+ * Taux « variable » quand il change d'une mission à l'autre, « forfait » pour les missions payées au forfait.
  */
 export function payrollCsv(rows: readonly PayrollRow[], month: string): string {
   const lines: string[][] = [
     [`Heures des extras, ${monthLabel(month)}`],
     [],
     ['Extra', 'Rôle', 'Missions', 'Heures', 'Taux horaire brut', 'Montant brut'],
-    ...rows.map((r) => [r.name, r.role, String(r.missions), decimal(r.hours), r.mixedRates ? 'variable' : decimal(r.rate), decimal(r.amount)]),
+    ...rows.map((r) => [r.name, r.role, String(r.missions), decimal(r.hours), r.mixedRates ? 'variable' : r.flatMissions > 0 ? 'forfait' : decimal(r.rate), decimal(r.amount)]),
     ['Total', '', String(rows.reduce((s, r) => s + r.missions, 0)), decimal(round2(rows.reduce((s, r) => s + r.hours, 0))), '', decimal(round2(rows.reduce((s, r) => s + r.amount, 0)))],
     [],
     ['Détail des missions'],
     ['Extra', 'Date', 'Événement', 'Client', 'Heures', 'Taux horaire brut', 'Montant brut'],
-    ...rows.flatMap((r) => r.lines.map((l) => [r.name, frDay(l.date), l.event, l.client, decimal(l.hours), decimal(l.rate), decimal(l.amount)])),
+    ...rows.flatMap((r) => r.lines.map((l) => [r.name, frDay(l.date), l.event, l.client, decimal(l.hours), l.flat ? 'forfait' : decimal(l.rate), decimal(l.amount)])),
   ];
   return '﻿' + lines.map((r) => r.map(cell).join(';')).join('\r\n') + '\r\n';
 }

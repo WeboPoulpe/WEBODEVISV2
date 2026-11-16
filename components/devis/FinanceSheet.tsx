@@ -71,7 +71,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
 
         const [{ data: prestations }, missions] = await Promise.all([
           sb.from('prestations').select('id, name, cost_price'),
-          sb.from('event_extras').select('status, arrival_time, departure_time, hours_worked, hourly_rate, extra:extras(hourly_rate)').eq('quote_id', quoteId),
+          sb.from('event_extras').select('status, arrival_time, departure_time, hours_worked, hourly_rate, flat_fee, extra:extras(hourly_rate, flat_fee)').eq('quote_id', quoteId),
         ]);
         const map: Record<string, number> = {};
         const ids: Record<string, string> = {};
@@ -88,10 +88,11 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
         // Colonnes absentes (migration pas encore appliquée) : pas de poste « personnel ».
         if (missions.error) setStaff({ available: false, cost: 0, missions: 0, incomplete: 0 });
         else {
-          type Row = { status: string | null; arrival_time: string | null; departure_time: string | null; hours_worked: unknown; hourly_rate: unknown; extra: { hourly_rate: unknown } | null };
+          type Row = { status: string | null; arrival_time: string | null; departure_time: string | null; hours_worked: unknown; hourly_rate: unknown; flat_fee: unknown; extra: { hourly_rate: unknown; flat_fee: unknown } | null };
           const rows: StaffRow[] = ((missions.data ?? []) as Row[]).filter((r) => r.status !== 'refuse').map((r) => ({
             status: r.status, arrival_time: r.arrival_time, departure_time: r.departure_time, hours_worked: r.hours_worked as StaffRow['hours_worked'],
             hourly_rate: r.hourly_rate as StaffRow['hourly_rate'], extra_rate: (r.extra?.hourly_rate ?? null) as StaffRow['extra_rate'],
+            flat_fee: r.flat_fee as StaffRow['flat_fee'], extra_flat: (r.extra?.flat_fee ?? null) as StaffRow['extra_flat'],
           }));
           setStaff({
             available: true,
@@ -167,7 +168,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
       label: 'Personnel (extras)', amount: result.staffCost,
       hint: staff.missions === 0
         ? 'Aucun extra sur cet événement'
-        : staff.incomplete > 0 ? `${staff.incomplete} extra${staff.incomplete > 1 ? 's' : ''} sans heures ou sans taux, non compté${staff.incomplete > 1 ? 's' : ''}` : undefined,
+        : staff.incomplete > 0 ? `${staff.incomplete} extra${staff.incomplete > 1 ? 's' : ''} sans heures, sans taux ni forfait, non compté${staff.incomplete > 1 ? 's' : ''}` : undefined,
     }] : []),
   ];
 

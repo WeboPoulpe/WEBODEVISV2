@@ -103,6 +103,15 @@ describe('personnel et totaux', () => {
     ])).toBe(211);
   });
 
+  it('un forfait compte tel quel, celui de la mission avant celui de l’extra', () => {
+    expect(staffCost([
+      { hours_worked: 9, hourly_rate: null, flat_fee: '120' },
+      { hours_worked: 6, hourly_rate: null, extra_flat: 90 },
+      { hours_worked: 4, hourly_rate: 15, extra_flat: 90 },
+      { hours_worked: 5, hourly_rate: null, flat_fee: 200, status: 'refuse' },
+    ])).toBe(270);
+  });
+
   it('les devis sans coût sont comptés à part', () => {
     const t = sumMargins([
       { revenueHT: 1000, totalCost: 400, hasCost: true },

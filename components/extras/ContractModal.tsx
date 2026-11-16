@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, errorCls, inputCls, labelCls } from '@/components/ui/kit';
+import PayModeToggle, { type PayMode } from './PayModeToggle';
 import { useFeedback } from '@/components/ui/Feedback';
 import { cn } from '@/lib/utils';
 import { CONTRACT_DISCLAIMER, DPAE_URL, type DpaeAlert, type DpaeField } from '@/lib/extraContract';
@@ -248,12 +249,16 @@ function StatusLine({ data }: { data: MissionHr }) {
 function TermsForm({ data, assignmentId, onSaved }: { data: MissionHr; assignmentId: string; onSaved: () => Promise<void> }) {
   const t = data.terms;
   const [f, setF] = useState({
-    position: t.position, classification: t.classification ?? '', rate: t.hourly_rate == null ? '' : String(t.hourly_rate).replace('.', ','),
+    position: t.position, classification: t.classification ?? '',
+    rate: (t.flat_fee ?? t.hourly_rate) == null ? '' : String(t.flat_fee ?? t.hourly_rate).replace('.', ','),
     location: t.location ?? '', start: t.start ?? '', end: t.end ?? '',
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // À l'heure ou au forfait : le montant saisi est le taux horaire ou le forfait de la mission.
+  const [payMode, setPayMode] = useState<PayMode>(t.flat_fee != null ? 'forfait' : 'heure');
+  const flat = payMode === 'forfait';
   const rate = f.rate.trim() === '' ? null : Number(f.rate.replace(',', '.').replace(/\s/g, ''));
   const rateBad = rate !== null && (!Number.isFinite(rate) || rate <= 0);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => { setF({ ...f, [k]: e.target.value }); setDone(false); };
@@ -261,7 +266,7 @@ function TermsForm({ data, assignmentId, onSaved }: { data: MissionHr; assignmen
   const save = async () => {
     setBusy(true); setError(null);
     try {
-      const res = await saveContractTerms(assignmentId, { position: f.position, classification: f.classification, hourly_rate: rate, location: f.location, start: f.start, end: f.end });
+      const res = await saveContractTerms(assignmentId, { position: f.position, classification: f.classification, hourly_rate: flat ? null : rate, flat_fee: flat ? rate : null, location: f.location, start: f.start, end: f.end });
       if (res.error) { setError(res.error); return; }
       setDone(true);
       await onSaved();
@@ -292,15 +297,18 @@ function TermsForm({ data, assignmentId, onSaved }: { data: MissionHr; assignmen
           <label htmlFor="ct-end" className={labelCls}>Fin prévue</label>
           <input id="ct-end" type="time" value={f.end} onChange={set('end')} className={inputCls} />
         </div>
-        <div>
-          <label htmlFor="ct-rate" className={labelCls}>Taux horaire brut</label>
-          <div className="relative">
-            <input id="ct-rate" inputMode="decimal" value={f.rate} onChange={set('rate')} aria-invalid={rateBad} className={cn(inputCls, 'pr-14')} placeholder="13,50" />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">€/h</span>
+        <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-2">
+            <label htmlFor="ct-rate" className="block text-sm font-medium text-gray-700">{flat ? 'Forfait brut de la mission' : 'Taux horaire brut'}</label>
+            <PayModeToggle value={payMode} label="Rémunération" onChange={(mode) => { setPayMode(mode); setF({ ...f, rate: '' }); setDone(false); }} />
           </div>
-          {rateBad && <p className="text-sm text-danger mt-1.5">Indiquez un montant, par exemple 13,50.</p>}
+          <div className="relative sm:max-w-[240px]">
+            <input id="ct-rate" inputMode="decimal" value={f.rate} onChange={set('rate')} aria-invalid={rateBad} className={cn(inputCls, 'pr-14')} placeholder={flat ? '120' : '13,50'} />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">{flat ? '€' : '€/h'}</span>
+          </div>
+          {rateBad && <p className="text-sm text-danger mt-1.5">Indiquez un montant, par exemple {flat ? '120' : '13,50'}.</p>}
         </div>
-        <div>
+        <div className="sm:col-span-2">
           <label htmlFor="ct-location" className={labelCls}>Lieu de travail</label>
           <input id="ct-location" value={f.location} onChange={set('location')} className={inputCls} placeholder="Adresse de l’événement" />
         </div>

@@ -187,6 +187,47 @@ describe('contrats d’extra et DPAE', () => {
     await expect(hr.resetContract(laterId)).rejects.toThrow(/consultation seule/);
   });
 
+  it('mission au forfait : le contrat annonce le forfait, ajustable, et peut revenir à l’heure', async () => {
+    const q = (await pg.query<{ id: string }>(`insert into quotes (owner_user_id, user_id, client_name, event_date, event_type, event_location, guest_count, status)
+      values ($1, $1, 'Gala', $2, 'Gala', 'Salle des fêtes', 60, 'valide') returning id`, [ME, addDays(today, 30)])).rows[0].id;
+    const flatId = (await pg.query<{ id: string }>(`insert into event_extras (quote_id, extra_id, status, arrival_time, departure_time, flat_fee)
+      values ($1, $2, 'confirme', '18:00', '23:00', 120) returning id`, [q, extraId])).rows[0].id;
+    const m = await hr.getMissionHr(flatId);
+    if (m.error !== null) throw new Error(m.error);
+    expect(m.terms).toMatchObject({ hourly_rate: null, flat_fee: 120 });
+    expect(JSON.stringify(m.doc)).toContain('rémunération forfaitaire brute de 120,00 € pour la mission');
+
+    expect((await hr.saveContractTerms(flatId, { ...m.terms, flat_fee: -5 })).error).toMatch(/forfait/);
+    expect((await hr.saveContractTerms(flatId, { ...m.terms, flat_fee: 150 })).error).toBeNull();
+    const adjusted = await hr.getMissionHr(flatId);
+    if (adjusted.error !== null) throw new Error(adjusted.error);
+    expect(adjusted.terms).toMatchObject({ hourly_rate: null, flat_fee: 150 });
+
+    expect((await hr.saveContractTerms(flatId, { ...m.terms, flat_fee: null, hourly_rate: 14 })).error).toBeNull();
+    const hourly = await hr.getMissionHr(flatId);
+    if (hourly.error !== null) throw new Error(hourly.error);
+    expect(hourly.terms).toMatchObject({ hourly_rate: 14, flat_fee: null });
+    expect(JSON.stringify(hourly.doc)).toContain('salaire horaire brut de 14,00 €');
+    await pg.query(`delete from quotes where id = $1`, [q]);
+  });
+
+  it('forfait habituel de l’extra : repris quand la mission ne précise rien', async () => {
+    const x = (await pg.query<{ id: string }>(`insert into extras (user_id, name, role, flat_fee) values ($1, 'Farid B.', 'Maître d’hôtel', 180) returning id`, [ME])).rows[0].id;
+    const q = (await pg.query<{ id: string }>(`insert into quotes (owner_user_id, user_id, client_name, event_date, event_type, guest_count, status)
+      values ($1, $1, 'Gala', $2, 'Gala', 60, 'valide') returning id`, [ME, addDays(today, 31)])).rows[0].id;
+    const id = (await pg.query<{ id: string }>(`insert into event_extras (quote_id, extra_id, status, arrival_time, departure_time)
+      values ($1, $2, 'confirme', '18:00', '23:00') returning id`, [q, x])).rows[0].id;
+    const m = await hr.getMissionHr(id);
+    if (m.error !== null) throw new Error(m.error);
+    expect(m.terms).toMatchObject({ hourly_rate: null, flat_fee: 180 });
+    await pg.query(`update event_extras set hourly_rate = 16 where id = $1`, [id]);
+    const own = await hr.getMissionHr(id);
+    if (own.error !== null) throw new Error(own.error);
+    expect(own.terms).toMatchObject({ hourly_rate: 16, flat_fee: null });
+    await pg.query(`delete from quotes where id = $1`, [q]);
+    await pg.query(`delete from extras where id = $1`, [x]);
+  });
+
   it('rappel de DPAE au traiteur, une seule fois par mission, puis DPAE notée faite', async () => {
     const run = await runDpaeReminders({ origin: 'https://webodevis.fr' });
     // Un email par entreprise : la mission dans 3 jours chez ME (celle dans 20 jours attend), et celle de l'autre entreprise.

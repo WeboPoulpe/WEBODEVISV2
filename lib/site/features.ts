@@ -522,7 +522,7 @@ export const FEATURES: Feature[] = [
       {
         title: 'Heures faites et paie',
         body: [
-          'Chaque extra a son taux horaire habituel. Après l’événement, vous notez les heures faites : l’onglet Extras de l’événement donne le total des heures et le coût du personnel, repris dans la marge du devis.',
+          'Chaque extra a son taux horaire habituel, ou son forfait par mission. Après l’événement, vous notez les heures faites : l’onglet Extras de l’événement donne le total des heures et le coût du personnel, repris dans la marge du devis.',
           'La page « Heures et paie » récapitule le mois, extra par extra, avec le détail par événement, et s’exporte en CSV pour votre comptable ou votre gestionnaire de paie.',
         ],
       },
@@ -537,7 +537,7 @@ export const FEATURES: Feature[] = [
       { q: 'L’extra peut-il confirmer sa présence depuis son lien ?', a: 'Oui. Il accepte ou refuse la mission depuis sa page, sans compte. Il peut aussi revenir sur un refus, et indiquer les dates où il n’est pas disponible.' },
       { q: 'WeboDevis fait-il la DPAE à ma place ?', a: 'Non. WeboDevis prépare les informations dans l’ordre du formulaire et vous rappelle l’échéance, mais c’est vous qui déclarez sur le site de l’Urssaf. Vous notez ensuite le numéro de l’accusé de réception sur la mission.' },
       { q: 'Le modèle de contrat est-il prêt à l’emploi ?', a: 'C’est une base à adapter à votre situation. Faites-la valider par votre expert-comptable ou votre juriste avant de l’utiliser.' },
-      { q: 'WeboDevis calcule-t-il le coût des extras ?', a: 'Oui. Les heures faites multipliées par le taux horaire de chaque extra donnent le coût du personnel de l’événement, repris dans la marge du devis.' },
+      { q: 'WeboDevis calcule-t-il le coût des extras ?', a: 'Oui. Les heures faites multipliées par le taux horaire de chaque extra, ou son forfait s’il est payé à la mission, donnent le coût du personnel de l’événement, repris dans la marge du devis.' },
     ],
     related: ['evenements', 'equipe', 'calendrier', 'suivi-financier'],
     guide: 'checklist-evenement-traiteur',
@@ -689,7 +689,7 @@ export const FEATURES: Feature[] = [
         title: 'Un coût de revient saisi une fois',
         body: [
           'Le coût matière d’une prestation se calcule à partir de sa recette : les ingrédients, leur quantité et leur prix, avec le détail ligne par ligne. « Utiliser ce coût » l’enregistre dans votre catalogue, avec le coefficient et le taux de marge. Vous pouvez aussi saisir le coût vous-même.',
-          'Le coût du personnel vient des heures faites par vos extras, multipliées par leur taux horaire. Le transport, la location et le reste s’ajoutent en frais additionnels. La synthèse donne la marge brute, poste par poste.',
+          'Le coût du personnel vient des heures faites par vos extras, multipliées par leur taux horaire, ou de leur forfait par mission. Le transport, la location et le reste s’ajoutent en frais additionnels. La synthèse donne la marge brute, poste par poste.',
         ],
       },
       {
@@ -702,7 +702,7 @@ export const FEATURES: Feature[] = [
     faqs: [
       { q: 'Le coût de revient est-il calculé à partir des ingrédients ?', a: 'Oui, si la prestation a sa recette : WeboDevis additionne le prix de ses ingrédients selon leur quantité. Un ingrédient sans prix, ou dans une unité qui ne se convertit pas, est signalé et laissé hors du total.' },
       { q: 'WeboDevis suit-il les acomptes et les paiements ?', a: 'Oui, par les factures. Vous facturez l’acompte puis le solde depuis le devis, et vous enregistrez chaque paiement reçu. Quand l’acompte est réglé, le devis passe à « Acompte reçu » ; quand le solde l’est, à « Payé ».' },
-      { q: 'Le coût des extras et de la location est-il repris automatiquement ?', a: 'Celui des extras, oui : leurs heures faites multipliées par leur taux horaire. La location et le transport s’ajoutent en frais additionnels sur la fiche « Marge et coûts » du devis.' },
+      { q: 'Le coût des extras et de la location est-il repris automatiquement ?', a: 'Celui des extras, oui : leurs heures faites multipliées par leur taux horaire, ou leur forfait. La location et le transport s’ajoutent en frais additionnels sur la fiche « Marge et coûts » du devis.' },
     ],
     related: ['devis-traiteur', 'facturation', 'extras', 'stock-et-fournisseurs'],
     guide: 'calculer-marge-traiteur',

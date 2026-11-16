@@ -21,7 +21,7 @@ const extra: ExtraHrDetails = {
 };
 const mission: MissionInfo = {
   extraName: 'Julie M.', role: 'Serveur', eventType: 'Mariage', eventDate: '2027-06-12', location: 'Château de Pont, 10400 Pont-sur-Seine',
-  arrival: '17:30', departure: '01:30', notes: 'Tenue noire', hourlyRate: 13.5,
+  arrival: '17:30', departure: '01:30', notes: 'Tenue noire', hourlyRate: 13.5, flatFee: null,
 };
 
 describe('n° de sécurité sociale et IBAN', () => {
@@ -45,7 +45,7 @@ describe('contrat d’extra', () => {
   const text = contractText(doc);
 
   it('reprend les conditions de la mission, une soirée qui finit après minuit comprise', () => {
-    expect(terms).toEqual({ position: 'Serveur', classification: null, hourly_rate: 13.5, location: 'Château de Pont, 10400 Pont-sur-Seine', start: '17:30', end: '01:30' });
+    expect(terms).toEqual({ position: 'Serveur', classification: null, hourly_rate: 13.5, flat_fee: null, location: 'Château de Pont, 10400 Pont-sur-Seine', start: '17:30', end: '01:30' });
     expect(plannedHours('17:30', '01:30')).toBe(8);
     expect(plannedHours('09:00', '13:15')).toBe(4.25);
     expect(plannedHours(null, '13:00')).toBeNull();
@@ -91,13 +91,25 @@ describe('contrat d’extra', () => {
     expect(custom.articles.at(-1)).toEqual({ title: 'Clauses particulières', paragraphs: ['Clause un.', 'Clause deux.'] });
   });
 
+  it('au forfait : le contrat annonce le forfait, pas un salaire horaire', () => {
+    const flatMission = { ...mission, hourlyRate: null, flatFee: 120 };
+    const flatTerms = defaultTerms(flatMission);
+    expect(flatTerms).toMatchObject({ hourly_rate: null, flat_fee: 120 });
+    expect(contractMissing(employer, extra, flatTerms, flatMission)).toEqual([]);
+    const t = contractText(buildContract(employer, extra, flatTerms, flatMission, { issuedOn: '2027-06-01' }));
+    expect(t).toContain('rémunération forfaitaire brute de 120,00 € pour la mission');
+    expect(t).toContain('minimum légal ou conventionnel');
+    expect(t).not.toContain('salaire horaire brut');
+    expect(t).toContain('indemnité compensatrice de congés payés');
+  });
+
   it('liste ce qui manque avant l’envoi', () => {
     expect(contractMissing(employer, extra, terms, mission)).toEqual([]);
     const missing = contractMissing({ ...employer, siret: null, retirement_fund: null }, { ...extra, birth_date: null, nationality: '' },
       { ...terms, hourly_rate: null, end: null }, mission);
     expect(missing).toEqual([
       'SIRET de l’entreprise (Paramètres)', 'Caisse de retraite complémentaire (Paramètres, Employeur)', 'Date de naissance de l’extra',
-      'Nationalité de l’extra', 'Heures de début et de fin', 'Taux horaire brut',
+      'Nationalité de l’extra', 'Heures de début et de fin', 'Taux horaire ou forfait brut',
     ]);
   });
 

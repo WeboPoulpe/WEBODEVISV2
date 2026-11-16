@@ -1,7 +1,7 @@
 'use client';
 
 // Récapitulatif des heures des extras pour la paie : un mois, un tableau par extra (missions, heures,
-// taux, montant brut) avec le détail par événement, et l'export CSV à transmettre au comptable.
+// taux ou forfait, montant brut) avec le détail par événement, et l'export CSV à transmettre au comptable.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -42,7 +42,7 @@ export default function ExtrasHoursPage() {
   const [missions, setMissions] = useState<PayrollMissionInput[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Heures saisies et taux : colonnes de la migration 0023, absentes tant qu'elle n'est pas appliquée.
+  // Heures saisies, taux et forfaits : colonnes des migrations 0023 et 0055, absentes tant qu'elles ne sont pas appliquées.
   const [hoursSupported, setHoursSupported] = useState(true);
   const [open, setOpen] = useState<string[]>([]);
 
@@ -51,29 +51,30 @@ export default function ExtrasHoursPage() {
     const supabase = createClient();
     const { data: extrasData, error: extrasErr } = await supabase.from('extras').select('*').order('name');
     if (extrasErr) { setError('Vos extras n’ont pas pu être chargés. Rechargez la page.'); setLoading(false); return; }
-    const list = (extrasData ?? []) as { id: string; name: string; role: string | null; hourly_rate?: unknown }[];
+    const list = (extrasData ?? []) as { id: string; name: string; role: string | null; hourly_rate?: unknown; flat_fee?: unknown }[];
     const ids = list.map((e) => e.id);
     let rows: Row[] = [];
-    let extraHours: Record<string, { hours_worked: unknown; hourly_rate: unknown }> = {};
+    let extraHours: Record<string, { hours_worked: unknown; hourly_rate: unknown; flat_fee: unknown }> = {};
     if (ids.length > 0) {
       const [assign, hours] = await Promise.all([
         supabase.from('event_extras')
           .select('id, extra_id, status, arrival_time, departure_time, quote:quotes(id, event_type, event_date, client_name)')
           .in('extra_id', ids),
-        supabase.from('event_extras').select('id, hours_worked, hourly_rate').in('extra_id', ids),
+        supabase.from('event_extras').select('id, hours_worked, hourly_rate, flat_fee').in('extra_id', ids),
       ]);
       if (assign.error) { setError('Les missions n’ont pas pu être chargées. Rechargez la page.'); setLoading(false); return; }
       rows = ((assign.data ?? []) as unknown as Row[]).filter((r) => r.quote?.id);
       setHoursSupported(!hours.error);
       if (!hours.error) {
-        extraHours = Object.fromEntries(((hours.data ?? []) as { id: string; hours_worked: unknown; hourly_rate: unknown }[]).map((h) => [h.id, h]));
+        extraHours = Object.fromEntries(((hours.data ?? []) as { id: string; hours_worked: unknown; hourly_rate: unknown; flat_fee: unknown }[]).map((h) => [h.id, h]));
       }
     }
-    setExtras(list.map((e) => ({ id: e.id, name: e.name, role: e.role, hourly_rate: toNumber(e.hourly_rate) })));
+    setExtras(list.map((e) => ({ id: e.id, name: e.name, role: e.role, hourly_rate: toNumber(e.hourly_rate), flat_fee: toNumber(e.flat_fee) })));
     setMissions(rows.map((r) => ({
       id: r.id, extra_id: r.extra_id, status: r.status,
       arrival_time: r.arrival_time, departure_time: r.departure_time,
       hours_worked: toNumber(extraHours[r.id]?.hours_worked), hourly_rate: toNumber(extraHours[r.id]?.hourly_rate),
+      flat_fee: toNumber(extraHours[r.id]?.flat_fee),
       event_date: r.quote!.event_date?.slice(0, 10) ?? null, event_type: r.quote!.event_type, client_name: r.quote!.client_name,
     })));
     setError(null);
@@ -134,7 +135,7 @@ export default function ExtrasHoursPage() {
 
       {!hoursSupported && (
         <p className="mb-4 rounded-2xl bg-white border border-gray-200 px-4 py-3 text-sm text-gray-700">
-          Les heures faites et les taux ne sont pas encore disponibles sur votre compte : le récapitulatif utilise les horaires prévus, sans montant.
+          Les heures faites, les taux et les forfaits ne sont pas encore disponibles sur votre compte : le récapitulatif utilise les horaires prévus, sans montant.
         </p>
       )}
 
@@ -163,7 +164,7 @@ export default function ExtrasHoursPage() {
           </dl>
           {total.missingRate > 0 && hoursSupported && (
             <p className="text-sm text-primary-800 mb-3">
-              {plural(total.missingRate, 'mission n’a', 'missions n’ont')} pas de taux : {total.missingRate > 1 ? 'leur' : 'son'} montant n’est pas compté. Indiquez le taux habituel sur la fiche de l’extra.
+              {plural(total.missingRate, 'mission n’a', 'missions n’ont')} ni taux ni forfait : {total.missingRate > 1 ? 'leur' : 'son'} montant n’est pas compté. Indiquez la rémunération habituelle sur la fiche de l’extra.
             </p>
           )}
 
@@ -178,7 +179,7 @@ export default function ExtrasHoursPage() {
                       <span className="block font-semibold text-gray-900 truncate">{r.name}</span>
                       <span className="block text-sm text-gray-600">
                         {plural(r.missions, 'mission', 'missions')}, {hoursLabel(r.hours)}
-                        {r.mixedRates ? ', taux variable' : r.rate !== null ? `, ${euros(r.rate)}/h` : ''}
+                        {r.mixedRates ? ', taux variable' : r.flatMissions > 0 ? ', au forfait' : r.rate !== null ? `, ${euros(r.rate)}/h` : ''}
                       </span>
                     </span>
                     <span className="font-display font-bold text-gray-900 tabular-nums whitespace-nowrap">
@@ -195,7 +196,7 @@ export default function ExtrasHoursPage() {
                             <span className="block text-gray-600 truncate">{[l.event, l.client].filter(Boolean).join(', ') || 'Événement'}</span>
                           </span>
                           <span className="text-right tabular-nums whitespace-nowrap">
-                            <span className="block text-gray-900">{hoursLabel(l.hours)}{l.rate !== null ? ` à ${euros(l.rate)}` : ''}</span>
+                            <span className="block text-gray-900">{hoursLabel(l.hours)}{l.flat ? ', au forfait' : l.rate !== null ? ` à ${euros(l.rate)}` : ''}</span>
                             <span className="block font-semibold text-gray-900">{l.amount === null ? 'Sans taux' : euros(l.amount)}</span>
                           </span>
                         </li>

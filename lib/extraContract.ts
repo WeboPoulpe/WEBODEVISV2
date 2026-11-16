@@ -82,8 +82,10 @@ export interface MissionInfo {
   arrival: string | null;
   departure: string | null;
   notes: string | null;
-  /** Taux de la mission, sinon taux habituel de l'extra. */
+  /** Taux de la mission, sinon taux habituel de l'extra ; null quand la mission est au forfait. */
   hourlyRate: number | null;
+  /** Forfait brut de la mission, sinon forfait habituel de l'extra ; null quand elle est payée à l'heure. */
+  flatFee?: number | null;
 }
 
 /** Ce que le traiteur ajuste pour ce contrat (table extra_contracts, colonne terms). */
@@ -91,6 +93,8 @@ export interface ContractTerms {
   position: string;
   classification: string | null;
   hourly_rate: number | null;
+  /** Rémunération forfaitaire brute pour la mission : quand elle est renseignée, le taux horaire ne s'applique pas. */
+  flat_fee: number | null;
   location: string | null;
   start: string | null;
   end: string | null;
@@ -101,7 +105,8 @@ export function defaultTerms(m: MissionInfo): ContractTerms {
   return {
     position: m.role?.trim() || 'Extra',
     classification: null,
-    hourly_rate: m.hourlyRate ?? null,
+    hourly_rate: m.flatFee != null ? null : m.hourlyRate ?? null,
+    flat_fee: m.flatFee ?? null,
     location: m.location?.trim() || null,
     start: hhmm(m.arrival),
     end: hhmm(m.departure),
@@ -241,7 +246,7 @@ export function contractMissing(e: Employer, d: Partial<ExtraHrDetails>, t: Cont
   if (!m.eventDate) out.push('Date de l’événement');
   if (!t.position.trim()) out.push('Poste occupé');
   if (!hhmm(t.start) || !hhmm(t.end)) out.push('Heures de début et de fin');
-  if (t.hourly_rate == null || !(t.hourly_rate > 0)) out.push('Taux horaire brut');
+  if (!(t.flat_fee != null && t.flat_fee > 0) && !(t.hourly_rate != null && t.hourly_rate > 0)) out.push('Taux horaire ou forfait brut');
   return out;
 }
 
@@ -250,7 +255,8 @@ export function buildContract(e: Employer, d: Partial<ExtraHrDetails>, t: Contra
   const name = employeeName(d, m.extraName);
   const start = hhmm(t.start), end = hhmm(t.end);
   const hours = plannedHours(start, end);
-  const rate = t.hourly_rate != null && t.hourly_rate > 0 ? t.hourly_rate : null;
+  const flat = t.flat_fee != null && t.flat_fee > 0 ? t.flat_fee : null;
+  const rate = flat === null && t.hourly_rate != null && t.hourly_rate > 0 ? t.hourly_rate : null;
   const convention = e.convention?.trim() || DEFAULT_CONVENTION;
   const day = m.eventDate ? dateLong(m.eventDate) : 'date à préciser';
   const salarie = d.sex === 'F' ? 'la salariée' : 'le salarié';
@@ -310,7 +316,9 @@ export function buildContract(e: Employer, d: Partial<ExtraHrDetails>, t: Contra
     {
       title: 'Rémunération',
       paragraphs: [
-        rate
+        flat
+          ? `${Salarie} perçoit une rémunération forfaitaire brute de ${euro(flat)} pour la mission${hours ? `, prévue pour ${hoursFr(hours)} de travail` : ''}. Ce forfait ne peut pas être inférieur à la rémunération due pour les heures réellement effectuées, calculée sur le salaire minimum légal ou conventionnel, majorations comprises ; un complément est versé si nécessaire.`
+          : rate
           ? `${Salarie} perçoit un salaire horaire brut de ${euro(rate)}${hours ? `, soit ${euro(Math.round(rate * hours * 100) / 100)} brut pour les ${hoursFr(hours)} prévues` : ''}. Les heures réellement effectuées sont payées sur la base de ce taux, avec les majorations prévues par la loi et la convention collective le cas échéant.`
           : `Le salaire horaire brut est fixé par l’employeur conformément à la convention collective.`,
         'S’y ajoute une indemnité compensatrice de congés payés égale à 10 % de la rémunération brute totale (article L. 1242-16 du Code du travail), versée à la fin du contrat.',

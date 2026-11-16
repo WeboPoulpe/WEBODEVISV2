@@ -19,6 +19,7 @@ import { notifyMissionChanged } from '@/server/extras';
 import { euros, toNumber } from '@/lib/staffCost';
 import { useFeedback } from '@/components/ui/Feedback';
 import ContractModal, { DPAE_TONES } from '@/components/extras/ContractModal';
+import PayModeToggle, { type PayMode } from '@/components/extras/PayModeToggle';
 import ExtraHrForm from '@/components/extras/ExtraHrForm';
 import { dpaeNeedsAction, type MissionHrStatus } from '@/lib/extraContract';
 import { getHrStatuses } from '@/server/extraHr';
@@ -35,6 +36,8 @@ interface Extra {
   unavailable_dates: string[] | null;
   /** Taux horaire brut habituel (colonne absente tant que la migration 0023 n'est pas appliquée). */
   hourly_rate?: number | string | null;
+  /** Forfait brut habituel par mission, pour un extra payé au forfait (migration 0055). */
+  flat_fee?: number | string | null;
 }
 
 interface QuoteOption {
@@ -258,14 +261,14 @@ function MissionModal({ assignment, extra, onClose, onStatusChange, onRemove, on
 
 // ── Fiche d'un extra ─────────────────────────────────────────────────────────
 const OTHER_ROLE = '__autre__';
-interface ExtraForm { name: string; role: string; phone: string; email: string; rate: string }
+interface ExtraForm { name: string; role: string; phone: string; email: string; payMode: PayMode; rate: string }
 
 function ExtraModal({ initial, onSave, onClose, saving, showRate }: {
   initial?: Partial<Extra>;
   onSave: (d: ExtraForm) => Promise<boolean>;
   onClose: () => void;
   saving: boolean;
-  /** Champ « Taux horaire brut », masqué tant que la base n'a pas la colonne. */
+  /** Rémunération habituelle (taux horaire ou forfait), masquée tant que la base n'a pas les colonnes. */
   showRate: boolean;
 }) {
   const [name, setName]   = useState(initial?.name  ?? '');
@@ -277,15 +280,19 @@ function ExtraModal({ initial, onSave, onClose, saving, showRate }: {
   const role = roleChoice === OTHER_ROLE ? otherRole.trim() : roleChoice;
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
-  const initialRate = toNumber(initial?.hourly_rate);
+  // Rémunération habituelle : au forfait si la fiche a un forfait, sinon à l'heure.
+  const initialFlat = toNumber(initial?.flat_fee);
+  const initialRate = initialFlat ?? toNumber(initial?.hourly_rate);
+  const [payMode, setPayMode] = useState<PayMode>(initialFlat !== null ? 'forfait' : 'heure');
   const [rate, setRate]   = useState(initialRate === null ? '' : String(initialRate).replace('.', ','));
+  const flat = payMode === 'forfait';
   const [error, setError] = useState<string | null>(null);
   const rateInvalid = rate.trim() !== '' && (toNumber(rate) === null || toNumber(rate)! < 0);
 
   const submit = async () => {
     if (!name.trim() || rateInvalid) return;
     setError(null);
-    if (!(await onSave({ name, role, phone, email, rate }))) setError('L’extra n’a pas pu être enregistré. Réessayez.');
+    if (!(await onSave({ name, role, phone, email, payMode, rate }))) setError('L’extra n’a pas pu être enregistré. Réessayez.');
   };
 
   return (
@@ -327,14 +334,16 @@ function ExtraModal({ initial, onSave, onClose, saving, showRate }: {
         </div>
         {showRate && (
           <div>
-            <label htmlFor="extra-rate" className={labelCls}>Taux horaire brut</label>
+            <p className={labelCls}>Rémunération habituelle</p>
+            <PayModeToggle value={payMode} onChange={setPayMode} label="Rémunération habituelle" />
+            <label htmlFor="extra-rate" className={cn(labelCls, 'mt-3')}>{flat ? 'Forfait brut par mission' : 'Taux horaire brut'}</label>
             <div className="relative sm:max-w-[200px]">
-              <input id="extra-rate" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="13,50"
+              <input id="extra-rate" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={flat ? '120' : '13,50'}
                 aria-describedby="extra-rate-hint" aria-invalid={rateInvalid} className={cn(inputCls, 'pr-14')} />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">€/h</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">{flat ? '€' : '€/h'}</span>
             </div>
             <p id="extra-rate-hint" className={cn('text-sm mt-1.5', rateInvalid ? 'text-danger' : 'text-gray-500')}>
-              {rateInvalid ? 'Indiquez un montant, par exemple 13,50.' : 'Repris sur chacune de ses missions, modifiable mission par mission.'}
+              {rateInvalid ? `Indiquez un montant, par exemple ${flat ? '120' : '13,50'}.` : `Repris sur chacune de ses missions, modifiable mission par mission${flat ? ' : le même montant quelle que soit la durée' : ''}.`}
             </p>
           </div>
         )}
@@ -539,8 +548,10 @@ function ExtraRow({
   const past = assignments
     .filter((a) => a.quote.event_date && a.quote.event_date < today)
     .sort((a, b) => (b.quote.event_date ?? '').localeCompare(a.quote.event_date ?? ''));
+  const flatFee = toNumber(extra.flat_fee);
   const rate = toNumber(extra.hourly_rate);
-  const meta = [extra.role, rate !== null ? `${euros(rate)}/h` : null, extra.phone, extra.email].filter(Boolean).join(', ');
+  const payLabel = flatFee !== null ? `${euros(flatFee)} la mission` : rate !== null ? `${euros(rate)}/h` : null;
+  const meta = [extra.role, payLabel, extra.phone, extra.email].filter(Boolean).join(', ');
   const daysOff = (extra.unavailable_dates ?? []).map((d) => d.slice(0, 10)).filter((d) => d >= today).sort();
 
   return (
@@ -633,7 +644,7 @@ export default function ExtrasPage() {
   // Contrat et DPAE : statut par mission, et fenêtre ouverte.
   const [hr,          setHr]          = useState<Record<string, MissionHrStatus>>({});
   const [contractFor, setContractFor] = useState<{ id: string; name: string; tab: 'contrat' | 'dpae' } | null>(null);
-  // La colonne du taux horaire n'existe qu'après la migration 0023 : le champ est masqué sinon.
+  // Les colonnes du taux horaire et du forfait n'existent qu'après les migrations 0023 et 0055 : le champ est masqué sinon.
   const [rateSupported, setRateSupported] = useState(false);
 
   const load = useCallback(async () => {
@@ -641,7 +652,7 @@ export default function ExtrasPage() {
     const supabase = createClient();
     const [{ data: extrasData, error: extrasErr }, rateProbe] = await Promise.all([
       supabase.from('extras').select('*').order('name'),
-      supabase.from('extras').select('id, hourly_rate').limit(1),
+      supabase.from('extras').select('id, hourly_rate, flat_fee').limit(1),
     ]);
     setRateSupported(!rateProbe.error);
     const extras = (extrasData ?? []) as Extra[];
@@ -685,7 +696,11 @@ export default function ExtrasPage() {
     const supabase = createClient();
     const fields = {
       name: form.name.trim(), role: form.role || null, phone: form.phone || null, email: form.email || null,
-      ...(rateSupported ? { hourly_rate: toNumber(form.rate) } : {}),
+      // À l'heure ou au forfait : un seul des deux est gardé sur la fiche.
+      ...(rateSupported ? {
+        hourly_rate: form.payMode === 'heure' ? toNumber(form.rate) : null,
+        flat_fee: form.payMode === 'forfait' ? toNumber(form.rate) : null,
+      } : {}),
     };
     const res = editing
       ? await supabase.from('extras').update(fields).eq('id', editing.id).select().single()

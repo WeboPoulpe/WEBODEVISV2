@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  appliedRate, hoursInput, hoursLabel, parseHours, missionCost, monthRange, payrollByExtra, payrollCsv, plannedHours, retainedHours, staffTotals, toNumber,
+  appliedRate, hoursInput, hoursLabel, parseHours, missionCost, missionPay, monthRange, payrollByExtra, payrollCsv, plannedHours, retainedHours, staffTotals, toNumber,
 } from './staffCost';
 
 describe('heures prévues', () => {
@@ -34,6 +34,27 @@ describe('heures retenues et coût', () => {
   it('coût = heures × taux, null sans taux', () => {
     expect(missionCost({ arrival_time: '18:00', departure_time: '01:30' }, 14)).toBe(105);
     expect(missionCost({ hours_worked: 4 }, null)).toBeNull();
+  });
+  it('forfait ou taux : la mission d’abord, sinon l’habitude de l’extra', () => {
+    expect(missionPay({ flat_fee: '120' }, { hourly_rate: 14 })).toEqual({ mode: 'forfait', amount: 120 });
+    expect(missionPay({ hourly_rate: 15 }, { flat_fee: 120 })).toEqual({ mode: 'heure', rate: 15 });
+    expect(missionPay({}, { flat_fee: '120.00' })).toEqual({ mode: 'forfait', amount: 120 });
+    expect(missionPay({}, { hourly_rate: 14 })).toEqual({ mode: 'heure', rate: 14 });
+    expect(missionPay({}, {})).toBeNull();
+  });
+  it('au forfait, le coût ne dépend pas des heures', () => {
+    expect(missionCost({ hours_worked: 9, flat_fee: 120 }, 14)).toBe(120);
+    expect(missionCost({ hours_worked: 3 }, null, 100)).toBe(100);
+    expect(missionCost({ hours_worked: 3, hourly_rate: 15 }, null, 100)).toBe(45);
+  });
+  it('total d’un événement avec des forfaits : les heures restent comptées', () => {
+    const t = staffTotals([
+      { status: 'present', hours_worked: 6, flat_fee: 110 },
+      { status: 'confirme', hours_worked: 5, extraFlat: 90 },
+      { status: 'confirme', hours_worked: 4, extraRate: 15 },
+      { status: 'confirme', hours_worked: 2 },
+    ]);
+    expect(t).toEqual({ hours: 17, cost: 260, missingRate: 1 });
   });
   it('lit les nombres venus de la base', () => {
     expect(toNumber('12,5')).toBe(12.5);
@@ -89,6 +110,28 @@ describe('récapitulatif pour la paie', () => {
     expect(lines[4]).toBe('Zoé Martin;Serveur;2;12,50;variable;171,50');
     expect(lines[5]).toBe('Total;;3;17,50;;251,50');
     expect(lines).toContain('Zoé Martin;03/10/2026;Mariage;"Dupont; fils";8,00;13,00;104,00');
+  });
+
+  it('forfaits dans la paie : montant fixe, signalé dans le fichier', () => {
+    const people = [
+      { id: 'f', name: 'Farid Benali', role: 'Maître d’hôtel', hourly_rate: null, flat_fee: '150' },
+      { id: 'g', name: 'Gaëlle Petit', role: 'Serveur', hourly_rate: 13, flat_fee: null },
+    ];
+    const work = [
+      { id: 'f1', extra_id: 'f', status: 'present', event_date: '2026-10-03', event_type: 'Mariage', client_name: 'Dupont', hours_worked: 9 },
+      { id: 'f2', extra_id: 'f', status: 'present', event_date: '2026-10-10', event_type: 'Gala', client_name: 'Mairie', hours_worked: 7, flat_fee: 180 },
+      { id: 'g1', extra_id: 'g', status: 'present', event_date: '2026-10-03', event_type: 'Mariage', client_name: 'Dupont', hours_worked: 8 },
+      { id: 'g2', extra_id: 'g', status: 'present', event_date: '2026-10-10', event_type: 'Gala', client_name: 'Mairie', hours_worked: 7, flat_fee: 100 },
+    ];
+    const [farid, gaelle] = payrollByExtra(work, people, monthRange('2026-10'));
+    expect(farid).toMatchObject({ missions: 2, hours: 16, rate: null, mixedRates: false, flatMissions: 2, amount: 330, missingRate: 0 });
+    expect(farid.lines[0]).toMatchObject({ flat: true, rate: null, amount: 150 });
+    expect(gaelle).toMatchObject({ missions: 2, hours: 15, rate: null, mixedRates: true, flatMissions: 1, amount: 204 });
+    const lines = payrollCsv([farid, gaelle], '2026-10').slice(1).trim().split('\r\n');
+    expect(lines[3]).toBe('Farid Benali;Maître d’hôtel;2;16,00;forfait;330,00');
+    expect(lines[4]).toBe('Gaëlle Petit;Serveur;2;15,00;variable;204,00');
+    expect(lines).toContain('Farid Benali;10/10/2026;Gala;Mairie;7,00;forfait;180,00');
+    expect(lines).toContain('Gaëlle Petit;03/10/2026;Mariage;Dupont;8,00;13,00;104,00');
   });
 
   it('heures saisies à la main', () => {

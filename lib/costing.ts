@@ -201,16 +201,21 @@ export interface StaffRow {
   hourly_rate: number | string | null;
   /** Taux habituel de l'extra, quand la mission n'en a pas. */
   extra_rate?: number | string | null;
+  /** Forfait brut de la mission : il remplace heures × taux. */
+  flat_fee?: number | string | null;
+  /** Forfait habituel de l'extra, quand la mission n'a ni forfait ni taux. */
+  extra_flat?: number | string | null;
   /** Statut de la mission : une mission refusée ne coûte rien. */
   status?: string | null;
 }
 
 /**
  * Coût du personnel, calculé exactement comme la page « Heures et paie » (lib/staffCost.ts) : heures faites,
- * sinon heures prévues, × taux de la mission, sinon taux de l'extra ; missions confirmées ou présentes seulement.
+ * sinon heures prévues, × taux de la mission, sinon taux de l'extra ; un forfait (mission, sinon extra) compte tel quel ;
+ * missions confirmées ou présentes seulement.
  */
 export function staffCost(rows: readonly StaffRow[]): number {
-  return cents(staffTotals(rows.map((r) => ({ ...r, status: r.status ?? undefined, extraRate: r.extra_rate }))).cost);
+  return cents(staffTotals(rows.map((r) => ({ ...r, status: r.status ?? undefined, extraRate: r.extra_rate, extraFlat: r.extra_flat }))).cost);
 }
 
 /** Total des frais annexes du devis (colonne extra_costs). */

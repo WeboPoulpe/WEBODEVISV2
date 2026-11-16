@@ -225,7 +225,7 @@ async function writableMission(assignmentId: string): Promise<{ error: string; c
   return { error: null, ctx, uid: user.id };
 }
 
-/** Conditions du contrat ajustées pour cette mission (poste, classification, taux, lieu, horaires). */
+/** Conditions du contrat ajustées pour cette mission (poste, classification, taux ou forfait, lieu, horaires). */
 export async function saveContractTerms(assignmentId: string, input: Partial<ContractTerms>): Promise<{ error: string | null }> {
   const w = await writableMission(assignmentId);
   if (w.error !== null) return { error: w.error };
@@ -234,8 +234,13 @@ export async function saveContractTerms(assignmentId: string, input: Partial<Con
   if (!position) return { error: 'Indiquez le poste occupé.' };
   const rate = input.hourly_rate == null || (input.hourly_rate as unknown) === '' ? null : Number(input.hourly_rate);
   if (rate != null && (!Number.isFinite(rate) || rate <= 0 || rate > 1000)) return { error: 'Le taux horaire n’est pas valide.' };
+  const flat = input.flat_fee == null || (input.flat_fee as unknown) === '' ? null : Number(input.flat_fee);
+  if (flat != null && (!Number.isFinite(flat) || flat <= 0 || flat > 100000)) return { error: 'Le forfait n’est pas valide.' };
+  // Au forfait, le taux horaire ne s'applique pas : un seul des deux est gardé.
   const terms: ContractTerms = {
-    position, classification: clean(input.classification, 120), hourly_rate: rate == null ? null : Math.round(rate * 100) / 100,
+    position, classification: clean(input.classification, 120),
+    hourly_rate: flat != null || rate == null ? null : Math.round(rate * 100) / 100,
+    flat_fee: flat == null ? null : Math.round(flat * 100) / 100,
     location: clean(input.location, 300), start: hhmm(input.start), end: hhmm(input.end),
   };
   const id = await ensureContractRow(w.ctx);
