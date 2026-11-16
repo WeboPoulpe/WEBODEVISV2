@@ -26,7 +26,8 @@ import {
 import { appOrigin, sendMail } from '@/lib/mail';
 import { brochureEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
-import { isValidEmail, MAX_RECIPIENTS, splitEmails, uniqueEmails } from '@/lib/emailList';
+import { isValidEmail, MAX_BROCHURE_RECIPIENTS, MAX_RECIPIENTS, normalizeEmail, splitEmails, uniqueEmails } from '@/lib/emailList';
+import type { BrochureRecipient } from '@/lib/brochureRecipients';
 import { googleFontsHref } from '@/lib/quoteOutput';
 import { companyIdsOf } from './companyScope';
 import { snapshotBeforeSave } from './brochureSnapshot';
@@ -482,54 +483,80 @@ export async function brochureShareMeta(token: string): Promise<{ title: string;
  * de Prospects de l'entreprise encore « nouvelle », celle-ci passe à « Brochure envoyée ».
  */
 export async function sendBrochure(input: {
-  brochureId: string; to: string; message?: string; prospectId?: string;
+  brochureId: string; to?: string; message?: string; prospectId?: string;
   /** Lien personnalisé pour ce client (nom, message d'accueil) : créé et envoyé à la place du lien principal. */
   personal?: { label: string; greeting?: string | null } | null;
-}): Promise<{ error: string | null }> {
+  /** Envoi à plusieurs clients : chaque destinataire nommé reçoit son propre lien personnalisé. */
+  recipients?: BrochureRecipient[];
+  /** Message d'accueil des liens personnalisés, {{client}} remplacé par le nom du client. */
+  greeting?: string | null;
+}): Promise<{ error: string | null; sent?: number; failed?: string[] }> {
   const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
-  const recipients = uniqueEmails(splitEmails(input.to ?? ''));
-  if (recipients.length === 0) return { error: 'Indiquez l’adresse email du destinataire.' };
-  const invalid = recipients.filter((e) => !isValidEmail(e));
+  const grouped = Array.isArray(input.recipients);
+  // Destinataires : la liste de clients, ou les adresses tapées (un même lien pour tous).
+  let list: BrochureRecipient[];
+  if (grouped) {
+    const seen = new Set<string>();
+    list = [];
+    for (const r of input.recipients!) {
+      const email = normalizeEmail(String(r?.email ?? ''));
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      list.push({ email, name: String(r.name ?? '').trim().slice(0, 80) || undefined, customerId: r.customerId });
+    }
+  } else {
+    list = uniqueEmails(splitEmails(input.to ?? '')).map((email) => ({ email }));
+  }
+  const max = grouped ? MAX_BROCHURE_RECIPIENTS : MAX_RECIPIENTS;
+  if (list.length === 0) return { error: 'Indiquez l’adresse email du destinataire.' };
+  const invalid = list.map((r) => r.email).filter((e) => !isValidEmail(e));
   if (invalid.length) return { error: invalid.length === 1 ? `L’adresse « ${invalid[0]} » n’est pas valide.` : `Ces adresses ne sont pas valides : ${invalid.join(', ')}.` };
-  if (recipients.length > MAX_RECIPIENTS) return { error: `Une brochure part à ${MAX_RECIPIENTS} adresses au plus.` };
+  if (list.length > max) return { error: `Une brochure part à ${max} adresses au plus.` };
 
   const row = await getBrochure(input.brochureId);
   if (!row) return { error: NOT_FOUND };
   if (!row.is_active) return { error: 'Le lien de cette brochure est désactivé : réactivez-le avant de l’envoyer.' };
-  let personalToken: string | null = null;
-  if (input.personal?.label?.trim()) {
-    personalToken = newLinkToken();
+  const newClientLink = async (label: string, greeting: string | null) => {
+    const token = newLinkToken();
     await db.insert(brochure_links).values({
-      brochure_id: row.id, owner_user_id: row.owner_user_id, token: personalToken, kind: 'client',
-      label: input.personal.label.trim().slice(0, 80), greeting: String(input.personal.greeting ?? '').trim().slice(0, 140) || null,
+      brochure_id: row.id, owner_user_id: row.owner_user_id, token, kind: 'client',
+      label: label.trim().slice(0, 80), greeting: String(greeting ?? '').trim().slice(0, 140) || null,
     });
-  }
+    return token;
+  };
+  // Envoi d'un seul lien personnalisé à toutes les adresses tapées (fenêtre d'un client, Webo).
+  const sharedPersonal = !grouped && input.personal?.label?.trim() ? await newClientLink(input.personal.label, input.personal.greeting ?? null) : null;
+
   const company = await companyProfile(row.owner_user_id);
   const companyName = company?.name || 'Votre traiteur';
-  const mail = {
-    fromName: companyName,
-    replyTo: company?.email || user.email,
-    ...brochureEmail({
-      companyName, brochureName: row.name, message: input.message ?? null,
-      link: `${await appOrigin()}/b/${personalToken ?? row.share_token}`, language: row.language === 'en' ? 'en' : 'fr',
-    }),
-  };
+  const origin = await appOrigin();
+  const language = row.language === 'en' ? 'en' : 'fr';
   // Un email par destinataire, l'un après l'autre (Resend limite le nombre d'envois par seconde).
   const failed: string[] = [];
-  for (const to of recipients) {
-    const res = await sendMail({ to, ...mail });
-    if (res.error) failed.push(to);
+  const sent: string[] = [];
+  for (const r of list) {
+    const token = r.name
+      ? await newClientLink(r.name, input.greeting ? input.greeting.replace(/\{\{\s*client\s*\}\}/gi, r.name) : null)
+      : sharedPersonal ?? row.share_token;
+    const res = await sendMail({
+      to: r.email, fromName: companyName, replyTo: company?.email || user.email,
+      ...brochureEmail({ companyName, brochureName: row.name, message: input.message ?? null, link: `${origin}/b/${token}`, language }),
+    });
+    (res.error ? failed : sent).push(r.email);
   }
-  if (failed.length === recipients.length) return { error: 'L’email n’a pas pu partir. Vérifiez l’adresse, puis réessayez.' };
+  if (sent.length === 0) return { error: 'L’email n’a pas pu partir. Vérifiez l’adresse, puis réessayez.', ...(grouped ? { sent: 0, failed } : {}) };
 
+  await logActivity({ ...actorOf(user), action: 'envoi', entity: 'brochure', entityId: row.id, label: row.name,
+    summary: `Brochure ${row.name} envoyée à ${sent.length === 1 ? sent[0] : `${sent.length} destinataires`}`, details: { to: sent, failed } });
   if (input.prospectId && UUID.test(input.prospectId)) {
     await db.update(prospect_requests).set({ status: 'broch_envoyee', updated_at: new Date().toISOString() }).where(and(
       eq(prospect_requests.id, input.prospectId), eq(prospect_requests.status, 'nouveau'),
       sql`${prospect_requests.owner_user_id} in ${companyIdsOf(user.id)}`,
     ));
   }
-  return failed.length ? { error: `L’email n’a pas pu partir vers : ${failed.join(', ')}.` } : { error: null };
+  const error = failed.length ? `L’email n’a pas pu partir vers : ${failed.join(', ')}.` : null;
+  return grouped ? { error, sent: sent.length, failed } : { error };
 }
 
 /** Est-ce quelqu'un de l'entreprise qui regarde (aperçu) ? Ses lectures ne comptent pas. */

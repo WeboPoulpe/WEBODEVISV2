@@ -16,9 +16,14 @@ vi.mock('next/headers', () => ({
 const pushes: { userId: string; title: string; body: string }[] = [];
 vi.mock('@/lib/push', () => ({ pushToUser: async (userId: string, m: { title: string; body: string }) => { pushes.push({ userId, title: m.title, body: m.body }); return 1; } }));
 const sent: { to: string; subject: string; html: string }[] = [];
+// Adresses pour lesquelles l'envoi échoue (Resend).
+const failTo = new Set<string>();
 vi.mock('@/lib/mail', () => ({
   appOrigin: async () => 'https://webodevis.fr',
-  sendMail: async (m: { to: string; subject: string; html: string }) => { sent.push({ to: m.to, subject: m.subject, html: m.html }); return { error: null }; },
+  sendMail: async (m: { to: string; subject: string; html: string }) => {
+    sent.push({ to: m.to, subject: m.subject, html: m.html });
+    return failTo.has(m.to) ? { error: 'refusé' } : { error: null };
+  },
 }));
 const OWNER = '00000000-0000-4000-8000-0000000000b1';
 const STRANGER = '00000000-0000-4000-8000-0000000000b2';
@@ -599,5 +604,54 @@ describe('brochures : historique', () => {
       `select action, summary from activity_log where entity_type = 'brochure' and entity_id = $1 order by created_at`, [id]);
     expect(rows.map((r) => r.action)).toEqual(['creation', 'modification', 'suppression']);
     expect(rows[0].summary).toBe('Brochure Historique 2027 créée');
+  });
+});
+
+describe('brochures : envoi à plusieurs clients', () => {
+  const tokenOf = async (id: string) => (await pg.query<{ share_token: string }>(`select share_token from brochures where id = $1`, [id])).rows[0].share_token;
+  it('chaque client nommé reçoit son propre lien, les adresses libres le lien principal', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Envoi groupé' });
+    sent.length = 0;
+    const res = await br.sendBrochure({
+      brochureId: id!, greeting: 'Pour {{client}}',
+      recipients: [{ email: 'julie@exemple.fr', name: 'Julie' }, { email: 'marc@exemple.fr', name: 'Marc' }, { email: 'libre@exemple.fr' }],
+    });
+    expect(res).toMatchObject({ error: null, sent: 3, failed: [] });
+    const clientLinks = (await links.listBrochureLinks(id!))!.filter((x) => x.kind === 'client');
+    expect(clientLinks.map((l) => [l.label, l.greeting]).sort()).toEqual([['Julie', 'Pour Julie'], ['Marc', 'Pour Marc']]);
+    const julie = clientLinks.find((l) => l.label === 'Julie')!;
+    expect(sent.find((m) => m.to === 'julie@exemple.fr')!.html).toContain(`/b/${julie.token}`);
+    expect(sent.find((m) => m.to === 'libre@exemple.fr')!.html).toContain(`/b/${await tokenOf(id!)}`);
+    const { rows } = await pg.query<{ summary: string }>(`select summary from activity_log where entity_id = $1 and action = 'envoi'`, [id]);
+    expect(rows).toEqual([{ summary: 'Brochure Envoi groupé envoyée à 3 destinataires' }]);
+  });
+
+  it('une même adresse ne part qu’une fois', async () => {
+    const { id } = await br.createBrochure({ name: 'Doublons' });
+    sent.length = 0;
+    const res = await br.sendBrochure({ brochureId: id!, recipients: [{ email: 'Julie@Exemple.fr', name: 'Julie' }, { email: 'julie@exemple.fr' }] });
+    expect(res.sent).toBe(1);
+    expect(sent).toHaveLength(1);
+  });
+
+  it('50 destinataires au plus', async () => {
+    const { id } = await br.createBrochure({ name: 'Trop' });
+    const many = Array.from({ length: 51 }, (_, i) => ({ email: `c${i}@exemple.fr` }));
+    expect((await br.sendBrochure({ brochureId: id!, recipients: many })).error).toMatch(/50 adresses au plus/);
+  });
+
+  it('un échec n’empêche pas les autres envois et est signalé', async () => {
+    const { id } = await br.createBrochure({ name: 'Échec partiel' });
+    failTo.add('panne@exemple.fr');
+    const res = await br.sendBrochure({ brochureId: id!, recipients: [{ email: 'a@exemple.fr' }, { email: 'panne@exemple.fr' }, { email: 'b@exemple.fr' }] });
+    failTo.clear();
+    expect(res).toMatchObject({ sent: 2, failed: ['panne@exemple.fr'] });
+    expect(res.error).toMatch(/panne@exemple\.fr/);
+  });
+
+  it('refuse une adresse invalide', async () => {
+    const { id } = await br.createBrochure({ name: 'Invalide' });
+    expect((await br.sendBrochure({ brochureId: id!, recipients: [{ email: 'pas-un-email' }] })).error).toMatch(/pas-un-email/);
   });
 });

@@ -2,6 +2,8 @@
 
 /** Nombre maximal de destinataires pour un même envoi. */
 export const MAX_RECIPIENTS = 10;
+/** Une brochure part à plus de monde à la fois : un envoi à une liste de clients. */
+export const MAX_BROCHURE_RECIPIENTS = 50;
 
 export const isValidEmail = (email: string) => /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email);
 
