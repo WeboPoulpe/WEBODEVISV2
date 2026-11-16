@@ -2,16 +2,19 @@ import Link from 'next/link';
 import { Check } from 'lucide-react';
 import FaqList from '@/components/site/FaqList';
 import HeroPanel from '@/components/site/HeroPanel';
-import { JsonLd, container, sectionGap } from '@/components/site/ui';
+import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
 import { pageMetadata } from '@/lib/site/metadata';
 import { DEMO, HOME, QUOTE_REQUEST, PRICING } from '@/lib/site/pages';
-import { FIRST_MONTH_HT, MONTHLY_HT, SETUP_HT, SETUP_INCLUDES, YEARLY_BONUS, YEARLY_HT, euros, ttc } from '@/lib/pricing';
+import {
+  EXTRAS, FIRST_MONTH_HT, FIRST_YEAR_HT, MONTHLY_HT, MONTHLY_INCLUDES, NEXT_YEAR_HT, PRICE_LINE, SETUP_INCLUDES, euros, ttc,
+} from '@/lib/pricing';
 import { breadcrumbSchema, faqSchema, type Faq } from '@/lib/site/schema';
 
-// Tarifs de WeboDevis : montants dans lib/pricing, les mêmes que l'écran Abonnement du logiciel et le paiement Stripe.
+// Tarifs de WeboDevis : un seul prix, lu dans l'ordre où le traiteur le vit (la démo, le premier mois, les suivants).
+// Montants et listes dans lib/pricing, les mêmes que l'écran Abonnement du logiciel et le paiement Stripe.
 
 const TITLE = 'Tarifs | WeboDevis, le logiciel des traiteurs';
-const DESCRIPTION = `WeboDevis : ${euros(FIRST_MONTH_HT)} HT le premier mois, mise en service comprise (formation, modèles de devis, import de vos clients), puis ${euros(MONTHLY_HT)} HT par mois.`;
+const DESCRIPTION = `WeboDevis : ${PRICE_LINE}. La démonstration est gratuite.`;
 
 export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: PRICING.href });
 
@@ -20,45 +23,51 @@ const crumbs = [
   { name: PRICING.label, path: PRICING.href },
 ];
 
-const INCLUDED = [
-  'Tout le logiciel : devis, factures, événements, production, stock, brochures',
-  '200 WeboCoins chaque mois pour Webo, l’assistant',
-  'Les mises à jour, sans supplément',
-  'Vos données exportables à tout moment',
-];
-
-const PLANS = [
-  {
-    name: 'Mensuel', price: euros(FIRST_MONTH_HT), unit: 'HT le premier mois',
-    then: `puis ${euros(MONTHLY_HT)} HT par mois`,
-    ttc: `${euros(ttc(FIRST_MONTH_HT))} TTC, puis ${euros(ttc(MONTHLY_HT))} TTC par mois`,
-    note: 'Mise en service comprise. Ensuite, sans engagement : vous arrêtez quand vous voulez, à la fin du mois payé.',
-    bonus: [] as string[],
-    badge: undefined as string | undefined,
-  },
-  {
-    name: 'Annuel', price: euros(YEARLY_HT), unit: 'HT par an',
-    then: `+ mise en service de ${euros(SETUP_HT)} HT, la première année`,
-    ttc: `${euros(ttc(YEARLY_HT))} TTC par an`,
-    note: 'Onze mois payés pour douze, avec en plus :',
-    bonus: YEARLY_BONUS,
-    badge: '1 mois offert',
-  },
-];
-
-const EXTRAS = [
-  'La création de vos brochures',
-  'La reprise de vos anciens devis, de votre catalogue ou d’un autre logiciel',
-  'Toute autre prestation en dehors de la mise en service',
+const DEMO_INCLUDES = [
+  'La démo s’ouvre sur un compte déjà rempli',
+  'Vous parcourez les devis, les événements, les courses',
 ];
 
 const FAQS: Faq[] = [
-  { q: 'Que comprend la mise en service ?', a: `Une formation à la prise en main, deux modèles de devis de mariage, deux modèles de devis traiteur (cocktail ou à emporter), la création des prestations qui vont avec et l’import de vos clients. Elle se paie une seule fois, au premier abonnement : ${euros(SETUP_HT)} HT, soit ${euros(FIRST_MONTH_HT)} HT le premier mois en formule mensuelle.` },
-  { q: 'Y a-t-il un essai gratuit ?', a: 'La démonstration est gratuite et sans inscription : elle s’ouvre sur un compte déjà rempli, avec des données fictives. L’abonnement commence quand vous créez votre compte.' },
-  { q: 'Comment arrêter mon abonnement ?', a: 'Depuis Paramètres, Abonnement, en un clic. Vous gardez tout jusqu’à la fin de la période payée. Ensuite, vos données restent consultables et exportables, et vous pouvez vous réabonner quand vous voulez, sans repayer la mise en service.' },
-  { q: 'Les prix sont-ils hors taxes ?', a: `Oui. La TVA de 20 % s’ajoute : ${euros(ttc(FIRST_MONTH_HT))} TTC le premier mois puis ${euros(ttc(MONTHLY_HT))} TTC par mois, ou ${euros(ttc(YEARLY_HT))} TTC par an. Vos factures sont disponibles dans le logiciel.` },
+  { q: 'Pourquoi une mise en service ?', a: 'Pour que vous ne partiez pas d’un logiciel vide. Nous le préparons avec vous, avec vos modèles de devis et vos prestations : vos premiers devis partent dès la première semaine. Elle se paie une seule fois, avec le premier mois.' },
+  { q: 'Suis-je engagé ?', a: 'Non. Vous arrêtez quand vous voulez, depuis Paramètres, Abonnement, à la fin du mois payé. Vos données restent consultables et exportables, et vous pouvez vous réabonner sans repayer la mise en service.' },
+  { q: 'Les prix sont-ils hors taxes ?', a: `Oui. Avec la TVA de 20 % : ${euros(ttc(FIRST_MONTH_HT))} TTC le premier mois, puis ${euros(ttc(MONTHLY_HT))} TTC par mois. Vos factures sont disponibles dans le logiciel.` },
   { q: 'Les brochures sont-elles comprises ?', a: 'L’outil Brochures est dans l’abonnement : vous créez les vôtres sans supplément. Si vous préférez que nous les réalisions pour vous, c’est une prestation à part, sur devis.' },
 ];
+
+const card = 'flex flex-col rounded-[28px] p-7 md:p-8';
+
+function Step({ n, when, children, className }: { n: number; when: string; children: React.ReactNode; className: string }) {
+  return (
+    <li className={`${card} ${className}`}>
+      <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-forest text-[15px] font-semibold text-white">{n}</span>
+      <h2 className="mt-5 text-[15px] font-medium text-gray-600">{when}</h2>
+      {children}
+    </li>
+  );
+}
+
+function Amount({ value, unit }: { value: string; unit?: string }) {
+  return (
+    <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+      <span className="font-display text-[44px] leading-[1.05] text-gray-900 tabular-nums">{value}</span>
+      {unit && <span className="text-gray-600">{unit}</span>}
+    </p>
+  );
+}
+
+function Included({ items }: { items: string[] }) {
+  return (
+    <ul className="mt-5 space-y-2.5">
+      {items.map((i) => (
+        <li key={i} className="flex gap-3 text-base leading-snug text-gray-800">
+          <Check className="h-5 w-5 mt-0.5 flex-shrink-0 text-primary-600" aria-hidden />
+          <span>{i}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function TarifsPage() {
   return (
@@ -66,82 +75,55 @@ export default function TarifsPage() {
       <JsonLd data={[breadcrumbSchema(crumbs), faqSchema(FAQS)]} />
       <HeroPanel
         crumbs={crumbs}
-        title="Un prix simple, tout compris"
-        lead="Nous mettons votre compte en place avec vous, puis un seul abonnement avec tout le logiciel. Au mois, ou à l’année avec un mois offert."
+        title="Un seul prix, en trois étapes"
+        lead={`Vous essayez gratuitement. Nous installons le logiciel avec vous. Ensuite, c’est ${euros(MONTHLY_HT)} HT par mois, sans engagement.`}
+        demo={false}
       />
 
-      <section aria-label="Formules" className="pt-10 md:pt-16">
-        <div className={`${container} grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-[960px]`}>
-          {PLANS.map((p) => (
-            <div key={p.name} className="rounded-[28px] bg-white ring-1 ring-black/5 p-7 md:p-9">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-gray-900">{p.name}</h2>
-                {p.badge && <span className="rounded-full bg-primary-50 px-3 py-1 text-sm font-medium text-primary-800">{p.badge}</span>}
-              </div>
-              <p className="mt-6 flex items-baseline gap-2">
-                <span className="font-display text-5xl text-gray-900 tabular-nums">{p.price}</span>
-                <span className="text-gray-600">{p.unit}</span>
+      <section aria-label="Le prix, étape par étape" className="pt-8 md:pt-12">
+        <div className={`${container} max-w-[1080px]`}>
+          <ol className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
+            <Step n={1} when="Aujourd’hui" className="bg-sage-100">
+              <Amount value="Gratuit" />
+              <p className="text-[15px] text-gray-600">Sans carte bancaire</p>
+              <Included items={DEMO_INCLUDES} />
+              <p className="mt-auto pt-7">
+                <DemoButton className="w-full" />
+                <TextLink href={DEMO.href} className="md:hidden">{DEMO.label}</TextLink>
               </p>
-              <p className="mt-1 font-medium text-gray-800">{p.then}</p>
-              <p className="mt-1 text-[15px] text-gray-500">{p.ttc}</p>
-              <p className="mt-5 site-body text-gray-700">{p.note}</p>
-              {p.bonus.length > 0 && (
-                <ul className="mt-3 space-y-2">
-                  {p.bonus.map((b) => (
-                    <li key={b} className="flex gap-3 site-body text-gray-800">
-                      <Check className="h-5 w-5 mt-1 flex-shrink-0 text-primary-600" aria-hidden />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+            </Step>
+            <Step n={2} when="Le premier mois, une seule fois" className="bg-white ring-1 ring-black/5">
+              <Amount value={euros(FIRST_MONTH_HT)} unit="HT" />
+              <p className="text-[15px] text-gray-600">{euros(ttc(FIRST_MONTH_HT))} TTC · mise en service et premier mois compris</p>
+              <Included items={SETUP_INCLUDES} />
+            </Step>
+            <Step n={3} when="Ensuite, chaque mois" className="bg-white ring-1 ring-black/5">
+              <Amount value={euros(MONTHLY_HT)} unit="HT" />
+              <p className="text-[15px] text-gray-600">{euros(ttc(MONTHLY_HT))} TTC · sans engagement</p>
+              <Included items={MONTHLY_INCLUDES} />
+            </Step>
+          </ol>
 
-        <div className={`${container} max-w-[960px] mt-8`}>
-          <h2 className="site-h2">Inclus dans les deux formules</h2>
-          <ul className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-            {INCLUDED.map((i) => (
-              <li key={i} className="flex gap-3 site-body text-gray-800">
-                <Check className="h-5 w-5 mt-1 flex-shrink-0 text-primary-600" aria-hidden />
-                <span>{i}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-8 site-body text-gray-700">
-            Avant de vous décider, <Link href={DEMO.href} className="underline underline-offset-4 text-primary-700">essayez la démonstration</Link>&nbsp;: elle est gratuite et sans inscription.
+          <p className="mt-4 lg:mt-5 rounded-[24px] bg-primary-50 px-7 py-5 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            <span className="text-[15px] text-gray-700">Votre première année, tout compris</span>
+            <strong className="font-display text-[28px] font-semibold text-gray-900 tabular-nums">{euros(FIRST_YEAR_HT)} HT</strong>
+            <span className="text-[15px] text-gray-700 lg:ml-auto">
+              {euros(FIRST_MONTH_HT)} le premier mois, puis 11 mois à {euros(MONTHLY_HT)}. Les années suivantes&nbsp;: {euros(NEXT_YEAR_HT)} HT.
+            </span>
           </p>
         </div>
       </section>
 
-      <section aria-labelledby="titre-mise-en-service" className={sectionGap}>
-        <div className={`${container} max-w-[960px]`}>
-          <div className="rounded-[28px] bg-white ring-1 ring-black/5 p-7 md:p-9">
-            <p className="text-sm font-medium text-primary-700">Au démarrage, une seule fois</p>
-            <h2 id="titre-mise-en-service" className="site-h2 mt-2">La mise en service</h2>
-            <p className="site-body text-gray-700 mt-4 max-w-[60ch]">
-              Vous ne partez pas d’un compte vide&nbsp;: nous préparons WeboDevis avec vous, pour que vos premiers devis partent dès la première semaine.
-            </p>
-            <ul className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-              {SETUP_INCLUDES.map((i) => (
-                <li key={i} className="flex gap-3 site-body text-gray-800">
-                  <Check className="h-5 w-5 mt-1 flex-shrink-0 text-primary-600" aria-hidden />
-                  <span>{i}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mt-6 rounded-[28px] bg-white ring-1 ring-black/5 p-7 md:p-9 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <section aria-labelledby="titre-options" className={sectionGap}>
+        <div className={`${container} max-w-[1080px]`}>
+          <div className="rounded-[28px] bg-white ring-1 ring-black/5 p-7 md:p-9 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <p className="text-sm font-medium text-primary-700">En plus, sur devis</p>
-              <h2 className="site-h2 mt-2">Le reste, à la demande</h2>
-              <ul className="mt-4 space-y-2 site-body text-gray-700">
+              <h2 id="titre-options" className="site-h2">En option, sur simple devis</h2>
+              <ul className="mt-5 space-y-2 site-body text-gray-700">
                 {EXTRAS.map((e) => <li key={e}>{e}</li>)}
               </ul>
             </div>
-            <Link href={QUOTE_REQUEST.href} className="inline-flex flex-shrink-0 items-center justify-center h-12 px-6 rounded-2xl bg-primary text-white font-semibold hover:bg-primary-700 transition-colors">
+            <Link href={QUOTE_REQUEST.href} className="inline-flex flex-shrink-0 items-center justify-center h-12 px-6 rounded-2xl border border-gray-300 bg-white text-gray-900 font-semibold hover:border-gray-400 transition-colors">
               {QUOTE_REQUEST.label}
             </Link>
           </div>
@@ -149,9 +131,17 @@ export default function TarifsPage() {
       </section>
 
       <section aria-labelledby="titre-questions" className={sectionGap}>
-        <div className={`${container} max-w-[960px]`}>
-          <h2 id="titre-questions" className="site-h2">Questions fréquentes</h2>
+        <div className={`${container} max-w-[1080px]`}>
+          <h2 id="titre-questions" className="site-h2">Les questions qu’on nous pose</h2>
           <div className="mt-6"><FaqList faqs={FAQS} /></div>
+        </div>
+      </section>
+
+      <section aria-labelledby="titre-essayer" className={sectionGap}>
+        <div className={`${container} max-w-[1080px] text-center`}>
+          <h2 id="titre-essayer" className="site-h2">Le mieux, c’est de l’essayer.</h2>
+          <p className="site-body text-gray-700 mt-4">La démonstration est gratuite, sans carte bancaire.</p>
+          <p className="mt-7"><DemoButton /></p>
         </div>
       </section>
     </>
