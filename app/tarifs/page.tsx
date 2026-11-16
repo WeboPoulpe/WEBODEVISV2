@@ -137,13 +137,6 @@ export default function TarifsPage() {
         </div>
       </section>
 
-      <section aria-labelledby="titre-essayer" className={sectionGap}>
-        <div className={`${container} max-w-[1080px] text-center`}>
-          <h2 id="titre-essayer" className="site-h2">Le mieux, c’est de l’essayer.</h2>
-          <p className="site-body text-gray-700 mt-4">La démonstration est gratuite, sans carte bancaire.</p>
-          <p className="mt-7"><DemoButton /></p>
-        </div>
-      </section>
     </>
   );
 }

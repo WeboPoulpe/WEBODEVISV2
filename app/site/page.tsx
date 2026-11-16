@@ -1,100 +1,76 @@
 import Link from 'next/link';
+import { Check } from 'lucide-react';
 import CoursesCalculator from '@/components/site/CoursesCalculator';
-import DashboardPreview from '@/components/site/DashboardPreview';
-import EventMarquee from '@/components/site/EventMarquee';
-import EventPreview from '@/components/site/EventPreview';
-import FeaturePreviewFor from '@/components/site/FeaturePreviews';
 import FaqList from '@/components/site/FaqList';
-import LinkList from '@/components/site/LinkList';
-import { PhoneChecklist, PhoneCourses, PhoneHome, PhoneMission, PhoneQuotes } from '@/components/site/Phone';
-import QuotePreview from '@/components/site/QuotePreview';
-import RequestPreview from '@/components/site/RequestPreview';
-import JourneyTabs, { type JourneyStep } from '@/components/site/JourneyTabs';
 import Testimonial from '@/components/site/Testimonial';
+import AutoChecklist from '@/components/site/story/AutoChecklist';
+import CrewPhones from '@/components/site/story/CrewPhones';
+import Julien from '@/components/site/story/Julien';
+import LockScreen from '@/components/site/story/LockScreen';
+import MarginCounter from '@/components/site/story/MarginCounter';
+import QuoteStepper from '@/components/site/story/QuoteStepper';
+import SignedMessages from '@/components/site/story/SignedMessages';
+import Van from '@/components/site/story/Van';
+import WeekBar from '@/components/site/story/WeekBar';
 import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
+import { EXTRAS, FIRST_MONTH_HT, MONTHLY_HT, MONTHLY_INCLUDES, PRICE_LINE, SETUP_INCLUDES, euros } from '@/lib/pricing';
 import { RELEASE } from '@/lib/site/config';
-import { FEATURE_LIST } from '@/lib/site/features';
+import { FEATURE_LIST, featureBySlug } from '@/lib/site/features';
 import { pageMetadata } from '@/lib/site/metadata';
-import { GUIDES } from '@/lib/site/guides';
-import { AUDIENCE_LINKS, FEATURES_INDEX, FEATURE_COLUMNS, GUIDES_INDEX, HOME, PRICING, QUOTE_REQUEST } from '@/lib/site/pages';
+import { GUIDES_INDEX, HOME, PRICING, QUOTE_REQUEST } from '@/lib/site/pages';
 import { breadcrumbSchema, faqSchema, organizationSchema, softwareSchema, websiteSchema, type Faq } from '@/lib/site/schema';
-import { fr } from '@/lib/site/typo';
-import { PRICE_LINE } from '@/lib/pricing';
+import { INVOICED, SENT, STORY } from '@/lib/site/story';
 
 // L'accueil du site (servi à l'adresse « / » pour un visiteur sans session).
+// Il raconte la semaine de Julien, un traiteur inventé : chaque jour montre ce que le logiciel change, avec un seul
+// lien vers la page détaillée. L'histoire mène au tarif, puis à la démonstration. Chiffres : lib/site/story.
 const TITLE = 'WeboDevis : le logiciel des traiteurs, du devis à l’événement';
 const DESCRIPTION =
   'Logiciel pour traiteurs : brochure en ligne, devis signés en ligne, événements, liste de courses calculée par convive, extras, factures et l’assistant Webo. Sur téléphone, tablette et ordinateur.';
 
 export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: HOME.href });
 
-const two = 'grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-10';
+const two = 'grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-10 lg:items-center';
+const when = 'text-sm font-semibold uppercase tracking-[0.06em]';
+const before = 'mt-6 max-w-[40ch] border-l-[3px] border-primary-300 pl-4 font-display text-[19px] italic leading-snug';
+const darkLink = 'rounded text-base font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white';
+/** Julien à côté d'un visuel : devant lui sur grand écran, posé dessus sur téléphone. */
+const stage = 'flex flex-col items-start md:flex-row md:items-end';
+const stageFigure = 'relative z-10 ml-3 -mb-4 w-[112px] flex-shrink-0 md:ml-0 md:mb-0 md:-mr-5 md:w-[150px]';
 
-// Les écrans de l'app qu'on fait défiler au doigt : chacun mène à sa page.
-const SCREENS = [
-  { Screen: PhoneQuotes, href: '/fonctionnalites/devis-traiteur', title: 'Les devis', text: 'Chaque devis avec sa date, son statut et son montant.' },
-  { Screen: PhoneChecklist, href: '/fonctionnalites/evenements', title: 'L’événement', text: 'La checklist, le matériel, les courses, les extras.' },
-  { Screen: PhoneCourses, href: '/fonctionnalites/liste-de-courses', title: 'Les courses', text: 'La liste à cocher, rayon par rayon.' },
-  { Screen: PhoneMission, href: '/fonctionnalites/extras', title: 'La mission d’un extra', text: 'Ce que votre extra voit en ouvrant son lien.' },
-];
-
-// Une affaire, étape par étape : la frise de l'accueil.
-const JOURNEY: JourneyStep[] = [
-  {
-    key: 'demande',
-    label: 'Demande',
-    title: 'Plus aucune demande perdue dans vos mails.',
-    body: (
-      <p>
-        Vos futurs clients remplissent un formulaire à votre nom, à partager par lien ou à poser sur votre site. La demande arrive dans l’application avec la date, le type d’événement et le nombre de personnes, et chacun reçoit son email.
-      </p>
-    ),
-    link: { href: '/fonctionnalites/demandes-de-devis', label: 'Les demandes de devis, en détail' },
-    preview: <RequestPreview />,
-  },
-  {
-    key: 'devis',
-    label: 'Devis',
-    title: 'Un devis soigné, signé en ligne.',
-    body: (
-      <p>
-        Trois étapes pour le créer, vos modèles pour ne pas repartir de zéro. Votre client le reçoit par lien, le lit sur son téléphone et le signe en ligne. Le statut suit l’affaire jusqu’au paiement.
-      </p>
-    ),
-    link: { href: '/fonctionnalites/devis-traiteur', label: 'Les devis, en détail' },
-    preview: <QuotePreview />,
-  },
-  {
-    key: 'evenement',
-    label: 'Événement',
-    title: 'Devis signé, l’événement est prêt à préparer.',
-    body: (
-      <p>
-        Il arrive avec sa checklist, son matériel, sa liste de courses et ses extras. Chaque extra ouvre son lien et retrouve ses missions.
-      </p>
-    ),
-    link: { href: '/fonctionnalites/evenements', label: 'Les événements, en détail' },
-    preview: <EventPreview />,
-  },
+/** « Pour aller plus loin » : les fonctions, rangées comme un traiteur range son métier. */
+const MORE: { title: string; slugs: string[] }[] = [
+  { title: 'Gestion commerciale', slugs: ['demandes-de-devis', 'brochures-traiteur', 'devis-traiteur', 'signature-devis-en-ligne', 'clients', 'assistant-webo'] },
+  { title: 'Organisation', slugs: ['evenements', 'liste-de-courses', 'extras', 'stock-et-fournisseurs', 'allergenes', 'application-mobile'] },
+  { title: 'Gestion', slugs: ['calendrier', 'facturation', 'facture-electronique', 'suivi-financier', 'equipe'] },
 ];
 
 const FAQS: Faq[] = [
-  { q: 'À qui s’adresse WeboDevis ?', a: 'Aux traiteurs, qu’ils travaillent seuls ou en équipe : mariages, réceptions privées, événements d’entreprise, séminaires. Le logiciel suit une affaire de la demande reçue jusqu’à l’événement servi.' },
-  { q: 'Quand WeboDevis sort-il ?', a: `La version ${RELEASE.version}, première version publique, sort le ${RELEASE.dateLabel}.` },
-  { q: 'Peut-on essayer le logiciel avant sa sortie ?', a: 'Oui. Vous laissez votre nom, votre email et votre téléphone, puis la démonstration s’ouvre sur un compte déjà rempli de données fictives, pour parcourir les devis, les événements et la liste de courses. Rien de ce que vous y modifiez n’est enregistré : ce compte ne sert pas à travailler sur vos vraies données.' },
+  { q: 'À qui s’adresse WeboDevis ?', a: 'Aux traiteurs, qu’ils travaillent seuls ou en équipe : mariages, réceptions privées, événements d’entreprise, séminaires. Le logiciel suit une affaire de la demande reçue jusqu’à la facture payée.' },
   { q: 'Combien coûte WeboDevis ?', a: `${PRICE_LINE}. La démonstration est gratuite. La page Tarifs détaille tout.` },
-  { q: 'Faut-il installer quelque chose ?', a: 'Non. WeboDevis s’ouvre dans un navigateur, sur ordinateur, tablette et téléphone. Sur téléphone, vous pouvez l’ajouter à l’écran d’accueil pour l’ouvrir comme une application. Une connexion internet est nécessaire, sauf pour consulter « Ma journée ».' },
-  { q: 'WeboDevis a-t-il une intelligence artificielle ?', a: 'Oui : Webo, l’assistant intégré. Il prépare un devis, une relance, une checklist ou une facture à partir d’une phrase, d’une dictée ou d’une photo, et vous le présente. Rien n’est enregistré ni envoyé sans votre validation.' },
-  { q: 'Puis-je travailler à plusieurs ?', a: 'Oui. Vous invitez vos collaborateurs, chacun avec son rôle : gérant, collaborateur ou consultation. Toute l’entreprise partage les devis, les clients, le catalogue et le stock.' },
-  { q: 'Mon client doit-il créer un compte pour lire son devis ?', a: 'Non. Il reçoit un email avec un lien, ouvre le devis en ligne, et peut l’imprimer ou l’enregistrer en PDF.' },
-  { q: 'Puis-je garder mes anciens devis ?', a: 'Oui. Un devis fait ailleurs s’importe avec son client, sa date, son montant et son fichier d’origine, conservé tel quel.' },
+  { q: 'Faut-il installer quelque chose ?', a: 'Non. WeboDevis s’ouvre dans un navigateur, sur ordinateur, tablette et téléphone. Sur téléphone, vous pouvez l’ajouter à l’écran d’accueil pour l’ouvrir comme une application.' },
+  { q: 'Peut-on essayer le logiciel avant de s’abonner ?', a: `Oui. La démonstration est gratuite, sans carte bancaire : vous laissez votre nom, votre email et votre téléphone, puis elle s’ouvre sur un compte déjà rempli de données fictives. La version ${RELEASE.version}, première version publique, sort le ${RELEASE.dateLabel}.` },
+  { q: 'Puis-je garder mes anciens devis ?', a: 'Oui. Un devis fait ailleurs s’importe avec son client, sa date, son montant et son fichier d’origine, conservé tel quel. Si vous préférez que nous reprenions vos clients et vos devis pour vous, c’est une option, sur devis.' },
 ];
 
 const crumbs = [{ name: HOME.label, path: HOME.href }];
 
+function Included({ items }: { items: string[] }) {
+  return (
+    <ul className="mt-5 space-y-2.5">
+      {items.map((i) => (
+        <li key={i} className="flex gap-3 text-base leading-snug text-white/85">
+          <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary-300" aria-hidden />
+          <span>{i}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function SitePage() {
   return (
-    <>
+    <div className="story">
       <JsonLd data={[
         organizationSchema(),
         websiteSchema(),
@@ -103,229 +79,223 @@ export default function SitePage() {
         faqSchema(FAQS),
       ]} />
 
-      {/* ── Ouverture : le titre en très grand, puis le produit qui sort du panneau vert ── */}
-      <section className="relative">
-        <div aria-hidden className="absolute inset-x-2 sm:inset-x-2.5 -top-px bottom-[310px] md:bottom-48 lg:bottom-64 rounded-b-[28px] bg-forest" />
-        <div className={`${container} relative`}>
-          <div className="site-dark grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-x-14 gap-y-6 lg:items-end pt-7 sm:pt-12 lg:pt-16">
+      {/* ── Lundi, 7 h 30 : les demandes du week-end ── */}
+      <section id="lun" aria-labelledby="titre-lun" className="relative">
+        <div aria-hidden className="absolute inset-x-2 sm:inset-x-2.5 -top-px bottom-0 rounded-b-[28px] bg-forest" />
+        <div className={`${container} relative site-dark`}>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-x-12 gap-y-9 lg:items-end pt-7 sm:pt-12 lg:pt-16 pb-10 lg:pb-14">
             <div>
-              <h1 className="site-hero-title font-display text-white">
-                Le logiciel des&nbsp;<span className="site-swoosh">traiteurs
-                  <svg aria-hidden viewBox="0 0 300 24" preserveAspectRatio="none">
-                    <path d="M4 16 C 70 4, 160 2, 296 12" pathLength="1" fill="none" stroke="rgb(var(--p-400))" strokeWidth="9" strokeLinecap="round" />
-                  </svg>
-                </span>.
+              <h1 id="titre-lun" className="text-white">
+                <span className="block text-base font-medium text-white/60">WeboDevis, le logiciel des traiteurs</span>
+                <span className={`${when} mt-6 block text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30</span>
+                <span className="site-page-title font-display mt-3 block max-w-[13ch]">Six demandes sont arrivées ce week-end.</span>
               </h1>
-              <p className="site-tagline font-display text-primary-300 mt-5 lg:mt-7 max-w-[17ch] sm:max-w-none">Du premier devis au dernier couvert servi.</p>
-            </div>
-            <div className="lg:pb-2">
-              <p className="site-lead text-white/70 max-w-[46ch]">
-                Les demandes, les devis, les événements, les courses et l’équipe se préparent au même endroit, sur le téléphone comme au bureau.
+              <p className="site-lead text-white/75 mt-6 max-w-[44ch]">
+                Moi, c’est Julien, traiteur à Troyes. Je dormais. Ma brochure, elle, a travaillé. Voici ma semaine avec WeboDevis.
               </p>
               <DemoButton className="mt-7" />
-              <p className="text-[15px] leading-relaxed text-white/60 mt-5 md:mt-6 max-w-[46ch]">
-                Sortie de la version {RELEASE.version} le {RELEASE.dateLabel}.
-              </p>
-              <p className="text-[15px] leading-relaxed text-white/60 mt-2 max-w-[46ch]">
-                Mise en service avec vous, puis <span className="font-semibold text-white">100&nbsp;€&nbsp;HT par mois</span>, sans engagement.{' '}
+              <p className="text-[15px] leading-relaxed text-white/65 mt-5 max-w-[46ch]">
+                {PRICE_LINE}.{' '}
                 <Link href={PRICING.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">Les tarifs</Link>
               </p>
+              <p className="text-[15px] leading-relaxed text-white/50 mt-2">
+                Sortie de la version {RELEASE.version} le <time dateTime={RELEASE.date}>{RELEASE.dateLabel}</time>.
+              </p>
+            </div>
+            <div className="flex items-end justify-center lg:justify-end">
+              <Julien pose="cafe" disc="dark" title="Julien, traiteur, son café dans une main et son téléphone dans l’autre" className="relative z-10 -mr-4 w-[112px] flex-shrink-0 sm:w-[150px]" />
+              <LockScreen className="w-full max-w-[270px]" />
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Téléphone : l'app dans sa main. À partir de la tablette : le tableau de bord. */}
-          <div className="md:hidden flex justify-center mt-9">
-            <PhoneHome className="site-settle" />
+      <WeekBar />
+
+      {/* ── Lundi, 9 h : les devis partent ── */}
+      <section id="devis" aria-labelledby="titre-devis" className="pt-16 md:pt-24">
+        <div className={`${container} site-reveal ${two}`}>
+          <div>
+            <p className={`${when} text-primary`}>Lundi, 9&nbsp;h · au bureau</p>
+            <h2 id="titre-devis" className="site-h2 mt-3 max-w-[16ch]">À 9&nbsp;h&nbsp;30, les six devis sont partis.</h2>
+            <p className="site-body text-gray-700 mt-5 max-w-[46ch]">
+              Je pars de mon modèle «&nbsp;mariage&nbsp;», je change le nombre de convives, le prix suit. Le client reçoit son devis par mail ou WhatsApp, avec ma brochure.
+            </p>
+            <p className={`${before} text-gray-600`}>Avant, c’était mon dimanche soir sur Word.</p>
+            <ul aria-label="Les six devis envoyés" className="mt-6 flex flex-wrap gap-1.5">
+              {SENT.map((s) => (
+                <li key={s} className="rounded-full bg-sage-100 px-3 py-1 text-[13px] text-sage">{s} · envoyé</li>
+              ))}
+            </ul>
+            <p className="mt-6"><TextLink href="/fonctionnalites/devis-traiteur">Les devis, en détail</TextLink></p>
           </div>
-          <DashboardPreview className="hidden md:flex site-settle mt-12 lg:mt-16" />
-          <p className="text-sm text-gray-500 mt-4 text-center md:text-left">
-            Les écrans de ce site sont des aperçus, remplis avec des données d’exemple.
+          <div className={stage}>
+            <Julien pose="bureau" className={stageFigure} />
+            <QuoteStepper className="w-full md:flex-1 lg:-rotate-[1.5deg]" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Mercredi : le devis est signé ── */}
+      <section id="mer" aria-labelledby="titre-mer" className="mx-2 sm:mx-2.5 mt-16 md:mt-24 overflow-hidden rounded-[28px] bg-primary-50">
+        <div className={`${container} py-14 md:py-20 text-center`}>
+          <Van className="mx-auto mb-7 w-[260px] sm:w-[300px]" />
+          <p className={`${when} text-primary`}>Mercredi, 14&nbsp;h&nbsp;12 · dans le camion</p>
+          <h2 id="titre-mer" className="site-h2 mt-3 mx-auto max-w-[16ch]">Mon téléphone vibre. Léa a signé.</h2>
+          <SignedMessages className="mt-9" />
+          <p className="site-body text-gray-700 mt-8 mx-auto max-w-[46ch]">
+            Je n’ai rien ressaisi. Le mariage est dans mon calendrier, avec tout ce qu’il faut pour le préparer.
+          </p>
+          <p className="mt-6"><TextLink href="/fonctionnalites/signature-devis-en-ligne">La signature en ligne, en détail</TextLink></p>
+        </div>
+      </section>
+
+      {/* ── Jeudi : les courses se recalculent ── */}
+      <section id="jeu" aria-labelledby="titre-jeu" className="site-dark mx-2 sm:mx-2.5 mt-16 md:mt-24 overflow-hidden rounded-[28px] bg-forest text-white">
+        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-x-16 gap-y-10 py-14 md:py-20 lg:items-center`}>
+          <div>
+            <p className={`${when} text-primary-300`}>Jeudi, 6&nbsp;h · avant le marché</p>
+            <h2 id="titre-jeu" className="site-h2 mt-3 max-w-[15ch]">Léa rappelle&nbsp;: ils seront {STORY.finalGuests}.</h2>
+            <p className="site-body text-white/75 mt-5 max-w-[46ch]">
+              Je change le chiffre, c’est tout. Les quantités, la liste par fournisseur et le devis se recalculent. Faites-le vous-même&nbsp;: tout suit.
+            </p>
+            <p className={`${before} text-white/70`}>Avant, je refaisais mes règles de trois sur un coin de table.</p>
+            <p className="mt-6"><Link href="/fonctionnalites/liste-de-courses" className={darkLink}>La liste de courses, en détail</Link></p>
+            <Julien pose="caisse" disc="dark" className="mt-8 w-[120px] md:w-[150px]" />
+          </div>
+          <CoursesCalculator initial={STORY.guests} />
+        </div>
+      </section>
+
+      {/* ── Vendredi : les extras savent où aller ── */}
+      <section id="ven" aria-labelledby="titre-ven" className="pt-16 md:pt-24">
+        <div className={`${container} site-reveal text-center`}>
+          <Julien pose="detente" className="mx-auto mb-5 w-[120px] md:w-[150px]" />
+          <p className={`${when} text-primary`}>Vendredi, 18&nbsp;h · la veille</p>
+          <h2 id="titre-ven" className="site-h2 mt-3 mx-auto max-w-[18ch]">Personne ne m’appelle pour redemander l’adresse.</h2>
+          <p className="site-body text-gray-700 mt-5 mx-auto max-w-[46ch]">
+            Mes huit extras ont reçu leur mission sur leur portable&nbsp;: le lieu, l’heure, la tenue, leur poste.
+          </p>
+          <CrewPhones className="mt-10" />
+          <p className="mt-8"><TextLink href="/fonctionnalites/extras">La gestion des extras, en détail</TextLink></p>
+        </div>
+      </section>
+
+      {/* ── Samedi : le jour du mariage ── */}
+      <section id="sam" aria-labelledby="titre-sam" className="mx-2 sm:mx-2.5 mt-16 md:mt-24 rounded-[28px] bg-sage-100">
+        <div className={`${container} ${two} py-14 md:py-20`}>
+          <div>
+            <p className={`${when} text-sage`}>Samedi, 13&nbsp;h · on charge</p>
+            <h2 id="titre-sam" className="site-h2 mt-3 max-w-[14ch]">Je coche, je sers, je ne cherche rien.</h2>
+            <p className="site-body text-gray-700 mt-5 max-w-[46ch]">
+              Feuille de production en cuisine, feuille d’envoi au camion, checklist sur place. Toute l’équipe lit la même chose.
+            </p>
+            <p className="mt-6"><TextLink href="/fonctionnalites/evenements">Les événements, en détail</TextLink></p>
+          </div>
+          <div className={stage}>
+            <Julien pose="plateau" disc="sage" className={stageFigure} />
+            <AutoChecklist className="w-full md:flex-1" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Lundi suivant : la facture et la marge ── */}
+      <section id="fin" aria-labelledby="titre-fin" className="pt-16 md:pt-24">
+        <div className={`${container} text-center`}>
+          <Julien pose="victoire" className="mx-auto mb-5 w-[120px] md:w-[150px]" />
+          <p className={`${when} text-primary`}>Lundi suivant, 8&nbsp;h</p>
+          <h2 id="titre-fin" className="site-h2 mt-3 mx-auto max-w-[20ch]">La facture part en un clic. Et je sais ce que j’ai gagné.</h2>
+          <MarginCounter className="mt-8 text-[clamp(4rem,13vw,8.75rem)]" />
+          <p className="mt-2 text-gray-600">de marge sur le mariage de Léa et Hugo</p>
+          <dl className="mt-6 flex flex-wrap justify-center gap-x-7 gap-y-1 text-[15px] text-gray-600">
+            <div className="flex gap-1.5"><dt>Facturé</dt><dd className="font-semibold text-gray-900 tabular-nums">{euros(INVOICED)}</dd></div>
+            <div className="flex gap-1.5"><dt>Encaissé</dt><dd className="font-semibold text-gray-900 tabular-nums">{euros(INVOICED)}</dd></div>
+            <div className="flex gap-1.5"><dt>Reste à payer</dt><dd className="font-semibold text-gray-900 tabular-nums">{euros(0)}</dd></div>
+          </dl>
+          <p className="site-body text-gray-700 mt-7 mx-auto max-w-[46ch]">
+            Et il est 8&nbsp;h&nbsp;05&nbsp;: trois nouvelles demandes sont arrivées ce week-end.
+          </p>
+          <p className="mt-6"><TextLink href="/fonctionnalites/facturation">Les factures, en détail</TextLink></p>
+          <p className="mt-8 text-sm text-gray-500">Julien est un personnage&nbsp;: sa semaine et ses chiffres sont un exemple.</p>
+        </div>
+      </section>
+
+      {/* ── Après l'histoire inventée, la parole d'un vrai traiteur ── */}
+      <Testimonial className="pt-16 md:pt-24" />
+
+      {/* ── Le tarif ── */}
+      <section id="tarif" aria-labelledby="titre-tarif" className="site-dark mx-2 sm:mx-2.5 mt-16 md:mt-24 rounded-[28px] bg-forest text-white">
+        <div className={`${container} py-14 md:py-20`}>
+          <p className={`${when} text-primary-300`}>Et pour commencer&nbsp;?</p>
+          <h2 id="titre-tarif" className="site-h2 mt-3 max-w-[16ch]">Vous ne partez pas d’un logiciel vide.</h2>
+          <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+            <div className="rounded-[24px] bg-white/[0.06] p-7 ring-1 ring-white/10">
+              <h3 className="text-[15px] font-medium text-primary-300">1. Le premier mois, une seule fois</h3>
+              <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+                <span className="font-display text-[52px] leading-none tabular-nums">{euros(FIRST_MONTH_HT)}</span>
+                <span className="text-white/65">HT, mise en service comprise</span>
+              </p>
+              <p className="mt-3 text-white/75">Nous installons votre logiciel avec vous.</p>
+              <Included items={SETUP_INCLUDES} />
+            </div>
+            <div className="rounded-[24px] bg-white/[0.06] p-7 ring-1 ring-white/10">
+              <h3 className="text-[15px] font-medium text-primary-300">2. Ensuite, chaque mois</h3>
+              <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+                <span className="font-display text-[52px] leading-none tabular-nums">{euros(MONTHLY_HT)}</span>
+                <span className="text-white/65">HT par mois</span>
+              </p>
+              <p className="mt-3 text-white/75">Sans engagement, vous arrêtez quand vous voulez.</p>
+              <Included items={MONTHLY_INCLUDES} />
+            </div>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
+            <DemoButton />
+            <Link href={PRICING.href} className={darkLink}>Le détail des tarifs</Link>
+          </div>
+          <p className="mt-6 text-[15px] text-white/60 max-w-[70ch]">
+            En option, sur devis&nbsp;: {EXTRAS.map((e) => e.charAt(0).toLowerCase() + e.slice(1)).join(' ; ')}.{' '}
+            <Link href={QUOTE_REQUEST.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">{QUOTE_REQUEST.label}</Link>
           </p>
         </div>
       </section>
 
-      {/* ── Les occasions, en bandeau qui défile, puis la parole d'un traiteur ── */}
-      <EventMarquee className="mt-14 md:mt-20" />
-      <Testimonial className="pt-14 md:pt-20 lg:pt-24" />
-
-      {/* ── Une affaire en trois étapes, en frise : demande, devis, événement ── */}
-      <section id="parcours" aria-labelledby="titre-parcours" className={sectionGap}>
+      {/* ── Pour aller plus loin : les pages détaillées ── */}
+      <section aria-labelledby="titre-plus" className={sectionGap}>
         <div className={container}>
-          <h2 id="titre-parcours" className="site-h1 font-display max-w-[14ch]">Une affaire, de la demande au service.</h2>
-          <div className="site-reveal mt-10 md:mt-14">
-            <JourneyTabs steps={JOURNEY} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Les nouveautés fortes : la brochure qui attire, l'assistant qui prépare ── */}
-      <section id="brochures" aria-labelledby="titre-brochures" className={sectionGap}>
-        <div className={`${container} site-reveal ${two} lg:items-center`}>
-          <div>
-            <h2 id="titre-brochures" className="site-h2">Votre carte devient une brochure qui ramène des clients.</h2>
-            <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
-              La brochure se fait à partir de votre catalogue, avec ses photos et ses prix à jour. Votre client la feuillette sur son téléphone, et la dernière page est un formulaire&nbsp;: sa demande arrive dans vos prospects, prête à devenir un devis.
-            </p>
-            <p className="site-body text-gray-700 mt-4 max-w-[52ch]">
-              Un lien par client ou par source, un QR code pour vos salons, des images pour Instagram&nbsp;: vous savez d’où viennent vos demandes.
-            </p>
-            <p className="mt-6"><TextLink href="/fonctionnalites/brochures-traiteur">Les brochures, en détail</TextLink></p>
-          </div>
-          <FeaturePreviewFor kind="brochure" />
-        </div>
-      </section>
-
-      <section id="webo" aria-labelledby="titre-webo" className={sectionGap}>
-        <div className={`${container} site-reveal grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-x-16 gap-y-10 lg:items-center`}>
-          <div className="lg:order-2">
-            <h2 id="titre-webo" className="site-h2">Webo prépare. Vous validez.</h2>
-            <p className="site-body text-gray-700 mt-6 max-w-[52ch]">
-              Webo, l’assistant de WeboDevis, prépare un devis, une relance, une checklist ou une facture à partir d’une phrase, d’une dictée ou de la photo d’un menu. Il prend vos prix dans votre catalogue et retient vos habitudes.
-            </p>
-            <p className="site-body text-gray-700 mt-4 max-w-[52ch]">
-              Chaque action vous est présentée avant d’être faite&nbsp;: rien ne s’enregistre et rien ne part sans votre accord.
-            </p>
-            <p className="mt-6"><TextLink href="/fonctionnalites/assistant-webo">Webo, en détail</TextLink></p>
-          </div>
-          <div className="lg:order-1"><FeaturePreviewFor kind="webo" /></div>
-        </div>
-      </section>
-
-      {/* ── Le calcul des courses : le moment fort du produit, en très grand ── */}
-      <section aria-labelledby="titre-courses" className="site-dark mx-2 sm:mx-2.5 mt-20 md:mt-28 lg:mt-36 rounded-[28px] bg-forest text-white overflow-hidden">
-        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-x-16 gap-y-10 py-14 md:py-20 lg:py-24 lg:items-center`}>
-          <div>
-            <h2 id="titre-courses" className="site-h2 max-w-[16ch]">Vos courses, calculées au gramme près.</h2>
-            <p className="site-body text-white/75 mt-6 max-w-[52ch]">
-              Chaque prestation de votre catalogue porte ses ingrédients et leur quantité par personne. WeboDevis les multiplie par le nombre de couverts, additionne ce qui revient dans plusieurs plats, et range la liste par fournisseur.
-            </p>
-            <p className="site-body text-white/75 mt-4 max-w-[52ch]">Faites varier les couverts&nbsp;: tout suit.</p>
-            <p className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-base font-semibold">
-              <Link href="/fonctionnalites/liste-de-courses" className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">La liste de courses, en détail</Link>
-              <Link href="/guides/calculer-quantites-par-convive" className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Guide&nbsp;: les quantités par convive</Link>
-            </p>
-          </div>
-          <CoursesCalculator />
-        </div>
-      </section>
-
-      {/* ── L'app, écran par écran : à faire défiler au doigt ── */}
-      <section aria-labelledby="titre-ecrans" className={sectionGap}>
-        <div className={container}>
-          <h2 id="titre-ecrans" className="site-h2 max-w-[16ch]">L’application, écran par écran.</h2>
-          <p className="site-body text-gray-700 mt-5 max-w-[52ch]">
-            Sur téléphone, WeboDevis s’ajoute à l’écran d’accueil et s’ouvre en plein écran. Au centre de la barre, le «&nbsp;+&nbsp;» crée un devis.
-          </p>
-        </div>
-        <div className="mx-auto w-full max-w-[1240px] lg:px-8 mt-9 md:mt-12">
-          <ul className="site-rail gap-5 px-5 sm:px-8 pb-2 lg:grid lg:grid-cols-4 lg:gap-6 lg:px-0">
-            {SCREENS.map(({ Screen, href, title, text }) => (
-              <li key={href} className="w-[288px] lg:w-auto">
-                <Screen />
-                <Link href={href} className="group block mt-5 px-1 rounded-lg">
-                  <span className="block font-display text-xl font-semibold tracking-[-0.01em] text-gray-900 underline-offset-4 group-hover:underline">{title}</span>
-                  <span className="block text-base leading-relaxed text-gray-600 mt-1">{text}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className={container}>
-          <p className="mt-8"><TextLink href="/fonctionnalites/application-mobile">L’application mobile, en détail</TextLink></p>
-        </div>
-      </section>
-
-      {/* ── Toutes les fonctionnalités, par étape du métier ── */}
-      <section id="fonctionnalites" aria-labelledby="titre-fonctions" className="site-dark mx-2 sm:mx-2.5 mt-20 md:mt-28 lg:mt-36 rounded-[28px] bg-forest text-white">
-        <div className={`${container} py-14 md:py-20 lg:py-24`}>
-          <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
-            <h2 id="titre-fonctions" className="site-h1 font-display max-w-[12ch]">Tout ce que fait WeboDevis.</h2>
-            <p>
-              <Link href={FEATURES_INDEX.href} className="rounded text-base font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">La vue d’ensemble</Link>
-            </p>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-10 mt-10 md:mt-14">
-            {FEATURE_COLUMNS.map((group) => (
+          <h2 id="titre-plus" className="site-h2">Pour aller plus loin</h2>
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-9">
+            {MORE.map((group) => (
               <div key={group.title}>
-                <h3 className="text-base text-white/55 pb-3">{group.title}</h3>
-                <LinkList links={group.links} columns={1} tone="dark" />
+                <h3 className="border-b border-gray-300/70 pb-3 text-[15px] font-medium text-gray-600">{group.title}</h3>
+                <ul className="mt-2">
+                  {group.slugs.map((slug) => {
+                    const f = featureBySlug(slug);
+                    return f && (
+                      <li key={slug}>
+                        <Link href={f.href} className="inline-block rounded py-1.5 text-[17px] text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900">{f.label}</Link>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── Pour qui ── */}
-      <section aria-labelledby="titre-pour-qui" className={sectionGap}>
-        <div className={container}>
-          <h2 id="titre-pour-qui" className="site-h2">Pour quel traiteur&nbsp;?</h2>
-          <LinkList links={AUDIENCE_LINKS} columns={3} className="mt-8 md:mt-10" />
-        </div>
-      </section>
-
-      {/* ── Sortie de la version 0.1 ── */}
-      <section aria-labelledby="titre-sortie" className={sectionGap}>
-        <div className={container}>
-          <div className="rounded-[28px] bg-white border border-gray-200 px-6 py-10 sm:px-10 md:py-14 lg:px-16 grid grid-cols-1 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] gap-x-16 gap-y-7 lg:items-end">
-            <div>
-              <p className="text-base text-gray-600">Sortie de la version {RELEASE.version}</p>
-              <h2 id="titre-sortie" className="site-h1 font-display mt-3">
-                <time dateTime={RELEASE.date}>{RELEASE.dateLabel}</time>
-              </h2>
-            </div>
-            <div>
-              <p className="site-body text-gray-700 max-w-[46ch]">
-                La première version publique couvre le métier d’un bout à l’autre&nbsp;: brochures, demandes, devis signés en ligne, événements, liste de courses, extras, stock, factures, et l’assistant Webo.
-              </p>
-              <p className="site-body text-gray-700 mt-4 max-w-[46ch]">
-                D’ici là, la démonstration est ouverte, sur un compte rempli de données fictives. Ensuite&nbsp;: une mise en service avec vous, puis <strong className="font-semibold text-gray-900">100&nbsp;€&nbsp;HT par mois</strong>, sans engagement.
-              </p>
-              <p className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-                <DemoButton />
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Guides : des couvertures à faire défiler ── */}
-      <section aria-labelledby="titre-guides" className={sectionGap}>
-        <div className={`${container} flex flex-wrap items-end justify-between gap-x-10 gap-y-4`}>
-          <div>
-            <h2 id="titre-guides" className="site-h2 max-w-[13ch]">Des guides écrits pour le métier.</h2>
-            <p className="site-body text-gray-700 mt-5 max-w-[44ch]">
-              Des méthodes à appliquer dès le prochain événement, avec ou sans logiciel.
-            </p>
-          </div>
-          <p><TextLink href={GUIDES_INDEX.href}>Tous les guides</TextLink></p>
-        </div>
-        <div className="mx-auto w-full max-w-[1240px] lg:px-8 mt-9 md:mt-12">
-          <ul className="site-rail gap-3 px-5 sm:px-8 pb-2 lg:grid lg:grid-cols-5 lg:px-0">
-            {GUIDES.map((g) => (
-              <li key={g.slug} className="w-[272px] lg:w-auto">
-                <Link href={g.href} className="site-lift group flex flex-col h-full min-h-[300px] lg:min-h-[340px] rounded-3xl bg-white border border-gray-200 p-6 hover:border-gray-300 transition-colors">
-                  <span className="text-sm text-gray-500">{g.minutes} min de lecture</span>
-                  <span className="block font-display text-[24px] font-semibold leading-[1.12] tracking-[-0.02em] text-gray-900 mt-4 underline-offset-4 decoration-2 group-hover:underline">{fr(g.title)}</span>
-                  <span className="block text-[15px] leading-relaxed text-gray-600 mt-auto pt-6">{fr(g.blurb)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-8"><TextLink href={GUIDES_INDEX.href}>Les guides, écrits pour le métier</TextLink></p>
         </div>
       </section>
 
       {/* ── Questions fréquentes ── */}
       <section aria-labelledby="titre-questions" className={sectionGap}>
-        <div className={`${container} ${two}`}>
+        <div className={`${container} grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-10`}>
           <div>
             <h2 id="titre-questions" className="site-h2 max-w-[12ch]">Questions fréquentes</h2>
             <p className="site-body text-gray-700 mt-5 max-w-[36ch]">
-              Une autre question, ou besoin d’une proposition pour votre maison ? <TextLink href={QUOTE_REQUEST.href}>{QUOTE_REQUEST.label}</TextLink>
+              Une autre question&nbsp;? <TextLink href={QUOTE_REQUEST.href}>Écrivez-nous</TextLink>
             </p>
           </div>
           <FaqList faqs={FAQS} />
         </div>
       </section>
-    </>
+    </div>
   );
 }
