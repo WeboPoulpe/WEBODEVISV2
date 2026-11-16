@@ -104,3 +104,33 @@ it('une table non suivie n’écrit rien', async () => {
   await run({ table: 'notifications', op: 'insert', values: { user_id: ME, title: 't', message: 'm', type: 'info' } });
   expect(await rows()).toEqual([]);
 });
+
+it('un import en lots de 100 (comme l’import de clients) ne fait qu’une ligne', async () => {
+  const many = (n: number, from: number) => Array.from({ length: n }, (_, i) => customer(`Lot${from + i}`, `Nom${from + i}`));
+  await run({ table: 'customers', op: 'insert', values: many(100, 0) });
+  await run({ table: 'customers', op: 'insert', values: many(100, 100) });
+  await run({ table: 'customers', op: 'insert', values: many(15, 200) });
+  const r = await rows();
+  expect(r).toHaveLength(1);
+  expect((r[0] as unknown as { details: { n: number } }).details.n).toBe(215);
+});
+
+it('les lignes complètes ne repartent pas vers le serveur pour une modification', async () => {
+  const spy = vi.spyOn(pg, 'query');
+  await run({ table: 'quote_services', op: 'update', values: { quantity: 4 }, filters: [{ column: 'id', op: 'eq', value: LINE }] as QueryDescriptor['filters'] });
+  const sqls = spy.mock.calls.map((c) => String(c[0]));
+  spy.mockRestore();
+  expect(sqls.some((q) => q.includes('row_to_json(t0)) from m t0'))).toBe(false);
+});
+
+it('le repère interne des lignes écrites ne part pas vers le navigateur', async () => {
+  const r = await run({ table: 'customers', op: 'insert', values: customer('Repere', 'Test'), single: 'single' });
+  expect(r.data).not.toHaveProperty('activity_ctid');
+  const u = await run({ table: 'quote_services', op: 'update', values: { quantity: 5 }, filters: [{ column: 'id', op: 'eq', value: LINE }] as QueryDescriptor['filters'] });
+  expect((u.data as object[])[0]).not.toHaveProperty('activity_ctid');
+});
+
+it('ni pour un compte de démo', async () => {
+  const r = await run({ table: 'customers', op: 'insert', values: customer('Demo', 'Repere', DEMO_USER_ID), single: 'single' }, { uid: DEMO_USER_ID });
+  expect(r.data).not.toHaveProperty('activity_ctid');
+});

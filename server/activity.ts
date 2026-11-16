@@ -2,7 +2,7 @@
 
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
-import { ACTIVITY_ACTIONS, ACTIVITY_ENTITIES, entityHref, type ActivityAction, type ActivityEntity } from '@/lib/activity';
+import { activitySummary, ACTIVITY_ACTIONS, ACTIVITY_ENTITIES, entityHref, type ActivityAction, type ActivityEntity } from '@/lib/activity';
 import { companyOf } from './companyScope';
 import { requireUser } from './session';
 
@@ -52,7 +52,7 @@ const DENIED: ActivityPage = { allowed: false, entries: [], next: null, people: 
 
 /** Éléments dont le lien mène à la fiche : on vérifie qu'ils existent encore. */
 const EXISTENCE: Partial<Record<ActivityEntity, string>> = {
-  devis: 'quotes', facture: 'customer_invoices', client: 'customers', brochure: 'brochures', prestation: 'prestations',
+  devis: 'quotes', facture: 'customer_invoices', client: 'customers', brochure: 'brochures',
 };
 
 const encodeCursor = (at: string, id: string) => Buffer.from(`${at}|${id}`).toString('base64url');
@@ -132,7 +132,9 @@ export async function listActivity(f: ActivityFilters): Promise<ActivityPage> {
         : checked && !alive.has(r.entity_id) ? null : entityHref(r.entity, r.entity_id);
       return {
         id: r.id, at: r.at, until: r.until !== r.at ? r.until : null, actor: r.actor, viaAdmin: r.via_admin,
-        action: r.action, entity: r.entity, entityId: r.entity_id, label: r.label, summary: r.summary, details: r.details, href,
+        action: r.action, entity: r.entity, entityId: r.entity_id, label: r.label, details: r.details, href,
+        // Ligne de lot (import) : le total, tenu à jour au fil des envois.
+        summary: typeof r.details?.n === 'number' ? activitySummary(r.action, r.entity, '', r.details.n) : r.summary,
       };
     }),
   };

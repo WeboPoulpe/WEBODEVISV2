@@ -72,7 +72,8 @@ export function entityHref(entity: ActivityEntity, id: string | null): string {
   if (!id) return list;
   if (entity === 'devis') return `/devis/${id}`;
   if (entity === 'brochure') return `/brochures/${id}`;
-  if (['facture', 'client', 'prestation'].includes(entity)) return `${list}?id=${id}`;
+  if (entity === 'facture') return `/factures/${id}`;
+  if (entity === 'client') return `/clients?fiche=${id}`;
   return list;
 }
 

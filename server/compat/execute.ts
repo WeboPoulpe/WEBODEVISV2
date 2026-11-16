@@ -255,44 +255,40 @@ async function isReadOnlyUser(uid: string | null): Promise<boolean> {
 }
 
 const OP_ACTION: Record<string, ActivityAction> = { insert: 'creation', upsert: 'modification', update: 'modification', delete: 'suppression' };
-/** Au-delà, une seule ligne d'historique résume l'écriture (« 214 clients créés »). */
-const MAX_DETAILED = 20;
 
 type Client = { query: (sql: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
 
 /**
  * Note dans l'historique les lignes qu'une écriture vient de toucher, dans sa transaction (une écriture annulée n'y
- * laisse rien). Un échec ici n'annule jamais l'écriture : le point de sauvegarde est abandonné, l'écriture continue.
+ * laisse rien). `written` : pour une suppression, les lignes effacées (JSON) ; sinon leurs emplacements (ctid), relus
+ * ici. Un échec du calcul ou de l'écriture n'annule jamais l'écriture : le point de sauvegarde est abandonné. Seul un
+ * point de sauvegarde impossible à poser ou à défaire remonte (la transaction serait alors perdue).
  */
 async function logWrites(client: Client, d: QueryDescriptor, ctx: QueryContext, t: TrackedTable, written: unknown[]): Promise<void> {
+  await client.query('savepoint activity');
   try {
-    await client.query('savepoint activity');
-    try {
-      const action = t.forceAction ?? OP_ACTION[d.op];
-      const { rows } = await client.query(
-        `select distinct on (k.id) k.id, k.label from (
-           select (${t.id})::uuid as id, coalesce((${t.label})::text, '') as label
-           from json_populate_recordset(null::public.${qi(d.table)}, $1::json) t0) k
-         where k.id is not null`,
-        [JSON.stringify(written)],
-      );
-      const items = rows as { id: string; label: string }[];
-      const log = (id: string | null, label: string, summary: string, details: unknown) => client.query(
-        'select public.log_activity(null, $1, $2, $3, $4, $5, $6, $7, $8::jsonb)',
-        [ctx.uid, !!ctx.actingAsAdmin, action, t.entity, id, label, summary, details ? JSON.stringify(details) : null],
-      );
-      if (items.length > MAX_DETAILED) {
-        await log(null, '', activitySummary(action, t.entity, '', items.length), { ids: items.slice(0, 200).map((i) => i.id) });
-      } else {
-        for (const i of items) await log(i.id, i.label, activitySummary(action, t.entity, i.label), null);
-      }
-      await client.query('release savepoint activity');
-    } catch (e) {
-      await client.query('rollback to savepoint activity');
-      throw e;
+    const action = t.forceAction ?? OP_ACTION[d.op];
+    const source = d.op === 'delete'
+      ? `json_populate_recordset(null::public.${qi(d.table)}, $1::json) t0`
+      : `public.${qi(d.table)} t0 where t0.ctid = any($1::tid[])`;
+    const { rows } = await client.query(
+      `select distinct on (k.id) k.id, k.label from (
+         select (${t.id})::uuid as id, coalesce((${t.label})::text, '') as label from ${source}) k
+       where k.id is not null`,
+      [d.op === 'delete' ? JSON.stringify(written) : written],
+    );
+    const items = rows as { id: string; label: string }[];
+    if (items.length) {
+      // Une seule requête : la fonction décide entre une ligne par élément et une ligne de lot (import).
+      await client.query('select public.log_activity_batch($1, $2, $3, $4, $5::uuid[], $6::text[], $7::text[], $8)', [
+        ctx.uid, !!ctx.actingAsAdmin, action, t.entity, items.map((i) => i.id), items.map((i) => i.label),
+        items.map((i) => activitySummary(action, t.entity, i.label)), activitySummary(action, t.entity, '', items.length),
+      ]);
     }
+    await client.query('release savepoint activity');
   } catch (e) {
     console.error(`[historique] ${d.op} ${d.table} : ${(e as Error).message}`);
+    await client.query('rollback to savepoint activity');
   }
 }
 
@@ -345,7 +341,7 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
         // un upsert sur l'id ou le jeton d'une autre ligne la réattribuait à son compte.
         mutation += ` on conflict (${conflict.join(', ')}) ${updates.length ? `do update set ${updates.join(', ')} where ${c.writeScope(d.table, 't0', 'update')}` : 'do nothing'}`;
       }
-      mutation += ' returning *';
+      mutation += TRACKED_TABLES[d.table] ? ' returning *, t0.ctid as activity_ctid' : ' returning *';
     } else if (d.op === 'update') {
       const row = rowsOf(d.values)[0];
       const keys = Object.keys(row);
@@ -357,7 +353,7 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
       const cols = keys.map((k) => c.column(d.table, k)).join(', ');
       const payload = p.add(JSON.stringify(row));
       const conditions = [c.writeScope(d.table, 't0', 'update'), ...c.where(d.table, 't0', d.filters)].join(' and ');
-      mutation = `update ${T} t0 set (${cols}) = (select ${cols} from json_populate_record(null::${T}, ${payload}::json)) where ${conditions} returning t0.*`;
+      mutation = `update ${T} t0 set (${cols}) = (select ${cols} from json_populate_record(null::${T}, ${payload}::json)) where ${conditions} returning t0.*${TRACKED_TABLES[d.table] ? ', t0.ctid as activity_ctid' : ''}`;
     } else {
       const conditions = [c.writeScope(d.table, 't0', 'delete'), ...c.where(d.table, 't0', d.filters)].join(' and ');
       mutation = `delete from ${T} t0 where ${conditions} returning t0.*`;
@@ -370,8 +366,8 @@ export async function executeQuery(d: QueryDescriptor, ctx: QueryContext): Promi
     const tracked = ctx.uid && !ctx.bypass && !isDemoUser(ctx.uid) ? TRACKED_TABLES[d.table] : undefined;
     const sql = `with m as (${mutation})
       select (select coalesce(bool_and(${check}), true) from m t0) as ok,
-             ${list ? `(select coalesce(json_agg(row_to_json(q)), '[]'::json) from (select ${list} from m t0) q)` : 'null::json'} as data,
-             ${tracked ? '(select json_agg(row_to_json(t0)) from m t0)' : 'null::json'} as written`;
+             ${list ? `(select coalesce(json_agg(${TRACKED_TABLES[d.table] ? `to_jsonb(q) - 'activity_ctid'` : 'row_to_json(q)'}), '[]'::json) from (select ${list} from m t0) q)` : 'null::json'} as data,
+             ${!tracked ? 'null::json' : d.op === 'delete' ? '(select json_agg(row_to_json(t0)) from m t0)' : '(select array_agg(t0.activity_ctid::text) from m t0)'} as written`;
 
     const client = await pool.connect();
     try {

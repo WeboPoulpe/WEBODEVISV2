@@ -101,7 +101,7 @@ it('élément supprimé : pas de lien, libellé gardé ; élément présent : li
   current = OWNER;
   const { entries } = await listActivity({ entity: 'client' });
   expect(entries.find((e) => e.label === 'Paul Disparu')).toMatchObject({ href: null });
-  expect(entries.find((e) => e.label === 'Julie')).toMatchObject({ href: `/clients?id=${CUSTOMER}` });
+  expect(entries.find((e) => e.label === 'Julie')).toMatchObject({ href: `/clients?fiche=${CUSTOMER}` });
 });
 
 it('pagination par 50', async () => {
@@ -114,4 +114,12 @@ it('pagination par 50', async () => {
   expect(second.entries).toHaveLength(6);
   expect(second.next).toBeNull();
   expect(new Set([...first.entries, ...second.entries].map((e) => e.id)).size).toBe(56);
+});
+
+it('une ligne d’import en lot affiche le total à jour', async () => {
+  current = OWNER;
+  await pg.query(`insert into activity_log (company_id, actor_id, action, entity_type, entity_label, summary, details, created_at, updated_at)
+    values ($1, $1, 'creation', 'ingredient', '', '100 ingrédients créés', '{"n": 215, "count": 1}', '2026-09-01T10:00:00Z', '2026-09-01T10:01:00Z')`, [OWNER]);
+  const { entries } = await listActivity({ entity: 'ingredient' });
+  expect(entries[0]).toMatchObject({ summary: '215 ingrédients créés' });
 });

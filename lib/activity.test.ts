@@ -25,6 +25,9 @@ describe('entityHref', () => {
   it('mène au devis', () => expect(entityHref('devis', 'x')).toBe('/devis/x'));
   it('mène à la brochure', () => expect(entityHref('brochure', 'b')).toBe('/brochures/b'));
   it('sans identifiant, pas de lien vers un élément', () => expect(entityHref('client', null)).toBe('/clients'));
+  it('ouvre la fiche du client', () => expect(entityHref('client', 'c')).toBe('/clients?fiche=c'));
+  it('ouvre la facture', () => expect(entityHref('facture', 'f')).toBe('/factures/f'));
+  it('une prestation mène à la liste', () => expect(entityHref('prestation', 'p')).toBe('/prestations'));
 });
 
 it('suit les tables principales, pas les tables techniques', () => {

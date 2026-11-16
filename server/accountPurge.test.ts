@@ -42,6 +42,8 @@ async function seed(owner: string, tag: string) {
   await pg.query(`update customer_invoices set status = 'emise', number = $2 where id = $1`, [inv.id, `F-${tag}`]);
   await pg.query(`insert into customer_invoice_payments (invoice_id, paid_on, amount, created_by) values ($1, '2026-10-20', 10, $2)`, [inv.id, owner]);
   await pg.query(`select public.next_document_number($1, 'invoice')`, [owner]);
+  // Historique : inaltérable, sauf pendant la purge du compte.
+  await pg.query(`select public.log_activity(null, $1, false, 'creation', 'client', $2, 'Jean', 'Client Jean créé', null)`, [owner, customer.id]);
 }
 
 const count = async (where: string) => {
@@ -73,6 +75,7 @@ describe('purge d’un compte', () => {
     expect((await pg.query(`select 1 from users where id = $1`, [A])).rows).toHaveLength(0);
     expect((await pg.query(`select 1 from quotes where client_name = 'Devis A'`)).rows).toHaveLength(0);
     expect((await pg.query(`select 1 from customer_invoices where number = 'F-A'`)).rows).toHaveLength(0);
+    expect((await pg.query(`select 1 from activity_log where company_id = $1`, [A])).rows).toHaveLength(0);
   });
 
   it('ne touche pas aux autres comptes ni aux données communes', async () => {
@@ -83,6 +86,11 @@ describe('purge d’un compte', () => {
     expect((await pg.query(`select 1 from ingredients where id = $1`, [GLOBAL_ING])).rows).toHaveLength(1);
     // Le collaborateur reste, simplement détaché.
     expect((await pg.query<{ parent_user_id: string | null }>(`select parent_user_id from profiles where id = $1`, [M])).rows[0]).toEqual({ parent_user_id: null });
+  });
+
+  it('l’historique des autres comptes reste, et reste protégé hors purge', async () => {
+    expect((await pg.query(`select 1 from activity_log where company_id = $1`, [B])).rows).toHaveLength(1);
+    await expect(pg.query(`delete from activity_log where company_id = $1`, [B])).rejects.toThrow(/effacé/);
   });
 
   it('la protection des factures émises reste entière hors purge', async () => {
