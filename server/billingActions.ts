@@ -1,6 +1,6 @@
 'use server';
 
-// Actions d'abonnement du titulaire : s'abonner, passer en annuel, annuler, reprendre, portail de facturation.
+// Actions d'abonnement du titulaire : s'abonner, annuler, reprendre, portail de facturation.
 // Elles n'utilisent pas requireWriter : elles doivent marcher justement quand l'abonnement n'est pas actif.
 
 import { eq } from 'drizzle-orm';
@@ -8,7 +8,7 @@ import { db } from '@/db';
 import { company_subscriptions, profiles } from '@/db/schema';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { appOrigin } from '@/lib/mail';
-import { SETUP_HT } from '@/lib/pricing';
+import { SETUP_HT, SETUP_SUMMARY } from '@/lib/pricing';
 import { priceFor, stripe, type Plan } from '@/lib/stripe';
 import { requireUser } from './session';
 import { applyStripeSubscription } from './stripeSync';
@@ -56,7 +56,8 @@ async function customerOf(companyId: string, email: string | null, existing: str
 export async function startCheckout(plan: Plan): Promise<BillingResult> {
   const who = await owner();
   if ('error' in who) return { error: who.error };
-  if (plan !== 'mensuel' && plan !== 'annuel') return { error: 'Formule inconnue.' };
+  // L'annuel n'est plus vendu : les comptes qui l'ont déjà le gardent, personne n'y entre.
+  if (plan !== 'mensuel') return { error: 'Formule inconnue.' };
   try {
     const sub = await getSubscription(who.companyId);
     if (isLive(sub)) return { error: null, url: '/parametres/abonnement' };
@@ -73,13 +74,13 @@ export async function startCheckout(plan: Plan): Promise<BillingResult> {
     const customer = await customerOf(who.companyId, who.email, sub?.stripe_customer_id ?? null);
     const origin = await appOrigin();
     // Mise en service au premier abonnement seulement : une entreprise qui a déjà eu un abonnement ne la repaie pas.
-    // Prix unique sur la première facture, à côté du premier mois ou de la première année.
+    // Prix unique sur la première facture, à côté du premier mois.
     const setup = sub?.stripe_subscription_id ? [] : [{
       price_data: {
         currency: 'eur',
         unit_amount: SETUP_HT * 100,
         tax_behavior: 'exclusive' as const,
-        product_data: { name: 'Mise en service WeboDevis', description: 'Formation, modèles de devis, prestations et import de vos clients' },
+        product_data: { name: 'Mise en service WeboDevis', description: SETUP_SUMMARY },
       },
       quantity: 1,
     }];
@@ -123,27 +124,6 @@ export async function syncCheckoutSession(sessionId: string): Promise<BillingRes
 async function current(companyId: string): Promise<LiveSubscription | null> {
   const sub = await getSubscription(companyId);
   return sub?.stripe_subscription_id && isLive(sub) ? (sub as LiveSubscription) : null;
-}
-
-export async function switchToAnnual(): Promise<BillingResult> {
-  const who = await owner();
-  if ('error' in who) return { error: who.error };
-  try {
-    const sub = await current(who.companyId);
-    if (!sub) return { error: NO_SUBSCRIPTION };
-    if (sub.plan === 'annuel') return { error: 'Vous êtes déjà sur la formule annuelle.' };
-    const stripeSub = await stripe().subscriptions.retrieve(sub.stripe_subscription_id);
-    const item = stripeSub.items.data[0];
-    if (!item) return { error: NO_SUBSCRIPTION };
-    await stripe().subscriptions.update(sub.stripe_subscription_id, {
-      items: [{ id: item.id, price: priceFor('annuel') }],
-      proration_behavior: 'create_prorations',
-    });
-    await applyStripeSubscription(sub.stripe_subscription_id);
-    return { error: null };
-  } catch (e) {
-    return failure(e, 'Le changement de formule a échoué.');
-  }
 }
 
 async function setCancelAtPeriodEnd(value: boolean): Promise<BillingResult> {

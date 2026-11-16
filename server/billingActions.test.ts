@@ -80,7 +80,7 @@ async function makeActive(price = 'price_m') {
 describe('startCheckout', () => {
   it('crée un seul client par entreprise sur deux appels, avec la taxe automatique', async () => {
     const a = await actions.startCheckout('mensuel');
-    const b = await actions.startCheckout('annuel');
+    const b = await actions.startCheckout('mensuel');
     expect(a).toEqual({ error: null, url: 'https://checkout.stripe.test/s' });
     expect(b.error).toBeNull();
     expect(customersCreate).toHaveBeenCalledTimes(1);
@@ -94,7 +94,7 @@ describe('startCheckout', () => {
       subscription_data: { metadata: { company_id: OWNER } }, cancel_url: 'https://app.test/abonnement',
     });
     expect(params.success_url).toBe('https://app.test/?abonnement=ok&session_id={CHECKOUT_SESSION_ID}');
-    expect(sessionsCreate.mock.calls[1][0].line_items[0].price).toBe('price_a');
+    expect(sessionsCreate.mock.calls[1][0].line_items[0].price).toBe('price_m');
   });
 
   it('premier abonnement : la mise en service (1 150 € HT, hors taxe) s’ajoute au premier paiement', async () => {
@@ -102,18 +102,25 @@ describe('startCheckout', () => {
     const items = sessionsCreate.mock.calls[0][0].line_items;
     expect(items).toHaveLength(2);
     expect(items[1]).toMatchObject({ quantity: 1, price_data: { currency: 'eur', unit_amount: 115000, tax_behavior: 'exclusive' } });
+    expect(items[1].price_data.product_data.description).not.toMatch(/import/i);
+  });
+
+  it('refuse l’abonnement annuel, qui n’est plus vendu', async () => {
+    expect(await actions.startCheckout('annuel')).toEqual({ error: 'Formule inconnue.' });
+    expect(sessionsCreate).not.toHaveBeenCalled();
+    expect(actions).not.toHaveProperty('switchToAnnual');
   });
 
   it('réabonnement après un abonnement terminé : pas de nouvelle mise en service', async () => {
     await pg.exec(`insert into company_subscriptions (company_id, stripe_customer_id, stripe_subscription_id, status)
       values ('${OWNER}', 'cus_1', 'sub_1', 'canceled')`);
-    await actions.startCheckout('annuel');
-    expect(sessionsCreate.mock.calls[0][0].line_items).toEqual([{ price: 'price_a', quantity: 1 }]);
+    await actions.startCheckout('mensuel');
+    expect(sessionsCreate.mock.calls[0][0].line_items).toEqual([{ price: 'price_m', quantity: 1 }]);
   });
 
   it('renvoie un abonné actif vers la page', async () => {
     await makeActive();
-    expect(await actions.startCheckout('annuel')).toEqual({ error: null, url: '/parametres/abonnement' });
+    expect(await actions.startCheckout('mensuel')).toEqual({ error: null, url: '/parametres/abonnement' });
     expect(sessionsCreate).not.toHaveBeenCalled();
   });
 
@@ -186,17 +193,6 @@ describe('gestion de l’abonnement', () => {
     await actions.resumeSubscription();
     expect(subUpdate.mock.calls[0]).toEqual(['sub_1', { cancel_at_period_end: true }]);
     expect(subUpdate.mock.calls[1]).toEqual(['sub_1', { cancel_at_period_end: false }]);
-  });
-
-  it('passe en annuel avec prorata, et refuse si déjà annuel ou sans abonnement', async () => {
-    expect((await actions.switchToAnnual()).error).toBeTruthy();
-    await makeActive();
-    expect(await actions.switchToAnnual()).toEqual({ error: null });
-    expect(subUpdate).toHaveBeenCalledWith('sub_1', { items: [{ id: 'si_1', price: 'price_a' }], proration_behavior: 'create_prorations' });
-    await pg.exec(`update company_subscriptions set plan = 'annuel'`);
-    subUpdate.mockClear();
-    expect((await actions.switchToAnnual()).error).toBeTruthy();
-    expect(subUpdate).not.toHaveBeenCalled();
   });
 
   it('ouvre le portail pour le client Stripe de l’entreprise', async () => {
