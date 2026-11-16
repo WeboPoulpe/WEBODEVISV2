@@ -1217,6 +1217,31 @@ export const audit_log = pgTable("audit_log", {
 	index("idx_audit_log_created").using("btree", table.created_at.desc().nullsLast().op("timestamptz_ops")),
 ]);
 
+// Historique des actions de l'entreprise (page Historique), lu par le titulaire et les gérants. Inaltérable (déclencheurs
+// de la migration 0056) ; écrit seulement par la fonction public.log_activity, qui regroupe les modifications rapprochées.
+// company_id : le compte titulaire. actor_id null : le client ou une tâche automatique.
+export const activity_log = pgTable("activity_log", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	company_id: uuid().notNull(),
+	actor_id: uuid(),
+	actor_label: text(),
+	via_admin: boolean().default(false).notNull(),
+	action: text().notNull(),
+	entity_type: text().notNull(),
+	entity_id: uuid(),
+	entity_label: text().notNull(),
+	summary: text().notNull(),
+	details: jsonb(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_activity_log_company_created").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.created_at.desc().nullsLast().op("timestamptz_ops")),
+	index("idx_activity_log_company_entity").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.entity_type.asc().nullsLast().op("text_ops")),
+	index("idx_activity_log_company_actor").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.actor_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_activity_log_group").using("btree", table.company_id.asc().nullsLast().op("uuid_ops"), table.entity_id.asc().nullsLast().op("uuid_ops"), table.updated_at.desc().nullsLast().op("timestamptz_ops")),
+	foreignKey({ columns: [table.company_id], foreignColumns: [users.id], name: "activity_log_company_id_fkey" }).onDelete("cascade"),
+]);
+
 // Stock d'un ingrédient pour une entreprise (compte titulaire) : quantité et seuil d'alerte. Les ingrédients du
 // catalogue commun ont ainsi un stock propre à chaque entreprise. Tenu à jour par le déclencheur des mouvements
 // (apply_stock_movement) ; les colonnes ingredients.stock_quantity et min_stock_alert ne servent plus.
