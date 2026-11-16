@@ -11,6 +11,7 @@ import { quoteProposalEmail } from '@/lib/mail/templates';
 import { DEMO_BLOCKED, isDemoUser } from '@/lib/demo';
 import { MAX_RECIPIENTS, isValidEmail, normalizeEmail, splitEmails, uniqueEmails } from '@/lib/emailList';
 import { requireUser, requireWriter } from './session';
+import { actorOf, logActivity, quoteLabel } from './activityWrite';
 
 /** Statuts d'avant l'envoi : à l'envoi, le devis passe à « Devis envoyé ». */
 const BEFORE_SENT = ['nouveau', 'broch_envoyee', 'devis_a_faire'];
@@ -127,6 +128,9 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
   });
   await db.insert(quote_events).values({ quote_id: quote.id, kind: 'envoi_email', actor_id: user.id, details: { to: sent, cc: cc.length && ccPending.length === 0 ? cc : [] } })
     .catch((e) => console.error('[historique]', e));
+  const label = await quoteLabel(quote.id);
+  await logActivity({ ...actorOf(user), action: 'envoi', entity: 'devis', entityId: quote.id, label,
+    summary: `Devis ${label} envoyé par email à ${sent.join(', ')}`, details: { to: sent, cc } });
   return { error: null, status, sent, failed, clientEmail, copySent, cc: cc.length && ccPending.length === 0 ? cc : undefined };
 }
 
@@ -158,6 +162,8 @@ export async function shareQuoteByWhatsapp(quoteId: string): Promise<{ error: st
   const phone = whatsappNumber(quote.client_phone);
   await db.insert(quote_events).values({ quote_id: quote.id, kind: 'envoi_whatsapp', actor_id: user.id, details: { phone } })
     .catch((e) => console.error('[historique]', e));
+  const label = await quoteLabel(quote.id);
+  await logActivity({ ...actorOf(user), action: 'envoi', entity: 'devis', entityId: quote.id, label, summary: `Devis ${label} envoyé par WhatsApp` });
   return { error: null, link: `${await appOrigin()}/d/${token}`, phone, status };
 }
 

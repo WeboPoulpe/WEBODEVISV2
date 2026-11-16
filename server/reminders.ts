@@ -9,6 +9,7 @@ import { sendMail } from '@/lib/mail';
 import { invoiceReminderEmail, quoteReminderEmail } from '@/lib/mail/templates';
 import { PENDING_STATUSES } from '@/lib/quoteStatus';
 import { accessOf } from './subscription';
+import { logActivity } from './activityWrite';
 
 // Relances automatiques, lancées une fois par jour par la tâche planifiée (voir app/api/cron/rappels-extras).
 // Pour chaque entreprise qui les a activées (Paramètres) :
@@ -188,6 +189,9 @@ export async function runReminders({ origin, now = new Date() }: { origin: strin
       if (error) { result.failed++; continue; }
       await db.insert(document_reminders).values({ owner_user_id: q.company, kind: 'devis', quote_id: q.id, sent_to: q.to, sent_at: now.toISOString() });
       result.quotes++;
+      const qLabel = `${q.quote_number ? `${q.quote_number} — ` : ''}${q.client_display || q.client_name}`;
+      await logActivity({ company: q.company, actor: null, action: 'relance', entity: 'devis', entityId: q.id, label: qLabel,
+        summary: `Relance envoyée — Devis ${qLabel}`, details: { to: q.to } });
       quoteDone.set(q.company, [...(quoteDone.get(q.company) ?? []), q.quote_number ? `${q.client_name} (devis ${q.quote_number})` : q.client_name]);
     } catch (e) {
       result.failed++;
@@ -206,6 +210,8 @@ export async function runReminders({ origin, now = new Date() }: { origin: strin
       if (error) { result.failed++; continue; }
       await db.insert(document_reminders).values({ owner_user_id: i.company, kind: 'facture', invoice_id: i.id, sent_to: i.to, sent_at: now.toISOString() });
       result.invoices++;
+      await logActivity({ company: i.company, actor: null, action: 'relance', entity: 'facture', entityId: i.id, label: i.number,
+        summary: `Relance envoyée — Facture ${i.number}`, details: { to: i.to } });
       invoiceDone.set(i.company, [...(invoiceDone.get(i.company) ?? []), `${i.number}${i.buyer_name ? ` (${i.buyer_name})` : ''}`]);
     } catch (e) {
       result.failed++;

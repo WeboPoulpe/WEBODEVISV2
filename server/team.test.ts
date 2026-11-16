@@ -83,3 +83,12 @@ describe('équipe', () => {
     current = OWNER;
   });
 });
+
+it('invitations, rôles et départs sont notés dans l’historique', async () => {
+  const { rows } = await pg.query<{ action: string; entity_type: string }>(
+    `select action, entity_type from activity_log where company_id = $1 and entity_type = 'equipe'`, [OWNER]);
+  const actions = rows.map((r) => r.action);
+  expect(actions).toContain('invitation');
+  expect(actions).toContain('role');
+  expect(actions).toContain('suppression');
+});

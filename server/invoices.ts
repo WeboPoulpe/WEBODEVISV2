@@ -12,6 +12,9 @@ import {
 import { formulaPending } from '@/lib/quoteFormulas';
 import { quoteColumns } from './formulaColumns';
 import { requireUser, requireWriter } from './session';
+import { actorOf, invoiceLabel, logActivity, quoteLabel } from './activityWrite';
+
+const euros = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 // Factures clients. Tout passe par ces actions serveur (les tables ne sont pas exposées à /api/db) :
 // chacune vérifie que la facture appartient à l'entreprise de l'utilisateur connecté.
@@ -258,6 +261,8 @@ export async function createInvoiceDraft(input: { quoteId: string; kind: Exclude
     total_ttc: totals.ttc,
     vat_breakdown: totals.byRate,
   }).returning({ id: customer_invoices.id });
+  await logActivity({ ...actorOf(user), action: 'creation', entity: 'facture', entityId: row.id, label: 'brouillon',
+    summary: `${{ acompte: 'Facture d’acompte', solde: 'Facture de solde' }[input.kind as string] ?? 'Facture'} préparée — Devis ${await quoteLabel(input.quoteId)}` });
   return { error: null, id: row.id };
 }
 
@@ -291,6 +296,7 @@ export async function createCreditNoteDraft(invoiceId: string): Promise<Result<{
     total_ttc: totals.ttc,
     vat_breakdown: totals.byRate,
   }).returning({ id: customer_invoices.id });
+  await logActivity({ ...actorOf(user), action: 'creation', entity: 'facture', entityId: credit.id, label: 'brouillon', summary: `Avoir préparé pour la facture ${row.number}` });
   return { error: null, id: credit.id };
 }
 
@@ -330,6 +336,7 @@ export async function deleteInvoiceDraft(id: string): Promise<Result> {
   if (!row) return { error: 'Facture introuvable.' };
   if (row.status !== 'brouillon') return { error: 'Une facture émise ne se supprime pas : établissez un avoir.' };
   await db.delete(customer_invoices).where(eq(customer_invoices.id, id));
+  await logActivity({ ...actorOf(user), action: 'suppression', entity: 'facture', entityId: id, label: 'brouillon', summary: 'Brouillon de facture supprimé' });
   return { error: null };
 }
 
@@ -382,6 +389,8 @@ export async function issueInvoice(id: string): Promise<Result<{ number: string 
     }
     return n;
   });
+  await logActivity({ ...actorOf(user), action: 'statut', entity: 'facture', entityId: id, label: number,
+    summary: `${row.kind === 'avoir' ? 'Avoir' : 'Facture'} ${number} émis${row.kind === 'avoir' ? '' : 'e'}` });
   return { error: null, number };
 }
 
@@ -420,6 +429,9 @@ export async function recordPayment(invoiceId: string, input: { paidOn: string; 
   const method = input.method in PAYMENT_METHODS ? input.method : 'autre';
   await db.insert(customer_invoice_payments).values({ invoice_id: row.id, paid_on: input.paidOn, amount, method, note: input.note?.trim().slice(0, 300) || null, created_by: user.id });
   await syncAfterPayment(row.id, user.id);
+  const label = await invoiceLabel(row.id);
+  await logActivity({ ...actorOf(user), action: 'paiement', entity: 'facture', entityId: row.id, label,
+    summary: `Paiement de ${euros(amount)} reçu — Facture ${label}`, details: { amount, method, paidOn: input.paidOn } });
   return { error: null };
 }
 
@@ -430,5 +442,7 @@ export async function deletePayment(paymentId: string): Promise<Result> {
   if (!p || !(await ownedInvoiceRow(user.id, p.invoice_id))) return { error: 'Paiement introuvable.' };
   await db.delete(customer_invoice_payments).where(eq(customer_invoice_payments.id, paymentId));
   await syncAfterPayment(p.invoice_id, user.id);
+  const label = await invoiceLabel(p.invoice_id);
+  await logActivity({ ...actorOf(user), action: 'suppression', entity: 'facture', entityId: p.invoice_id, label, summary: `Paiement retiré — Facture ${label}` });
   return { error: null };
 }

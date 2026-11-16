@@ -49,16 +49,16 @@ CREATE OR REPLACE FUNCTION public.log_activity(
   p_entity_label text, p_summary text, p_details jsonb
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
-  v_company uuid := p_company;
+  v_company uuid;
   v_label text;
   v_group uuid;
 BEGIN
+  -- L'entreprise : le titulaire du compte donné (ou de l'auteur), même si c'est un collaborateur qui est passé.
+  SELECT coalesce(pr.parent_user_id, pr.id) INTO v_company FROM public.profiles pr WHERE pr.id = coalesce(p_company, p_actor);
+  v_company := coalesce(v_company, p_company);
   IF p_actor IS NOT NULL THEN
-    SELECT coalesce(v_company, coalesce(pr.parent_user_id, pr.id)),
-           coalesce(nullif(trim(coalesce(pr.first_name, '') || ' ' || coalesce(pr.last_name, '')), ''), pr.email)
-      INTO v_company, v_label
-      FROM public.profiles pr WHERE pr.id = p_actor;
-    v_company := coalesce(v_company, p_company);
+    SELECT coalesce(nullif(trim(coalesce(pr.first_name, '') || ' ' || coalesce(pr.last_name, '')), ''), pr.email)
+      INTO v_label FROM public.profiles pr WHERE pr.id = p_actor;
   END IF;
   IF v_company IS NULL THEN RETURN; END IF;
 

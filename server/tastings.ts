@@ -5,11 +5,12 @@ import { db } from '@/db';
 import { isDemoUser } from '@/lib/demo';
 import { isValidEmail, normalizeEmail } from '@/lib/emailList';
 import { hhmm } from '@/lib/ical';
-import type { Tasting, TastingStatus } from '@/lib/tastings';
+import { TASTING_STATUS_LABELS, type Tasting, type TastingStatus } from '@/lib/tastings';
 import { companyIdsOf, companyOf } from './companyScope';
 import { parisDate } from './reminders';
 import { isMissingTable, sendTastingMail, tastingCompany } from './tastingReminders';
 import { requireUser, requireWriter } from './session';
+import { actorOf, logActivity } from './activityWrite';
 
 // Rendez-vous de dégustation : liste (agenda, fiche d'un devis), création, modification, annulation.
 // Visibles et modifiables par les comptes de l'entreprise ; un compte en consultation seule ne modifie rien.
@@ -192,6 +193,9 @@ export async function saveTasting(input: TastingInput): Promise<TastingResult> {
     }
 
     const tasting = (await findTasting(user.id, id))!;
+    const when = new Date(`${tasting.tasting_date}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
+    await logActivity({ ...actorOf(user), action: input.id ? 'modification' : 'creation', entity: 'degustation', entityId: id, label: tasting.client_name,
+      summary: `Dégustation du ${when} avec ${tasting.client_name} ${input.id ? 'modifiée' : 'enregistrée'}` });
     let mailed: boolean | undefined;
     if (kind && input.send_email && tasting.notify_client && tasting.client_email && tasting.tasting_date >= today && !isDemoUser(user.id)) {
       const company = await tastingCompany(await ownerOf(id));
@@ -221,6 +225,8 @@ export async function setTastingStatus({ id, status, sendEmail = true }: { id: s
     await db.execute(sql`update public.tastings set status = ${status}, updated_at = now()
       where id = ${id}::uuid and owner_user_id in ${companyIdsOf(user.id)}`);
     const tasting = (await findTasting(user.id, id))!;
+    await logActivity({ ...actorOf(user), action: 'statut', entity: 'degustation', entityId: id, label: tasting.client_name,
+      summary: `Dégustation avec ${tasting.client_name} : ${TASTING_STATUS_LABELS[status].toLowerCase()}` });
     let mailed: boolean | undefined;
     if (status === 'annule' && before.status === 'prevu' && sendEmail && before.notify_client && before.client_email
       && before.tasting_date >= parisDate(new Date()) && !isDemoUser(user.id)) {

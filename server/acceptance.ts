@@ -13,6 +13,7 @@ import { chosenFormula, parseFormulas, type QuoteFormula } from '@/lib/quoteForm
 import { formulaTotals, quoteDefaultRate, quoteTotalTTC, resolveGuestSplit } from '@/lib/quoteTotals';
 import { acceptanceFormulaName, quoteColumns } from './formulaColumns';
 import { getSessionUser } from './session';
+import { logActivity, quoteLabel } from './activityWrite';
 import { companyAccessOfUser, OWNER_UNAVAILABLE_MESSAGE } from './subscriptionGuard';
 
 // « Bon pour accord » en ligne : le client accepte et signe le devis depuis le lien reçu (/d/<jeton>).
@@ -131,6 +132,9 @@ export async function recordQuoteView(token: string): Promise<void> {
     select ${q.id}::uuid, 'consultation'
     where not exists (select 1 from public.quote_events e where e.quote_id = ${q.id}::uuid and e.kind = 'consultation' and e.created_at > now() - interval '6 hours')`)
     .catch(() => {});
+  const label = await quoteLabel(q.id);
+  await logActivity({ company: q.owner_user_id ?? q.user_id, actor: null, action: 'consultation_client', entity: 'devis', entityId: q.id, label,
+    summary: `Devis ${label} consulté par le client` });
 }
 
 export async function acceptQuote(input: {
@@ -216,6 +220,9 @@ export async function acceptQuote(input: {
     return row.at;
   });
   if (accepted === null) return { error: 'Ce devis vient d’être modifié ou accepté. Rechargez la page pour voir sa dernière version.' };
+  const label = await quoteLabel(q.id);
+  await logActivity({ company: owner, actor: null, action: 'acceptation', entity: 'devis', entityId: q.id, label,
+    summary: `Devis ${label} accepté et signé par ${name}`, details: { signer: name, formula: formula?.name ?? null, total } });
 
   // Emails : ils ne bloquent pas l'acceptation s'ils ne partent pas.
   const [p] = await db.select({ company: profiles.company_name, email: profiles.email, companyEmail: profiles.company_email, paymentUrl: profiles.company_payment_url })

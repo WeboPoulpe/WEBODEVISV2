@@ -122,3 +122,12 @@ describe('relances automatiques', () => {
     expect(await run(addDays(DAY0, 45))).toEqual({ quotes: 0, invoices: 0, failed: 0 });
   });
 });
+
+it('chaque relance est notée dans l’historique de l’entreprise, sans auteur', async () => {
+  const { rows } = await pg.query<{ actor_id: string | null; entity_type: string; summary: string }>(
+    `select actor_id, entity_type, summary from activity_log where company_id = $1 and action = 'relance'`, [A]);
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.every((r) => r.actor_id === null)).toBe(true);
+  expect(rows.some((r) => r.entity_type === 'devis' && /^Relance envoyée — Devis D-/.test(r.summary))).toBe(true);
+  expect(rows.some((r) => r.entity_type === 'facture')).toBe(true);
+});

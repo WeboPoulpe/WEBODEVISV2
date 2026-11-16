@@ -13,6 +13,13 @@ import { teamInviteEmail } from '@/lib/mail/templates';
 import { COMPANY_ROLES, type CompanyRole } from '@/lib/team';
 import { transferAccountData } from './accountPurge';
 import { requireUser, requireWriter } from './session';
+import { actorOf, logActivity } from './activityWrite';
+
+/** Nom d'un membre pour l'historique : prénom et nom, sinon son email. */
+async function memberName(id: string): Promise<string> {
+  const [m] = await db.select({ f: profiles.first_name, l: profiles.last_name, e: profiles.email }).from(profiles).where(eq(profiles.id, id)).limit(1);
+  return [m?.f, m?.l].filter(Boolean).join(' ').trim() || m?.e || '';
+}
 
 // Équipe d'une entreprise : le titulaire (ou un gérant) invite des collaborateurs, change leur rôle, les retire.
 // Les collaborateurs partagent les données de l'entreprise (voir server/compat/rules.ts, companyMembers).
@@ -111,6 +118,8 @@ export async function inviteMember(input: { email: string; role: CompanyRole }):
       days: INVITE_DAYS,
     }),
   });
+  await logActivity({ ...actorOf(user), action: 'invitation', entity: 'equipe', label: email,
+    summary: `${email} invité dans l’équipe (${COMPANY_ROLE_LABEL[input.role]})`, details: { email, role: input.role } });
   if (sent.error) return { error: 'L’invitation est enregistrée, mais l’email n’est pas parti. Réessayez dans un instant.' };
   return { error: null };
 }
@@ -141,6 +150,9 @@ export async function setMemberRole(memberId: string, role: CompanyRole): Promis
   if (!(await memberOf(ctx.company, memberId))) return { error: 'Ce collaborateur ne fait pas partie de votre entreprise.' };
   await db.update(profiles).set({ company_role: role }).where(eq(profiles.id, memberId));
   await logAudit({ actor: user.id, target: memberId, action: 'role_modifie', details: { equipe: role } });
+  const name = await memberName(memberId);
+  await logActivity({ ...actorOf(user), action: 'role', entity: 'equipe', entityId: memberId, label: name,
+    summary: `Rôle de ${name} : ${COMPANY_ROLE_LABEL[role]}`, details: { role } });
   return { error: null };
 }
 
@@ -152,9 +164,12 @@ export async function removeMember(memberId: string): Promise<Result> {
   if (!ctx.canManage) return { error: 'Seul le titulaire ou un gérant peut retirer un collaborateur.' };
   if (memberId === user.id) return { error: 'Vous ne pouvez pas vous retirer vous-même.' };
   if (!(await memberOf(ctx.company, memberId))) return { error: 'Ce collaborateur ne fait pas partie de votre entreprise.' };
+  const name = await memberName(memberId);
   await transferAccountData(memberId, ctx.company);
   await db.update(profiles).set({ is_active: false, parent_user_id: null, company_role: 'gerant' }).where(eq(profiles.id, memberId));
   await logAudit({ actor: user.id, target: memberId, action: 'compte_desactive', details: { equipe: 'retiré, données rendues au titulaire' } });
+  await logActivity({ ...actorOf(user), company: ctx.company, action: 'suppression', entity: 'equipe', entityId: memberId, label: name,
+    summary: `${name} retiré de l’équipe` });
   return { error: null };
 }
 
@@ -198,5 +213,7 @@ export async function acceptInvitation(input: { token: string; firstName: string
     return u.id;
   });
   await logAudit({ actor: newId, target: inv.company_id, action: 'compte_cree', details: { equipe: inv.company_role, invitePar: inv.invited_by } });
+  await logActivity({ actor: newId, company: inv.company_id, action: 'creation', entity: 'equipe', entityId: newId, label: inv.email,
+    summary: `${input.firstName.trim()} ${input.lastName.trim()} a rejoint l’équipe`.trim() });
   return { error: null, email: inv.email };
 }

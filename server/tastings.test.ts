@@ -190,3 +190,9 @@ describe('dégustations', () => {
     expect((await getQuoteHistory(quoteId))!.some((e) => e.kind === 'degustation')).toBe(false);
   });
 });
+
+it('les dégustations enregistrées sont notées dans l’historique', async () => {
+  const { rows } = await pg.query<{ entity_type: string; action: string; summary: string }>(
+    `select entity_type, action, summary from activity_log where entity_type = 'degustation' order by created_at`);
+  expect(rows.some((r) => r.action === 'creation' && /^Dégustation du /.test(r.summary))).toBe(true);
+});

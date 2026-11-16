@@ -50,3 +50,11 @@ describe('copie visible (Cc)', () => {
     expect(res.cc).toBeUndefined();
   });
 });
+
+it('l’envoi par email est noté dans l’historique', async () => {
+  await sendQuoteToClient({ quoteId, to: 'histo@client.fr', message: 'Bonjour' });
+  const { rows } = await pg.query<{ action: string; entity_type: string; entity_id: string; summary: string }>(
+    `select action, entity_type, entity_id, summary from activity_log where action = 'envoi' order by created_at desc limit 1`);
+  expect(rows[0]).toMatchObject({ action: 'envoi', entity_type: 'devis', entity_id: quoteId });
+  expect(rows[0].summary).toMatch(/envoyé par email à histo@client\.fr/);
+});

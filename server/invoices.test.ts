@@ -124,3 +124,12 @@ describe('factures', () => {
     await expect(pg.query(`delete from quotes where id = $1`, [quoteId])).rejects.toThrow();
   });
 });
+
+it('création, émission et paiements de facture sont notés dans l’historique', async () => {
+  const { rows } = await pg.query<{ action: string; entity_type: string; summary: string }>(
+    `select action, entity_type, summary from activity_log where company_id = $1 and entity_type = 'facture' order by created_at`, [ME]);
+  const actions = rows.map((r) => r.action);
+  expect(actions).toContain('creation');
+  expect(actions).toContain('statut');
+  expect(rows.find((r) => r.action === 'paiement')?.summary).toMatch(/^Paiement de 500,00\s€ reçu — Facture F-/);
+});

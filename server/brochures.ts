@@ -32,6 +32,7 @@ import { companyIdsOf } from './companyScope';
 import { snapshotBeforeSave } from './brochureSnapshot';
 import { findByToken, gateOf, isCompanyViewer as companyViewer, newLinkToken, notifyOwner, openAccess, unlock, type Gate } from './brochureAccess';
 import { getSessionUser, requireUser, requireWriter } from './session';
+import { actorOf, logActivity } from './activityWrite';
 
 export type BrochureRow = typeof brochures.$inferSelect;
 
@@ -161,6 +162,7 @@ export async function createBrochure(input: { name: string; style?: BrochureStyl
         : studioFromBrochure(parseBrochureContent(null), { title: name }, style, { company: templateCompany(company), language: 'fr' }),
     } : {}),
   }).returning({ id: brochures.id });
+  await logActivity({ ...actorOf(user), action: 'creation', entity: 'brochure', entityId: row.id, label: name });
   return { error: null, id: row.id };
 }
 
@@ -219,8 +221,10 @@ export async function saveBrochure(id: string, patch: Partial<Editable>): Promis
   const done = await db.update(brochures).set({
     ...set, updated_at: new Date().toISOString(),
     ...(reviewed ? { review_status: sql`case when ${brochures.review_status} = 'approved' then 'none' else ${brochures.review_status} end` } : {}),
-  }).where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
-  return done.length ? { error: null } : { error: NOT_FOUND };
+  }).where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id, name: brochures.name });
+  if (!done.length) return { error: NOT_FOUND };
+  await logActivity({ ...actorOf(user), action: 'modification', entity: 'brochure', entityId: id, label: done[0].name });
+  return { error: null };
 }
 
 export async function duplicateBrochure(id: string): Promise<{ error: string | null; id?: string }> {
@@ -232,15 +236,19 @@ export async function duplicateBrochure(id: string): Promise<{ error: string | n
     language: source.language, show_prices: source.show_prices, price_mode: source.price_mode, vat_rate: source.vat_rate,
     is_active: true, share_token: newToken(), cover: source.cover, content: source.content,
     editor_mode: source.editor_mode, layout: source.layout, studio: source.studio,
-  }).returning({ id: brochures.id });
+  }).returning({ id: brochures.id, name: brochures.name });
+  await logActivity({ ...actorOf(user), action: 'creation', entity: 'brochure', entityId: row.id, label: row.name,
+    summary: `Brochure ${row.name} créée à partir de ${source.name}` });
   return { error: null, id: row.id };
 }
 
 export async function deleteBrochure(id: string): Promise<{ error: string | null }> {
   const user = await requireWriter();
   if (!UUID.test(id ?? '')) return { error: NOT_FOUND };
-  const done = await db.delete(brochures).where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
-  return done.length ? { error: null } : { error: NOT_FOUND };
+  const done = await db.delete(brochures).where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id, name: brochures.name });
+  if (!done.length) return { error: NOT_FOUND };
+  await logActivity({ ...actorOf(user), action: 'suppression', entity: 'brochure', entityId: id, label: done[0].name });
+  return { error: null };
 }
 
 /** Nouveau lien : l'ancien cesse de marcher. */
@@ -249,8 +257,11 @@ export async function renewBrochureLink(id: string): Promise<{ error: string | n
   if (!UUID.test(id ?? '')) return { error: NOT_FOUND };
   const token = newToken();
   const done = await db.update(brochures).set({ share_token: token, updated_at: new Date().toISOString() })
-    .where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id });
-  return done.length ? { error: null, token } : { error: NOT_FOUND };
+    .where(and(eq(brochures.id, id), mine(user.id))).returning({ id: brochures.id, name: brochures.name });
+  if (!done.length) return { error: NOT_FOUND };
+  await logActivity({ ...actorOf(user), action: 'modification', entity: 'brochure', entityId: id, label: done[0].name,
+    summary: `Nouveau lien pour la brochure ${done[0].name} (l’ancien ne marche plus)` });
+  return { error: null, token };
 }
 
 /** Prestations du catalogue de l'entreprise citées par la brochure. */
@@ -426,6 +437,8 @@ export async function recordBrochureView(token: string): Promise<void> {
   await db.update(brochures).set({ view_count: sql`${brochures.view_count} + 1`, viewed_at: now }).where(eq(brochures.id, row.id));
   if (link) await db.update(brochure_links).set({ view_count: sql`${brochure_links.view_count} + 1`, viewed_at: now }).where(eq(brochure_links.id, link.id));
   await notifyOwner(access, 'open').catch(() => false);
+  await logActivity({ company: row.owner_user_id, actor: null, action: 'consultation_client', entity: 'brochure', entityId: row.id, label: row.name,
+    summary: `Brochure ${row.name} consultée${link?.kind === 'client' && link.label ? ` par ${link.label}` : ' par un client'}` });
 }
 
 /** Le lecteur arrive à la page du formulaire : le traiteur est prévenu (une fois par demi-heure et par lien). */
@@ -606,6 +619,7 @@ export async function createKindBrochure(input: { name: string; kind: BrochureKi
     cover: { title: name }, content: parseBrochureContent(null), editor_mode: 'studio',
     studio: brochureFromKind(input.kind, { title: name, subtitle: null, photoUrl: null, company: templateCompany(company), language }, ids),
   }).returning({ id: brochures.id });
+  await logActivity({ ...actorOf(user), action: 'creation', entity: 'brochure', entityId: row.id, label: name });
   return { error: null, id: row.id };
 }
 

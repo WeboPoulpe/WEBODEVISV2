@@ -90,3 +90,10 @@ describe('acceptation en ligne', () => {
     expect(rows[0].viewed_at).not.toBeNull();
   });
 });
+
+it('l’acceptation et la consultation du client sont notées dans l’historique, sans auteur', async () => {
+  const { rows } = await pg.query<{ action: string; actor_id: string | null; company_id: string; entity_id: string }>(
+    `select action, actor_id, company_id, entity_id from activity_log where entity_id = $1 order by created_at`, [quoteId]);
+  expect(rows.find((r) => r.action === 'acceptation')).toMatchObject({ actor_id: null, company_id: OWNER });
+  expect(rows.some((r) => r.action === 'consultation_client')).toBe(true);
+});

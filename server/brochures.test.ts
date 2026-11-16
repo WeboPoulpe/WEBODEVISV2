@@ -588,3 +588,16 @@ describe('brochures : liens, accès et notifications', () => {
     expect(sent[0].html).not.toContain(`/b/${(await rowOf(id!)).share_token}`);
   });
 });
+
+describe('brochures : historique', () => {
+  it('création, copie et suppression sont notées', async () => {
+    current = OWNER;
+    const { id } = await br.createBrochure({ name: 'Historique 2027' });
+    expect((await br.saveBrochure(id!, { name: 'Historique 2027 bis' })).error).toBeNull();
+    expect((await br.deleteBrochure(id!)).error).toBeNull();
+    const { rows } = await pg.query<{ action: string; summary: string }>(
+      `select action, summary from activity_log where entity_type = 'brochure' and entity_id = $1 order by created_at`, [id]);
+    expect(rows.map((r) => r.action)).toEqual(['creation', 'modification', 'suppression']);
+    expect(rows[0].summary).toBe('Brochure Historique 2027 créée');
+  });
+});
