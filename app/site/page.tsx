@@ -6,7 +6,7 @@ import Testimonial from '@/components/site/Testimonial';
 import AutoChecklist from '@/components/site/story/AutoChecklist';
 import CrewPhones from '@/components/site/story/CrewPhones';
 import Julien from '@/components/site/story/Julien';
-import LockScreen from '@/components/site/story/LockScreen';
+import HeroVideo from '@/components/site/HeroVideo';
 import MarginCounter from '@/components/site/story/MarginCounter';
 import QuoteStepper from '@/components/site/story/QuoteStepper';
 import SignedMessages from '@/components/site/story/SignedMessages';
@@ -83,9 +83,9 @@ export default function SitePage() {
       <section id="lun" aria-labelledby="titre-lun" className="relative">
         <div aria-hidden className="absolute inset-x-2 sm:inset-x-2.5 -top-px bottom-0 rounded-b-[28px] bg-forest" />
         <div className={`${container} relative site-dark`}>
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-x-12 gap-y-9 lg:items-end pt-7 sm:pt-12 lg:pt-16 pb-10 lg:pb-14">
-            <div>
-              <h1 id="titre-lun" className="site-hero-title font-display text-white">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-x-12 gap-y-8 pt-7 sm:pt-12 lg:pt-16 pb-10 lg:pb-14">
+            <div className="lg:self-end">
+              <h1 id="titre-lun" className="site-hero-title site-hero-title-side font-display text-white">
                 Le logiciel des&nbsp;<span className="site-swoosh">traiteurs
                   <svg aria-hidden viewBox="0 0 300 24" preserveAspectRatio="none">
                     <path d="M4 16 C 70 4, 160 2, 296 12" pathLength="1" fill="none" stroke="rgb(var(--p-400))" strokeWidth="9" strokeLinecap="round" />
@@ -93,17 +93,24 @@ export default function SitePage() {
                 </span>.
               </h1>
               <p className="site-lead text-white/75 mt-6 lg:mt-8 max-w-[44ch]">
-                Pour comprendre ce qu’il change, suivez Julien, traiteur à Troyes, pendant une semaine. Elle commence un lundi matin, avant le premier café.
+                Clé en main, de la demande à la facturation, en passant par l’organisation. Suivez la semaine de Julien, traiteur à Troyes.
               </p>
-              {/* Le début de l'histoire, en plus petit : la voix de Julien. */}
-              <div className="mt-8 border-l-[3px] border-primary-400 pl-5">
-                <p className={`${when} text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30</p>
-                <p className="site-tagline font-display text-white mt-2 max-w-[20ch]">Six demandes sont arrivées ce week-end.</p>
-                <p className="text-base leading-relaxed text-white/70 mt-3 max-w-[42ch]">
-                  «&nbsp;Je dormais. Ma brochure, elle, a travaillé. Voici ma semaine avec WeboDevis.&nbsp;»
-                </p>
+            </div>
+            <div className="lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-center">
+              <HeroVideo />
+              {/* Le début de l'histoire, sous la vidéo : la voix de Julien. */}
+              <div className="mt-6 flex items-center gap-4">
+                <Julien pose="cafe" disc="dark" title="Julien, traiteur, son café dans une main et son téléphone dans l’autre" className="w-[72px] flex-shrink-0 sm:w-[88px]" />
+                <div className="border-l-[3px] border-primary-400 pl-4">
+                  <p className={`${when} text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30</p>
+                  <p className="text-base leading-relaxed text-white/75 mt-1 max-w-[44ch]">
+                    «&nbsp;Six demandes sont arrivées ce week-end. Je dormais. Ma brochure, elle, a travaillé.&nbsp;»
+                  </p>
+                </div>
               </div>
-              <DemoButton className="mt-8" />
+            </div>
+            <div className="lg:col-start-1 lg:row-start-2 lg:self-start">
+              <DemoButton />
               <p className="text-[15px] leading-relaxed text-white/65 mt-5 max-w-[46ch]">
                 {PRICE_LINE}.{' '}
                 <Link href={PRICING.href} className="rounded text-white underline decoration-white/40 underline-offset-4 hover:decoration-white whitespace-nowrap">Les tarifs</Link>
@@ -111,10 +118,6 @@ export default function SitePage() {
               <p className="text-[15px] leading-relaxed text-white/50 mt-2">
                 Sortie de la version {RELEASE.version} le <time dateTime={RELEASE.date}>{RELEASE.dateLabel}</time>.
               </p>
-            </div>
-            <div className="flex items-end justify-center lg:justify-end">
-              <Julien pose="cafe" disc="dark" title="Julien, traiteur, son café dans une main et son téléphone dans l’autre" className="relative z-10 -mr-4 w-[112px] flex-shrink-0 sm:w-[150px]" />
-              <LockScreen className="w-full max-w-[270px]" />
             </div>
           </div>
         </div>

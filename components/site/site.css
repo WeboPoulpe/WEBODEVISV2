@@ -132,6 +132,10 @@
 @media (min-width: 1024px) {
   .site-hero-title { font-size: clamp(5rem, 8.4vw, 7rem); }
 }
+/* À côté de la vidéo du hero : la colonne est plus étroite, le titre descend d'un cran pour tenir sur deux lignes. */
+@media (min-width: 1024px) {
+  .site-hero-title-side { font-size: clamp(3.4rem, 5.6vw, 5rem); line-height: 0.94; }
+}
 /* Titre d'ouverture des pages intérieures : plus long, donc un cran en dessous. */
 .site-page-title {
   font-size: clamp(2.35rem, 1.2rem + 5.6vw, 4.75rem);

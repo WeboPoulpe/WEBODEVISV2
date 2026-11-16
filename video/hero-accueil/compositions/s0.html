@@ -1,0 +1,45 @@
+<template>
+  <style>
+@font-face{font-family:'Bricolage Grotesque';src:url('assets/fonts/bricolage.woff2') format('woff2');font-weight:200 800;}
+@font-face{font-family:'Instrument Sans';src:url('assets/fonts/instrument.woff2') format('woff2');font-weight:400 700;}
+#root{position:absolute;inset:0;overflow:hidden;font-family:'Instrument Sans',sans-serif;
+  --n-200:230 223 211;--n-300:209 201 187;--n-400:163 156 142;--n-600:87 83 76;--n-800:42 40 37;--n-900:27 26 23;
+  --p-300:229 174 146;--p-400:216 140 104;--p-700:180 80 45;--p-800:150 63 34;--sage:63 107 79;--forest:28 38 33;
+  --font-display:'Bricolage Grotesque';}
+.fill{position:absolute;inset:0;}
+.day{position:absolute;font:600 46px 'Instrument Sans',sans-serif;letter-spacing:-0.01em;white-space:nowrap;}
+.title{position:absolute;font:800 132px/1 'Bricolage Grotesque',sans-serif;letter-spacing:-0.03em;}
+.title .ln{display:block;white-space:nowrap;}
+.title .w{display:inline-block;}
+.title .acc{color:var(--acc);}
+.shot{position:absolute;overflow:hidden;border-radius:28px;background:#F3EEE6;box-shadow:0 30px 80px rgba(20,24,20,.22);}
+.cam{position:absolute;left:0;top:0;width:2560px;}
+.cam img{display:block;width:2560px;height:auto;}
+.julien-box{position:absolute;}
+.julien{display:block;width:100%;height:auto;overflow:visible;}
+
+#root{background:#1C2621;color:#F7F3EC;--acc:#E5AE92;}
+#s0-title{left:110px;top:300px;font-size:168px;}
+#s0-sub{left:116px;top:712px;font:600 68px/1.18 'Bricolage Grotesque',sans-serif;letter-spacing:-0.015em;color:rgba(247,243,236,.82);}
+#s0-rule{position:absolute;left:116px;top:668px;width:150px;height:8px;border-radius:4px;background:#B4502D;}
+</style>
+  <div id="root" data-composition-id="s0" data-width="1920" data-height="1080">
+    <div id="calque-1" class="clip fill" data-start="0" data-duration="4.4" data-track-index="0"><div class="title" id="s0-title"><span class="ln"><span class="w">Le</span> <span class="w">logiciel</span> <span class="w acc">clé</span> <span class="w acc">en</span> <span class="w acc">main</span></span><span class="ln"><span class="w">des</span> <span class="w">traiteurs</span></span></div></div>
+    <div id="calque-2" class="clip fill" data-start="0" data-duration="4.4" data-track-index="0"><div id="s0-rule"></div><div class="title" id="s0-sub"><span class="ln"><span class="w">De</span> <span class="w">la</span> <span class="w">demande</span> <span class="w">à</span> <span class="w">la</span> <span class="w">facturation,</span></span><span class="ln"><span class="w">en</span> <span class="w">passant</span> <span class="w">par</span> <span class="w">l’organisation</span></span></div></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const D = 4.4;
+      const titleIn = (sel, at) => tl.fromTo(sel + " .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, stagger: 0.07, ease: "power2.out" }, at);
+      const breathe = (sel, n) => tl.fromTo(sel + " .julien-body", { scaleY: 1, transformOrigin: "50% 100%" }, { scaleY: 1.022, duration: 0.85, yoyo: true, repeat: n, ease: "sine.inOut" }, 0);
+
+      tl.fromTo("#s0-rule", { scaleX: 0, transformOrigin: "0 50%" }, { scaleX: 1, duration: 0.45, ease: "expo.out" }, 0.45);
+      tl.fromTo("#s0-sub .w", { opacity: 0.18 }, { opacity: 1, duration: 0.22, stagger: 0.11, ease: "power1.out" }, 0.6);
+      tl.to(["#s0-title", "#s0-sub", "#s0-rule"], { opacity: 0, filter: "blur(12px)", duration: 0.22, ease: "power2.in" }, D - 0.26);
+
+      tl.to({}, { duration: 0.001 }, D - 0.001);
+      window.__timelines["s0"] = tl;
+    })();
+  </script>
+</template>
