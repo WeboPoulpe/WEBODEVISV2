@@ -46,6 +46,15 @@ describe('accès', () => {
     current = MEMBER;
     expect(await listActivity({})).toEqual({ allowed: false, entries: [], next: null, people: [] });
   });
+  it('le titulaire y a toujours accès, quel que soit son rôle enregistré', async () => {
+    current = OWNER;
+    await pg.exec(`update profiles set company_role = 'collaborateur' where id = '${OWNER}'`);
+    try {
+      expect((await listActivity({})).allowed).toBe(true);
+    } finally {
+      await pg.exec(`update profiles set company_role = 'gerant' where id = '${OWNER}'`);
+    }
+  });
   it('un gérant voit l’historique de son entreprise, pas celui d’une autre', async () => {
     current = MANAGER;
     const r = await listActivity({});
@@ -79,6 +88,9 @@ describe('filtres', () => {
   });
   it('tri du plus ancien au plus récent', async () => {
     expect((await listActivity({ order: 'asc' })).entries[0].label).toBe('Julie');
+  });
+  it('les dates sont au format ISO', async () => {
+    expect((await listActivity({ order: 'asc' })).entries[0]).toMatchObject({ at: '2026-11-10T09:00:00.000000Z', until: null });
   });
   it('liste les personnes de l’entreprise qui ont agi', async () => {
     expect((await listActivity({})).people.map((p) => p.id).sort()).toEqual([OWNER, MEMBER].sort());

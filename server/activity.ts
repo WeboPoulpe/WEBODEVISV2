@@ -69,8 +69,11 @@ type Row = {
 
 export async function listActivity(f: ActivityFilters): Promise<ActivityPage> {
   const user = await requireUser();
-  const me = (await db.execute(sql`select company_role from public.profiles where id = ${user.id}::uuid`)) as unknown as { rows: { company_role: string }[] };
-  if (me.rows[0]?.company_role !== 'gerant') return DENIED;
+  // Même règle que la gestion de l'équipe (server/team.ts) : le titulaire, ou un gérant.
+  const me = (await db.execute(sql`select parent_user_id, company_role from public.profiles where id = ${user.id}::uuid`)) as unknown as
+    { rows: { parent_user_id: string | null; company_role: string }[] };
+  const p = me.rows[0];
+  if (!p || (p.parent_user_id && p.company_role !== 'gerant')) return DENIED;
 
   const asc = f.order === 'asc';
   const where: SQL[] = [sql`a.company_id = ${companyOf(user.id)}`];
@@ -93,7 +96,8 @@ export async function listActivity(f: ActivityFilters): Promise<ActivityPage> {
   }
 
   const res = (await db.execute(sql`
-    select a.id, a.created_at::text as at, a.updated_at::text as until, a.actor_label as actor, a.via_admin, a.action,
+    select a.id, to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as at,
+           to_char(a.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as until, a.actor_label as actor, a.via_admin, a.action,
            a.entity_type as entity, a.entity_id, a.entity_label as label, a.summary, a.details
     from public.activity_log a
     where ${sql.join(where, sql` and `)}
