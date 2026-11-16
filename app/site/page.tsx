@@ -104,7 +104,7 @@ export default function SitePage() {
                 <div className="border-l-[3px] border-primary-400 pl-4">
                   <p className={`${when} text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30</p>
                   <p className="text-base leading-relaxed text-white/75 mt-1 max-w-[44ch]">
-                    «&nbsp;Six demandes sont arrivées ce week-end. Je dormais. Ma brochure, elle, a travaillé.&nbsp;»
+                    «&nbsp;Six demandes sont arrivées ce week-end. J’étais en prestation. Ma brochure, elle, a travaillé pour moi.&nbsp;»
                   </p>
                 </div>
               </div>
