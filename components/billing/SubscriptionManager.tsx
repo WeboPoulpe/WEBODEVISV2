@@ -9,14 +9,15 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { btnPrimary, btnSecondary, btnGhost, cardCls } from '@/components/ui/kit';
 import { useFeedback } from '@/components/ui/Feedback';
+import { planAmount } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 import {
-  cancelSubscription, openBillingPortal, resumeSubscription, switchToAnnual, type BillingResult,
+  cancelSubscription, openBillingPortal, resumeSubscription, type BillingResult,
 } from '@/server/billingActions';
 import type { SubscriptionView } from '@/server/subscriptionView';
-import PlanCards, { planAmount } from './PlanCards';
+import PlanCards from './PlanCards';
 
-type Action = 'annual' | 'portal' | 'cancel' | 'resume';
+type Action = 'portal' | 'cancel' | 'resume';
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 const PLAN_LABEL = { mensuel: 'Mensuel', annuel: 'Annuel' } as const;
@@ -49,14 +50,6 @@ export default function SubscriptionManager({ view, canManage }: { view: Subscri
   const end = view.current_period_end ? day(view.current_period_end) : null;
   const spin = (a: Action) => busy === a && <Loader2 className="h-4 w-4 animate-spin" />;
 
-  const onAnnual = async () => {
-    const ok = await confirm({
-      title: 'Passer en annuel ?',
-      message: 'Vous passez à 1 100 € HT / an (1 320 € TTC), soit 1 mois offert. Le temps non utilisé de votre mois en cours est déduit.',
-      confirmLabel: 'Passer en annuel',
-    });
-    if (ok) await run('annual', switchToAnnual, 'Vous êtes maintenant sur la formule annuelle.');
-  };
   const onCancel = async () => {
     const ok = await confirm({
       title: 'Annuler l’abonnement ?',
@@ -134,9 +127,6 @@ export default function SubscriptionManager({ view, canManage }: { view: Subscri
 
       {canManage ? (
         <div className="flex flex-wrap gap-2">
-          {plan === 'mensuel' && !view.cancel_at_period_end && (
-            <button type="button" disabled={!!busy} onClick={onAnnual} className={btnPrimary}>{spin('annual')}Passer en annuel</button>
-          )}
           {view.status !== 'past_due' && (
             <button type="button" disabled={!!busy} onClick={() => run('portal', openBillingPortal)} className={btnSecondary}>
               {spin('portal')}Gérer ma carte et mes factures
