@@ -13,7 +13,7 @@ import SignedMessages from '@/components/site/story/SignedMessages';
 import Van from '@/components/site/story/Van';
 import WeekBar from '@/components/site/story/WeekBar';
 import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/components/site/ui';
-import { EXTRAS, FIRST_MONTH_HT, MONTHLY_HT, MONTHLY_INCLUDES, PRICE_LINE, SETUP_INCLUDES, euros } from '@/lib/pricing';
+import { EXTRAS, FIRST_MONTH_HT, MONTHLY_HT, MONTHLY_INCLUDES, PRICE_LINE, SETUP_INCLUDES, SETUP_PROMISE, euros } from '@/lib/pricing';
 import { RELEASE } from '@/lib/site/config';
 import { FEATURE_LIST, featureBySlug } from '@/lib/site/features';
 import { pageMetadata } from '@/lib/site/metadata';
@@ -247,6 +247,7 @@ export default function SitePage() {
               </p>
               <p className="mt-3 text-white/75">Nous installons votre logiciel avec vous.</p>
               <Included items={SETUP_INCLUDES} />
+              <p className="mt-5 font-medium text-white">{SETUP_PROMISE}</p>
             </div>
             <div className="rounded-[24px] bg-white/[0.06] p-7 ring-1 ring-white/10">
               <h3 className="text-[15px] font-medium text-primary-300">2. Ensuite, chaque mois</h3>

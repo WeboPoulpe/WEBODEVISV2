@@ -42,9 +42,16 @@ export const MONTHLY_INCLUDES = [
 
 /** En option, sur devis. */
 export const EXTRAS = [
-  'La reprise de vos clients et de vos devis déjà signés',
+  'La reprise de tous vos clients et de vos devis déjà signés',
+  'La création de toutes vos prestations',
   'La création de vos brochures par notre équipe',
 ];
+
+/** Ce que la mise en service permet tout de suite, dit sous sa liste. */
+export const SETUP_PROMISE = 'Dès le premier jour, vous faites votre premier devis.';
+
+/** Les options, en une phrase sous la mise en service. */
+export const SETUP_OPTIONS = 'En option, sur devis : votre brochure, tous vos clients, toutes vos prestations.';
 
 /** Le prix, dit de la même façon partout. */
 export const PRICE_LINE = `${euros(FIRST_MONTH_HT)} HT le premier mois, mise en service comprise, puis ${euros(MONTHLY_HT)} HT par mois, sans engagement`;

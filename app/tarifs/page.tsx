@@ -7,7 +7,7 @@ import { DemoButton, JsonLd, TextLink, container, sectionGap } from '@/component
 import { pageMetadata } from '@/lib/site/metadata';
 import { DEMO, HOME, QUOTE_REQUEST, PRICING } from '@/lib/site/pages';
 import {
-  EXTRAS, FIRST_MONTH_HT, FIRST_YEAR_HT, MONTHLY_HT, MONTHLY_INCLUDES, NEXT_YEAR_HT, PRICE_LINE, SETUP_INCLUDES, euros, ttc,
+  EXTRAS, FIRST_MONTH_HT, FIRST_YEAR_HT, MONTHLY_HT, MONTHLY_INCLUDES, NEXT_YEAR_HT, PRICE_LINE, SETUP_INCLUDES, SETUP_OPTIONS, SETUP_PROMISE, euros, ttc,
 } from '@/lib/pricing';
 import { breadcrumbSchema, faqSchema, type Faq } from '@/lib/site/schema';
 
@@ -98,6 +98,8 @@ export default function TarifsPage() {
               <Amount value={euros(FIRST_MONTH_HT)} unit="HT" />
               <p className="text-[15px] text-gray-600">{euros(ttc(FIRST_MONTH_HT))} TTC · mise en service et premier mois compris</p>
               <Included items={SETUP_INCLUDES} />
+              <p className="mt-5 font-medium text-gray-900">{SETUP_PROMISE}</p>
+              <p className="mt-2 text-[15px] text-gray-600">{SETUP_OPTIONS}</p>
             </Step>
             <Step n={3} when="Ensuite, chaque mois" className="bg-white ring-1 ring-black/5">
               <Amount value={euros(MONTHLY_HT)} unit="HT" />

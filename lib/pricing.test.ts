@@ -18,7 +18,13 @@ describe('offre WeboDevis', () => {
       'Vos prestations essentielles, déjà créées',
     ]);
     expect(pricing.MONTHLY_INCLUDES).toHaveLength(4);
-    expect(pricing.EXTRAS).toHaveLength(2);
+    expect(pricing.EXTRAS).toEqual([
+      'La reprise de tous vos clients et de vos devis déjà signés',
+      'La création de toutes vos prestations',
+      'La création de vos brochures par notre équipe',
+    ]);
+    expect(pricing.SETUP_PROMISE).toBe('Dès le premier jour, vous faites votre premier devis.');
+    expect(pricing.SETUP_OPTIONS).toBe('En option, sur devis : votre brochure, tous vos clients, toutes vos prestations.');
   });
 
   it('ne promet plus l’import des clients ni l’annuel', () => {
