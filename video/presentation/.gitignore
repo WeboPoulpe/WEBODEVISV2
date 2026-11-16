@@ -1,0 +1,7 @@
+captures/
+renders/
+.hyperframes/
+.thumbnails/
+node_modules/
+assets/audio/voix-brute.wav
+.waveform-cache/

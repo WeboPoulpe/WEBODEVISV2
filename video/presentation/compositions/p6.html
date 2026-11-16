@@ -1,0 +1,62 @@
+<template>
+  <style>
+@font-face{font-family:'Bricolage Grotesque';src:url('assets/fonts/bricolage.woff2') format('woff2');font-weight:200 800;}
+@font-face{font-family:'Instrument Sans';src:url('assets/fonts/instrument.woff2') format('woff2');font-weight:400 700;}
+#root{position:absolute;inset:0;overflow:hidden;font-family:'Instrument Sans',sans-serif;
+  --n-200:230 223 211;--n-300:209 201 187;--n-400:163 156 142;--n-600:87 83 76;--n-800:42 40 37;--n-900:27 26 23;
+  --p-300:229 174 146;--p-400:216 140 104;--p-700:180 80 45;--p-800:150 63 34;--sage:63 107 79;--forest:28 38 33;
+  --font-display:'Bricolage Grotesque';}
+.fill{position:absolute;inset:0;}
+.title{position:absolute;font:800 132px/1 'Bricolage Grotesque',sans-serif;letter-spacing:-0.03em;}
+.title .ln{display:block;white-space:nowrap;}
+.title .w{display:inline-block;}
+.title .acc{color:var(--acc);}
+.shot{position:absolute;overflow:hidden;border-radius:28px;background:#F3EEE6;box-shadow:0 30px 80px rgba(20,24,20,.22);}
+.cam{position:absolute;left:0;top:0;width:2560px;}
+.cam img{display:block;width:2560px;height:auto;}
+.julien-box{position:absolute;}
+.julien{display:block;width:100%;height:auto;overflow:visible;}
+#root{background:#F3EEE6;color:#1B1A17;--acc:#B4502D;}
+
+.item{position:absolute;left:1300px;font:700 76px/1 'Bricolage Grotesque';letter-spacing:-0.025em;color:#57534C;white-space:nowrap;}
+#p6-s .cam{opacity:0;} #p6-s #p6-s-cam{opacity:1;}
+</style>
+  <div id="root" data-composition-id="p6" data-width="1920" data-height="1080">
+    <div id="calque-23" class="clip fill" data-start="0" data-duration="7.4" data-track-index="0"><div class="shot" id="p6-s" style="left:90px;top:96px;width:1130px;height:1100px"><div class="cam" id="p6-s-cam"><img src="assets/screens/evenement.png" alt=""></div><div class="cam" id="p6-c1"><img src="assets/screens/courses.png" alt=""></div><div class="cam" id="p6-c2"><img src="assets/screens/checklist.png" alt=""></div><div class="cam" id="p6-c3"><img src="assets/screens/materiel.png" alt=""></div></div></div>
+    <div id="calque-24" class="clip fill" data-start="0" data-duration="7.4" data-track-index="0"><div class="title" id="p6-t" style="left:1296px;top:150px;font-size:104px;"><span class="ln"><span class="w">L’organisation</span></span><span class="ln"><span class="w acc">suit</span></span></div></div>
+    <div id="calque-25" class="clip fill" data-start="0" data-duration="7.4" data-track-index="0"><div class="item" id="p6-i1" style="top:470px">Les courses</div><div class="item" id="p6-i2" style="top:580px">La checklist</div><div class="item" id="p6-i3" style="top:690px">Le matériel</div></div>
+    <div id="calque-26" class="clip fill" data-start="0" data-duration="7.4" data-track-index="0"><div class="fill" id="p6-wipe" style="background:#E7EDDD"></div></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const D = 7.4;
+
+      const wordsIn = (sel, at, gap) => tl.fromTo(sel + " .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, stagger: gap || 0.09, ease: "power2.out" }, at);
+      const lineIn = (sel, n, at, gap) => tl.fromTo(sel + " .ln:nth-child(" + n + ") .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, stagger: gap || 0.09, ease: "power2.out" }, at);
+      const hide = (sel) => tl.set(sel, { opacity: 0 }, 0);
+      const pop = (sel, at) => tl.fromTo(sel, { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, at);
+      const out = (sel, at) => tl.to(sel, { opacity: 0, filter: "blur(12px)", duration: 0.22, ease: "power2.in" }, at);
+      const cam = (sel, x, y, s) => tl.fromTo(sel, { x: x, y: y, scale: s, transformOrigin: "0 0" }, { x: x, y: y, scale: s, duration: 0.01 }, 0);
+      const camTo = (sel, x, y, s, at, d) => tl.to(sel, { x: x, y: y, scale: s, duration: d || 0.85, ease: "power2.inOut" }, at);
+      const breathe = (sel, n) => tl.fromTo(sel + " .julien-body", { scaleY: 1, transformOrigin: "50% 100%" }, { scaleY: 1.022, duration: 0.85, yoyo: true, repeat: n, ease: "sine.inOut" }, 0);
+      const wipeUp = (sel) => tl.fromTo(sel, { yPercent: 100 }, { yPercent: 0, duration: 0.42, ease: "power2.inOut" }, D - 0.46);
+      const wipeSide = (sel) => tl.fromTo(sel, { xPercent: -100 }, { xPercent: 0, duration: 0.42, ease: "power3.in" }, D - 0.45);
+
+      wordsIn("#p6-t", 0.3, 0.35);
+      tl.fromTo("#p6-s", { opacity: 0, x: -80 }, { opacity: 1, x: 0, duration: 0.55, ease: "expo.out" }, 0.05);
+      cam("#p6-s-cam", -336, -180, 0.584);
+      cam("#p6-c1", -707, -1152, 1.2); ["#p6-c2", "#p6-c3"].forEach((c) => cam(c, -420, -690, 0.73));
+      camTo("#p6-s-cam", -420, -690, 0.73, 1.9, 0.9);
+      [["#p6-c1", "#p6-i1", 3.05], ["#p6-c2", "#p6-i2", 4.55], ["#p6-c3", "#p6-i3", 5.55]].forEach((s, i, all) => {
+        tl.fromTo(s[0], { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out" }, s[2]);
+        tl.fromTo(s[1], { opacity: 0, x: 40 }, { opacity: 1, x: 0, color: "#B4502D", duration: 0.4, ease: "expo.out" }, s[2]);
+        if (all[i + 1]) tl.to(s[1], { color: "#57534C", duration: 0.25 }, all[i + 1][2]);
+      });
+      wipeSide("#p6-wipe");
+
+      tl.to({}, { duration: 0.001 }, D - 0.001);
+      window.__timelines["p6"] = tl;
+    })();
+  </script>
+</template>

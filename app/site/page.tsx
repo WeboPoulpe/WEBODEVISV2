@@ -7,6 +7,7 @@ import AutoChecklist from '@/components/site/story/AutoChecklist';
 import CrewPhones from '@/components/site/story/CrewPhones';
 import Julien from '@/components/site/story/Julien';
 import HeroVideo from '@/components/site/HeroVideo';
+import PresentationVideo from '@/components/site/PresentationVideo';
 import MarginCounter from '@/components/site/story/MarginCounter';
 import QuoteStepper from '@/components/site/story/QuoteStepper';
 import SignedMessages from '@/components/site/story/SignedMessages';
@@ -235,6 +236,18 @@ export default function SitePage() {
 
       {/* ── Après l'histoire inventée, la parole d'un vrai traiteur ── */}
       <Testimonial className="pt-16 md:pt-24" />
+
+      {/* ── Tout le logiciel en une minute trente, raconté de vive voix ── */}
+      <section aria-labelledby="titre-video" className="pt-16 md:pt-24">
+        <div className={`${container} max-w-[1080px]`}>
+          <div className="text-center">
+            <p className={`${when} text-primary`}>En vidéo, 1&nbsp;min&nbsp;30</p>
+            <h2 id="titre-video" className="site-h2 mt-3 mx-auto max-w-[22ch]">De la demande à la facturation, en passant par l’organisation.</h2>
+          </div>
+          <PresentationVideo className="mt-8 md:mt-10" />
+          <p className="mt-4 text-center text-[15px] text-gray-600">Avec le son. Les écrans sont ceux de la démo.</p>
+        </div>
+      </section>
 
       {/* ── Le tarif ── */}
       <section id="tarif" aria-labelledby="titre-tarif" className="site-dark mx-2 sm:mx-2.5 mt-16 md:mt-24 rounded-[28px] bg-forest text-white">

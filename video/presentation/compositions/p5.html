@@ -1,0 +1,53 @@
+<template>
+  <style>
+@font-face{font-family:'Bricolage Grotesque';src:url('assets/fonts/bricolage.woff2') format('woff2');font-weight:200 800;}
+@font-face{font-family:'Instrument Sans';src:url('assets/fonts/instrument.woff2') format('woff2');font-weight:400 700;}
+#root{position:absolute;inset:0;overflow:hidden;font-family:'Instrument Sans',sans-serif;
+  --n-200:230 223 211;--n-300:209 201 187;--n-400:163 156 142;--n-600:87 83 76;--n-800:42 40 37;--n-900:27 26 23;
+  --p-300:229 174 146;--p-400:216 140 104;--p-700:180 80 45;--p-800:150 63 34;--sage:63 107 79;--forest:28 38 33;
+  --font-display:'Bricolage Grotesque';}
+.fill{position:absolute;inset:0;}
+.title{position:absolute;font:800 132px/1 'Bricolage Grotesque',sans-serif;letter-spacing:-0.03em;}
+.title .ln{display:block;white-space:nowrap;}
+.title .w{display:inline-block;}
+.title .acc{color:var(--acc);}
+.shot{position:absolute;overflow:hidden;border-radius:28px;background:#F3EEE6;box-shadow:0 30px 80px rgba(20,24,20,.22);}
+.cam{position:absolute;left:0;top:0;width:2560px;}
+.cam img{display:block;width:2560px;height:auto;}
+.julien-box{position:absolute;}
+.julien{display:block;width:100%;height:auto;overflow:visible;}
+#root{background:#B4502D;color:#F7F3EC;--acc:#F7F3EC;}
+</style>
+  <div id="root" data-composition-id="p5" data-width="1920" data-height="1080">
+    <div id="calque-20" class="clip fill" data-start="0" data-duration="5.1" data-track-index="0"><div class="title" id="p5-t" style="left:106px;top:110px;"><span class="ln"><span class="w">Reçu</span> <span class="w">par</span> <span class="w">mail,</span></span><span class="ln"><span class="w">signé</span> <span class="w">en</span> <span class="w">ligne</span></span></div></div>
+    <div id="calque-21" class="clip fill" data-start="0" data-duration="5.1" data-track-index="0"><div class="shot" id="p5-s" style="left:110px;top:440px;width:1700px;height:581px;"><div class="cam" id="p5-s-cam"><img src="assets/screens/evenement.png" alt=""></div></div></div>
+    <div id="calque-22" class="clip fill" data-start="0" data-duration="5.1" data-track-index="0"><div class="fill" id="p5-wipe" style="background:#F3EEE6"></div></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const D = 5.1;
+
+      const wordsIn = (sel, at, gap) => tl.fromTo(sel + " .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, stagger: gap || 0.09, ease: "power2.out" }, at);
+      const lineIn = (sel, n, at, gap) => tl.fromTo(sel + " .ln:nth-child(" + n + ") .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, stagger: gap || 0.09, ease: "power2.out" }, at);
+      const hide = (sel) => tl.set(sel, { opacity: 0 }, 0);
+      const pop = (sel, at) => tl.fromTo(sel, { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, at);
+      const out = (sel, at) => tl.to(sel, { opacity: 0, filter: "blur(12px)", duration: 0.22, ease: "power2.in" }, at);
+      const cam = (sel, x, y, s) => tl.fromTo(sel, { x: x, y: y, scale: s, transformOrigin: "0 0" }, { x: x, y: y, scale: s, duration: 0.01 }, 0);
+      const camTo = (sel, x, y, s, at, d) => tl.to(sel, { x: x, y: y, scale: s, duration: d || 0.85, ease: "power2.inOut" }, at);
+      const breathe = (sel, n) => tl.fromTo(sel + " .julien-body", { scaleY: 1, transformOrigin: "50% 100%" }, { scaleY: 1.022, duration: 0.85, yoyo: true, repeat: n, ease: "sine.inOut" }, 0);
+      const wipeUp = (sel) => tl.fromTo(sel, { yPercent: 100 }, { yPercent: 0, duration: 0.42, ease: "power2.inOut" }, D - 0.46);
+      const wipeSide = (sel) => tl.fromTo(sel, { xPercent: -100 }, { xPercent: 0, duration: 0.42, ease: "power3.in" }, D - 0.45);
+
+      hide("#p5-t .w");
+      lineIn("#p5-t", 1, 0.3, 0.3); lineIn("#p5-t", 2, 2.85, 0.16);
+      pop("#p5-s", 0.5);
+      cam("#p5-s-cam", -506, -297, 0.878);
+      camTo("#p5-s-cam", -810, -486, 1.38, 2.8, 0.8);
+      wipeUp("#p5-wipe");
+
+      tl.to({}, { duration: 0.001 }, D - 0.001);
+      window.__timelines["p5"] = tl;
+    })();
+  </script>
+</template>
