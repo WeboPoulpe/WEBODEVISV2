@@ -41,5 +41,8 @@ describe('offre WeboDevis', () => {
     expect(pricing.subscribeSummary(true)).toContain(`${euros(1250)} HT`);
     expect(pricing.subscribeSummary(false)).not.toMatch(/1.250/);
     expect(pricing.subscribeSummary(false)).toContain(`${euros(100)} HT`);
+    // Sans mise en service due, on ne dit pas pour autant qu'elle est payée : un premier paiement resté
+    // inachevé rouvre la facture d'origine, mise en service comprise.
+    expect(pricing.subscribeSummary(false)).not.toMatch(/déjà|repay/i);
   });
 });

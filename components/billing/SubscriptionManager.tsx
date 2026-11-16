@@ -71,7 +71,7 @@ export default function SubscriptionManager({ view, canManage }: { view: Subscri
     );
   }
 
-  // Sans abonnement en cours : les deux formules.
+  // Sans abonnement en cours : l'abonnement à prendre.
   if (!view.subscribed) {
     return (
       <section className={cn(cardCls, 'p-5 md:p-6')}>
@@ -81,7 +81,7 @@ export default function SubscriptionManager({ view, canManage }: { view: Subscri
             <p className="mt-1 text-sm text-gray-600">Vos données restent consultables et exportables. Réabonnez-vous pour les modifier à nouveau.</p>
           </>
         ) : (
-          <p className="text-lg font-semibold text-gray-900">Choisissez votre formule</p>
+          <p className="text-lg font-semibold text-gray-900">Abonnez-vous à WeboDevis</p>
         )}
         {!canManage && <p className="mt-3 text-sm text-gray-600">Seul le titulaire du compte peut gérer l’abonnement.</p>}
         <div className="mt-5">

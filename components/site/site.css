@@ -394,9 +394,9 @@
 /* ── L'accueil raconté : la semaine de Julien ─────────────────────────────────────────── */
 
 /* La barre de la semaine se colle sous l'en-tête (collé à 8 ou 10 px, haut de 64 ou 72 px). */
-.story-weekbar { top: 76px; }
-@media (min-width: 640px) { .story-weekbar { top: 78px; } }
-@media (min-width: 1024px) { .story-weekbar { top: 86px; } }
+.story-weekbar { top: 72px; }
+@media (min-width: 640px) { .story-weekbar { top: 74px; } }
+@media (min-width: 1024px) { .story-weekbar { top: 82px; } }
 .story-weekbar-list { scrollbar-width: none; }
 .story-weekbar-list::-webkit-scrollbar { display: none; }
 /* Sous l'en-tête et la barre : une ancre de jour ne se cache pas derrière. */

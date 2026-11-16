@@ -86,8 +86,8 @@ export default function SitePage() {
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-x-12 gap-y-9 lg:items-end pt-7 sm:pt-12 lg:pt-16 pb-10 lg:pb-14">
             <div>
               <h1 id="titre-lun" className="text-white">
-                <span className="block text-base font-medium text-white/60">WeboDevis, le logiciel des traiteurs</span>
-                <span className={`${when} mt-6 block text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30</span>
+                <span className="block text-base font-medium text-white/60">WeboDevis, le logiciel des traiteurs<span className="sr-only">.</span></span>{' '}
+                <span className={`${when} mt-6 block text-primary-300`}>Lundi, 7&nbsp;h&nbsp;30<span className="sr-only">.</span></span>{' '}
                 <span className="site-page-title font-display mt-3 block max-w-[13ch]">Six demandes sont arrivées ce week-end.</span>
               </h1>
               <p className="site-lead text-white/75 mt-6 max-w-[44ch]">

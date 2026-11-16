@@ -6,7 +6,7 @@ import SignOutButton from '@/components/billing/SignOutButton';
 import { getSessionUser } from '@/server/session';
 import { subscriptionView } from '@/server/subscriptionView';
 
-// Écran de paiement, hors de l'app (app/(app) y renvoie une entreprise jamais abonnée) : les deux formules et
+// Écran de paiement, hors de l'app (app/(app) y renvoie une entreprise jamais abonnée) : l'abonnement et
 // « S'abonner » vers Stripe Checkout. Un collaborateur y attend que le titulaire s'abonne, sans bouton de paiement.
 
 export const metadata = { title: 'Abonnement — WeboDevis' };
@@ -34,7 +34,7 @@ export default async function AbonnementPage() {
     return (
       <AuthShell
         title="L’abonnement de votre entreprise n’est pas encore actif"
-        subtitle="Le titulaire du compte doit choisir une formule. Vous entrerez dans WeboDevis dès qu’il l’aura fait."
+        subtitle="Le titulaire du compte doit s’abonner. Vous entrerez dans WeboDevis dès qu’il l’aura fait."
         footer={footer}
       >
         <a href="/abonnement" className={authButton}>Vérifier à nouveau</a>
@@ -44,7 +44,7 @@ export default async function AbonnementPage() {
 
   return (
     <AuthShell
-      title={view.access === 'readonly' ? 'Réactivez votre abonnement' : 'Choisissez votre formule'}
+      title={view.access === 'readonly' ? 'Réactivez votre abonnement' : 'Abonnez-vous à WeboDevis'}
       subtitle={view.access === 'readonly'
         ? 'Vos données restent consultables et exportables. Réabonnez-vous pour les modifier à nouveau.'
         : 'Votre compte est prêt. Abonnez-vous pour ouvrir WeboDevis.'}

@@ -63,5 +63,5 @@ export function planAmount(plan: 'mensuel' | 'annuel'): string {
 export function subscribeSummary(setupDue: boolean): string {
   return setupDue
     ? `Premier mois : ${euros(FIRST_MONTH_HT)} HT, mise en service comprise (${SETUP_SUMMARY.toLowerCase()}). Ensuite ${euros(MONTHLY_HT)} HT par mois, sans engagement.`
-    : `${euros(MONTHLY_HT)} HT par mois, sans engagement. La mise en service est déjà faite : vous ne la repayez pas.`;
+    : `${euros(MONTHLY_HT)} HT par mois, sans engagement.`;
 }
