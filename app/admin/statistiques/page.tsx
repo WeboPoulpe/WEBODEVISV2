@@ -10,8 +10,9 @@ import { Loader2 } from 'lucide-react';
 import { cardCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { DEVICE_LABEL, SOURCE_LABEL } from '@/lib/siteStats';
-import { adminSiteStats } from '@/server/admin';
-import type { SiteStats } from '@/server/siteStats';
+import { adminInstagramStats, adminSiteStats } from '@/server/admin';
+import InstagramBlock from '@/components/admin/InstagramBlock';
+import type { InstagramStats, SiteStats } from '@/server/siteStats';
 
 const nf = new Intl.NumberFormat('fr-FR');
 const PERIODS = [7, 30, 90] as const;
@@ -103,12 +104,16 @@ function Ranked({ title, rows, empty }: { title: string; rows: { label: string; 
 export default function AdminStatsPage() {
   const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
   const [stats, setStats] = useState<SiteStats | null>(null);
+  const [instagram, setInstagram] = useState<InstagramStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setStats(null);
     setError(null);
+    setInstagram(null);
     adminSiteStats(days).then(setStats).catch(() => setError('Les statistiques n’ont pas pu être chargées.'));
+    // Le bloc Instagram se charge à part : s'il échoue, les statistiques du site restent affichées.
+    adminInstagramStats(days).then(setInstagram).catch(() => {});
   }, [days]);
 
   return (
@@ -156,6 +161,8 @@ export default function AdminStatsPage() {
             <Ranked title="Appareils" empty="Aucune visite sur la période."
               rows={stats.devices.map((d) => ({ label: DEVICE_LABEL[d.device] ?? d.device, value: d.visitors }))} />
           </div>
+
+          {instagram && <InstagramBlock stats={instagram} />}
 
           <p className="text-xs text-gray-500">
             Les visites sont enregistrées par paquets, au plus une fois par heure, pour ne pas réveiller la base de données à chaque page : les dernières peuvent apparaître avec un peu de retard. Données conservées 13 mois.

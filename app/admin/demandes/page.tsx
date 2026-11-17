@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { REQUEST_KIND, REQUEST_STATUS } from '../labels';
+import OriginPill from '@/components/admin/OriginPill';
 import { useFeedback } from '@/components/ui/Feedback';
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -80,6 +81,7 @@ export default function AdminRequestsPage() {
                   <span className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900 truncate">{r.name}{r.company ? `, ${r.company}` : ''}</span>
                     <span className={cn(pill, REQUEST_STATUS[r.status]?.cls)}>{REQUEST_STATUS[r.status]?.label ?? r.status}</span>
+                    <OriginPill origin={r.origin} />
                   </span>
                   <span className="block text-sm text-gray-500 mt-0.5">{REQUEST_KIND[r.kind] ?? r.kind}</span>
                   <span className="block text-sm text-gray-700 line-clamp-2 mt-1">{r.message}</span>
@@ -134,7 +136,7 @@ function RequestDialog({ request, catalog, onClose, onChanged }: { request: Admi
       <div className="space-y-5 pb-3">
         {error && <p role="alert" className={errorCls}>{error}</p>}
         <div>
-          <p className="text-lg font-semibold text-gray-900">{request.name}</p>
+          <p className="flex flex-wrap items-center gap-2 text-lg font-semibold text-gray-900">{request.name}<OriginPill origin={request.origin} /></p>
           <p className="text-sm text-gray-500">
             {[request.company, request.team_size].filter(Boolean).join(', ')}{request.company || request.team_size ? '. ' : ''}Reçue le {when(request.created_at)}.
           </p>

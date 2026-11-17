@@ -118,3 +118,62 @@ export async function getSiteStats(days: number): Promise<SiteStats> {
 
   return { days: n, totals, daily, pages, sources, referrers, devices };
 }
+
+export interface InstagramStats {
+  days: number;
+  totals: { clics: number; visiteurs: number; demos: number; contacts: number; inscriptions: number };
+  daily: { day: string; clics: number }[];
+  liens: { origin: string; clics: number }[];
+  personnes: { kind: 'demo' | 'contact' | 'compte'; id: string; name: string; company: string | null; origin: string; at: string }[];
+}
+
+/**
+ * Les visites venues d'un lien Instagram (lib/origine.ts) sur les `days` derniers jours : clics sur /ig, visiteurs,
+ * demandes de démo et de contact, comptes, et les personnes qui se sont fait connaître. Écrit d'abord le paquet.
+ */
+export async function getInstagramStats(days: number): Promise<InstagramStats> {
+  await requireAdmin();
+  await flushVisits();
+  const n = [7, 30, 90].includes(days) ? days : 30;
+  const since = sql`current_date - ${n - 1}::int`;
+  const sinceParis = sql`(created_at at time zone 'Europe/Paris')::date >= ${since}`;
+  const q = async <T,>(query: ReturnType<typeof sql>) => (await db.execute(query)).rows as T[];
+  // Les demandes suspectes (robots) et les demandes « Site web » faites depuis l'app ne comptent pas.
+  const requests = sql`origin is not null and status <> 'suspecte' and kind in ('demo', 'devis', 'message')`;
+
+  const [visits] = await q<{ clics: number; visiteurs: number }>(sql`
+    select count(*) filter (where event = 'clic')::int as clics,
+      (select count(*)::int from (select distinct day, visitor from public.site_visits where day >= ${since} and origin is not null) v) as visiteurs
+    from public.site_visits where day >= ${since} and origin is not null`);
+  const [conversions] = await q<{ demos: number; contacts: number }>(sql`
+    select count(*) filter (where kind = 'demo')::int as demos, count(*) filter (where kind <> 'demo')::int as contacts
+    from public.site_requests where ${requests} and ${sinceParis}`);
+  const [accounts] = await q<{ inscriptions: number }>(sql`
+    select count(*)::int as inscriptions from public.profiles where origin is not null and ${sinceParis}`);
+  const daily = await q<{ day: string; clics: number }>(sql`
+    select to_char(d, 'YYYY-MM-DD') as day,
+      coalesce((select count(*)::int from public.site_visits where day = d and event = 'clic' and origin is not null), 0) as clics
+    from generate_series(${since}, current_date, interval '1 day') d order by d`);
+  const liens = await q<{ origin: string; clics: number }>(sql`
+    select origin, count(*)::int as clics from public.site_visits
+    where day >= ${since} and event = 'clic' and origin is not null group by origin order by clics desc, origin`);
+  const personnes = await q<InstagramStats['personnes'][number]>(sql`
+    select * from (
+      select case when kind = 'demo' then 'demo' else 'contact' end as kind, id::text as id, name, company, origin,
+        created_at as at
+      from public.site_requests where ${requests} and ${sinceParis}
+      union all
+      select 'compte' as kind, id::text as id,
+        coalesce(nullif(trim(concat_ws(' ', first_name, last_name)), ''), email) as name, company_name as company, origin,
+        created_at as at
+      from public.profiles where origin is not null and ${sinceParis}
+    ) p order by at desc limit 50`);
+
+  return {
+    days: n,
+    totals: { ...visits, ...conversions, ...accounts },
+    daily,
+    liens,
+    personnes: personnes.map((p) => ({ ...p, at: new Date(p.at).toISOString() })),
+  };
+}

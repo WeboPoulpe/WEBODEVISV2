@@ -116,6 +116,8 @@ export interface AdminAccount {
   modules: string[];
   is_demo: boolean;
   is_self: boolean;
+  /** Origine Instagram du compte (lib/origine.ts), ou null. */
+  origin: string | null;
   created_at: string;
   quotes: number;
   customers: number;
@@ -134,7 +136,7 @@ export async function listAccounts(): Promise<AdminAccount[]> {
   const admin = await requireStaff();
   const support = admin.role === 'support';
   const { rows } = await db.execute(sql`
-    select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at, p.deletion_requested_at, p.last_seen_at,
+    select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.origin, p.created_at, p.deletion_requested_at, p.last_seen_at,
            p.parent_user_id is not null as is_collaborator,
            cs.plan as sub_plan, cs.status as sub_status, cs.current_period_end as sub_period_end,
            cs.cancel_at_period_end as sub_cancel, cs.comped as sub_comped, cs.comped_note as sub_note,
@@ -404,6 +406,12 @@ export async function setErrorResolved(fingerprint: string, resolved: boolean): 
   await requireAdmin();
   await db.execute(sql`update public.error_groups set resolved_at = ${resolved ? sql`now()` : sql`null`} where fingerprint = ${fingerprint}`);
   return { error: null };
+}
+
+/** Visites et conversions venues des liens Instagram, pour le bloc Instagram de la page Statistiques. */
+export async function adminInstagramStats(days: number): Promise<import('./siteStats').InstagramStats> {
+  const { getInstagramStats } = await import('./siteStats');
+  return getInstagramStats(days);
 }
 
 /** Statistiques du site de présentation (sans cookie), pour la page Statistiques de l'admin. */

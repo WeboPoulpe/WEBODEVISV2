@@ -14,6 +14,7 @@ import Modal from '@/components/ui/Modal';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, inputCls, labelCls, pill } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
 import { useFeedback } from '@/components/ui/Feedback';
+import OriginPill from '@/components/admin/OriginPill';
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const accountName = (a: AdminAccount) => a.company_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || a.email;
@@ -140,6 +141,7 @@ export default function AdminAccountsPage() {
                     {a.role === 'admin' && <span className={cn(pill, 'bg-forest text-white')}>Administrateur</span>}
                     {a.role === 'support' && <span className={cn(pill, 'bg-sage-100 text-sage')}>Support</span>}
                     {a.is_demo && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Démonstration</span>}
+                    <OriginPill origin={a.origin} />
                     {a.deletion_requested_at
                       ? <span className={cn(pill, 'bg-red-50 text-red-700')}>Suppression demandée</span>
                       : !a.is_active && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Désactivé</span>}

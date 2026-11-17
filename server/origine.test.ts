@@ -19,7 +19,7 @@ vi.mock('@/db', () => ({ get db() { return drizzle(pg, { schema }); }, get pool(
 
 const { submitSiteRequest } = await import('./site');
 const { registerUser } = await import('./auth');
-const { createAccount } = await import('./admin');
+const { createAccount, listAccounts } = await import('./admin');
 const { originForEmail } = await import('./origine');
 
 const originOf = async (table: 'site_requests' | 'profiles', email: string) =>
@@ -78,4 +78,10 @@ it('inscription sans origine de visite : reprise par l’adresse', async () => {
 it('inscription sans aucune origine : null', async () => {
   expect(await registerUser({ email: 'n@t.fr', password: 'secret1', firstName: 'N', lastName: 'O' })).toEqual({ error: null });
   expect(await originOf('profiles', 'n@t.fr')).toBeNull();
+});
+
+it('la liste des comptes de l’admin montre l’origine', async () => {
+  const accounts = await listAccounts();
+  expect(accounts.find((a) => a.email === 'r@t.fr')?.origin).toBe('instagram:salon');
+  expect(accounts.find((a) => a.email === 'n@t.fr')?.origin).toBeNull();
 });
