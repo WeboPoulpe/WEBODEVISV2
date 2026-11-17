@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { CHECKOUT_SESSION_HEADER } from '@/lib/subscription';
 
 // Pages du site de présentation et de la démonstration : ouvertes à tous, lues par les moteurs de recherche.
-const SITE_PREFIXES = ['/site', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
+const SITE_PREFIXES = ['/site', '/ig', '/fonctionnalites', '/pour', '/guides', '/nouveautes', '/demo', '/contact', '/mentions-legales', '/confidentialite'];
 
 // Écrans de l'application (dossiers de app/(app) et app/(print), et l'administration) : sans session, ils
 // renvoient vers la connexion. À compléter quand un écran s'ajoute à la racine de l'app.
