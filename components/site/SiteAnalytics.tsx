@@ -2,13 +2,24 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+import { captureOriginFromUrl, readStoredOrigin } from '@/lib/origine';
 
 // Mesure d'audience du site, sans cookie (voir lib/siteStats.ts) : une page vue à chaque changement de page, et
 // l'ouverture de la démo. Le site précédent (referrer) n'est envoyé qu'à l'arrivée sur le site.
 
+// Origine Instagram de la visite (lib/origine.ts). À la première page, OrigineCapture (monté plus haut, donc dont
+// l'effet passe après celui-ci) ne l'a pas encore rangée : on la lit aussi dans l'adresse.
+function currentOrigin(): string | null {
+  try {
+    return captureOriginFromUrl(window.location.href).origin ?? readStoredOrigin();
+  } catch {
+    return null;
+  }
+}
+
 function send(data: { path: string; referrer?: string; event?: 'view' | 'demo' }) {
   try {
-    const body = JSON.stringify(data);
+    const body = JSON.stringify({ ...data, origin: currentOrigin() });
     if (!navigator.sendBeacon?.('/api/stats', body)) fetch('/api/stats', { method: 'POST', body, keepalive: true }).catch(() => {});
   } catch {
     // La mesure ne doit jamais gêner la visite.

@@ -48,3 +48,15 @@ export function storeOrigin(origin: string): void {
     // Stockage bloqué (navigation privée) : la visite continue sans origine.
   }
 }
+
+/**
+ * Lit ?o= dans une adresse : l'origine si elle est valide, et l'adresse à remettre sans o (chemin, autres paramètres,
+ * ancre), ou null quand il n'y a rien à retirer.
+ */
+export function captureOriginFromUrl(href: string): { origin: string | null; cleaned: string | null } {
+  const url = new URL(href);
+  if (!url.searchParams.has('o')) return { origin: null, cleaned: null };
+  const origin = parseOrigin(url.searchParams.get('o'));
+  url.searchParams.delete('o');
+  return { origin, cleaned: url.pathname + url.search + url.hash };
+}

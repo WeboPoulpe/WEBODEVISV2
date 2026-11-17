@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import RegisterServiceWorker from '@/components/pwa/RegisterServiceWorker';
 import ErrorReporter from '@/components/system/ErrorReporter';
+import OrigineCapture from '@/components/site/OrigineCapture';
 
 // Interface : Instrument Sans. Titres et grands chiffres : Bricolage Grotesque.
 const ui = Instrument_Sans({ subsets: ['latin'], variable: '--font-ui' });
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>{children}</AuthProvider>
         <RegisterServiceWorker />
         <ErrorReporter />
+        <OrigineCapture />
       </body>
     </html>
   );
