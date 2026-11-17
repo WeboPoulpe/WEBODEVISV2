@@ -17,13 +17,17 @@ export function parseOrigin(raw: unknown): string | null {
 
 /** Origine d'un lien /ig/<libellé> ; un libellé absent ou invalide donne le lien de la bio. */
 export function originFromPath(segments: string[] | undefined): string {
-  const label = segments?.[0];
+  // Un libellé tapé avec des majuscules sur un autocollant de story (« /ig/Noel ») reste reconnu.
+  const label = segments?.[0]?.toLowerCase();
   return label && LABEL.test(label) ? `instagram:${label}` : 'instagram';
 }
 
 /** Destination d'un lien /ig : un chemin du site seulement (jamais une autre adresse), sinon la présentation. */
 export function safeDestination(raw: string | null): string {
-  if (!raw || raw.length > 200 || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return DEFAULT_DESTINATION;
+  // Tabulations et retours à la ligne sont effacés par le navigateur : « /<tab>/autre.site » deviendrait « //autre.site ».
+  if (!raw || raw.length > 200 || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || /[\u0000-\u001f\u007f]/.test(raw)) {
+    return DEFAULT_DESTINATION;
+  }
   return raw;
 }
 

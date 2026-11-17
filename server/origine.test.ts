@@ -85,3 +85,19 @@ it('la liste des comptes de l’admin montre l’origine', async () => {
   expect(accounts.find((a) => a.email === 'r@t.fr')?.origin).toBe('instagram:salon');
   expect(accounts.find((a) => a.email === 'n@t.fr')?.origin).toBeNull();
 });
+
+it('demande de démo : origine valide gardée, forgée ignorée', async () => {
+  process.env.NEXTAUTH_SECRET ??= 'secret-de-test';
+  const { requestDemoAccess } = await import('./demo');
+  const { hmac, signTicket } = await import('./tickets');
+  // Un vrai défi signé, posé il y a 5 s (une réponse trop rapide est refusée), dont la réponse est 7.
+  const challenge = () => signTicket({ k: 'defi', n: 'n1', h: hmac('7:n1'), iat: Date.now() - 5000 }, 60_000);
+  const demo = (email: string, origin: unknown) => requestDemoAccess({
+    firstName: 'Camille', lastName: 'Martin', email, phone: '06 12 34 56 78', company: 'Traiteur Martin',
+    answer: '7', challenge: challenge(), origin: origin as string,
+  });
+  expect((await demo('demo1@t.fr', 'instagram:lancement')).error).toBeNull();
+  expect((await demo('demo2@t.fr', 'instagram:<script>')).error).toBeNull();
+  expect(await originOf('site_requests', 'demo1@t.fr')).toBe('instagram:lancement');
+  expect(await originOf('site_requests', 'demo2@t.fr')).toBeNull();
+});

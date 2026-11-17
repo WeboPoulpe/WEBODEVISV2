@@ -35,7 +35,7 @@ it('destination avec paramètres : conservés', async () => {
 });
 
 it('destination externe refusée', async () => {
-  for (const vers of ['//exemple.com', 'https://exemple.com', '/\\exemple.com']) {
+  for (const vers of ['//exemple.com', 'https://exemple.com', '/\\exemple.com', '/\t/evil.com', '/\n/evil.com', '/\r/evil.com']) {
     const res = await GET(req('/ig?vers=' + encodeURIComponent(vers)), params());
     expect(res.headers.get('location')).toBe('https://webodevis.fr/site?o=instagram');
   }

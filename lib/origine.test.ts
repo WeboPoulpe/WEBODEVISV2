@@ -60,3 +60,12 @@ it('origine invalide : retirée de l’adresse, pas gardée', () => {
 it('rien à capter : rien à faire', () => {
   expect(captureOriginFromUrl('https://webodevis.fr/demo?x=1')).toEqual({ origin: null, cleaned: null });
 });
+
+it('destination avec caractères de contrôle refusée (tabulation, retour à la ligne)', () => {
+  for (const v of ['/\t/evil.com', '/\n/evil.com', '/\r/evil.com', '/\u0000/evil.com', '/\u007f/evil.com']) expect(safeDestination(v)).toBe('/site');
+});
+
+it('libellé en majuscules : ramené en minuscules', () => {
+  expect(originFromPath(['Noel'])).toBe('instagram:noel');
+  expect(originFromPath(['Lancement-2026'])).toBe('instagram:lancement-2026');
+});

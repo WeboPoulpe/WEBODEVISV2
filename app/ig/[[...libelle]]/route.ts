@@ -30,7 +30,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (row) await recordHit(row).catch(() => {});
   }
 
-  const target = new URL(safeDestination(request.nextUrl.searchParams.get('vers')), request.nextUrl.origin);
+  let target = new URL(safeDestination(request.nextUrl.searchParams.get('vers')), request.nextUrl.origin);
+  // Deuxième garde : quoi que contienne ?vers=, on ne quitte jamais le site.
+  if (target.origin !== request.nextUrl.origin) target = new URL('/site', request.nextUrl.origin);
   target.searchParams.set('o', origin);
   return NextResponse.redirect(target, 302);
 }
