@@ -988,6 +988,8 @@ export const profiles = pgTable("profiles", {
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	subscription_type: text().default('free'),
 	company_name: text(),
+	// Origine Instagram du compte (lib/origine.ts) : la visite de l'inscription, ou une demande avec la même adresse.
+	origin: text(),
 	company_siret: text(),
 	company_address: text(),
 	company_phone: text(),
@@ -2013,6 +2015,8 @@ export const site_requests = pgTable("site_requests", {
 	// du questionnaire (lib/siteWeb.ts). Nuls pour les demandes du site public.
 	user_id: uuid(),
 	answers: jsonb(),
+	// Origine Instagram de la visite qui a envoyé la demande (lib/origine.ts), ou null.
+	origin: text(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	handled_at: timestamp({ withTimezone: true, mode: 'string' }),
 }, (table) => [
@@ -2034,9 +2038,12 @@ export const site_visits = pgTable("site_visits", {
 	referrer_host: text(),
 	device: text().default('ordinateur').notNull(),
 	visitor: text().notNull(),
+	// Origine Instagram de la visite (lib/origine.ts), ou null.
+	origin: text(),
 }, (table) => [
 	index("idx_site_visits_day").using("btree", table.day.asc().nullsLast()),
-	check("site_visits_event_check", sql`event = ANY (ARRAY['view'::text, 'demo'::text, 'contact'::text, 'signup'::text])`),
+	index("idx_site_visits_origin_day").using("btree", table.day.asc().nullsLast()).where(sql`(origin IS NOT NULL)`),
+	check("site_visits_event_check", sql`event = ANY (ARRAY['view'::text, 'demo'::text, 'contact'::text, 'signup'::text, 'clic'::text])`),
 	check("site_visits_source_check", sql`source = ANY (ARRAY['direct'::text, 'recherche'::text, 'reseaux'::text, 'site'::text])`),
 	check("site_visits_device_check", sql`device = ANY (ARRAY['mobile'::text, 'tablette'::text, 'ordinateur'::text])`),
 ]);

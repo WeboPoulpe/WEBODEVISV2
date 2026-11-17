@@ -3,11 +3,11 @@
 // impossible à relier d'un jour à l'autre ni à un autre site : la mesure reste anonyme, comme l'exige la CNIL
 // pour se passer de consentement. Les lignes sont effacées après 13 mois.
 
-export type SiteEvent = 'view' | 'demo' | 'contact' | 'signup';
+export type SiteEvent = 'view' | 'demo' | 'contact' | 'signup' | 'clic';
 export type Source = 'direct' | 'recherche' | 'reseaux' | 'site';
 export type Device = 'mobile' | 'tablette' | 'ordinateur';
 
-export const SITE_EVENTS: SiteEvent[] = ['view', 'demo', 'contact', 'signup'];
+export const SITE_EVENTS: SiteEvent[] = ['view', 'demo', 'contact', 'signup', 'clic'];
 export const RETENTION_MONTHS = 13;
 
 const SEARCH = /(^|\.)(google|bing|duckduckgo|ecosia|qwant|yahoo|yandex|startpage|brave|lilo)\./i;
