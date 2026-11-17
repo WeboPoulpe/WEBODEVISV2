@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { site_visits } from '@/db/schema';
 import { RETENTION_MONTHS, cleanPath, deviceOf, isBot, sourceOf, type Device, type SiteEvent, type Source } from '@/lib/siteStats';
+import { parseOrigin } from '@/lib/origine';
 import { requireAdmin } from './session';
 
 // Statistiques du site (voir lib/siteStats.ts). Pour ne pas réveiller la base Neon à chaque page vue (le temps de
@@ -28,14 +29,17 @@ function visitorOf(day: string, ip: string, ua: string): string {
 export interface HitContext { ip: string; userAgent: string; ownHost: string }
 
 /** Une ligne prête à écrire, ou null (robot, chemin invalide). */
-export function buildRow(input: { path: string; referrer?: string | null; event?: SiteEvent }, ctx: HitContext, now = new Date()): Row | null {
+export function buildRow(input: { path: string; referrer?: string | null; event?: SiteEvent; origin?: unknown }, ctx: HitContext, now = new Date()): Row | null {
   if (isBot(ctx.userAgent)) return null;
   const path = cleanPath(input.path);
   if (!path) return null;
   const day = parisDay(now);
   const { source, host } = sourceOf(input.referrer, ctx.ownHost);
+  // Une visite venue d'un lien Instagram compte en « Réseaux sociaux » même sans provenance : le navigateur intégré
+  // d'Instagram n'en envoie souvent pas.
+  const origin = parseOrigin(input.origin);
   return {
-    day, path, event: input.event ?? 'view', source, referrer_host: host, device: deviceOf(ctx.userAgent),
+    day, path, event: input.event ?? 'view', source: origin ? 'reseaux' : source, referrer_host: host, origin, device: deviceOf(ctx.userAgent),
     visitor: visitorOf(day, ctx.ip, ctx.userAgent), created_at: now.toISOString(),
   };
 }

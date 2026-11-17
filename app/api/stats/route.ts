@@ -13,7 +13,7 @@ const SESSION_COOKIES = ['next-auth.session-token', '__Secure-next-auth.session-
 
 export async function POST(request: NextRequest) {
   if (SESSION_COOKIES.some((c) => request.cookies.has(c))) return new NextResponse(null, { status: 204 });
-  let body: { path?: unknown; referrer?: unknown; event?: unknown };
+  let body: { path?: unknown; referrer?: unknown; event?: unknown; origin?: unknown };
   try {
     body = JSON.parse((await request.text()).slice(0, 2000));
   } catch {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   // Seule la démo se déclare depuis le navigateur ; contact et inscription sont comptés côté serveur.
   if (event !== 'view' && event !== 'demo') return new NextResponse(null, { status: 204 });
   const row = buildRow(
-    { path: String(body.path ?? ''), referrer: typeof body.referrer === 'string' ? body.referrer : null, event },
+    { path: String(body.path ?? ''), referrer: typeof body.referrer === 'string' ? body.referrer : null, event, origin: body.origin },
     {
       ip: (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim(),
       userAgent: request.headers.get('user-agent') ?? '',
