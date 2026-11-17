@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { ArrowLeft, Bug, FolderTree, Inbox, LayoutDashboard, LogOut, ScrollText, Settings2, Users, Coins, Sparkles, Globe, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -22,9 +23,17 @@ const NAV = [
   { href: '/admin/reglages', icon: Settings2, label: 'Réglages', exact: false },
 ];
 
+// Le support n'a que la page Comptes (les fonctions serveur des autres pages lui sont refusées de toute façon).
+const SUPPORT_HOME = '/admin/comptes';
+
 // Coque de l'espace d'administration : barre latérale sur ordinateur, onglets en haut sur téléphone et tablette.
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+export default function AdminShell({ children, role }: { children: React.ReactNode; role: 'admin' | 'support' }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const support = role === 'support';
+  const nav = support ? NAV.filter((item) => item.href === SUPPORT_HOME) : NAV;
+  const outside = support && pathname !== SUPPORT_HOME && !pathname.startsWith(`${SUPPORT_HOME}/`);
+  useEffect(() => { if (outside) router.replace(SUPPORT_HOME); }, [outside, router]);
   const { signOut } = useAuth();
   const isActive = (item: (typeof NAV)[number]) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
   const leave = async () => { await signOut(); window.location.assign('/login'); };
@@ -35,10 +44,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <aside className="hidden lg:flex flex-col w-64 m-2 rounded-3xl bg-forest text-white flex-shrink-0">
         <div className="px-6 pt-7 pb-6">
           <Wordmark className="text-[22px] text-white" />
-          <p className="text-sm text-white/55 mt-1.5">Administration</p>
+          <p className="text-sm text-white/55 mt-1.5">{support ? 'Support' : 'Administration'}</p>
         </div>
         <nav className="flex-1 px-3 space-y-1" aria-label="Administration">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link key={item.href} href={item.href} aria-current={isActive(item) ? 'page' : undefined}
               className={cn('flex items-center gap-3 h-11 px-3 rounded-xl text-[15px] font-medium transition-colors',
                 isActive(item) ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white')}>
@@ -62,14 +71,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <div className="flex items-center justify-between gap-3 h-14 px-4">
             <p className="flex items-baseline gap-2 min-w-0">
               <Wordmark className="text-lg text-white" />
-              <span className="text-sm text-white/55 truncate">Administration</span>
+              <span className="text-sm text-white/55 truncate">{support ? 'Support' : 'Administration'}</span>
             </p>
             <Link href="/" className="flex items-center gap-1.5 h-10 px-3 -mr-2 rounded-xl text-sm font-medium text-white/80 hover:text-white">
               <ArrowLeft className="h-4 w-4" />L’app
             </Link>
           </div>
           <nav className="flex gap-1 px-3 pb-2 overflow-x-auto scrollbar-none" aria-label="Administration">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <Link key={item.href} href={item.href} aria-current={isActive(item) ? 'page' : undefined}
                 className={cn('flex-shrink-0 h-10 px-3.5 flex items-center rounded-full text-sm font-medium whitespace-nowrap transition-colors',
                   isActive(item) ? 'bg-white text-forest' : 'text-white/75 hover:text-white')}>
@@ -79,7 +88,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </nav>
         </header>
         <main className="flex-1 overflow-y-auto pt-5 lg:pt-8" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-          {children}
+          {outside ? null : children}
         </main>
       </div>
     </div>

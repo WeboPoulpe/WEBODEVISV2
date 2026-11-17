@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSessionUser, requireAdmin } from '@/server/session';
+import { getSessionUser, requireStaff, type StaffRole } from '@/server/session';
 import AdminShell from '@/components/admin/AdminShell';
 
 export const dynamic = 'force-dynamic';
@@ -7,12 +7,13 @@ export const dynamic = 'force-dynamic';
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!(await getSessionUser())) redirect('/login');
 
-  // Check admin role
+  // Administrateur, ou support (limité à la page Comptes : voir AdminShell, et requireAdmin dans les fonctions serveur).
+  let role: StaffRole;
   try {
-    await requireAdmin();
+    role = (await requireStaff()).role;
   } catch {
     redirect('/');
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return <AdminShell role={role}>{children}</AdminShell>;
 }

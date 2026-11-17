@@ -13,7 +13,7 @@ import { appOrigin, sendMail } from '@/lib/mail';
 import { accountInviteEmail, passwordResetEmail } from '@/lib/mail/templates';
 import { revalidateTag } from 'next/cache';
 import { getAppSettings, getBillingEnforced, SETTINGS_TAG, setAppSetting, setBillingEnforced, type AppSettings } from './settings';
-import { requireAdmin } from './session';
+import { requireAdmin, requireStaff } from './session';
 import { setComped } from './subscription';
 import { isTestMode } from '@/lib/stripe';
 
@@ -101,13 +101,15 @@ export async function getAdminOverview(): Promise<AdminOverview> {
 }
 
 // ── Comptes ───────────────────────────────────────────────────────────────────
+export type AccountRole = 'admin' | 'support' | 'user';
+const ROLES: AccountRole[] = ['admin', 'support', 'user'];
 export interface AdminAccount {
   id: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
   company_name: string | null;
-  role: 'admin' | 'user';
+  role: AccountRole;
   is_active: boolean;
   /** Options actives du compte (clés de lib/modules.ts). */
   modules: string[];
@@ -126,8 +128,10 @@ export interface AdminAccount {
   is_collaborator: boolean;
 }
 
+/** Liste des comptes : l'administrateur et le support (lui sans les abonnements, et sans les comptes de l'équipe). */
 export async function listAccounts(): Promise<AdminAccount[]> {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
+  const support = admin.role === 'support';
   const { rows } = await db.execute(sql`
     select p.id, p.email, p.first_name, p.last_name, p.company_name, p.role, p.is_active, p.modules, p.created_at, p.deletion_requested_at, p.last_seen_at,
            p.parent_user_id is not null as is_collaborator,
@@ -157,7 +161,7 @@ export async function listAccounts(): Promise<AdminAccount[]> {
     last_seen_at: r.last_seen_at ? new Date(r.last_seen_at).toISOString() : null,
     is_demo: r.id === DEMO_USER_ID,
     is_self: r.id === admin.id,
-  }));
+  })).filter((a) => !support || a.role === 'user').map((a) => (support ? { ...a, subscription: null } : a));
 }
 
 type Result = { error: string | null };
@@ -178,11 +182,12 @@ export async function setAccountActive(id: string, active: boolean): Promise<Res
   return { error: null };
 }
 
-export async function setAccountRole(id: string, role: 'admin' | 'user'): Promise<Result> {
+export async function setAccountRole(id: string, role: AccountRole): Promise<Result> {
   const admin = await requireAdmin();
   const blocked = guard(admin.id, id);
   if (blocked) return { error: blocked };
-  await db.update(profiles).set({ role: role === 'admin' ? 'admin' : 'user' }).where(eq(profiles.id, id));
+  if (!ROLES.includes(role)) return { error: 'Rôle inconnu.' };
+  await db.update(profiles).set({ role }).where(eq(profiles.id, id));
   await logAudit({ actor: admin.id, target: id, action: 'role_modifie', details: { role } });
   return { error: null };
 }

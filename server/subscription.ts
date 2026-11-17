@@ -55,7 +55,7 @@ export async function accessOf(companyId: string): Promise<Access> {
   try {
     // Un compte administrateur n'est jamais soumis à l'abonnement (sinon il se verrouille lui-même).
     const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, companyId)).limit(1);
-    const access: Access = profile?.role === 'admin'
+    const access: Access = profile?.role === 'admin' || profile?.role === 'support'
       ? 'full'
       : accessFrom(await getSubscription(companyId), { demo: isDemoUser(companyId), enforced: await enforced() });
     if (access === 'full') accessCache.set(companyId, { access, at: Date.now() });

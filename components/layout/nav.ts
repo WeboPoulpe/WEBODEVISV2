@@ -96,7 +96,7 @@ export function useNavGroups(): NavGroup[] {
   const hidden = [...hiddenRoutes(profile?.modules), ...(employee ? ['/site-web', '/historique'] : [])];
   return NAV_GROUPS
     .map((g) => ({ ...g, items: g.items.filter((i) => !hidden.includes(i.href)) }))
-    .map((g) => (g.title === 'Paramètres' && profile?.role === 'admin' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g))
+    .map((g) => (g.title === 'Paramètres' && (profile?.role === 'admin' || profile?.role === 'support') ? { ...g, items: [...g.items, ADMIN_ITEM] } : g))
     .filter((g) => g.items.length > 0);
 }
 

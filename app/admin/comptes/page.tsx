@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Loader2, LogIn, Plus, Search, Trash2 } from 'lucide-react';
 import {
   createAccount, deleteEmptyAccount, listAccounts, sendAccountPasswordLink, setAccountActive, setAccountComped, setAccountRole, updateAccount,
-  type AdminAccount,
+  type AccountRole, type AdminAccount,
 } from '@/server/admin';
 import { cancelAccountDeletion, purgeRequestedAccount } from '@/server/account';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +25,11 @@ const subscriptionText = (a: AdminAccount) => {
   if (s.comped) return 'Offert';
   return s.status === 'none' ? 'Aucun' : statusLabel(s.status, s.cancel_at_period_end);
 };
+const ROLE_OPTIONS: { value: AccountRole; label: string; hint: string }[] = [
+  { value: 'user', label: 'Client', hint: 'Utilise l’app pour son entreprise.' },
+  { value: 'support', label: 'Support', hint: 'Équipe WeboDevis : voit la liste des comptes et entre dans ceux des clients pour les remplir, sans autre accès à l’administration.' },
+  { value: 'admin', label: 'Administrateur', hint: 'Accès complet à cet espace d’administration.' },
+];
 const STANDARD = MODULES.filter((m) => m.standard).map((m) => m.key);
 
 type Filter = 'tous' | 'actifs' | 'desactives';
@@ -62,7 +67,9 @@ function ModulesPicker({ value, onChange }: { value: string[]; onChange: (v: str
 }
 
 export default function AdminAccountsPage() {
-  const { actAs } = useAuth();
+  const { actAs, profile } = useAuth();
+  // Le support ne fait qu'entrer dans les comptes : ni création, ni réglages, ni abonnements.
+  const support = profile?.role === 'support';
   const [accounts, setAccounts] = useState<AdminAccount[] | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('tous');
@@ -92,7 +99,7 @@ export default function AdminAccountsPage() {
           <h1 className="text-[26px] md:text-[32px] font-bold text-gray-900 leading-tight">Comptes</h1>
           <p className="text-sm text-gray-500 mt-0.5">{accounts ? `${accounts.length} compte${accounts.length > 1 ? 's' : ''}` : ' '}</p>
         </div>
-        <button onClick={() => setCreating(true)} className={btnPrimary}><Plus className="h-4 w-4" />Nouveau compte</button>
+        {!support && <button onClick={() => setCreating(true)} className={btnPrimary}><Plus className="h-4 w-4" />Nouveau compte</button>}
       </div>
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
@@ -131,6 +138,7 @@ export default function AdminAccountsPage() {
                   <span className="flex items-center gap-2 flex-wrap">
                     <span className={cn('font-semibold truncate', a.is_active ? 'text-gray-900' : 'text-gray-500')}>{accountName(a)}</span>
                     {a.role === 'admin' && <span className={cn(pill, 'bg-forest text-white')}>Administrateur</span>}
+                    {a.role === 'support' && <span className={cn(pill, 'bg-sage-100 text-sage')}>Support</span>}
                     {a.is_demo && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Démonstration</span>}
                     {a.deletion_requested_at
                       ? <span className={cn(pill, 'bg-red-50 text-red-700')}>Suppression demandée</span>
@@ -142,12 +150,12 @@ export default function AdminAccountsPage() {
                   {a.quotes} devis, {a.customers} client{a.customers > 1 ? 's' : ''}
                   <span className="block text-gray-500">{a.last_seen_at ? `Vu le ${day(a.last_seen_at)}` : a.last_quote_at ? `Dernier devis le ${day(a.last_quote_at)}` : 'Jamais venu'}</span>
                 </span>
-                <span className="hidden lg:block w-32 text-sm text-gray-700">
+                {!support && <span className="hidden lg:block w-32 text-sm text-gray-700">
                   {subscriptionText(a)}
                   {a.subscription && !a.subscription.comped && a.subscription.current_period_end && (
                     <span className="block text-gray-500">jusqu’au {day(a.subscription.current_period_end)}</span>
                   )}
-                </span>
+                </span>}
                 <span className="hidden sm:block w-28 text-right text-sm text-gray-500 whitespace-nowrap">{day(a.created_at)}</span>
               </button>
             </li>
@@ -155,14 +163,14 @@ export default function AdminAccountsPage() {
         </ul>
       )}
 
-      {open && <AccountDialog key={open.id} account={open} onClose={() => setOpenId(null)} onChanged={load} onEnter={() => enter(open.id)} />}
+      {open && <AccountDialog key={open.id} account={open} support={support} onClose={() => setOpenId(null)} onChanged={load} onEnter={() => enter(open.id)} />}
       {creating && <CreateDialog onClose={() => setCreating(false)} onCreated={async () => { await load(); setCreating(false); }} />}
     </div>
   );
 }
 
 // ── Fiche d'un compte ─────────────────────────────────────────────────────────
-function AccountDialog({ account, onClose, onChanged, onEnter }: { account: AdminAccount; onClose: () => void; onChanged: () => Promise<void>; onEnter: () => void }) {
+function AccountDialog({ account, support, onClose, onChanged, onEnter }: { account: AdminAccount; support: boolean; onClose: () => void; onChanged: () => Promise<void>; onEnter: () => void }) {
   const { confirm } = useFeedback();
   const [firstName, setFirstName] = useState(account.first_name ?? '');
   const [lastName, setLastName] = useState(account.last_name ?? '');
@@ -172,7 +180,7 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const locked = account.is_demo;
+  const locked = account.is_demo || support;
   const isEmpty = account.quotes === 0 && account.customers === 0;
 
   const run = async (name: string, action: () => Promise<{ error: string | null }>, done?: string) => {
@@ -211,7 +219,7 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
           {account.email}. Créé le {day(account.created_at)}. {account.quotes} devis, {account.customers} client{account.customers > 1 ? 's' : ''}.
         </p>
         {error && <p role="alert" className={errorCls}>{error}</p>}
-        {account.deletion_requested_at && purgeOn && (
+        {!support && account.deletion_requested_at && purgeOn && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 space-y-3">
             <p>Le titulaire a demandé la suppression de son compte le {day(account.deletion_requested_at)}. Ses données seront effacées automatiquement le {day(purgeOn)}.</p>
             <div className="flex flex-wrap gap-2">
@@ -281,9 +289,22 @@ function AccountDialog({ account, onClose, onChanged, onEnter }: { account: Admi
             <div className="divide-y divide-gray-100">
               <Switch label="Compte actif" hint="Désactivé, le compte ne peut plus se connecter. Ses données sont conservées." checked={account.is_active}
                 disabled={busy !== null} onChange={(v) => run('active', () => setAccountActive(account.id, v))} />
-              <Switch label="Administrateur" hint="Donne accès à cet espace d’administration." checked={account.role === 'admin'}
-                disabled={busy !== null} onChange={(v) => run('role', () => setAccountRole(account.id, v ? 'admin' : 'user'))} />
             </div>
+            <fieldset className="mt-3" disabled={busy !== null}>
+              <legend className="text-[15px] font-medium text-gray-900 mb-1">Rôle</legend>
+              <div className="space-y-1">
+                {ROLE_OPTIONS.map((o) => (
+                  <label key={o.value} className="flex items-start gap-3 py-1.5 cursor-pointer">
+                    <input type="radio" name={`role-${account.id}`} value={o.value} checked={account.role === o.value}
+                      onChange={() => run('role', () => setAccountRole(account.id, o.value), 'Rôle modifié.')} className="mt-1 h-4 w-4 accent-[rgb(var(--p-600))]" />
+                    <span className="min-w-0">
+                      <span className="block text-[15px] text-gray-900">{o.label}</span>
+                      <span className="block text-sm text-gray-500">{o.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <div className="flex flex-wrap gap-2 mt-4">
               <button onClick={() => run('link', () => sendAccountPasswordLink(account.id), `Lien envoyé à ${account.email}.`)} disabled={busy !== null} className={btnSecondary}>
                 {busy === 'link' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}Envoyer un lien de mot de passe

@@ -14,6 +14,7 @@ const COLLAB = '00000000-0000-4000-8000-0000000000b3';
 let isAdmin = true;
 vi.mock('./session', () => ({
   requireAdmin: async () => { if (!isAdmin) throw new Error('Réservé aux administrateurs'); return { id: ADMIN, email: 'a@t.fr' }; },
+  requireStaff: async () => { if (!isAdmin) throw new Error('Réservé à l’équipe WeboDevis'); return { id: ADMIN, email: 'a@t.fr', role: 'admin' }; },
   requireUser: async () => ({ id: ADMIN, email: 'a@t.fr' }),
 }));
 let pg: PGlite;

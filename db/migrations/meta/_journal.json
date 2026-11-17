@@ -407,6 +407,13 @@
       "when": 1795000000000,
       "tag": "0057_activity_log_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1795100000000,
+      "tag": "0058_support_role",
+      "breakpoints": true
     }
   ]
 }

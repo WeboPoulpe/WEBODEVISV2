@@ -46,6 +46,19 @@ export async function requireAdmin(): Promise<SessionUser> {
   return user;
 }
 
+export type StaffRole = 'admin' | 'support';
+
+/**
+ * Équipe WeboDevis : administrateur, ou support (il remplit les comptes des traiteurs). Le support n'a droit qu'à
+ * la liste des comptes et à l'entrée dans un compte client ; tout le reste de l'administration passe par requireAdmin.
+ */
+export async function requireStaff(): Promise<SessionUser & { role: StaffRole }> {
+  const user = await requireUser();
+  const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, user.id)).limit(1);
+  if (profile?.role !== 'admin' && profile?.role !== 'support') throw new UnauthorizedError('Réservé à l’équipe WeboDevis');
+  return { ...user, role: profile.role };
+}
+
 export class ReadOnlyError extends Error {
   constructor() {
     super('Votre accès est en consultation seule : demandez au gérant de modifier votre rôle.');

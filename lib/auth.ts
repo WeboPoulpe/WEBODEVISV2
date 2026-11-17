@@ -84,8 +84,11 @@ export const authOptions: NextAuthOptions = {
         } else if (typeof session.actAs === 'string' && adminId && session.actAs !== adminId) {
           const [admin] = await db.select({ role: profiles.role, is_active: profiles.is_active, email: profiles.email })
             .from(profiles).where(eq(profiles.id, adminId)).limit(1);
-          const [target] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, session.actAs)).limit(1);
-          if (admin?.role === 'admin' && admin.is_active && target) {
+          const [target] = await db.select({ id: users.id, email: users.email, role: profiles.role })
+            .from(users).leftJoin(profiles, eq(profiles.id, users.id)).where(eq(users.id, session.actAs)).limit(1);
+          // Le support entre seulement dans les comptes clients, jamais dans celui d'un membre de l'équipe.
+          const allowed = admin?.role === 'admin' || (admin?.role === 'support' && target?.role === 'user');
+          if (allowed && admin?.is_active && target) {
             token.adminEmail = (token.adminEmail as string | undefined) ?? admin.email;
             token.adminId = adminId;
             token.sub = target.id;

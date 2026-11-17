@@ -5,7 +5,7 @@ export const customer_type = pgEnum("customer_type", ['particulier', 'entreprise
 export const subscription_type = pgEnum("subscription_type", ['free', 'premium', 'entreprise'])
 export const support_ticket_status = pgEnum("support_ticket_status", ['Ouvert', 'En cours', 'En attente de réponse', 'Résolu', 'Fermé'])
 export const support_ticket_type = pgEnum("support_ticket_type", ['Bug technique', 'Question fonctionnelle', 'Suggestion d\'amélioration', 'Problème de facturation', 'Autre'])
-export const user_role = pgEnum("user_role", ['admin', 'user'])
+export const user_role = pgEnum("user_role", ['admin', 'user', 'support'])
 
 
 export const collaborator_roles = pgTable("collaborator_roles", {

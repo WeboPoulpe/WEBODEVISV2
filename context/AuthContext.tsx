@@ -11,7 +11,7 @@ export interface Profile {
   email: string;
   first_name: string | null;
   last_name: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'support';
   is_active: boolean;
   company_name: string | null;
   logo_url: string | null;
