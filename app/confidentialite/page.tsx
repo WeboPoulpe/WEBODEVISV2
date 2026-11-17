@@ -83,6 +83,11 @@ export default function ConfidentialitePage() {
             l’identifier ni de le suivre sur d’autres sites. Ces statistiques anonymes (pages vues, provenance, type d’appareil)
             sont conservées 13 mois.
           </p>
+          <p>
+            Quand vous arrivez depuis un de nos liens Instagram, nous notons cette provenance pendant votre visite&nbsp;; si vous
+            nous écrivez, demandez la démonstration ou créez un compte, elle est enregistrée avec votre demande ou votre compte.
+            Elle est gardée par votre navigateur le temps de la visite seulement (sans cookie, effacée à la fermeture de l’onglet).
+          </p>
           <p>Aucun cookie de publicité n’est déposé dans le logiciel. Votre navigateur garde aussi, sans les transmettre, quelques préférences d’affichage et, si vous avez essayé la démonstration, de quoi la rouvrir sans ressaisir vos coordonnées.</p>
 
           <h2>Vos droits</h2>
