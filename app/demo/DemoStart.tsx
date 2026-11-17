@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { getDemoChallenge, requestDemoAccess, type DemoChallenge } from '@/server/demo';
 import { authButton, authError, authInput, authLabel } from '@/components/auth/AuthShell';
 import { cn } from '@/lib/utils';
+import { readStoredOrigin } from '@/lib/origine';
 
 // Parcours d'accès à la démonstration, en trois écrans courts : qui, où joindre, vérification.
 // Les coordonnées arrivent dans l'espace d'administration (Demandes) ; la personne reçoit par email
@@ -86,7 +87,7 @@ export default function DemoStart() {
     }
     if (!challenge) return;
     setBusy(true);
-    const res = await requestDemoAccess({ firstName, lastName, company, email, phone, answer, challenge: challenge.token, website })
+    const res = await requestDemoAccess({ firstName, lastName, company, email, phone, answer, challenge: challenge.token, website, origin: readStoredOrigin() })
       .catch(() => ({ error: 'L’ouverture a échoué. Réessayez dans un instant.' } as Awaited<ReturnType<typeof requestDemoAccess>>));
     if (res.error || !res.ticket) {
       setBusy(false);

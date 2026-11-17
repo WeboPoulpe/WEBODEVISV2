@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { submitSiteRequest, type SiteRequestInput } from '@/server/site';
 import { cn } from '@/lib/utils';
+import { readStoredOrigin } from '@/lib/origine';
 
 // Formulaire de contact du site : une demande de devis pour le logiciel, ou un message.
 // Second (et dernier) composant client du site, avec le menu. L'envoi passe par l'action serveur
@@ -58,6 +59,7 @@ export default function ContactForm({ initialKind, initialMigration = false }: {
 ${values.message}` : values.message,
       website: values.website,
       startedAt: startedAt.current,
+      origin: readStoredOrigin(),
     }).catch(() => ({ error: 'L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez.' }));
     setSending(false);
     if (result.error) { setError(result.error); return; }

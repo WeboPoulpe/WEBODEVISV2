@@ -14,6 +14,7 @@ import { appOrigin, sendMail } from '@/lib/mail';
 import { passwordChangedEmail, passwordResetEmail, welcomeEmail } from '@/lib/mail/templates';
 import { getSessionUser } from './session';
 import { isSignupOpen } from './settings';
+import { originForEmail } from './origine';
 import { recordEventNow } from './siteStats';
 
 const MIN_PASSWORD = 6;
@@ -29,6 +30,8 @@ export async function registerUser(input: {
   password: string;
   firstName: string;
   lastName: string;
+  /** Origine Instagram de la visite (lib/origine.ts) ; à défaut, celle d'une demande avec la même adresse. */
+  origin?: string | null;
 }): Promise<{ error: string | null }> {
   if (!(await isSignupOpen())) return { error: 'Les inscriptions ne sont pas encore ouvertes.' };
   const email = normalizeEmail(input.email);
@@ -39,6 +42,7 @@ export async function registerUser(input: {
   if (existing) return { error: 'User already registered' };
 
   const password_hash = await bcrypt.hash(input.password, 10);
+  const origin = await originForEmail(email, input.origin);
   await db.transaction(async (tx) => {
     const [user] = await tx.insert(users).values({ email, password_hash }).returning({ id: users.id });
     // Le rôle et l'état actif sont fixés ici, jamais par le navigateur.
@@ -50,13 +54,14 @@ export async function registerUser(input: {
       role: 'user',
       is_active: true,
       has_completed_onboarding: false,
+      origin,
     });
   });
   // Conversion pour les statistiques du site (la base vient d'écrire : pas de réveil en plus).
   const h = await headers();
   await recordEventNow('signup', '/register', {
     ip: (h.get('x-forwarded-for') ?? '').split(',')[0].trim(), userAgent: h.get('user-agent') ?? '', ownHost: h.get('host') ?? '',
-  }).catch(() => {});
+  }, origin).catch(() => {});
   // L'email de bienvenue ne bloque pas l'inscription s'il ne part pas.
   await sendMail({ to: email, ...welcomeEmail({ firstName: input.firstName.trim() || null, appUrl: await appOrigin() }) });
   return { error: null };

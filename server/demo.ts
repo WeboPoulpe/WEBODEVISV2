@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { profiles, site_requests } from '@/db/schema';
 import { appOrigin, isTestAddress, sendMail } from '@/lib/mail';
 import { demoAccessEmail, demoLeadNotificationEmail } from '@/lib/mail/templates';
+import { parseOrigin } from '@/lib/origine';
 import { hmac, readTicket, signTicket } from './tickets';
 
 // Accès à la démonstration : la personne laisse ses coordonnées et répond à une question de vérification.
@@ -44,6 +45,8 @@ export interface DemoAccessInput {
   challenge: string;
   /** Champ piège, invisible pour une personne. */
   website?: string;
+  /** Origine Instagram de la visite (lib/origine.ts), revalidée ici. */
+  origin?: string | null;
 }
 
 export interface DemoAccessResult {
@@ -100,7 +103,7 @@ export async function requestDemoAccess(input: DemoAccessInput): Promise<DemoAcc
 
   const name = `${firstName} ${lastName}`;
   await db.insert(site_requests).values({
-    kind: 'demo', name, email, phone, company, ip_hash,
+    kind: 'demo', name, email, phone, company, ip_hash, origin: parseOrigin(input.origin),
     message: 'A ouvert la démonstration depuis le site.',
   });
 

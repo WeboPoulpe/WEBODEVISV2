@@ -59,8 +59,8 @@ export async function flushVisits(): Promise<void> {
 }
 
 /** Conversion enregistrée tout de suite, pendant une requête qui écrit déjà en base (et avec le paquet en attente). */
-export async function recordEventNow(event: SiteEvent, path: string, ctx: HitContext): Promise<void> {
-  const row = buildRow({ path, event }, ctx);
+export async function recordEventNow(event: SiteEvent, path: string, ctx: HitContext, origin?: string | null): Promise<void> {
+  const row = buildRow({ path, event, origin }, ctx);
   if (row) buffer.push(row);
   await flushVisits();
 }

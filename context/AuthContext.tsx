@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { SessionProvider, signIn as nextAuthSignIn, signOut as nextAuthSignOut, useSession } from 'next-auth/react';
 import { clearDayView } from '@/lib/offlineStore';
 import { getMyProfile, registerUser } from '@/server/auth';
+import { readStoredOrigin } from '@/lib/origine';
 
 // ── Profile type (mirrors existing app profiles table) ──────────────────────
 export interface Profile {
@@ -85,7 +86,7 @@ function AuthState({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = (email: string, password: string, firstName: string, lastName: string) =>
-    registerUser({ email, password, firstName, lastName });
+    registerUser({ email, password, firstName, lastName, origin: readStoredOrigin() });
 
   const actAs = async (targetId: string | null) => {
     await update({ actAs: targetId });

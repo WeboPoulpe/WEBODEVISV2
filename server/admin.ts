@@ -15,6 +15,7 @@ import { revalidateTag } from 'next/cache';
 import { getAppSettings, getBillingEnforced, SETTINGS_TAG, setAppSetting, setBillingEnforced, type AppSettings } from './settings';
 import { requireAdmin, requireStaff } from './session';
 import { setComped } from './subscription';
+import { originForEmail } from './origine';
 import { isTestMode } from '@/lib/stripe';
 
 // Espace d'administration de la plateforme. Chaque action commence par requireAdmin() :
@@ -202,6 +203,8 @@ export async function createAccount(input: { email: string; firstName: string; l
 
   // Mot de passe provisoire que personne ne connaît : le compte s'ouvre par le lien envoyé.
   const password_hash = await bcrypt.hash(crypto.randomBytes(24).toString('base64url'), 10);
+  // Un prospect venu d'Instagram (demande de démo ou de contact avec la même adresse) garde son origine.
+  const origin = await originForEmail(email, null);
   const userId = await db.transaction(async (tx) => {
     const [user] = await tx.insert(users).values({ email, password_hash }).returning({ id: users.id });
     await tx.insert(profiles).values({
@@ -211,6 +214,7 @@ export async function createAccount(input: { email: string; firstName: string; l
       company_name: input.companyName.trim() || null,
       role: 'user', is_active: true, has_completed_onboarding: false,
       modules: enabledModules(input.modules),
+      origin,
     });
     return user.id;
   });

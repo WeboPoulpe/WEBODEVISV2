@@ -8,6 +8,7 @@ import { profiles, site_requests } from '@/db/schema';
 import { appOrigin, isTestAddress, sendMail } from '@/lib/mail';
 import { siteRequestAckEmail, siteRequestNotificationEmail } from '@/lib/mail/templates';
 import { spamReason } from '@/lib/siteSpam';
+import { parseOrigin } from '@/lib/origine';
 import { recordEventNow } from './siteStats';
 
 export interface SiteRequestInput {
@@ -23,6 +24,8 @@ export interface SiteRequestInput {
   website?: string;
   /** Heure d'ouverture du formulaire (ms) : un envoi trop rapide vient d'un robot. */
   startedAt?: number;
+  /** Origine Instagram de la visite (lib/origine.ts), revalidée ici. */
+  origin?: string | null;
 }
 
 const MAX_PER_HOUR = 5;
@@ -70,14 +73,15 @@ export async function submitSiteRequest(input: SiteRequestInput): Promise<{ erro
   // ni l'accusé de réception, qui partirait vers une adresse souvent fausse et nuirait à la réputation du domaine.
   const elapsedMs = typeof input.startedAt === 'number' ? Date.now() - input.startedAt : null;
   const suspicious = spamReason({ message, name, company: request.company, elapsedMs });
+  const origin = parseOrigin(input.origin);
   await db.insert(site_requests).values({
-    kind, name, email, message, ip_hash,
+    kind, name, email, message, ip_hash, origin,
     phone: request.phone, company: request.company, team_size: request.teamSize,
     ...(suspicious ? { status: 'suspecte', admin_notes: `Classée suspecte automatiquement : ${suspicious}.` } : {}),
   });
   if (suspicious) return { error: null };
   // Conversion pour les statistiques du site, dans la foulée de l'écriture de la demande.
-  await recordEventNow('contact', '/contact', { ip, userAgent: h.get('user-agent') ?? '', ownHost: h.get('host') ?? '' }).catch(() => {});
+  await recordEventNow('contact', '/contact', { ip, userAgent: h.get('user-agent') ?? '', ownHost: h.get('host') ?? '' }, origin).catch(() => {});
 
   // Une adresse d'essai (tests automatiques) ne prévient personne.
   if (isTestAddress(email)) return { error: null };
