@@ -9,7 +9,7 @@ import { enabledModules } from '@/lib/modules';
 import type { NavPreviewKey } from '@/lib/navMega';
 import { CONFIRMED_STATUSES, PENDING_STATUSES, quoteStatusLabel } from '@/lib/quoteStatus';
 import { quoteLines } from '@/lib/quoteFormulas';
-import { formulaSql } from './formulaColumns';
+import { formulaSql, lightServices } from './formulaColumns';
 import { requireUser } from './session';
 
 // Aperçu vivant du mégamenu de la barre latérale : quelques lignes et un ou deux chiffres par page.
@@ -94,7 +94,7 @@ export async function getNavPreview(key: NavPreviewKey, clientToday?: string): P
       const [events, [count], courses, team] = await Promise.all([
         rows<{ id: string; client_name: string; event_type: string | null; event_date: string; guest_count: number | null; checklist: unknown; event_materials: unknown; event_material_checks: unknown; services: unknown; formulas: unknown; chosen_formula_id: string | null }>(sql`
           select q.id, q.client_name, q.event_type, q.event_date::text as event_date, q.guest_count,
-            q.checklist, q.event_materials, q.event_material_checks, q.services, ${await formulaSql('q')}
+            q.checklist, q.event_materials, q.event_material_checks, ${lightServices('q.services')} as services, ${await formulaSql('q')}
           from public.quotes q where ${upcomingConfirmed} ${week ? sql`and q.event_date <= ${end}::date` : sql``}
           order by q.event_date limit 3`),
         rows<{ n: number }>(sql`select count(*)::int as n from public.quotes q where ${upcomingConfirmed} ${week ? sql`and q.event_date <= ${end}::date` : sql``}`),

@@ -11,6 +11,7 @@ import { applyQuoteUpdate, EDITABLE_STATUSES, QUOTE_TEMPLATES, TEMPLATE_LABEL, t
 import { QUOTE_FONTS } from '@/lib/quoteOutput';
 import { defaultVatRate } from '@/lib/vat';
 import { companyIdsOf } from '../companyScope';
+import { lightServices } from '../formulaColumns';
 import {
   eur, fail, isUuid, like, nullableNum, nullableStr, propose, str, tool, ToolError,
   type AgentName, type Handler, type ProposalSummary, type ToolContext,
@@ -224,7 +225,7 @@ const HANDLERS: Record<string, Handler> = {
 
   async find_quotes(ctx, i) {
     const q = str(i.query, 100);
-    const rows = await db.select({ id: quotes.id, number: quotes.quote_number, client: quotes.client_name, event_date: quotes.event_date, event_type: quotes.event_type, guests: quotes.guest_count, status: quotes.status, total_amount: quotes.total_amount, vat_rate: quotes.vat_rate, services: quotes.services, formulas: quotes.formulas, chosen_formula_id: quotes.chosen_formula_id })
+    const rows = await db.select({ id: quotes.id, number: quotes.quote_number, client: quotes.client_name, event_date: quotes.event_date, event_type: quotes.event_type, guests: quotes.guest_count, status: quotes.status, total_amount: quotes.total_amount, vat_rate: quotes.vat_rate, services: lightServices(quotes.services), formulas: quotes.formulas, chosen_formula_id: quotes.chosen_formula_id })
       .from(quotes)
       .where(and(sql`${quotes.owner_user_id} in ${companyIdsOf(ctx.companyId)}`, q ? or(
         ilike(quotes.client_name, like(q)), ilike(quotes.quote_number, like(q)), ilike(quotes.event_type, like(q)),

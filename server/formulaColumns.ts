@@ -1,5 +1,5 @@
 import 'server-only';
-import { getTableColumns, sql, type SQL } from 'drizzle-orm';
+import { getTableColumns, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import { quote_acceptances, quotes } from '@/db/schema';
 
@@ -52,4 +52,17 @@ export async function formulaSql(alias: string): Promise<SQL> {
 /** Nom de la formule signée avec une acceptation (null sans formule ou avant la migration 0031). */
 export async function acceptanceFormulaName(): Promise<SQL<string | null>> {
   return (await formulaColumnsReady()) ? sql<string | null>`${quote_acceptances.formula_name}` : nothing<string | null>();
+}
+
+/**
+ * Lignes d'un devis sans leurs textes longs (description, cartes gastronomiques FR/EN) : ces textes pèsent jusqu'à
+ * plusieurs centaines de Ko par ligne, et les écrans de synthèse (accueil, aperçu du menu, recherche de Webo) n'ont
+ * besoin que des noms, quantités et prix. La base les retire avant l'envoi, ce qui épargne le transfert réseau.
+ */
+export function lightServices(column: AnyColumn | string): SQL<unknown> {
+  const col = typeof column === 'string' ? sql.raw(column.replace(/[^a-z_.]/gi, '')) : sql`${column}`;
+  return sql`(case when jsonb_typeof(${col}) = 'array' then (
+    select coalesce(jsonb_agg(case when jsonb_typeof(x.e) = 'object' then x.e - 'description' - 'gastroCardHtml' - 'gastroCardHtmlEn' else x.e end order by x.i), '[]'::jsonb)
+    from jsonb_array_elements(${col}) with ordinality as x(e, i)
+  ) else ${col} end)`;
 }

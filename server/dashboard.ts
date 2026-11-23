@@ -13,7 +13,7 @@ import { enabledModules } from '@/lib/modules';
 import { CONFIRMED_STATUSES, PENDING_STATUSES } from '@/lib/quoteStatus';
 import { quoteDefaultRate, quoteTotalTTC, quoteVatBreakdown, resolveGuestSplit, type VatLine } from '@/lib/quoteTotals';
 import { quoteLines } from '@/lib/quoteFormulas';
-import { formulaSql } from './formulaColumns';
+import { formulaSql, lightServices } from './formulaColumns';
 import { catalogKey, quoteCost, staffCost, sumMargins, type MarginSummary, type StaffRow } from '@/lib/costing';
 import { requireUser } from './session';
 
@@ -91,7 +91,7 @@ export async function getDashboard(clientToday?: string): Promise<DashboardData 
   const [quotes, [counts], prospects, assignments, extrasCount, courses, rentals, rentalModels, lowStock, orders, notifs, catalogRows, staffRows] = await Promise.all([
     rows<QuoteRow>(sql`
       select q.id, q.client_name, q.internal_name, q.event_type, q.event_date::text as event_date, q.guest_count,
-        q.guest_count_adults, q.guest_count_children, q.status, q.total_amount::text, q.vat_rate::text, q.services,
+        q.guest_count_adults, q.guest_count_children, q.status, q.total_amount::text, q.vat_rate::text, ${lightServices('q.services')} as services,
         ${paris(sql`q.created_at`)} as created_day, ${paris(sql`q.sent_at`)} as sent_day,
         q.checklist, q.event_materials, q.event_material_checks, q.extra_costs, ${await formulaSql('q')}
       from public.quotes q
