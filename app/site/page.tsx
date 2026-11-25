@@ -141,7 +141,7 @@ export default function SitePage() {
                 <li key={s} className="rounded-full bg-sage-100 px-3 py-1 text-[13px] text-sage">{s} · envoyé</li>
               ))}
             </ul>
-            <p className="mt-6"><TextLink href="/fonctionnalites/devis-traiteur">Les devis, en détail</TextLink></p>
+            <p className="mt-6"><TextLink href="/fonctionnalites/devis-traiteur">Le logiciel de devis traiteur, en détail</TextLink></p>
           </div>
           <div className={stage}>
             <Julien pose="bureau" className={stageFigure} />

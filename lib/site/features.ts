@@ -118,7 +118,7 @@ export const FEATURES: Feature[] = [
     metaTitle: 'Logiciel de devis traiteur : formules, envoi | WeboDevis',
     description: 'Créez vos devis de traiteur en trois étapes, avec plusieurs formules au choix, et envoyez-les par email ou WhatsApp. Modèles, options, relances et historique.',
     keyword: 'logiciel devis traiteur',
-    h1: 'Le devis de traiteur, de la création à l’envoi',
+    h1: 'Le logiciel de devis traiteur, de la création à l’envoi',
     lead: 'Trois étapes pour créer le devis, un éditeur pour le mettre en page, un lien pour l’envoyer. Et un statut qui suit l’affaire, de la première demande au paiement.',
     preview: 'devis',
     highlights: [
