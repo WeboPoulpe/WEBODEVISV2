@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { accountStylesFor, companyIdOf } from '@/lib/quoteStyles';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { generateQuoteHtml } from '@/lib/generateQuoteHtml';
@@ -69,7 +70,7 @@ interface Options {
   images: string[];
 }
 
-type QuoteTemplate = 'standard' | 'mariage' | 'business' | 'classique' | 'prestige';
+type QuoteTemplate = 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure';
 
 interface Props {
   quoteId: string;
@@ -717,7 +718,7 @@ export default function QuoteInlineEditor({
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Modèle de document</p>
                 <div className="flex gap-2">
-                  {TEMPLATES.map((t) => (
+                  {[...TEMPLATES, ...accountStylesFor(companyIdOf(profile)).map((s) => ({ key: s.key as QuoteTemplate, label: s.label }))].map((t) => (
                     <button
                       key={t.key}
                       onClick={() => setTemplate(t.key)}

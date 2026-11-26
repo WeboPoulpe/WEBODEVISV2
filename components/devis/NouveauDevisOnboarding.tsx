@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { ACCOUNT_STYLES, accountStylesFor, companyIdOf } from '@/lib/quoteStyles';
 import { cn } from '@/lib/utils';
 import { syncWeboDocument } from '@/lib/weboFinancials';
 import { scaleToGuests } from '@/lib/quoteScale';
@@ -33,6 +34,8 @@ const TEMPLATES = [
   { key: 'business', label: 'Business', color: '#1e293b', desc: 'Sobre, pour les entreprises' },
   { key: 'prestige', label: 'Prestige', color: '#0a0a0a', desc: 'Noir et or, haut de gamme' },
 ];
+/** Styles qu'un devis peut porter (communs et réservés) : un modèle ou l'adresse peut demander l'un d'eux. */
+const KNOWN_STYLES: string[] = [...TEMPLATES.map((t) => t.key), ...ACCOUNT_STYLES.map((s) => s.key)];
 
 type Customer = {
   id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null; company_name: string | null;
@@ -61,11 +64,11 @@ export default function NouveauDevisOnboarding() {
   const [picked, setPicked] = useState<Customer | null>(null);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
-  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique' | 'prestige'>('classique');
+  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure'>('classique');
   // Style de départ : celui demandé dans l'adresse (/devis/nouveau?style=…), sinon celui choisi pour le compte.
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('style') ?? profile?.default_quote_style ?? null;
-    if (wanted && TEMPLATES.some((t) => t.key === wanted)) setTemplate(wanted as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige');
+    if (wanted && KNOWN_STYLES.includes(wanted)) setTemplate(wanted as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure');
   }, [profile?.default_quote_style]);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   // Contenu de départ : un modèle enregistré (menus, textes, mise en page) plutôt qu'un document vierge.
@@ -81,7 +84,7 @@ export default function NouveauDevisOnboarding() {
         const tpl = wanted ? list.find((t) => t.id === wanted) : null;
         if (tpl) {
           setStartFrom(tpl.id);
-          if (tpl.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige');
+          if (tpl.template && KNOWN_STYLES.includes(tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure');
         }
       });
   }, [user]);
@@ -414,8 +417,8 @@ export default function NouveauDevisOnboarding() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {TEMPLATES.map((t) => (
-                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige')} aria-pressed={template === t.key}
+                  {[...TEMPLATES, ...accountStylesFor(companyIdOf(profile))].map((t) => (
+                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure')} aria-pressed={template === t.key}
                       className={cn(choice(template === t.key), 'flex items-center sm:flex-col sm:items-start gap-3 p-4 text-left')}>
                       {/* Aperçu : une page avec la couleur d'accent du modèle */}
                       <span className="w-12 h-16 sm:w-full sm:h-24 rounded-lg bg-gray-50 border border-gray-200 p-2 flex flex-col gap-1.5 flex-shrink-0">
@@ -439,7 +442,7 @@ export default function NouveauDevisOnboarding() {
                       onChange={(e) => {
                         setStartFrom(e.target.value);
                         const tpl = savedTemplates.find((t) => t.id === e.target.value);
-                        if (tpl?.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige');
+                        if (tpl?.template && KNOWN_STYLES.includes(tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure');
                       }}>
                       <option value="">Document vierge</option>
                       {savedTemplates.map((t) => <option key={t.id} value={t.id}>Modèle : {t.name}</option>)}

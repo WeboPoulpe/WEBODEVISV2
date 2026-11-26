@@ -18,6 +18,8 @@ import { syncWeboDocument } from '@/lib/weboFinancials';
 import { isPerGuestPrestation } from '@/lib/brochure';
 import { cardFromDescription, isBlankHtml, translateCarteToEnglish, translateTextFrToEn } from '@/lib/prestationCard';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { useAuth } from '@/context/AuthContext';
+import { accountStylesFor, companyIdOf } from '@/lib/quoteStyles';
 import type { QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import RecipientPicker from '@/components/devis/RecipientPicker';
 import CompanySearch from '@/components/clients/CompanySearch';
@@ -100,7 +102,10 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [remarks, setRemarks] = useState('');
   const [vatRate, setVatRate] = useState(20);
   const [hidePrice, setHidePrice] = useState(false);
-  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique' | 'prestige'>('standard');
+  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure'>('standard');
+  // Styles réservés au compte, proposés après les styles communs.
+  const { profile: authProfile } = useAuth();
+  const ownStyles = accountStylesFor(companyIdOf(authProfile));
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
   // Formules au choix du client (colonnes de la migration 0031 : sans elles, la section n'est pas proposée).
@@ -258,7 +263,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           const loadedRemarks = data.remarks || '';
           const loadedVatRate = data.vat_rate ?? 20;
           const loadedHidePrice = data.hide_price ?? false;
-          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige') || 'standard';
+          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure') || 'standard';
           const loadedLanguage = (data.language as 'fr' | 'en') || 'fr';
           const loadedServices = Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : [];
 
@@ -1116,8 +1121,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         { key: 'mariage', label: 'Mariage', color: '#c8956c', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
                         { key: 'business', label: 'Business', color: '#1e293b', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
                         { key: 'prestige', label: 'Prestige', color: '#c9a96e', gradient: '#0a0a0a' },
+                        ...ownStyles.map((s) => ({ key: s.key, label: s.label, color: s.color, gradient: s.gradient })),
                       ].map((t) => (
-                        <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige')}
+                        <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure')}
                           className={cn('py-2 px-2 rounded-lg text-xs font-semibold border transition-all',
                             template === t.key ? 'border-gray-900 shadow-sm' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
                           <span className="block w-4 h-4 rounded-full mx-auto mb-1" style={{ background: t.color }} />
@@ -1170,7 +1176,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                                       mariage:  { color: '#c8956c', bg: '#fffdf7', border: '#f5e6d3', font: '"Playfair Display",serif', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
                                       business: { color: '#1e293b', bg: '#f8fafc', border: '#e2e8f0', font: 'Montserrat,sans-serif', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
                                       classique: { color: '#B4502D', bg: '#F7F3EC', border: '#E6DFD3', font: 'Georgia,serif', gradient: '#1C2621' },
-                                      prestige: { color: '#9c7a36', bg: '#faf6ee', border: '#e9dfca', font: '"Playfair Display",serif', gradient: '#0a0a0a' } }[template];
+                                      prestige: { color: '#9c7a36', bg: '#faf6ee', border: '#e9dfca', font: '"Playfair Display",serif', gradient: '#0a0a0a' },
+                                      epicure: { color: '#9c7a36', bg: '#faf6ee', border: '#e9dfca', font: '"Playfair Display",serif', gradient: '#0a0a0a' } }[template];
                         return (
                           <div style={{ fontFamily: tpl.font, fontSize: 9 }}>
                             {/* Mini header */}

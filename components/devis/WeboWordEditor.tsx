@@ -628,7 +628,7 @@ export default function WeboWordEditor({ quoteId, initialHtml, clientName, onBac
         cgv: companyAssets.cgv,
         language: (q.language as 'fr' | 'en') ?? 'fr',
       },
-      { template: (q.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige') ?? 'standard', font },
+      { template: (q.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure') ?? 'standard', font },
     );
 
     if (editorRef.current) { editorRef.current.innerHTML = fresh; lockFinancials(editorRef.current); }

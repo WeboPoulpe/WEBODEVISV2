@@ -12,6 +12,7 @@
 import { lineTotalHT, quoteVatBreakdown, vatRowsForDisplay, resolveGuestSplit } from './quoteTotals';
 import { chosenFormula, effectiveLines, lineFormulaId, parseFormulas, type QuoteFormula } from './quoteFormulas';
 import { sanitizeHtml } from './sanitize';
+import { accountStyle } from './quoteStyles';
 
 export interface QuoteHtmlData {
   companyName: string;
@@ -67,7 +68,7 @@ export interface QuoteHtmlData {
 
 export interface QuoteHtmlOptions {
   font?: string;
-  template?: 'standard' | 'mariage' | 'business' | 'classique' | 'prestige';
+  template?: 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure';
 }
 
 const money = (n: number, lang: 'fr' | 'en' = 'fr') =>
@@ -311,7 +312,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     lightBorder = '#E6DFD3';
     fontFamily = opts.font ? `'${opts.font}',serif` : "'Georgia',serif";
     menuItemColor = '#1C2621';
-  } else if (tmpl === 'prestige') {
+  } else if (tmpl === 'prestige' || accountStyle(tmpl)) {
     // Noir et or : tout le document sur fond noir, texte crème, titres, filets et totaux dorés.
     headerGradient = 'background:#0a0a0a;border-bottom:1px solid #c9a96e;';
     accentColor = '#c9a96e';
@@ -344,6 +345,9 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     fontFamily = opts.font ? `'${opts.font}',serif` : "'Georgia',serif";
     menuItemColor = '#9c27b0';
   }
+
+  // Style réservé à un compte : son logo remplace le nom dans le bandeau du devis et coiffe la carte.
+  const brandLogo = accountStyle(tmpl)?.logoUrl ?? null;
 
   // ── Google Font import (if custom font selected) ───────────────────────────
   const googleFontImport = opts.font && opts.font !== 'Georgia'
@@ -515,7 +519,9 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   <div style="${headerGradient}margin:-20mm -20mm 0;padding:13mm 20mm 11mm;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <h1 style="font-size:22px;font-weight:bold;color:${headerInk};margin:0 0 3px;letter-spacing:-0.5px;">${d.companyName}</h1>
+        ${brandLogo
+          ? `<img src="${brandLogo}" alt="${d.companyName}" style="display:block;width:84px;height:auto;margin:0 0 4px;">`
+          : `<h1 style="font-size:22px;font-weight:bold;color:${headerInk};margin:0 0 3px;letter-spacing:-0.5px;">${d.companyName}</h1>`}
         <p style="color:rgba(255,255,255,0.65);margin:0;font-size:11px;">${t.traiteurChef}</p>
       </div>
       <div style="text-align:right;">
@@ -593,6 +599,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 
   <!-- ── Header Carte (pleine largeur) ── -->
   <div class="gastro-header" style="${headerGradient}margin:24px -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">
+    ${brandLogo ? `<img src="${brandLogo}" alt="" style="display:block;width:70px;height:auto;margin:0 auto 8px;">` : ''}
     <p style="font-size:9px;font-weight:bold;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:3px;margin:0 0 5px;">
       ${t.eventLabel(eventTypeT, d.eventDate ? dateFr(d.eventDate) : '')}
     </p>

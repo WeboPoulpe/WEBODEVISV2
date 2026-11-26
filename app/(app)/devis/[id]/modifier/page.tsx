@@ -140,7 +140,7 @@ export default async function ModifierPage({
         contactPhone:      (quote as { recipient_contact_phone?: string | null }).recipient_contact_phone ?? null,
       },
       {
-        template: (quote.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige') ?? 'standard',
+        template: (quote.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' | 'epicure') ?? 'standard',
         font:     (quote.selected_font as string | null) ?? undefined,
       },
     );

@@ -21,7 +21,7 @@ const TABLE_MIN_WIDTH = 460;
 
 export type PreviewTemplate = NonNullable<QuoteHtmlOptions['template']>;
 type Template = PreviewTemplate;
-export const PREVIEW_TEMPLATES: Template[] = ['standard', 'mariage', 'business', 'classique', 'prestige'];
+export const PREVIEW_TEMPLATES: Template[] = ['standard', 'mariage', 'business', 'classique', 'prestige', 'epicure'];
 const TEMPLATES = PREVIEW_TEMPLATES;
 /** Classe des morceaux de document : les styles de l'application y sont annulés, comme dans l'éditeur des devis. */
 const PAPER = 'presta-preview-paper';

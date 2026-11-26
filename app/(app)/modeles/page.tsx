@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Check, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { accountStylesFor, companyIdOf } from '@/lib/quoteStyles';
 import { generateQuoteHtml, type QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
 import { QUOTE_FONTS } from '@/lib/quoteOutput';
 import TemplateThumb from '@/components/devis/TemplateThumb';
@@ -54,14 +55,17 @@ export default function QuoteStylesPage() {
   const [preview, setPreview] = useState<StyleKey | null>(null);
 
   const record = profile as unknown as { default_quote_style?: string | null; default_quote_font?: string | null } | null;
+  // Styles proposés : les communs, puis ceux réservés au compte.
+  const companyId = companyIdOf(profile);
+  const styles = useMemo(() => [...STYLES, ...accountStylesFor(companyId).map((s) => ({ key: s.key as StyleKey, label: s.label, desc: s.desc }))], [companyId]);
   useEffect(() => {
     if (!record) return;
-    if (record.default_quote_style && STYLES.some((s) => s.key === record.default_quote_style)) setStyle(record.default_quote_style as StyleKey);
+    if (record.default_quote_style && styles.some((s) => s.key === record.default_quote_style)) setStyle(record.default_quote_style as StyleKey);
     if (record.default_quote_font) setFont(record.default_quote_font);
-  }, [record?.default_quote_style, record?.default_quote_font]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [record?.default_quote_style, record?.default_quote_font, styles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const company = profile?.company_name || 'Votre entreprise';
-  const samples = useMemo(() => Object.fromEntries(STYLES.map((s) => [s.key, sampleHtml(s.key, font, company)])) as Record<StyleKey, string>, [font, company]);
+  const samples = useMemo(() => Object.fromEntries(styles.map((s) => [s.key, sampleHtml(s.key, font, company)])) as Record<StyleKey, string>, [font, company, styles]);
   const dirty = (record?.default_quote_style ?? 'classique') !== style || (record?.default_quote_font ?? 'Georgia') !== font;
 
   const save = async () => {
@@ -97,7 +101,7 @@ export default function QuoteStylesPage() {
       </div>
 
       <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" role="radiogroup" aria-label="Style des nouveaux devis">
-        {STYLES.map((s) => {
+        {styles.map((s) => {
           const selected = style === s.key;
           return (
             <li key={s.key} className={cn(cardCls, 'p-3 flex flex-col', selected && 'border-forest ring-2 ring-forest')}>
