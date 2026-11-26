@@ -38,7 +38,7 @@ export default function TemplateThumb({ html, lines, loading, label, onClick }: 
       ref={box}
       onClick={onClick}
       aria-label={label}
-      className="group relative block w-full aspect-[3/4] overflow-hidden rounded-xl bg-white border border-gray-200 hover:border-primary-300 focus-visible:border-primary transition-colors"
+      className="quote-out group relative block w-full aspect-[3/4] overflow-hidden rounded-xl bg-white border border-gray-200 hover:border-primary-300 focus-visible:border-primary transition-colors"
     >
       {loading ? (
         <span className="absolute inset-0 animate-pulse bg-gray-100" />

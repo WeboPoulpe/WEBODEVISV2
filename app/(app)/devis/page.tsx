@@ -1577,7 +1577,7 @@ export default function DevisPage() {
             <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
               {previewTpl.content_html ? (
                 <div
-                  className="bg-white shadow-sm rounded-xl p-6 min-h-full"
+                  className="quote-out bg-white shadow-sm rounded-xl p-6 min-h-full"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewTpl.content_html) }}
                 />
               ) : (

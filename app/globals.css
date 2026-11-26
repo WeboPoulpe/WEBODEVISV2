@@ -273,3 +273,7 @@ h1, h2, .font-display {
   .group-hover\:opacity-100,
   .hover\:opacity-100 { opacity: 1 !important; }
 }
+
+/* Devis au style Prestige (repère webo-dark posé par generateQuoteHtml) : la feuille qui le porte est noire, partout
+   où il s'affiche (éditeur, page du client, vignettes et aperçu des modèles), comme dans lib/quoteOutput.ts. */
+.quote-out:has(.webo-dark) { background: #0a0a0a !important; color: #f5f0eb; }
