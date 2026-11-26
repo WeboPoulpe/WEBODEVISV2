@@ -10,6 +10,7 @@ import { shortText } from '@/lib/brochure';
 import { frameImgStyle } from '@/lib/photoFrame';
 import type { PhotoFilter, ResolvedStudioElement, ResolvedStudioPage, ResolvedStudioPrestation, StudioText } from '@/lib/brochureStudio';
 import { FramedPhoto } from '../PhotoText';
+import { formColors } from '@/lib/formColors';
 import { ICONS } from './icons';
 
 const cq = (n: number) => `${n}cqw`;
@@ -245,6 +246,7 @@ export function ElementContent({ el, editor, language, formSlot }: {
         <div style={{
           width: '100%', height: '100%', boxSizing: 'border-box', overflowY: editor ? 'hidden' : 'auto', padding: cq(4),
           background: el.bg ?? undefined, borderRadius: el.radius ? cq(el.radius) : undefined, color: el.color,
+          ...formColors(el.color, el.accent),
         }}>
           {editor || !formSlot ? <FormPreview color={el.color} accent={el.accent} language={language} /> : formSlot}
         </div>

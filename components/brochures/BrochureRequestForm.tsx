@@ -35,8 +35,11 @@ const TEXT = {
   },
 };
 
-const field = 'w-full rounded-lg border border-black/15 bg-white/80 px-2.5 py-1.5 text-[13px] text-[#1C2621] outline-none focus:border-[#B4502D]';
-const lab = 'block text-[11px] uppercase tracking-wider text-[#5b5b55] mb-0.5';
+// Couleurs : celles du formulaire réglées dans le Studio (variables posées par formColors, lib/formColors.ts), sinon celles d'origine.
+// Les champs et la sélection gardent un fond clair : leur texte reste sombre.
+const field = 'w-full rounded-lg border border-black/15 bg-white/80 px-2.5 py-1.5 text-[13px] text-[#1C2621] outline-none focus:border-[color:var(--wb-form-accent,#B4502D)]';
+const lab = 'block text-[11px] uppercase tracking-wider text-[color:var(--wb-form-muted,#5b5b55)] mb-0.5';
+const labOnLight = 'block text-[11px] uppercase tracking-wider text-[#5b5b55] mb-0.5';
 
 /** État du formulaire, à tenir au-dessus du livre. */
 export function useBrochureForm() {
@@ -59,9 +62,9 @@ export default function BrochureRequestForm({ token, language, form, selection }
 
   if (state === 'sent') {
     return (
-      <div role="status" className="text-[#1C2621]">
+      <div role="status" className="text-[color:var(--wb-form-text,#1C2621)]">
         <p className="text-lg font-semibold">{t.thanks}</p>
-        <p className="mt-2 text-sm text-[#5b5b55]">{t.thanksMore}</p>
+        <p className="mt-2 text-sm text-[color:var(--wb-form-muted,#5b5b55)]">{t.thanksMore}</p>
       </div>
     );
   }
@@ -98,8 +101,8 @@ export default function BrochureRequestForm({ token, language, form, selection }
         <label><span className={lab}>{t.place}</span><input value={f.service_address ?? ''} onChange={(e) => set('service_address', e.target.value)} className={field} /></label>
       </div>
       {items.length > 0 && (
-        <div className="rounded-lg border border-[#B4502D]/30 bg-white/70 p-2" aria-label={en ? 'Your selection' : 'Votre sélection'}>
-          <p className={lab}>{en ? 'Your selection' : 'Votre sélection'}</p>
+        <div className="rounded-lg border border-black/10 bg-white/80 p-2" aria-label={en ? 'Your selection' : 'Votre sélection'}>
+          <p className={labOnLight}>{en ? 'Your selection' : 'Votre sélection'}</p>
           <ul className="space-y-1">
             {items.map((i) => (
               <li key={i.key} className="flex items-center gap-2 text-[13px] text-[#1C2621]">
@@ -112,7 +115,7 @@ export default function BrochureRequestForm({ token, language, form, selection }
           {total != null && (
             <p className="mt-1.5 border-t border-black/10 pt-1.5 text-[13px] text-[#1C2621]" aria-live="polite">
               {en ? 'Estimate' : 'Estimation'}{guests ? ` (${guests} ${en ? 'guests' : 'invités'})` : ` (${en ? '1 guest — enter your number of guests' : '1 invité — indiquez le nombre d’invités'})`} :{' '}
-              <strong className="text-[#B4502D]">{money.format(total)} {selection?.tax}</strong>
+              <strong className="text-[#1C2621]">{money.format(total)} {selection?.tax}</strong>
               <span className="block text-[11px] text-[#5b5b55]">{en ? 'Indicative, confirmed in your quote.' : 'Indicative, confirmée dans votre devis.'}</span>
             </p>
           )}
@@ -121,7 +124,7 @@ export default function BrochureRequestForm({ token, language, form, selection }
       <label className="block"><span className={lab}>{t.message}</span><textarea rows={3} value={f.message ?? ''} onChange={(e) => set('message', e.target.value)} className={field} /></label>
       {error && <p role="alert" className="text-[13px] text-red-700">{error}</p>}
       <button type="submit" disabled={state === 'sending'}
-        className="w-full rounded-lg bg-[#B4502D] px-3 py-2 text-[14px] font-semibold text-white disabled:opacity-60">
+        className="w-full rounded-lg bg-[color:var(--wb-form-accent,#B4502D)] px-3 py-2 text-[14px] font-semibold text-[color:var(--wb-form-on-accent,#fff)] disabled:opacity-60">
         {state === 'sending' ? t.sending : t.send}
       </button>
     </form>

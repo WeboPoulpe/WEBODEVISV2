@@ -3,25 +3,31 @@
 // Le formulaire de la brochure en plein écran (téléphone) : confortable à remplir, avec un retour au livre.
 
 import type { ReactNode } from 'react';
+import { formColors } from '@/lib/formColors';
+
+/** Couleurs du formulaire réglées dans le Studio : fond (null : crème d'origine), texte, bouton. */
+export interface FormTheme { bg: string | null; color: string; accent: string }
 import { ArrowLeft } from 'lucide-react';
 
-export default function FormSheet({ open, onClose, title, language, children }: {
+export default function FormSheet({ open, onClose, title, language, theme, children }: {
   open: boolean;
   onClose: () => void;
   title: string;
   language: 'fr' | 'en';
+  theme?: FormTheme | null;
   children: ReactNode;
 }) {
   if (!open) return null;
   return (
     <div role="dialog" aria-modal="true" aria-label={title}
-      className="fixed inset-0 z-50 overflow-y-auto bg-[#FBF7F0] text-[#1C2621]" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+      className="fixed inset-0 z-50 overflow-y-auto bg-[#FBF7F0] text-[#1C2621]"
+      style={{ fontFamily: 'Georgia, "Times New Roman", serif', ...(theme ? { background: theme.bg ?? undefined, color: theme.color, ...formColors(theme.color, theme.accent) } : {}) }}>
       <div className="mx-auto max-w-md px-5 pb-10 pt-4">
         <button type="button" onClick={onClose}
           className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-sm text-[#5b5b55]">
           <ArrowLeft className="h-4 w-4" /> {language === 'en' ? 'Back to the brochure' : 'Revenir au livre'}
         </button>
-        <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#B4502D]">{title}</p>
+        <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--wb-form-accent,#B4502D)]">{title}</p>
         {children}
       </div>
     </div>

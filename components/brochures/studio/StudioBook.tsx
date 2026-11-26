@@ -13,6 +13,7 @@ import type { PhotoFrame } from '@/lib/photoFrame';
 import { Flipbook } from '../Flipbook';
 import FormSheet from '../FormSheet';
 import BrochureRequestForm, { useBrochureForm, type Selection } from '../BrochureRequestForm';
+import { formColors } from '@/lib/formColors';
 import { StudioPageView } from './StudioPage';
 import { recordBrochureFormReached } from '@/server/brochures';
 import { FramedPhoto } from '../PhotoText';
@@ -266,6 +267,13 @@ export default function StudioBook({ pages, language, name, token, options = DEF
   const form = useBrochureForm();
   const [sheet, setSheet] = useState(false);
   const [onForm, setOnForm] = useState(false);
+  // Couleurs du formulaire réglées dans le Studio : reprises par la fenêtre plein écran et les boutons du lecteur.
+  const formTheme = useMemo(() => {
+    const p = pages.find((x) => x.form);
+    const el = p?.els.find((e) => e.type === 'form');
+    return el && el.type === 'form' ? { bg: el.bg ?? p!.bg, color: el.color, accent: el.accent } : null;
+  }, [pages]);
+  const accentStyle = formTheme ? { ...formColors(formTheme.color, formTheme.accent) } : undefined;
   const onFormPage = useCallback((on: boolean) => setOnForm(on), []);
   // Téléphone : en arrivant sur la page du formulaire, il s'ouvre en plein écran (une fois par arrivée).
   useEffect(() => { setSheet(!!phone && onForm); }, [phone, onForm]);
@@ -297,8 +305,8 @@ export default function StudioBook({ pages, language, name, token, options = DEF
   const bar = chosen.length > 0 && !(onForm && !phone) && (
     <div className={phone ? 'pointer-events-none absolute inset-x-0 z-10 flex justify-center px-3' : 'fixed inset-x-0 bottom-20 z-40 flex justify-center px-3'}
       style={phone ? { bottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 52px)' } : undefined}>
-      <button type="button" onClick={toForm}
-        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-[#B4502D] px-4 py-2.5 text-sm font-semibold text-white shadow-lg">
+      <button type="button" onClick={toForm} style={accentStyle}
+        className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-[color:var(--wb-form-accent,#B4502D)] px-4 py-2.5 text-sm font-semibold text-[color:var(--wb-form-on-accent,#fff)] shadow-lg">
         {chosen.length} {en ? (chosen.length > 1 ? 'items chosen' : 'item chosen') : (chosen.length > 1 ? 'prestations choisies' : 'prestation choisie')} · {en ? 'Send my request' : 'Faire ma demande'} →
       </button>
     </div>
@@ -313,11 +321,11 @@ export default function StudioBook({ pages, language, name, token, options = DEF
           contact={hasContact ? <ContactButtons phone={companyPhone} options={options} language={language} className="flex gap-2" /> : null}
           formSlot={(
             <button type="button" onClick={() => setSheet(true)}
-              className="w-full rounded-lg bg-[#B4502D] px-3 py-3 text-[15px] font-semibold text-white">
+              className="w-full rounded-lg bg-[color:var(--wb-form-accent,#B4502D)] px-3 py-3 text-[15px] font-semibold text-[color:var(--wb-form-on-accent,#fff)]">
               {en ? 'Fill in the form' : 'Remplir le formulaire'}
             </button>
           )} />
-        <FormSheet open={sheet} onClose={() => setSheet(false)} title={en ? 'Your request' : 'Votre demande'} language={language}>
+        <FormSheet open={sheet} onClose={() => setSheet(false)} title={en ? 'Your request' : 'Votre demande'} language={language} theme={formTheme}>
           <BrochureRequestForm token={token} language={language} form={form} selection={selection} />
         </FormSheet>
       </>
