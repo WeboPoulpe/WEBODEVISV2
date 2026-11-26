@@ -2197,6 +2197,24 @@ export const material_templates = pgTable("material_templates", {
 		}).onDelete("cascade"),
 ]);
 
+// Kit de matériel : un modèle (child_id) inclus dans un autre (parent_id). Lien vivant, mis à plat à l'application (lib/materialKits.ts).
+export const material_template_set_children = pgTable("material_template_set_children", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	parent_id: uuid().notNull(),
+	child_id: uuid().notNull(),
+	sort_order: integer().default(0).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("material_template_set_children_pair_key").using("btree", table.parent_id.asc().nullsLast().op("uuid_ops"), table.child_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_material_template_set_children_child_id").using("btree", table.child_id.asc().nullsLast().op("uuid_ops")),
+	index("idx_material_template_set_children_user_id").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({ columns: [table.user_id], foreignColumns: [users.id], name: "material_template_set_children_user_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.parent_id], foreignColumns: [material_template_sets.id], name: "material_template_set_children_parent_id_fkey" }).onDelete("cascade"),
+	foreignKey({ columns: [table.child_id], foreignColumns: [material_template_sets.id], name: "material_template_set_children_child_id_fkey" }).onDelete("cascade"),
+	check("material_template_set_children_not_self", sql`parent_id <> child_id`),
+]);
+
 // Abonnements aux notifications push d'un appareil : celui d'un compte (traiteur) ou celui d'un extra (page de missions).
 export const push_subscriptions = pgTable("push_subscriptions", {
 	id: uuid().defaultRandom().primaryKey().notNull(),

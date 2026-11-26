@@ -130,4 +130,11 @@ export const RULES: Record<string, TableRule> = {
     read: team('user_id'),
     write: (t, u) => `(${team('user_id')(t, u)} and exists (select 1 from public.material_template_sets ms where ms.id = ${t}.set_id and ms.user_id in ${companyMembers(u)}))`,
   },
+  // Un kit ne relie que deux modèles de l'entreprise.
+  material_template_set_children: {
+    read: team('user_id'),
+    write: (t, u) => `(${team('user_id')(t, u)}`
+      + ` and exists (select 1 from public.material_template_sets mp where mp.id = ${t}.parent_id and mp.user_id in ${companyMembers(u)})`
+      + ` and exists (select 1 from public.material_template_sets mc where mc.id = ${t}.child_id and mc.user_id in ${companyMembers(u)}))`,
+  },
 };

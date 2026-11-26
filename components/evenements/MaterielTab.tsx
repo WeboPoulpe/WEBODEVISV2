@@ -7,6 +7,7 @@ import MaterialPicker, { rememberMaterial } from './MaterialPicker';
 import ApplyTemplateDialog, { type TemplateChoice } from './ApplyTemplateDialog';
 import { createClient } from '@/lib/supabase/client';
 import { quantityFor } from '@/lib/equipment';
+import { flattenSet, type KitLink } from '@/lib/materialKits';
 import type { ApplyPlan } from '@/lib/templateApply';
 import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/ui/Modal';
@@ -105,6 +106,7 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
   const guests = quote.guest_count ?? 0;
   const [materialSets, setMaterialSets] = useState<MaterialTemplateSet[]>([]);
   const [materialTemplates, setMaterialTemplates] = useState<MaterialTemplate[]>([]);
+  const [materialKits, setMaterialKits] = useState<KitLink[]>([]);
   const [choosingMaterialSet, setChoosingMaterialSet] = useState(false);
 
   useEffect(() => {
@@ -114,13 +116,16 @@ export default function MaterielTab({ quote, onChange }: { quote: EventQuote; on
       .then(({ data }) => setMaterialSets((data ?? []) as MaterialTemplateSet[]));
     supabase.from('material_templates').select('id, set_id, name, unit, default_qty, qty_per_guest').order('sort_order')
       .then(({ data }) => setMaterialTemplates((data ?? []) as MaterialTemplate[]));
+    supabase.from('material_template_set_children').select('parent_id, child_id, sort_order').order('sort_order')
+      .then(({ data }) => setMaterialKits((data ?? []) as KitLink[]));
   }, [user]);
 
   const materialChoices: TemplateChoice<null>[] = materialSets
     .map((s) => ({
       id: s.id,
       name: s.name,
-      lines: materialTemplates.filter((t) => t.set_id === s.id).map((t) => ({
+      // Un modèle complet apporte aussi ses kits ; les articles en double s'additionnent (mergeIncoming).
+      lines: flattenSet(s.id, materialTemplates, materialKits).map((t) => ({
         name: t.name,
         unit: t.unit,
         qty: t.qty_per_guest != null ? quantityFor(Number(t.qty_per_guest), guests) : Number(t.default_qty),

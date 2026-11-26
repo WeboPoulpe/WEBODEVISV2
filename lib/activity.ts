@@ -128,6 +128,10 @@ export const TRACKED_TABLES: Record<string, TrackedTable> = {
   rental_templates: { entity: 'materiel', id: 't0.set_id', label: `coalesce(t0.material_name, '')`, forceAction: 'modification' },
   material_template_sets: named('materiel'),
   material_templates: named('materiel'),
+  material_template_set_children: {
+    entity: 'materiel', id: 't0.parent_id', forceAction: 'modification',
+    label: `coalesce((select ms.name from public.material_template_sets ms where ms.id = t0.parent_id), '')`,
+  },
   material_presets: named('materiel'),
   profiles: { entity: 'parametres', id: 't0.id', label: `''`, forceAction: 'modification' },
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, ListChecks, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, Layers, ListChecks, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { EQUIPMENT_BASE, findBaseArticle, formatPerGuest, formatQty, matchesSearch, sameName, UNITS } from '@/lib/equipment';
 import PerGuestInput from '@/components/ui/PerGuestInput';
@@ -9,14 +9,17 @@ import Modal from '@/components/ui/Modal';
 import SearchField, { searchStatus } from '@/components/ui/SearchField';
 import { btnGhost, btnPrimary, btnSecondary, cardCls, errorCls, iconBtn, iconBtnDanger, inputCls, labelCls } from '@/components/ui/kit';
 import { cn } from '@/lib/utils';
+import { flattenSet, wouldCycle, type KitLink } from '@/lib/materialKits';
 import { useFeedback } from '@/components/ui/Feedback';
 
 // Modèles de matériel : ce qu'on emporte pour un type de réception (« Cocktail » : 4 chafing dish, 6 caisses
 // isothermes, 1 rallonge pour 30 couverts…). Dans un événement, onglet Matériel, on applique un modèle à
 // « À préparer » : les quantités par couvert se calculent d'après le nombre de couverts.
+// Un modèle peut inclure d'autres modèles comme kits (« Kit café » dans « Brunch ») : lien vivant, quantités additionnées.
 
 export interface Preset { id: string; name: string; unit: string | null; default_qty: number; qty_per_guest: number | null }
 interface TemplateSet { id: string; name: string }
+interface Link extends KitLink { id: string; sort_order: number }
 interface Item {
   id: string;
   set_id: string;
@@ -31,6 +34,7 @@ interface Item {
 interface Picked { unit: string; qty: string; perGuest: number | null }
 
 const ITEM_SELECT = 'id, set_id, name, unit, default_qty, qty_per_guest, sort_order';
+const LINK_SELECT = 'id, parent_id, child_id, sort_order';
 const num = (v: string, fallback: number) => { const n = parseFloat(v.replace(',', '.')); return Number.isFinite(n) ? n : fallback; };
 const asItem = (row: Item): Item => ({ ...row, default_qty: Number(row.default_qty), qty_per_guest: row.qty_per_guest == null ? null : Number(row.qty_per_guest) });
 const emptyItem = { id: null as string | null, name: '', unit: 'pièce', perGuest: false, qty: '1', ratio: 1 / 30 };
@@ -42,6 +46,9 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
   const { confirm } = useFeedback();
   const [sets, setSets] = useState<TemplateSet[] | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [links, setLinks] = useState<Link[]>([]);
+  // Fenêtre « Ajouter un kit » : modèles cochés.
+  const [pickingKits, setPickingKits] = useState<string[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -54,20 +61,27 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const [s, i] = await Promise.all([
+    const [s, i, l] = await Promise.all([
       supabase.from('material_template_sets').select('id, name').order('created_at'),
       supabase.from('material_templates').select(ITEM_SELECT).order('sort_order'),
+      supabase.from('material_template_set_children').select(LINK_SELECT).order('sort_order'),
     ]);
-    if (s.error || i.error) setError('Vos modèles n’ont pas pu être chargés. Rechargez la page.');
+    if (s.error || i.error || l.error) setError('Vos modèles n’ont pas pu être chargés. Rechargez la page.');
     const loaded = (s.data ?? []) as TemplateSet[];
     setSets(loaded);
     setItems(((i.data ?? []) as Item[]).map(asItem));
+    setLinks((l.data ?? []) as Link[]);
     setActiveId((current) => (current && loaded.some((x) => x.id === current) ? current : loaded[0]?.id ?? null));
   }, [userId]);
   useEffect(() => { load(); }, [load]);
 
   const active = sets?.find((s) => s.id === activeId) ?? null;
   const activeItems = useMemo(() => items.filter((i) => i.set_id === activeId), [items, activeId]);
+  const activeKits = useMemo(() => links.filter((l) => l.parent_id === activeId).sort((a, b) => a.sort_order - b.sort_order), [links, activeId]);
+  const nameOf = (id: string) => sets?.find((s) => s.id === id)?.name ?? '';
+  /** Articles une fois les kits mis à plat (un article présent dans deux kits compte deux fois). */
+  const totalCount = (id: string) => flattenSet(id, items, links).length;
+  const usedIn = (id: string) => links.filter((l) => l.child_id === id).map((l) => nameOf(l.parent_id)).filter(Boolean);
 
   const openPicking = () => { setQuery(''); setSource(presets.length > 0 ? 'mine' : 'base'); setPicking({}); };
 
@@ -104,6 +118,13 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
       if (inserted.error) setError('Le modèle est créé, mais ses articles n’ont pas pu être copiés.');
       else setItems((list) => [...list, ...((inserted.data ?? []) as Item[]).map(asItem)]);
     }
+    if (activeKits.length > 0) {
+      const copied = await supabase.from('material_template_set_children').insert(activeKits.map((k) => ({
+        user_id: userId, parent_id: copy.id, child_id: k.child_id, sort_order: k.sort_order,
+      }))).select(LINK_SELECT);
+      if (copied.error) setError('Le modèle est créé, mais ses kits n’ont pas pu être copiés.');
+      else setLinks((list) => [...list, ...((copied.data ?? []) as Link[])]);
+    }
     setSets((list) => [...(list ?? []), copy]);
     setActiveId(copy.id);
     setBusy(false);
@@ -111,9 +132,12 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
 
   const removeSet = async () => {
     if (!active) return;
+    const parents = usedIn(active.id);
     if (!(await confirm({
       title: `Supprimer le modèle « ${active.name} » ?`,
-      message: `Ses ${activeItems.length} article${activeItems.length > 1 ? 's' : ''} seront supprimés aussi. Le matériel déjà ajouté à vos événements ne change pas.`,
+      message: `Ses ${activeItems.length} article${activeItems.length > 1 ? 's' : ''} seront supprimés aussi.`
+        + (parents.length ? ` Il sera retiré de ${parents.map((p) => `« ${p} »`).join(', ')}.` : '')
+        + ' Le matériel déjà ajouté à vos événements ne change pas.',
       danger: true,
     }))) return;
     const res = await createClient().from('material_template_sets').delete().eq('id', active.id);
@@ -121,7 +145,30 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
     const rest = (sets ?? []).filter((s) => s.id !== active.id);
     setSets(rest);
     setItems((list) => list.filter((i) => i.set_id !== active.id));
+    setLinks((list) => list.filter((l) => l.parent_id !== active.id && l.child_id !== active.id));
     setActiveId(rest[0]?.id ?? null);
+  };
+
+  // ── Kits ─────────────────────────────────────────────────────────────────────
+  const addKits = async () => {
+    if (!pickingKits || !active) return;
+    if (pickingKits.length === 0) { setPickingKits(null); return; }
+    setBusy(true); setError(null);
+    const res = await createClient().from('material_template_set_children').insert(pickingKits.map((child_id, i) => ({
+      user_id: userId, parent_id: active.id, child_id, sort_order: activeKits.length + i,
+    }))).select(LINK_SELECT);
+    setBusy(false);
+    if (res.error) { setError('Les kits n’ont pas pu être ajoutés. Réessayez.'); return; }
+    setLinks((list) => [...list, ...((res.data ?? []) as Link[])]);
+    setPickingKits(null);
+  };
+
+  const removeKit = async (link: Link) => {
+    if (!(await confirm({ title: `Retirer le kit « ${nameOf(link.child_id)} » de « ${nameOf(link.parent_id)} » ?`, message: 'Le kit lui-même n’est pas supprimé.', confirmLabel: 'Retirer', danger: true }))) return;
+    const previous = links;
+    setLinks((list) => list.filter((l) => l.id !== link.id));
+    const res = await createClient().from('material_template_set_children').delete().eq('id', link.id);
+    if (res.error) { setLinks(previous); setError('Le kit n’a pas pu être retiré. Réessayez.'); }
   };
 
   // ── Articles ─────────────────────────────────────────────────────────────────
@@ -214,7 +261,7 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
                 className={cn('flex-shrink-0 h-10 px-4 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
                   s.id === activeId ? 'bg-forest text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300')}>
                 {s.name}
-                <span className={cn('ml-2 tabular-nums', s.id === activeId ? 'text-white/60' : 'text-gray-400')}>{items.filter((i) => i.set_id === s.id).length}</span>
+                <span className={cn('ml-2 tabular-nums', s.id === activeId ? 'text-white/60' : 'text-gray-400')}>{totalCount(s.id)}</span>
               </button>
             ))}
           </div>
@@ -224,7 +271,13 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
               <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-5 pt-4 pb-3">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-gray-900 break-words">{active.name}</h2>
-                  <p className="text-sm text-gray-500">{activeItems.length} article{activeItems.length > 1 ? 's' : ''}</p>
+                  <p className="text-sm text-gray-500">
+                    {activeItems.length} article{activeItems.length > 1 ? 's' : ''}
+                    {activeKits.length > 0 && <> + {activeKits.length} kit{activeKits.length > 1 ? 's' : ''}, {totalCount(active.id)} au total</>}
+                  </p>
+                  {usedIn(active.id).length > 0 && (
+                    <p className="text-sm text-gray-500">Inclus dans {usedIn(active.id).map((n) => `« ${n} »`).join(', ')}</p>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
                   <button onClick={() => setNaming({ id: active.id, name: active.name })} className={iconBtn} aria-label="Renommer le modèle"><Pencil className="h-4 w-4" /></button>
@@ -235,7 +288,7 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
                 </div>
               </header>
 
-              {activeItems.length === 0 ? (
+              {activeItems.length === 0 && activeKits.length > 0 ? null : activeItems.length === 0 ? (
                 <p className="px-5 pb-6 text-[15px] text-gray-600">Ce modèle est vide. « Depuis une liste » propose votre matériel et la liste de base (chafing dish, caisses isothermes, rallonges…) : il suffit de cocher.</p>
               ) : (
                 <ul className="divide-y divide-gray-100 border-t border-gray-100">
@@ -252,6 +305,37 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
                   ))}
                 </ul>
               )}
+
+              <div className="border-t border-gray-100 px-4 sm:px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-[15px] font-semibold text-gray-900">Kits inclus</h3>
+                    <p className="text-sm text-gray-500">Un autre modèle ajouté tel quel. S’il change, ce modèle suit ; un article présent deux fois voit ses quantités s’additionner.</p>
+                  </div>
+                  {sets.some((s) => !wouldCycle(active.id, s.id, links) && !activeKits.some((k) => k.child_id === s.id)) && (
+                    <button onClick={() => setPickingKits([])} className={btnSecondary}><Layers className="h-4 w-4" />Ajouter un kit</button>
+                  )}
+                </div>
+                {activeKits.length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {activeKits.map((k) => {
+                      const kitItems = flattenSet(k.child_id, items, links);
+                      return (
+                        <li key={k.id} className="flex items-center gap-2 pl-3 pr-1 py-1.5 rounded-2xl bg-gray-50">
+                          <Layers className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden />
+                          <button onClick={() => setActiveId(k.child_id)} className="flex-1 min-w-0 text-left py-1">
+                            <span className="font-medium text-gray-900 break-words hover:underline">{nameOf(k.child_id)}</span>
+                            <span className="block text-sm text-gray-500 truncate">
+                              {kitItems.length === 0 ? 'Vide pour l’instant' : kitItems.map((i) => i.name).join(', ')}
+                            </span>
+                          </button>
+                          <button onClick={() => removeKit(k)} className={iconBtnDanger} aria-label={`Retirer le kit ${nameOf(k.child_id)}`}><X className="h-4 w-4" /></button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             </section>
           )}
         </>
@@ -272,6 +356,41 @@ export default function MaterialTemplates({ userId, presets }: { userId: string;
           </form>
         </Modal>
       )}
+
+      {pickingKits && active && sets && (() => {
+        const candidates = sets.filter((s) => !wouldCycle(active.id, s.id, links) && !activeKits.some((k) => k.child_id === s.id));
+        const count = pickingKits.length;
+        return (
+          <Modal
+            title={`Ajouter un kit à « ${active.name} »`}
+            onClose={() => setPickingKits(null)}
+            footer={<>
+              <button onClick={() => setPickingKits(null)} className={btnGhost}>Fermer</button>
+              <button onClick={addKits} disabled={count === 0 || busy} className={btnPrimary}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}{count > 1 ? `Ajouter ${count} kits` : 'Ajouter'}</button>
+            </>}
+          >
+            <div className="pb-3 space-y-3">
+              <p className="text-sm text-gray-600">Cochez les modèles à inclure. Un modèle qui contient déjà « {active.name} » n’est pas proposé.</p>
+              <ul className="space-y-1.5">
+                {candidates.map((s) => {
+                  const on = pickingKits.includes(s.id);
+                  const n = totalCount(s.id);
+                  return (
+                    <li key={s.id}>
+                      <label className="flex items-center gap-3 pl-3 pr-2 py-2.5 rounded-2xl bg-gray-50 cursor-pointer">
+                        <input type="checkbox" checked={on} className="h-6 w-6 rounded-md accent-sage flex-shrink-0"
+                          onChange={(e) => setPickingKits((list) => (e.target.checked ? [...(list ?? []), s.id] : (list ?? []).filter((id) => id !== s.id)))} />
+                        <span className="flex-1 min-w-0 text-[15px] text-gray-900 break-words">{s.name}</span>
+                        <span className="text-sm text-gray-500 tabular-nums">{n} article{n > 1 ? 's' : ''}</span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {picking && active && (() => {
         const inSet = (name: string) => activeItems.some((i) => sameName(i.name, name));
