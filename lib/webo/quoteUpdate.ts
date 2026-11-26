@@ -20,9 +20,9 @@ export interface QuoteUpdateSpec {
   hidePrice?: boolean | null;
 }
 
-export const QUOTE_TEMPLATES = ['classique', 'standard', 'mariage', 'business'] as const;
+export const QUOTE_TEMPLATES = ['classique', 'standard', 'mariage', 'business', 'prestige'] as const;
 export type QuoteTemplate = (typeof QUOTE_TEMPLATES)[number];
-export const TEMPLATE_LABEL: Record<QuoteTemplate, string> = { classique: 'Classique', standard: 'Violet', mariage: 'Mariage', business: 'Business' };
+export const TEMPLATE_LABEL: Record<QuoteTemplate, string> = { classique: 'Classique', standard: 'Violet', mariage: 'Mariage', business: 'Business', prestige: 'Prestige' };
 
 type Line = { id?: string; name?: string; quantity?: number } & Record<string, unknown>;
 

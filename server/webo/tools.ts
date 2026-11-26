@@ -78,7 +78,7 @@ const TOOLS: Record<string, Anthropic.Tool> = {
       },
     },
     remove_lines: { type: 'array', items: { type: 'string' } },
-    template: { anyOf: [{ type: 'string', enum: ['classique', 'standard', 'mariage', 'business'] }, { type: 'null' }], description: 'Style du devis : classique, standard (violet), mariage, business.' },
+    template: { anyOf: [{ type: 'string', enum: ['classique', 'standard', 'mariage', 'business', 'prestige'] }, { type: 'null' }], description: 'Style du devis : classique, standard (violet), mariage, business, prestige (noir et or).' },
     font: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'Police du devis (Georgia, Playfair Display, Lora, Montserrat, Cormorant Garamond, Inter…).' },
     language: { anyOf: [{ type: 'string', enum: ['fr', 'en'] }, { type: 'null' }] },
     hide_price: { anyOf: [{ type: 'boolean' }, { type: 'null' }], description: 'Masquer les prix sur le devis.' },
@@ -363,7 +363,7 @@ const HANDLERS: Record<string, Handler> = {
     const current = (Array.isArray(q.services) ? q.services : []) as { name?: string }[];
     for (const n of remove) if (!current.some((l) => (l.name ?? '').toLowerCase() === n.toLowerCase())) fail(`Aucune ligne « ${n} » dans ce devis.`);
     const add = await buildLines(ctx, i.add_lines, guests ?? q.guest_count);
-    const template = i.template == null ? null : (QUOTE_TEMPLATES.includes(i.template as QuoteTemplate) ? i.template as QuoteTemplate : fail('Style inconnu : classique, standard, mariage ou business.'));
+    const template = i.template == null ? null : (QUOTE_TEMPLATES.includes(i.template as QuoteTemplate) ? i.template as QuoteTemplate : fail('Style inconnu : classique, standard, mariage, business ou prestige.'));
     const font = i.font == null ? null : (QUOTE_FONTS.find((f) => f.toLowerCase() === str(i.font, 60).toLowerCase()) ?? fail(`Police inconnue. Polices possibles : ${QUOTE_FONTS.join(', ')}.`));
     const language = i.language === 'fr' || i.language === 'en' ? i.language : null;
     const hidePrice = typeof i.hide_price === 'boolean' ? i.hide_price : null;

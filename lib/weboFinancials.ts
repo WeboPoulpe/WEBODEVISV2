@@ -34,6 +34,8 @@ export interface WeboSyncInput {
   refreshDishes?: string[];
   /** Lignes supprimées du devis : leur plat quitte la carte (retrouvé par l'identifiant de la ligne, sinon par son nom). */
   removedLines?: { id?: string | null; name: string }[];
+  /** Nouveau devis tiré d'un modèle ou d'une copie : la date du document devient celle du jour. */
+  refreshDate?: boolean;
   /** Rempli par la synchronisation : blocs de texte laissés tels quels parce que réécrits à la main. */
   kept?: ('intro' | 'menuTitle')[];
 }
@@ -287,6 +289,8 @@ export function syncWeboDocument(
       const target = doc.querySelector(sel) ?? findLabeledCard(doc, labels);
       if (replaceWithFresh(doc, target, fresh.querySelector(sel))) changed = true;
     }
+
+    if (input.refreshDate && replaceWithFresh(doc, doc.querySelector('[data-webo-date]'), fresh.querySelector('[data-webo-date]'))) changed = true;
 
     // Blocs de prose : remplacés seulement s'ils ont encore la forme générée.
     const prose: [string, string, 'intro' | 'menuTitle'][] = [

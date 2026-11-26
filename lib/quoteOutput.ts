@@ -107,6 +107,9 @@ export function quoteOutputCss(s: QuoteOutputSettings): string {
     @page { size: A4; margin: 0; }
     .quote-out, .quote-out * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     .quote-out { color: #1a1a1a; background: #fff; }
+    /* Style Prestige (repère webo-dark posé par generateQuoteHtml) : la feuille entière est noire, texte crème
+       (à l'impression aussi, le body de la page imprimée portant quote-out). */
+    .quote-out:has(.webo-dark) { background: #0a0a0a !important; color: #f5f0eb; }
     .quote-pages { width: 100%; border-collapse: collapse; border-spacing: 0; table-layout: fixed; }
     .quote-pages > thead > tr > td, .quote-pages > tfoot > tr > td, .quote-pages > tbody > tr > td { padding: 0; border: 0; }
     .quote-gap { height: 0; }
@@ -318,6 +321,7 @@ export function buildQuotePrintPage(p: {
   ${fontHref ? `<link rel="stylesheet" href="${fontHref}">` : ''}
   <style>
     html, body { margin: 0; padding: 0; background: #fff; color-scheme: light; }
+    html:has(.webo-dark) { background: #0a0a0a; }
     ${quoteOutputCss(p.settings)}
   </style>
 </head>

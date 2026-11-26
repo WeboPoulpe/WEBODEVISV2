@@ -58,7 +58,7 @@ function useQuoteHtml() {
           contactEmail:      clientInfo.contactEmail || null,
           contactPhone:      clientInfo.contactPhone || null,
         },
-        { template: template as 'standard' | 'mariage' | 'business' | 'classique' },
+        { template: template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige' },
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, profile?.company_name],

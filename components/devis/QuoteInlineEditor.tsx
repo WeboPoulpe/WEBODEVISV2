@@ -69,7 +69,7 @@ interface Options {
   images: string[];
 }
 
-type QuoteTemplate = 'standard' | 'mariage' | 'business' | 'classique';
+type QuoteTemplate = 'standard' | 'mariage' | 'business' | 'classique' | 'prestige';
 
 interface Props {
   quoteId: string;
@@ -89,6 +89,7 @@ const TEMPLATES: { key: QuoteTemplate; label: string }[] = [
   { key: 'standard', label: 'Violet' },
   { key: 'mariage',  label: 'Mariage'  },
   { key: 'business', label: 'Business' },
+  { key: 'prestige', label: 'Prestige' },
 ];
 
 const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors';

@@ -67,7 +67,7 @@ export interface QuoteHtmlData {
 
 export interface QuoteHtmlOptions {
   font?: string;
-  template?: 'standard' | 'mariage' | 'business' | 'classique';
+  template?: 'standard' | 'mariage' | 'business' | 'classique' | 'prestige';
 }
 
 const money = (n: number, lang: 'fr' | 'en' = 'fr') =>
@@ -283,6 +283,19 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   let lightBorder: string;
   let fontFamily: string;
   let menuItemColor: string;
+  // Bandeaux : nom de l'entreprise et titre de la carte, cadre « DEVIS ».
+  let headerInk = 'white';
+  let headerFrame = 'background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.5);color:white;';
+  // Lignes en option et lignes incluses : ambre et vert, sauf style qui les accorde à sa palette.
+  let opt = { bg: '#fffbeb', text: '#d97706', name: '#92400e', badgeBg: '#fef3c7' };
+  let free = { text: '#16a34a', bg: '#dcfce7' };
+  // Neutres : texte, textes discrets, fonds et filets (le style Prestige les passe en clair sur fond noir).
+  let pal = {
+    ink: '#1a1a1a', body: '#555', mid: '#666', soft: '#777', faint: '#888', fainter: '#bbb', ghost: '#ccc', ghost2: '#aaa',
+    softBg: '#fafafa', line: '#e0e0e0', line2: '#f0f0f0', strike: '#9ca3af',
+  };
+  // Document sur fond noir (repère lu par la feuille de sortie, lib/quoteOutput.ts).
+  let darkMark = '';
 
   if (tmpl === 'mariage') {
     headerGradient = 'background:linear-gradient(135deg,#8b5a2b 0%,#c8956c 60%,#e2b99a 100%);';
@@ -298,6 +311,23 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     lightBorder = '#E6DFD3';
     fontFamily = opts.font ? `'${opts.font}',serif` : "'Georgia',serif";
     menuItemColor = '#1C2621';
+  } else if (tmpl === 'prestige') {
+    // Noir et or : tout le document sur fond noir, texte crème, titres, filets et totaux dorés.
+    headerGradient = 'background:#0a0a0a;border-bottom:1px solid #c9a96e;';
+    accentColor = '#c9a96e';
+    lightBg = '#141414';
+    lightBorder = '#3a3226';
+    fontFamily = opts.font ? `'${opts.font}',serif` : "'Playfair Display',Georgia,serif";
+    menuItemColor = '#c9a96e';
+    headerInk = '#c9a96e';
+    headerFrame = 'background:transparent;border:1.5px solid #c9a96e;color:#c9a96e;';
+    opt = { bg: '#141414', text: '#d4b97a', name: '#e8d9b5', badgeBg: '#2a241c' };
+    free = { text: '#d4b97a', bg: '#2a241c' };
+    pal = {
+      ink: '#f5f0eb', body: '#d9d0c1', mid: '#cfc5b4', soft: '#bdb3a3', faint: '#a89f92', fainter: '#7d7468', ghost: '#6b6358', ghost2: '#8a8174',
+      softBg: '#141414', line: '#3a3226', line2: '#2a241c', strike: '#7d7468',
+    };
+    darkMark = ' webo-dark';
   } else if (tmpl === 'business') {
     headerGradient = 'background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#334155 100%);';
     accentColor = '#1e293b';
@@ -342,34 +372,34 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       ? (extractEnTitle(s.gastroCardHtmlEn) || s.nameEn || s.name || '—')
       : (s.name || '—');
     const badge = s.isFree
-      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.inclusBadge}</span>`
+      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:${free.text};background:${free.bg};padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.inclusBadge}</span>`
       : s.isOption
-      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
+      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:${opt.text};background:${opt.badgeBg};padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
       : '';
     const isOpt = s.isOption;
-    const rowBg = isOpt ? `background-color:#fffbeb;` : '';
-    const nameColor = isOpt ? 'color:#92400e;' : 'color:#1a1a1a;';
-    const priceStyle = s.isFree ? 'text-decoration:line-through;color:#9ca3af;' : isOpt ? 'color:#d97706;' : '';
+    const rowBg = isOpt ? `background-color:${opt.bg};` : '';
+    const nameColor = isOpt ? `color:${opt.name};` : `color:${pal.ink};`;
+    const priceStyle = s.isFree ? `text-decoration:line-through;color:${pal.strike};` : isOpt ? `color:${opt.text};` : '';
     return `
     <tr${formulaAttr(s)} style="${rowBg}">
       <td style="padding:9px 12px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
         <strong style="font-size:12px;${nameColor}">${displayName}</strong>${badge}
       </td>
-      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${isOpt ? 'color:#d97706;' : ''}">${s.quantity}</td>
+      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${isOpt ? `color:${opt.text};` : ''}">${s.quantity}</td>
       ${!d.hidePrice ? `
-      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.unitPrice)}${!s.isFree && s.childUnitPrice != null && children > 0 ? `<br><span style="font-size:9px;color:#888;">${lang === 'en' ? 'child' : 'enfant'} ${m(s.childUnitPrice)}</span>` : ''}</td>
+      <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(s.unitPrice)}${!s.isFree && s.childUnitPrice != null && children > 0 ? `<br><span style="font-size:9px;color:${pal.faint};">${lang === 'en' ? 'child' : 'enfant'} ${m(s.childUnitPrice)}</span>` : ''}</td>
       <td style="padding:9px 12px;text-align:right;border-bottom:1px solid ${lightBorder};font-size:12px;font-weight:600;vertical-align:top;${priceStyle}">${s.isFree ? t.inclus : m(lineTotalHT(s, adults, children))}</td>
       ` : ''}
     </tr>`;
   };
   const colCount = d.hidePrice ? 2 : 4;
   // Mention « à choisir » : retirée de la page du client et de l'impression une fois la formule retenue.
-  const pending = (text: string) => chosen ? '' : ` <span data-webo-formula-pending="1" style="font-weight:normal;font-style:italic;color:#888;">— ${text}</span>`;
+  const pending = (text: string) => chosen ? '' : ` <span data-webo-formula-pending="1" style="font-weight:normal;font-style:italic;color:${pal.faint};">— ${text}</span>`;
   const formulaHeaderRow = (f: QuoteFormula) => `
     <tr data-webo-formula="${f.id}" style="background-color:${lightBg};">
       <td colspan="${colCount}" style="padding:10px 12px 8px;border-bottom:1px solid ${lightBorder};vertical-align:top;">
         <strong style="font-size:12px;color:${accentColor};text-transform:uppercase;letter-spacing:0.6px;">${f.name}</strong>${pending(t.aChoisir)}
-        ${f.description ? `<br><span style="font-size:11px;color:#777;font-style:italic;">${f.description}</span>` : ''}
+        ${f.description ? `<br><span style="font-size:11px;color:${pal.soft};font-style:italic;">${f.description}</span>` : ''}
       </td>
     </tr>`;
   // Devis classique : les lignes dans l'ordre. Devis à formules : les lignes communes, puis chaque formule.
@@ -395,13 +425,13 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       return `<div${formulaAttr(s)} data-webo-dish="${s.name}"${s.id ? ` data-webo-line="${s.id}"` : ''}${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};">${cardHtml}</div>`;
     }
     const optBadge = s.isOption
-      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#d97706;background:#fef3c7;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
+      ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:${opt.text};background:${opt.badgeBg};padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;letter-spacing:0.3px;">${t.option}</span>`
       : '';
     return `
       <div${formulaAttr(s)} data-webo-dish="${s.name}"${s.id ? ` data-webo-line="${s.id}"` : ''}${dishLang} style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${lightBorder};text-align:center;">
-        <p style="font-size:15px;font-weight:normal;color:${s.isOption ? '#d97706' : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
+        <p style="font-size:15px;font-weight:normal;color:${s.isOption ? opt.text : menuItemColor};margin:0 0 5px;letter-spacing:0.3px;">${s.name}${optBadge}</p>
         ${s.description
-          ? `<div class="svc-desc" style="font-size:12px;color:#777;font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</div>`
+          ? `<div class="svc-desc" style="font-size:12px;color:${pal.soft};font-style:italic;font-weight:normal;margin:0;line-height:1.55;">${s.description}</div>`
           : ''}
       </div>`;
   };
@@ -428,26 +458,26 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   <div${f ? ` data-webo-formula="${f.id}"` : ''} style="display:flex;justify-content:flex-end;margin-bottom:${f && !chosen ? '12px' : '20px'};">
     <div style="min-width:220px;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:12px;">
       ${f ? `<div style="font-size:11px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">${chosen ? `${t.formuleRetenue} : ` : ''}${f.name}${pending(t.aChoisir)}</div>` : ''}
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:${pal.mid};">
         <span>${t.sousTotalHt}</span><span>${m(htSansOption)}</span>
       </div>
       ${vatRows.map((r, i) => i < vatRows.length - 1 ? `
-      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#666;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:${pal.mid};">
         <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
       </div>` : `
-      <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:${pal.mid};padding-bottom:10px;border-bottom:1px solid ${lightBorder};">
         <span>${t.tva} ${rateLabel(r.rate)}</span><span>${m(r.vat)}</span>
       </div>`).join('')}
       <div style="display:flex;justify-content:space-between;gap:14px;font-size:15px;font-weight:bold;color:${accentColor};">
         <span>${t.totalTtc}</span><span>${m(ttc)}</span>
       </div>
-      ${f && guests > 0 ? `<div style="margin-top:3px;font-size:11px;color:#888;text-align:right;">${lang === 'en' ? '' : 'soit '}${m(ttc / guests)} ${t.parPersonne}</div>` : ''}
+      ${f && guests > 0 ? `<div style="margin-top:3px;font-size:11px;color:${pal.faint};text-align:right;">${lang === 'en' ? '' : 'soit '}${m(ttc / guests)} ${t.parPersonne}</div>` : ''}
       ${optionHt > 0 ? `
       <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${lightBorder};">
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:#d97706;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px;color:${opt.text};">
           <span>${t.siOptionsHt}</span><span>+ ${m(optionHt)}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:bold;color:#d97706;">
+        <div style="display:flex;justify-content:space-between;gap:14px;font-size:13px;font-weight:bold;color:${opt.text};">
           <span>${t.totalTtcOptions}</span><span style="white-space:nowrap;">${m(ttcAvecOptions)}</span>
         </div>
       </div>
@@ -458,39 +488,39 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   const totalsHtml = shownFormulas.length === 0
     ? totalsBox(activeServices)
     : (chosen ? '' : `
-  <p data-webo-formula-pending="1" style="margin:0 0 10px;text-align:right;font-size:11px;color:#888;font-style:italic;">${t.formulesNote}</p>`)
+  <p data-webo-formula-pending="1" style="margin:0 0 10px;text-align:right;font-size:11px;color:${pal.faint};font-style:italic;">${t.formulesNote}</p>`)
       + shownFormulas.map((f) => totalsBox(effectiveLines(activeServices, formulas, f.id), f)).join('');
 
   // Cadre « Bon pour accord » et durée de validité : après les CGV quand le devis les contient (même page).
   const signatureHtml = `<div data-webo-sign="1" style="display:flex;gap:14px;margin-top:16px;">
-  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.bonAccord}</p>
-    <p style="font-size:10px;color:#bbb;font-style:italic;margin:0;">${t.dateSignature}</p>
+  <div style="flex:1;border:1px solid ${pal.line};border-radius:8px;padding:12px;min-height:60px;">
+    <p style="font-size:9px;font-weight:bold;color:${pal.faint};text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.bonAccord}</p>
+    <p style="font-size:10px;color:${pal.fainter};font-style:italic;margin:0;">${t.dateSignature}</p>
   </div>
-  <div style="flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:12px;min-height:60px;">
-    <p style="font-size:9px;font-weight:bold;color:#888;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.prestataire}</p>
+  <div style="flex:1;border:1px solid ${pal.line};border-radius:8px;padding:12px;min-height:60px;">
+    <p style="font-size:9px;font-weight:bold;color:${pal.faint};text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">${t.prestataire}</p>
     <p style="font-size:12px;font-weight:600;margin:0;">${d.companyName}</p>
   </div>
 </div>
 
-<div style="margin-top:14px;padding:7px 12px;background:#fafafa;border-radius:5px;border:1px solid #f0f0f0;">
-  <p style="font-size:10px;color:#aaa;margin:0;text-align:center;">${t.devisValide}</p>
+<div style="margin-top:14px;padding:7px 12px;background:${pal.softBg};border-radius:5px;border:1px solid ${pal.line2};">
+  <p style="font-size:10px;color:${pal.ghost2};margin:0;text-align:center;">${t.devisValide}</p>
 </div>`;
 
   return `${googleFontImport}
 <!-- ═══════════════════════ PAGE 1 — DEVIS FINANCIER ═══════════════════════ -->
-<div style="font-family:${fontFamily};color:#1a1a1a;line-height:1.65;">
+<div class="webo-page1${darkMark}" style="font-family:${fontFamily};color:${pal.ink};line-height:1.65;">
 
   <!-- ── Header pleine largeur (marges négatives pour échapper au padding de la feuille A4) ── -->
   <div style="${headerGradient}margin:-20mm -20mm 0;padding:13mm 20mm 11mm;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <h1 style="font-size:22px;font-weight:bold;color:white;margin:0 0 3px;letter-spacing:-0.5px;">${d.companyName}</h1>
+        <h1 style="font-size:22px;font-weight:bold;color:${headerInk};margin:0 0 3px;letter-spacing:-0.5px;">${d.companyName}</h1>
         <p style="color:rgba(255,255,255,0.65);margin:0;font-size:11px;">${t.traiteurChef}</p>
       </div>
       <div style="text-align:right;">
-        <div style="background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.5);color:white;padding:5px 16px;border-radius:5px;font-size:18px;font-weight:bold;letter-spacing:3px;display:inline-block;">${t.devis}</div>
-        <p style="color:rgba(255,255,255,0.65);margin:6px 0 0;font-size:11px;">${t.date} : ${today}</p>
+        <div style="${headerFrame}padding:5px 16px;border-radius:5px;font-size:18px;font-weight:bold;letter-spacing:3px;display:inline-block;">${t.devis}</div>
+        <p data-webo-date="1" style="color:rgba(255,255,255,0.65);margin:6px 0 0;font-size:11px;">${t.date} : ${today}</p>
       </div>
     </div>
   </div>
@@ -502,26 +532,26 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${
         (d.clientType === 'entreprise' && d.clientCompanyName) ? d.clientCompanyName : (d.clientName || t.aCompleter)
       }</p>
-      ${d.clientType === 'entreprise' && d.clientSiret ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">SIRET : ${d.clientSiret}</p>` : ''}
-      ${d.clientType === 'entreprise' && d.contactName ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${lang === 'en' ? 'Attn' : 'À l\'attention de'} : ${d.contactName}${d.contactRole ? ` — ${d.contactRole}` : ''}</p>` : ''}
-      ${(d.clientType === 'entreprise' ? d.contactEmail : d.clientEmail) ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactEmail : d.clientEmail}</p>` : ''}
-      ${(d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone) ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone}</p>` : ''}
-      ${d.clientAddress ? `<p style="color:#555;margin:0;font-size:11px;">${d.clientAddress}</p>` : ''}
+      ${d.clientType === 'entreprise' && d.clientSiret ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">SIRET : ${d.clientSiret}</p>` : ''}
+      ${d.clientType === 'entreprise' && d.contactName ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${lang === 'en' ? 'Attn' : 'À l\'attention de'} : ${d.contactName}${d.contactRole ? ` — ${d.contactRole}` : ''}</p>` : ''}
+      ${(d.clientType === 'entreprise' ? d.contactEmail : d.clientEmail) ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactEmail : d.clientEmail}</p>` : ''}
+      ${(d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone) ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone}</p>` : ''}
+      ${d.clientAddress ? `<p style="color:${pal.body};margin:0;font-size:11px;">${d.clientAddress}</p>` : ''}
     </div>
     <div data-webo-event="1" style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
       <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${eventTypeT || t.aPreciser}</p>
-      ${d.eventDate     ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${dateFr(d.eventDate)}</p>` : ''}
+      ${d.eventDate     ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${dateFr(d.eventDate)}</p>` : ''}
       ${d.guestCountAdults || d.guestCountChildren
-        ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${d.guestCountAdults || 0} ${lang === 'en' ? 'adults' : 'adultes'}${d.guestCountChildren ? ` + ${d.guestCountChildren} ${lang === 'en' ? (d.guestCountChildren > 1 ? 'children' : 'child') : (d.guestCountChildren > 1 ? 'enfants' : 'enfant')}` : ''}</p>`
-        : (d.guestCount ? `<p style="color:#555;margin:0 0 2px;font-size:11px;">${t.invite(d.guestCount)}</p>` : '')}
-      ${d.eventLocation ? `<p style="color:#555;margin:0;font-size:11px;">${d.eventLocation}</p>` : ''}
+        ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${d.guestCountAdults || 0} ${lang === 'en' ? 'adults' : 'adultes'}${d.guestCountChildren ? ` + ${d.guestCountChildren} ${lang === 'en' ? (d.guestCountChildren > 1 ? 'children' : 'child') : (d.guestCountChildren > 1 ? 'enfants' : 'enfant')}` : ''}</p>`
+        : (d.guestCount ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${t.invite(d.guestCount)}</p>` : '')}
+      ${d.eventLocation ? `<p style="color:${pal.body};margin:0;font-size:11px;">${d.eventLocation}</p>` : ''}
     </div>
   </div>
 
   <!-- ── Intro — [data-webo-intro] : mise à jour seulement si non retouchée à la main ── -->
-  <div data-webo-intro="1" style="margin-bottom:16px;padding:11px 14px;border-left:4px solid ${accentColor};background:#fafafa;border-radius:0 5px 5px 0;">
-    <p style="margin:0;font-style:italic;color:#555;font-size:12px;">
+  <div data-webo-intro="1" style="margin-bottom:16px;padding:11px 14px;border-left:4px solid ${accentColor};background:${pal.softBg};border-radius:0 5px 5px 0;">
+    <p style="margin:0;font-style:italic;color:${pal.body};font-size:12px;">
       ${t.intro(d.clientName || '', eventTypeT, d.eventDate ? dateFr(d.eventDate) : '', d.eventLocation || '')}
     </p>
   </div>
@@ -541,7 +571,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       </tr>
     </thead>
     <tbody>
-      ${tableRows || `<tr><td colspan="4" style="padding:14px;color:#bbb;font-style:italic;text-align:center;">${t.aucunePrestation}</td></tr>`}
+      ${tableRows || `<tr><td colspan="4" style="padding:14px;color:${pal.fainter};font-style:italic;text-align:center;">${t.aucunePrestation}</td></tr>`}
     </tbody>
   </table>
 
@@ -559,26 +589,26 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 </div>
 
 <!-- ═══════════════════════ CARTE GASTRONOMIQUE ═══════════════════════ -->
-<div class="gastro-page" style="font-family:${fontFamily};color:#1a1a1a;line-height:1.7;">
+<div class="gastro-page${darkMark}" style="font-family:${fontFamily};color:${pal.ink};line-height:1.7;">
 
   <!-- ── Header Carte (pleine largeur) ── -->
   <div class="gastro-header" style="${headerGradient}margin:24px -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">
     <p style="font-size:9px;font-weight:bold;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:3px;margin:0 0 5px;">
       ${t.eventLabel(eventTypeT, d.eventDate ? dateFr(d.eventDate) : '')}
     </p>
-    <h2 style="font-size:24px;font-weight:bold;color:white;margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">${t.menuTitle(eventTypeT)}</h2>
+    <h2 style="font-size:24px;font-weight:bold;color:${headerInk};margin:0 0 4px;font-style:italic;letter-spacing:0.5px;">${t.menuTitle(eventTypeT)}</h2>
     ${d.eventLocation ? `<p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:11px;">${d.eventLocation}</p>` : ''}
     <div style="width:36px;height:2px;background:rgba(255,255,255,0.35);margin:12px auto 0;"></div>
   </div>
 
   <!-- ── Plats ── -->
   <div class="gastro-menu" style="max-width:400px;margin:0 auto;">
-    ${menuItems || `<p style="text-align:center;color:#bbb;font-style:italic;">${t.menuCompleter}</p>`}
+    ${menuItems || `<p style="text-align:center;color:${pal.fainter};font-style:italic;">${t.menuCompleter}</p>`}
   </div>
 
   <!-- ── Pied de carte ── -->
   <div style="margin-top:28px;text-align:center;padding-top:14px;border-top:1px solid ${lightBorder};">
-    <p style="font-size:11px;color:#ccc;font-style:italic;margin:0;">${d.companyName} — ${t.traiteurChef}</p>
+    <p style="font-size:11px;color:${pal.ghost};font-style:italic;margin:0;">${d.companyName} — ${t.traiteurChef}</p>
   </div>
 </div>
 
@@ -586,7 +616,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 ${d.remarks ? `
 <div style="margin:20px 0 16px;">
   <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.remarques}</p>
-  <p style="font-size:12px;color:#555;white-space:pre-line;margin:0;">${d.remarks}</p>
+  <p style="font-size:12px;color:${pal.body};white-space:pre-line;margin:0;">${d.remarks}</p>
 </div>
 ` : ''}
 
@@ -594,11 +624,11 @@ ${d.cgv ? `
 <!-- ═══════════════════════ CONDITIONS GÉNÉRALES DE VENTE ═══════════════════════ -->
 <div data-webo-cgv="1" style="page-break-before:always;break-before:page;margin-top:24px;">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-    <div style="flex:1;height:1px;background:#e0e0e0;"></div>
+    <div style="flex:1;height:1px;background:${pal.line};"></div>
     <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:2px;margin:0;">${t.cgv}</p>
-    <div style="flex:1;height:1px;background:#e0e0e0;"></div>
+    <div style="flex:1;height:1px;background:${pal.line};"></div>
   </div>
-  <div style="font-size:10px;color:#555;line-height:1.6;">${d.cgv}</div>
+  <div style="font-size:10px;color:${pal.body};line-height:1.6;">${d.cgv}</div>
 </div>
 
 ${signatureHtml}

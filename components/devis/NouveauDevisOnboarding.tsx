@@ -31,6 +31,7 @@ const TEMPLATES = [
   { key: 'standard', label: 'Violet', color: '#9c27b0', desc: 'Bandeaux violets' },
   { key: 'mariage', label: 'Mariage', color: '#c8956c', desc: 'Doré, chaleureux' },
   { key: 'business', label: 'Business', color: '#1e293b', desc: 'Sobre, pour les entreprises' },
+  { key: 'prestige', label: 'Prestige', color: '#0a0a0a', desc: 'Noir et or, haut de gamme' },
 ];
 
 type Customer = {
@@ -60,11 +61,11 @@ export default function NouveauDevisOnboarding() {
   const [picked, setPicked] = useState<Customer | null>(null);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
-  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('classique');
+  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique' | 'prestige'>('classique');
   // Style de départ : celui demandé dans l'adresse (/devis/nouveau?style=…), sinon celui choisi pour le compte.
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('style') ?? profile?.default_quote_style ?? null;
-    if (wanted && TEMPLATES.some((t) => t.key === wanted)) setTemplate(wanted as 'standard' | 'mariage' | 'business' | 'classique');
+    if (wanted && TEMPLATES.some((t) => t.key === wanted)) setTemplate(wanted as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige');
   }, [profile?.default_quote_style]);
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   // Contenu de départ : un modèle enregistré (menus, textes, mise en page) plutôt qu'un document vierge.
@@ -80,7 +81,7 @@ export default function NouveauDevisOnboarding() {
         const tpl = wanted ? list.find((t) => t.id === wanted) : null;
         if (tpl) {
           setStartFrom(tpl.id);
-          if (tpl.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique');
+          if (tpl.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige');
         }
       });
   }, [user]);
@@ -198,6 +199,7 @@ export default function NouveauDevisOnboarding() {
           },
           financials: true,
           parties: true,
+          refreshDate: true,
         }, { template: template as QuoteHtmlOptions['template'], font: tpl.selected_font ?? undefined }) ?? tpl.content_html : null;
         fromTemplate = {
           services, content_html: html, remarks: tpl.remarks ?? null, vat_rate: tpl.vat_rate ?? 20, hide_price: tpl.hide_price ?? false,
@@ -413,7 +415,7 @@ export default function NouveauDevisOnboarding() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {TEMPLATES.map((t) => (
-                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique')} aria-pressed={template === t.key}
+                    <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige')} aria-pressed={template === t.key}
                       className={cn(choice(template === t.key), 'flex items-center sm:flex-col sm:items-start gap-3 p-4 text-left')}>
                       {/* Aperçu : une page avec la couleur d'accent du modèle */}
                       <span className="w-12 h-16 sm:w-full sm:h-24 rounded-lg bg-gray-50 border border-gray-200 p-2 flex flex-col gap-1.5 flex-shrink-0">
@@ -437,7 +439,7 @@ export default function NouveauDevisOnboarding() {
                       onChange={(e) => {
                         setStartFrom(e.target.value);
                         const tpl = savedTemplates.find((t) => t.id === e.target.value);
-                        if (tpl?.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique');
+                        if (tpl?.template && TEMPLATES.some((t) => t.key === tpl.template)) setTemplate(tpl.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige');
                       }}>
                       <option value="">Document vierge</option>
                       {savedTemplates.map((t) => <option key={t.id} value={t.id}>Modèle : {t.name}</option>)}

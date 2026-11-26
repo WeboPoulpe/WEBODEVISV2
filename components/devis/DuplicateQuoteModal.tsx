@@ -129,6 +129,7 @@ export default function DuplicateQuoteModal({ quoteId, userId, onClose }: { quot
         },
         financials: true,
         parties: true,
+        refreshDate: true,
       }, { template: (source.template ?? undefined) as QuoteHtmlOptions['template'], font: source.selected_font ?? undefined }) ?? contentHtml;
     }
 

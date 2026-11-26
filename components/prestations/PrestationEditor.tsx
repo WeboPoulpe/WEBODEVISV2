@@ -763,7 +763,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
   const quoteStyle: PreviewTemplate = PREVIEW_TEMPLATES.includes(profileStyle?.default_quote_style as PreviewTemplate)
     ? (profileStyle!.default_quote_style as PreviewTemplate) : 'classique';
   const quoteFont = profileStyle?.default_quote_font || 'Georgia';
-  const styleLabel: Record<string, string> = { classique: 'Classique', standard: 'Standard', mariage: 'Mariage', business: 'Business' };
+  const styleLabel: Record<string, string> = { classique: 'Classique', standard: 'Standard', mariage: 'Mariage', business: 'Business', prestige: 'Prestige' };
   const previewData = useDeferredValue({ name, unitPrice: priceOk ? priceValue! : 0, isOption, description, gastroCardHtml: cardFr && !isBlankHtml(cardFr) ? cardFr : null });
 
   // Classes des deux mises en page : « W » = la page dispose d'au moins 940 px (requête de conteneur).

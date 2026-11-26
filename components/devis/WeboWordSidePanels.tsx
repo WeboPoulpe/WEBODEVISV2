@@ -100,7 +100,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const [remarks, setRemarks] = useState('');
   const [vatRate, setVatRate] = useState(20);
   const [hidePrice, setHidePrice] = useState(false);
-  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique'>('standard');
+  const [template, setTemplate] = useState<'standard' | 'mariage' | 'business' | 'classique' | 'prestige'>('standard');
   const [language, setLanguage] = useState<'fr' | 'en'>('fr');
   const [services, setServices] = useState<Service[]>([]);
   // Formules au choix du client (colonnes de la migration 0031 : sans elles, la section n'est pas proposée).
@@ -258,7 +258,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           const loadedRemarks = data.remarks || '';
           const loadedVatRate = data.vat_rate ?? 20;
           const loadedHidePrice = data.hide_price ?? false;
-          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business' | 'classique') || 'standard';
+          const loadedTemplate = (data.template as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige') || 'standard';
           const loadedLanguage = (data.language as 'fr' | 'en') || 'fr';
           const loadedServices = Array.isArray(data.services) ? data.services.filter((s: Service) => !s.isPageBreak) : [];
 
@@ -1115,8 +1115,9 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         { key: 'standard', label: 'Violet', color: '#9c27b0', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
                         { key: 'mariage', label: 'Mariage', color: '#c8956c', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
                         { key: 'business', label: 'Business', color: '#1e293b', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
+                        { key: 'prestige', label: 'Prestige', color: '#c9a96e', gradient: '#0a0a0a' },
                       ].map((t) => (
-                        <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique')}
+                        <button key={t.key} onClick={() => setTemplate(t.key as 'standard' | 'mariage' | 'business' | 'classique' | 'prestige')}
                           className={cn('py-2 px-2 rounded-lg text-xs font-semibold border transition-all',
                             template === t.key ? 'border-gray-900 shadow-sm' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
                           <span className="block w-4 h-4 rounded-full mx-auto mb-1" style={{ background: t.color }} />
@@ -1168,7 +1169,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
                         const tpl = { standard: { color: '#9c27b0', bg: '#faf5ff', border: '#e9d5ff', font: 'Georgia,serif', gradient: 'linear-gradient(135deg,#6a1080,#9c27b0,#ab47bc)' },
                                       mariage:  { color: '#c8956c', bg: '#fffdf7', border: '#f5e6d3', font: '"Playfair Display",serif', gradient: 'linear-gradient(135deg,#8b5a2b,#c8956c,#e2b99a)' },
                                       business: { color: '#1e293b', bg: '#f8fafc', border: '#e2e8f0', font: 'Montserrat,sans-serif', gradient: 'linear-gradient(135deg,#0f172a,#1e293b,#334155)' },
-                                      classique: { color: '#B4502D', bg: '#F7F3EC', border: '#E6DFD3', font: 'Georgia,serif', gradient: '#1C2621' } }[template];
+                                      classique: { color: '#B4502D', bg: '#F7F3EC', border: '#E6DFD3', font: 'Georgia,serif', gradient: '#1C2621' },
+                                      prestige: { color: '#9c7a36', bg: '#faf6ee', border: '#e9dfca', font: '"Playfair Display",serif', gradient: '#0a0a0a' } }[template];
                         return (
                           <div style={{ fontFamily: tpl.font, fontSize: 9 }}>
                             {/* Mini header */}

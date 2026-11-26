@@ -22,6 +22,7 @@ const STYLES: { key: StyleKey; label: string; desc: string }[] = [
   { key: 'mariage', label: 'Mariage', desc: 'Tons dorés et chaleureux, pour les réceptions.' },
   { key: 'business', label: 'Business', desc: 'Sobre et contrasté, pour les entreprises.' },
   { key: 'standard', label: 'Violet', desc: 'Bandeaux violets, le style des premiers devis.' },
+  { key: 'prestige', label: 'Prestige', desc: 'Noir et or, pour une maison haut de gamme.' },
 ];
 
 /** Un devis d'exemple, pour montrer chaque style tel qu'il sortira. */
