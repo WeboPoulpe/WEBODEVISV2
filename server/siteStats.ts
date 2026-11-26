@@ -7,19 +7,12 @@ import { RETENTION_MONTHS, cleanPath, deviceOf, isBot, sourceOf, type Device, ty
 import { parseOrigin } from '@/lib/origine';
 import { requireAdmin } from './session';
 
-// Statistiques du site (voir lib/siteStats.ts). Pour ne pas réveiller la base Neon à chaque page vue (le temps de
-// calcul est facturé), les visites attendent en mémoire et sont écrites par paquets, en une requête : dès
-// FLUSH_COUNT visites, ou quand la plus ancienne attend depuis FLUSH_AGE_MS. Une instance arrêtée avant d'écrire
-// perd son paquet : acceptable pour des statistiques. Les conversions faites côté serveur (contact, inscription)
-// passent par recordEventNow, dans une requête qui écrit déjà : aucun réveil de plus.
-
-export const FLUSH_COUNT = 100;
-export const FLUSH_AGE_MS = 60 * 60_000;
+// Statistiques du site (voir lib/siteStats.ts). Chaque visite est écrite tout de suite, en une petite requête.
+// Une écriture par paquets en mémoire avait été essayée pour ménager la base : sur Vercel, l'instance s'arrête bien
+// avant d'avoir rempli le paquet, qui était perdu (7 visites enregistrées du 16 au 26 novembre 2026). Les robots ne
+// sont pas comptés (buildRow) ; un réveil de la base pour une vraie visite coûte une fraction de centime.
 
 type Row = typeof site_visits.$inferInsert;
-let buffer: Row[] = [];
-let oldest = 0;
-
 const parisDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d);
 
 function visitorOf(day: string, ip: string, ua: string): string {
@@ -44,25 +37,15 @@ export function buildRow(input: { path: string; referrer?: string | null; event?
   };
 }
 
-/** Met la visite en attente ; écrit le paquet s'il est plein ou trop ancien. */
-export async function recordHit(row: Row, now = Date.now()): Promise<void> {
-  if (buffer.length === 0) oldest = now;
-  buffer.push(row);
-  if (buffer.length >= FLUSH_COUNT || now - oldest >= FLUSH_AGE_MS) await flushVisits();
+/** Enregistre la visite. */
+export async function recordHit(row: Row): Promise<void> {
+  await db.insert(site_visits).values(row).catch((e) => console.error('[stats] écriture de la visite', e));
 }
 
-export async function flushVisits(): Promise<void> {
-  if (buffer.length === 0) return;
-  const rows = buffer;
-  buffer = [];
-  await db.insert(site_visits).values(rows).catch((e) => console.error('[stats] écriture du paquet', e));
-}
-
-/** Conversion enregistrée tout de suite, pendant une requête qui écrit déjà en base (et avec le paquet en attente). */
+/** Conversion côté serveur (contact, inscription). */
 export async function recordEventNow(event: SiteEvent, path: string, ctx: HitContext, origin?: string | null): Promise<void> {
   const row = buildRow({ path, event, origin }, ctx);
-  if (row) buffer.push(row);
-  await flushVisits();
+  if (row) await recordHit(row);
 }
 
 /** Les lignes de plus de 13 mois (tâche de nuit). */
@@ -70,7 +53,6 @@ export async function purgeOldVisits(): Promise<void> {
   await db.execute(sql`delete from public.site_visits where day < (current_date - make_interval(months => ${RETENTION_MONTHS}))`);
 }
 
-export function testOnlyResetBuffer() { buffer = []; oldest = 0; }
 
 export interface SiteStats {
   days: number;
@@ -82,10 +64,9 @@ export interface SiteStats {
   devices: { device: Device; visitors: number }[];
 }
 
-/** Les statistiques des `days` derniers jours, pour l'admin. Écrit d'abord le paquet en attente. */
+/** Les statistiques des `days` derniers jours, pour l'admin. */
 export async function getSiteStats(days: number): Promise<SiteStats> {
   await requireAdmin();
-  await flushVisits();
   const n = [7, 30, 90].includes(days) ? days : 30;
   const since = sql`current_date - ${n - 1}::int`;
   const q = async <T,>(query: ReturnType<typeof sql>) => (await db.execute(query)).rows as T[];
@@ -129,11 +110,10 @@ export interface InstagramStats {
 
 /**
  * Les visites venues d'un lien Instagram (lib/origine.ts) sur les `days` derniers jours : clics sur /ig, visiteurs,
- * demandes de démo et de contact, comptes, et les personnes qui se sont fait connaître. Écrit d'abord le paquet.
+ * demandes de démo et de contact, comptes, et les personnes qui se sont fait connaître.
  */
 export async function getInstagramStats(days: number): Promise<InstagramStats> {
   await requireAdmin();
-  await flushVisits();
   const n = [7, 30, 90].includes(days) ? days : 30;
   const since = sql`current_date - ${n - 1}::int`;
   const sinceParis = sql`(created_at at time zone 'Europe/Paris')::date >= ${since}`;

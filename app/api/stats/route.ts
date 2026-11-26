@@ -4,7 +4,7 @@ import { buildRow, recordHit } from '@/server/siteStats';
 
 // Collecte des statistiques du site (components/site/SiteAnalytics.tsx, via navigator.sendBeacon). Sans cookie,
 // sans adresse IP gardée. Une personne connectée (l'équipe, un traiteur) n'est pas comptée : seuls les visiteurs.
-// La visite part dans le paquet en attente (server/siteStats.ts) : la base n'est pas réveillée à chaque page.
+// La visite est écrite tout de suite (server/siteStats.ts).
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -3,7 +3,7 @@ import { originFromPath, safeDestination } from '@/lib/origine';
 import { buildRow, recordHit } from '@/server/siteStats';
 
 // Lien court des posts et stories Instagram : webodevis.fr/ig (bio) et webodevis.fr/ig/<libellé> (une story).
-// Le clic part dans le paquet des statistiques (sans réveiller la base), puis la visite continue sur le site avec
+// Le clic est compté dans les statistiques, puis la visite continue sur le site avec
 // ?o=<origine>, que components/site/OrigineCapture.tsx garde le temps de la visite. Une personne connectée
 // (l'équipe) et les robots sont redirigés sans être comptés. Destination : un chemin du site (?vers=/demo), jamais
 // une autre adresse. Voir lib/origine.ts.

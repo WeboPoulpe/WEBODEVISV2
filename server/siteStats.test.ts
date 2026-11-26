@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import * as schema from '@/db/schema';
 import { createTestDb } from '@/db/testDb';
 
-// Statistiques du site : écriture par paquets (pour ne pas réveiller la base à chaque page) et chiffres de l'admin.
+// Statistiques du site : écriture des visites et chiffres de l'admin.
 
 vi.mock('server-only', () => ({}));
 vi.mock('./session', () => ({ requireAdmin: async () => ({ id: 'a', email: 'a@w.fr' }) }));
@@ -22,25 +22,16 @@ const stored = async () => (await pg.query<{ n: number }>('select count(*)::int 
 beforeAll(async () => { pg = await createTestDb(); });
 beforeEach(async () => {
   await pg.exec('delete from site_visits;');
-  s.testOnlyResetBuffer();
 });
 
-describe('écriture par paquets', () => {
-  it('n’écrit rien avant 100 visites, puis tout en une fois', async () => {
-    const t0 = Date.now();
-    for (let i = 0; i < s.FLUSH_COUNT - 1; i++) await s.recordHit(s.buildRow({ path: '/tarifs' }, ctx(`ip${i}`))!, t0);
-    expect(await stored()).toBe(0);
-    await s.recordHit(s.buildRow({ path: '/tarifs' }, ctx('last'))!, t0);
-    expect(await stored()).toBe(s.FLUSH_COUNT);
-  });
-
-  it('écrit un petit paquet quand la plus ancienne visite attend depuis une heure', async () => {
-    const t0 = Date.now();
-    await s.recordHit(s.buildRow({ path: '/' }, ctx())!, t0);
-    await s.recordHit(s.buildRow({ path: '/tarifs' }, ctx())!, t0 + 60_000);
-    expect(await stored()).toBe(0);
-    await s.recordHit(s.buildRow({ path: '/contact' }, ctx())!, t0 + s.FLUSH_AGE_MS);
-    expect(await stored()).toBe(3);
+describe('écriture', () => {
+  // Sur Vercel, une instance s'arrête bien avant 100 visites ou une heure : un paquet en mémoire était perdu
+  // (7 visites enregistrées du 16 au 26 novembre). Chaque visite est donc écrite tout de suite.
+  it('écrit chaque visite tout de suite', async () => {
+    await s.recordHit(s.buildRow({ path: '/' }, ctx())!);
+    expect(await stored()).toBe(1);
+    await s.recordHit(s.buildRow({ path: '/tarifs' }, ctx())!);
+    expect(await stored()).toBe(2);
   });
 
   it('ignore les robots et les chemins invalides', () => {
@@ -48,10 +39,9 @@ describe('écriture par paquets', () => {
     expect(s.buildRow({ path: 'https://ailleurs.fr' }, ctx())).toBeNull();
   });
 
-  it('une conversion côté serveur écrit tout de suite, avec le paquet en attente', async () => {
-    await s.recordHit(s.buildRow({ path: '/tarifs' }, ctx())!);
+  it('une conversion côté serveur est écrite tout de suite', async () => {
     await s.recordEventNow('contact', '/contact', ctx());
-    expect(await stored()).toBe(2);
+    expect(await stored()).toBe(1);
   });
 
   it('ne garde ni l’adresse IP ni le chemin du site précédent', () => {
