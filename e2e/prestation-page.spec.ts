@@ -83,7 +83,7 @@ test('ouvrir depuis la liste, modifier et enregistrer : les valeurs arrivent en 
     expect(await horizontalOverflow(page)).toBe(0);
 
     // Entrée dans un champ enregistre, puis la liste revient avec un message.
-    await page.getByLabel('Prix de revient').press('Enter');
+    await page.getByLabel('Coût des matières premières').press('Enter');
     await expect(page).toHaveURL(/\/prestations$/, { timeout: 30_000 });
     await expect(page.getByRole('status').filter({ hasText: '« Cocktail prestige du soir » est enregistrée.' })).toBeVisible({ timeout: 30_000 });
     expect((await sql<{ name: string; unit_price: number; cost_price: number; description: string }>(

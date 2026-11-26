@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Carrot, Check, Loader2, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, Carrot, Check, ChevronDown, Loader2, Plus, Search, X } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PrestationQuotePreview, { PREVIEW_TEMPLATES, type PreviewTemplate } from '@/components/prestations/PrestationQuotePreview';
 import PrestationCarteSection from '@/components/prestations/PrestationCarteSection';
@@ -103,6 +103,34 @@ function PriceField({ id, label, value, onChange, error, placeholder }: {
       </div>
       {error && <p id={`${id}-error`} className="text-sm text-danger mt-1.5">{error}</p>}
     </div>
+  );
+}
+
+/** Toutes les formules du coût et de la marge d'une prestation, pour s'en souvenir (repliées par défaut). */
+function CalculationNotes() {
+  const rows: [string, string][] = [
+    ['Coût des matières premières', 'Somme, pour chaque ingrédient, de sa quantité par unité vendue × son prix d’achat HT. Avec une recette, WeboDevis le calcule (« Coût matière calculé »).'],
+    ['Marge', 'Prix unitaire HT − coût des matières premières.'],
+    ['Taux de marge', 'Marge ÷ prix unitaire HT × 100. Exemple : 15,50 € vendu, 6,00 € de matières → 9,50 € de marge, soit 61,3 %.'],
+    ['Coefficient', 'Prix unitaire HT ÷ coût des matières premières. Exemple : 15,50 ÷ 6,00 = 2,58.'],
+    ['Prix enfant', 'Le même coût des matières premières s’applique : la marge enfant est plus faible si son prix l’est.'],
+    ['Dans un devis', 'Coût d’une ligne = quantité × coût des matières premières (ligne offerte comprise). Marge du devis = CA HT − (matières premières + frais annexes + personnel).'],
+  ];
+  return (
+    <details className="group mt-2" data-testid="presta-calc-notes">
+      <summary className="inline-flex items-center gap-1 min-h-10 cursor-pointer select-none text-sm font-medium text-primary-700 list-none [&::-webkit-details-marker]:hidden">
+        <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />Notes de calcul : coût et marge
+      </summary>
+      <dl className="mt-1 rounded-xl bg-gray-50 p-4 space-y-2 text-sm">
+        {rows.map(([term, text]) => (
+          <div key={term}>
+            <dt className="font-medium text-gray-900">{term}</dt>
+            <dd className="text-gray-600">{text}</dd>
+          </div>
+        ))}
+        <p className="text-gray-500 pt-1">Tous les montants sont hors taxes.</p>
+      </dl>
+    </details>
   );
 }
 
@@ -714,7 +742,12 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
     const cleanText = (html: string | null) => (html === null || isBlankHtml(html) ? null : sanitizeHtml(html));
     const descriptionOut = description === startValues.description ? (description.trim() || null) : cleanText(description);
     const cardFrOut = cardFr === startValues.cardFr ? cardFr : cleanText(cardFr);
-    const cardEnOut = cardEn === startValues.cardEn ? cardEn : cleanText(cardEn);
+    // Prestation renommée sans toucher à sa version anglaise : celle-ci parle encore de l'ancienne prestation
+    // (copie renommée, par exemple), et son titre s'afficherait dans les devis en anglais. Elle est retirée ; le
+    // prochain devis en anglais la retraduit à partir du nouveau nom.
+    const renamed = !!initial && name.trim() !== startValues.name.trim();
+    const staleEn = renamed && cardEn === startValues.cardEn && cardEn !== null;
+    const cardEnOut = staleEn ? null : cardEn === startValues.cardEn ? cardEn : cleanText(cardEn);
     const payload = {
       name: name.trim(),
       unit_price: cents(priceValue ?? 0),
@@ -728,7 +761,7 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
       is_option: isOption,
       // Les fiches ne sont écrites que si elles ont changé.
       ...(cardFr !== startValues.cardFr ? { gastro_card_html: cardFrOut } : {}),
-      ...(cardEn !== startValues.cardEn ? { gastro_card_html_en: cardEnOut } : {}),
+      ...(cardEn !== startValues.cardEn || staleEn ? { gastro_card_html_en: cardEnOut } : {}),
       user_id: user.id,
       // La case « vérifié » ne tient que pour la liste cochée : une liste modifiée est à revérifier.
       ...(allergensReady ? { allergens_extra: extra, allergens_checked: allergensChecked } : {}),
@@ -818,16 +851,21 @@ function PrestationForm({ initial }: { initial: PrestationRecord | null }) {
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                     <PriceField id="presta-price" label="Prix unitaire HT" value={price} onChange={setPrice} error={errors.price} placeholder="85,00" />
                     <PriceField id="presta-childPrice" label="Prix enfant HT" value={childPrice} onChange={setChildPrice} error={errors.childPrice} placeholder="Facultatif" />
-                    <PriceField id="presta-costPrice" label="Prix de revient" value={costPrice} onChange={setCostPrice} error={errors.costPrice} placeholder="Facultatif" />
+                    <PriceField id="presta-costPrice" label="Coût des matières premières" value={costPrice} onChange={setCostPrice} error={errors.costPrice} placeholder="Facultatif" />
                   </div>
-                  <p className="text-sm text-gray-500 mt-2">Sans prix enfant, le prix adulte s’applique à tous les invités. Le prix de revient ne figure jamais dans les devis.</p>
+                  <p className="text-sm text-gray-500 mt-2">Sans prix enfant, le prix adulte s’applique à tous les invités. Le coût des matières premières ne figure jamais dans les devis.</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Calcul : pour une unité vendue, additionnez le prix d’achat HT de chaque ingrédient × sa quantité
+                    (ex. 150 g de saumon à 24 €/kg = 0,15 × 24 = 3,60 €).
+                  </p>
                   {margin && (
                     <p data-testid="presta-margin" className={cn('text-[15px] mt-2', margin.amount < 0 ? 'text-danger' : 'text-gray-800')}>
                       {margin.amount < 0
-                        ? <>Le prix de revient dépasse le prix de vente : perte de <strong>{formatCurrency(-margin.amount)}</strong> par unité.</>
+                        ? <>Le coût des matières premières dépasse le prix de vente : perte de <strong>{formatCurrency(-margin.amount)}</strong> par unité.</>
                         : <>Marge : <strong>{formatCurrency(margin.amount)}</strong> par unité{margin.rate != null && <>, soit <strong>{String(margin.rate).replace('.', ',')} %</strong> du prix HT</>}{margin.coefficient != null && <>, coefficient <strong>{String(margin.coefficient).replace('.', ',')}</strong></>}.</>}
                     </p>
                   )}
+                  <CalculationNotes />
                   {initial && (
                     <RecipeCostPanel
                       prestationId={initial.id} recipeKey={recipeKey}

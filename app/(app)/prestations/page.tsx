@@ -232,7 +232,7 @@ function PrestationRow({
   allergensToCheck: boolean;
 }) {
   const excerpt = plainText(p.description);
-  // Taux de marge, seulement quand le prix de revient est connu.
+  // Taux de marge, seulement quand le coût des matières premières est connu.
   const cost = Number(p.cost_price ?? 0);
   const price = Number(p.unit_price) || 0;
   const rate = cost > 0 && price > 0 ? Math.round(margin(price, cost).rate ?? 0) : null;
@@ -245,7 +245,7 @@ function PrestationRow({
             <span className="font-semibold text-gray-900 line-clamp-2">{p.name}</span>
             {p.is_option && <span className={cn(pill, 'bg-gray-100 text-gray-700')}>Option</span>}
             {rate != null && (
-              <span className={cn(pill, rate < 0 ? 'bg-danger/10 text-danger' : 'bg-gray-100 text-gray-700')} title="Marge sur le prix de revient">
+              <span className={cn(pill, rate < 0 ? 'bg-danger/10 text-danger' : 'bg-gray-100 text-gray-700')} title="Marge = (prix HT − coût des matières premières) ÷ prix HT">
                 Marge {rate} %
               </span>
             )}

@@ -6,11 +6,11 @@ export const catalogue: HelpGuide[] = [
     category: 'catalogue',
     title: 'Créer une prestation et son prix',
     summary: 'Ajoutez vos plats, vos boissons, votre matériel et votre personnel au catalogue : ils se glissent ensuite dans chaque devis, avec leur prix.',
-    keywords: ['prestation', 'plat', 'menu', 'tarif', 'prix', 'catalogue', 'carte', 'produit', 'service', 'description', 'prix de revient', 'prix enfant'],
+    keywords: ['prestation', 'plat', 'menu', 'tarif', 'prix', 'catalogue', 'carte', 'produit', 'service', 'description', 'prix de revient', 'coût des matières premières', 'matières premières', 'prix enfant'],
     href: '/prestations',
     steps: [
       { title: 'Ouvrez « Prestations », puis cliquez sur « Nouvelle prestation »', text: 'La prestation se remplit sur une page à part.' },
-      { title: 'Donnez un nom et un « Prix unitaire HT »', text: 'Ce sont les deux champs obligatoires. « Prix enfant HT » et « Prix de revient » sont facultatifs ; avec un prix de revient, la marge s’affiche.' },
+      { title: 'Donnez un nom et un « Prix unitaire HT »', text: 'Ce sont les deux champs obligatoires. « Prix enfant HT » et « Coût des matières premières » sont facultatifs ; avec ce coût, la marge s’affiche. « Notes de calcul » rappelle les formules.' },
       { title: 'Choisissez la catégorie et la sous-catégorie', text: 'Elles rangent la prestation dans le catalogue. « Nouvelle catégorie », sous le champ, en crée une sans quitter la page.' },
       { title: 'Rédigez la description', text: 'L’« Aperçu dans un devis » montre la ligne du tableau et la prestation dans la carte du menu, telles que le client les lira. Sur téléphone, il est dans l’onglet « Aperçu ».' },
       { title: 'Cliquez sur « Ajouter la prestation »', text: 'Ou appuyez sur Entrée dans un champ. La liste revient, avec la prestation mise en évidence.' },

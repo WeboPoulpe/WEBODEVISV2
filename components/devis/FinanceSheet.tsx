@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { X, Loader2, Wallet } from 'lucide-react';
+import { X, Loader2, Wallet, Calculator } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 import { quoteVatBreakdown, resolveGuestSplit } from '@/lib/quoteTotals';
 import { catalogKey, quoteCost, staffCost, type StaffRow } from '@/lib/costing';
 import { quoteLines } from '@/lib/quoteFormulas';
+import { evalAmount } from '@/lib/calcExpression';
 
 // Marge d'un devis : chiffre d'affaires HT, coûts par poste (prestations, frais annexes, personnel), marge brute.
 // Coût d'une ligne : prix de revient de la prestation du catalogue de même nom, sinon celui porté par la ligne.
@@ -162,7 +163,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
   };
 
   const posts: { label: string; amount: number; hint?: string }[] = [
-    { label: 'Prestations (prix de revient)', amount: result.materialCost },
+    { label: 'Prestations (matières premières)', amount: result.materialCost },
     { label: 'Frais annexes', amount: result.extraCost },
     ...(staff.available ? [{
       label: 'Personnel (extras)', amount: result.staffCost,
@@ -219,6 +220,10 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                   </p>
                 </div>
               </div>
+              <p className="text-sm text-gray-500 -mt-3" data-testid="finance-calc-note">
+                Calcul : coûts = matières premières des prestations + frais annexes{staff.available ? ' + personnel' : ''}.
+                Marge brute = CA HT − coûts ; taux = marge ÷ CA HT × 100 ; coefficient = CA HT ÷ coûts.
+              </p>
 
               {!result.hasCost && ca_ht > 0 && (
                 <p className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-[15px] text-amber-900">
@@ -314,7 +319,7 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                     )}
                   </div>
                 </div></div>
-                <p className="text-sm text-gray-500 mt-2">Touchez la colonne Coût pour saisir le prix de revient unitaire HT. Il est enregistré sur la prestation et sert à tous vos devis.</p>
+                <p className="text-sm text-gray-500 mt-2">Touchez la colonne Coût pour saisir le coût des matières premières unitaire HT. Il est enregistré sur la prestation et sert à tous vos devis. Coût = quantité × coût unitaire ; marge = vente − coût ; % = marge ÷ vente × 100.</p>
               </div>
 
               {/* Frais annexes */}
@@ -327,7 +332,11 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                   {extraCosts.length === 0 ? (
                     <p className="text-sm text-gray-500 italic">Aucun frais annexe. Ajoutez transport, location, frais fixes…</p>
                   ) : (
-                    extraCosts.map((e) => (
+                    extraCosts.map((e) => {
+                      // Calculatrice : le libellé « CAM 200 + 50 + COM 250 » donne son total, à reporter dans le montant.
+                      const computed = evalAmount(e.label);
+                      const differs = computed != null && Math.abs(computed - (Number(e.amount) || 0)) >= 0.005;
+                      return (
                       <div key={e.id} className="flex items-center gap-2">
                         <input
                           value={e.label}
@@ -336,6 +345,21 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                           aria-label="Libellé du frais"
                           className="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                         />
+                        <button
+                          type="button"
+                          onClick={() => computed != null && updateExtra(e.id, 'amount', computed)}
+                          disabled={!differs}
+                          title={computed == null
+                            ? 'Calculatrice : tapez le détail dans le libellé (ex : CAM 200 + COM 250), le total se reporte dans le montant'
+                            : differs ? `Reporter le total du libellé : ${formatCurrency(computed)}` : 'Le montant correspond au total du libellé'}
+                          aria-label={computed != null && differs ? `Reporter le total du libellé, ${formatCurrency(computed)}` : 'Calculatrice du libellé'}
+                          data-testid="extra-calc"
+                          className={`flex-shrink-0 inline-flex items-center gap-1 h-10 px-2 rounded-lg text-sm tabular-nums transition-colors ${
+                            differs ? 'text-primary bg-primary-50 hover:bg-primary-100 font-medium' : 'text-gray-300 cursor-default'}`}
+                        >
+                          <Calculator className="h-4 w-4" />
+                          {differs && <span className="hidden sm:inline">= {formatCurrency(computed!)}</span>}
+                        </button>
                         <input
                           type="number" min={0} step={0.01}
                           value={e.amount || ''}
@@ -348,9 +372,13 @@ export default function FinanceSheet({ open, onClose, quoteId }: Props) {
                           <X className="h-4 w-4" />
                         </button>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
+                {extraCosts.length > 0 && (
+                  <p className="text-sm text-gray-500 mt-2">Calculatrice : écrivez le détail dans le libellé (ex : CAM 200 + COM 250, ou 3 x 15), puis touchez la calculatrice pour reporter le total.</p>
+                )}
                 {staff.available && (
                   <p className="text-sm text-gray-500 mt-2">Le personnel est compté d’après les heures des extras, dans l’onglet Extras de l’événement.</p>
                 )}
