@@ -295,7 +295,8 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
     ink: '#1a1a1a', body: '#555', mid: '#666', soft: '#777', faint: '#888', fainter: '#bbb', ghost: '#ccc', ghost2: '#aaa',
     softBg: '#fafafa', line: '#e0e0e0', line2: '#f0f0f0', strike: '#9ca3af',
   };
-  // Document sur fond noir (repère lu par la feuille de sortie, lib/quoteOutput.ts).
+  // Document sur fond noir : repère lu par la feuille de sortie (lib/quoteOutput.ts), posé sur les blocs refaits à
+  // chaque synchronisation (cadres client et événement, tableau) pour que la page suive un changement de style.
   let darkMark = '';
 
   if (tmpl === 'mariage') {
@@ -513,7 +514,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 
   return `${googleFontImport}
 <!-- ═══════════════════════ PAGE 1 — DEVIS FINANCIER ═══════════════════════ -->
-<div class="webo-page1${darkMark}" style="font-family:${fontFamily};color:${pal.ink};line-height:1.65;">
+<div style="font-family:${fontFamily};color:${pal.ink};line-height:1.65;">
 
   <!-- ── Header pleine largeur (marges négatives pour échapper au padding de la feuille A4) ── -->
   <div style="${headerGradient}margin:-20mm -20mm 0;padding:13mm 20mm 11mm;">
@@ -533,9 +534,9 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 
   <!-- ── Client + Événement — remplaçables via [data-webo-client] / [data-webo-event] ── -->
   <div style="display:flex;gap:14px;margin-top:18px;margin-bottom:16px;">
-    <div data-webo-client="1" style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
+    <div data-webo-client="1"${darkMark ? ` class="${darkMark.trim()}"` : ''} style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.client}</p>
-      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${
+      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;color:${pal.ink};">${
         (d.clientType === 'entreprise' && d.clientCompanyName) ? d.clientCompanyName : (d.clientName || t.aCompleter)
       }</p>
       ${d.clientType === 'entreprise' && d.clientSiret ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">SIRET : ${d.clientSiret}</p>` : ''}
@@ -544,9 +545,9 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
       ${(d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone) ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${d.clientType === 'entreprise' ? d.contactPhone : d.clientPhone}</p>` : ''}
       ${d.clientAddress ? `<p style="color:${pal.body};margin:0;font-size:11px;">${d.clientAddress}</p>` : ''}
     </div>
-    <div data-webo-event="1" style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
+    <div data-webo-event="1"${darkMark ? ` class="${darkMark.trim()}"` : ''} style="flex:1;background:${lightBg};border:1px solid ${lightBorder};border-radius:8px;padding:13px;">
       <p style="font-size:9px;font-weight:bold;color:${accentColor};text-transform:uppercase;letter-spacing:1.5px;margin:0 0 5px;">${t.evenement}</p>
-      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;">${eventTypeT || t.aPreciser}</p>
+      <p style="font-size:14px;font-weight:bold;margin:0 0 3px;color:${pal.ink};">${eventTypeT || t.aPreciser}</p>
       ${d.eventDate     ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${dateFr(d.eventDate)}</p>` : ''}
       ${d.guestCountAdults || d.guestCountChildren
         ? `<p style="color:${pal.body};margin:0 0 2px;font-size:11px;">${d.guestCountAdults || 0} ${lang === 'en' ? 'adults' : 'adultes'}${d.guestCountChildren ? ` + ${d.guestCountChildren} ${lang === 'en' ? (d.guestCountChildren > 1 ? 'children' : 'child') : (d.guestCountChildren > 1 ? 'enfants' : 'enfant')}` : ''}</p>`
@@ -563,7 +564,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
   </div>
 
   <!-- ── Bloc financier (tableau + totaux) — remplaçable indépendamment via [data-webo-financials] ── -->
-  <div data-webo-financials="1">
+  <div data-webo-financials="1"${darkMark ? ` class="${darkMark.trim()}"` : ''} style="color:${pal.ink};">
   <!-- ── Tableau des prestations ── -->
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;">
     <thead>
@@ -595,7 +596,7 @@ export function generateQuoteHtml(input: QuoteHtmlData, opts: QuoteHtmlOptions =
 </div>
 
 <!-- ═══════════════════════ CARTE GASTRONOMIQUE ═══════════════════════ -->
-<div class="gastro-page${darkMark}" style="font-family:${fontFamily};color:${pal.ink};line-height:1.7;">
+<div class="gastro-page" style="font-family:${fontFamily};color:${pal.ink};line-height:1.7;">
 
   <!-- ── Header Carte (pleine largeur) ── -->
   <div class="gastro-header" style="${headerGradient}margin:24px -20mm 28px;padding:14mm 20mm 12mm;text-align:center;">

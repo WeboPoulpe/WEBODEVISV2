@@ -128,6 +128,8 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
   const initialParties = useRef<string>('');
   // Langue du devis au chargement : un changement refait la carte dans la nouvelle langue.
   const initialLanguage = useRef<'fr' | 'en'>('fr');
+  // Style au chargement : en changer refait aussi les cadres Client / Événement, dessinés aux couleurs du style.
+  const initialTemplate = useRef<string | null>(null);
   // Traduction en cours des prestations (devis en anglais) : « 2 / 5 ».
   const [translating, setTranslating] = useState<string | null>(null);
 
@@ -291,6 +293,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
           setTemplate(loadedTemplate);
           setLanguage(loadedLanguage);
           initialLanguage.current = loadedLanguage;
+          initialTemplate.current = loadedTemplate;
           setServices(loadedServices);
 
           initialFinancials.current = JSON.stringify({
@@ -604,7 +607,7 @@ export default function WeboWordSidePanels({ quoteId, activePanel, onClose, onAp
     // Valider depuis le panneau Client ou Événement resynchronise toujours les cartes :
     // rattrape aussi les devis dont la base a déjà les bonnes valeurs mais pas le document.
     const partiesChanged = currentParties !== initialParties.current
-      || activePanel === 'client' || activePanel === 'event';
+      || activePanel === 'client' || activePanel === 'event' || template !== initialTemplate.current;
     // Appliquer enregistre aussi ce qui a été tapé dans la feuille : rien n'est perdu au rechargement.
     const sheetHtml = getSheetHtml?.() || null;
     if (sheetHtml) updatePayload.content_html = sheetHtml;
