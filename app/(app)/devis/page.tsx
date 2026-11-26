@@ -9,7 +9,7 @@ import {
   LayoutGrid, List, Columns3, StickyNote, Save, Loader2, TrendingUp, CalendarRange, Copy,
   BookCopy, Library, X, UploadCloud, FileText, Download, Wallet, ChevronDown, FolderInput, Folder, MoreHorizontal, Send, Receipt,
 } from 'lucide-react';
-import { companyIds, companyQuotesFilter } from '@/lib/companyFilter';
+import { companyIds } from '@/lib/companyFilter';
 import { createClient } from '@/lib/supabase/client';
 import { useUrlAction } from '@/lib/useUrlAction';
 import { cn, formatDate, formatCurrency } from '@/lib/utils';
@@ -34,6 +34,7 @@ import SendQuoteModal from '@/components/devis/SendQuoteModal';
 import { inputCls, labelCls, errorCls } from '@/components/ui/kit';
 import MoveToFolderModal from '@/components/devis/MoveToFolderModal';
 import DuplicateQuoteModal from '@/components/devis/DuplicateQuoteModal';
+import { listQuotesLight, listQuoteTemplatesLight } from '@/server/quoteList';
 import BillQuoteModal from '@/components/factures/BillQuoteModal';
 import InvoiceStatusPill from '@/components/factures/InvoiceStatusPill';
 import { listInvoices, type Invoice } from '@/server/invoices';
@@ -88,31 +89,12 @@ interface Quote {
 type ViewMode = 'list' | 'pipeline';
 type Scope = 'encours' | 'confirmes' | 'refuses' | 'prospects';
 
-/** Colonnes chargées pour la liste des devis (une seule source de vérité). */
-// ⚠️ Doit rester UN littéral d'une seule pièce : supabase-js infère le type des lignes
-// depuis la chaîne elle-même (une concaténation casse l'inférence).
-const QUOTE_COLUMNS = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id';
-/** Mêmes colonnes avec les formules du devis (migration 0031). */
-const QUOTE_COLUMNS_FORMULAS = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email, folder_id, formulas, chosen_formula_id';
-/** Mêmes colonnes sans folder_id — utilisé tant que la migration lot E n'est pas appliquée. */
-const QUOTE_COLUMNS_LEGACY = 'id, quote_number, client_name, internal_name, event_type, event_date, guest_count, guest_count_adults, guest_count_children, status, total_amount, vat_rate, created_at, user_id, owner_user_id, services, imported, imported_file_url, imported_file_name, prospect_id, client_first_name, client_last_name, client_email';
-
 /**
- * Charge les devis de l'utilisateur. Si la colonne `folder_id` n'existe pas encore
- * (migration lot E non appliquée), on retombe sur l'ancienne sélection au lieu de
- * casser toute la page.
+ * Devis de l'entreprise pour la liste, lignes allégées (sans descriptions ni cartes HTML) : voir server/quoteList.ts.
+ * Le devis complet est relu par son identifiant quand on l'ouvre ou le duplique.
  */
-async function loadQuotes(supabase: ReturnType<typeof createClient>, userId: string, ids: string[]): Promise<Quote[]> {
-  // Devis de toute l'entreprise (titulaire et collaborateurs) ; le filtre reste utile pour un compte administrateur.
-  const filter = companyQuotesFilter(userId, ids);
-  // Formules (migration 0031) : sans elles, la sélection habituelle.
-  const withFormulas = await supabase.from('quotes').select(QUOTE_COLUMNS_FORMULAS).or(filter).order('created_at', { ascending: false });
-  if (!withFormulas.error) return (withFormulas.data ?? []) as unknown as Quote[];
-  const res = await supabase.from('quotes').select(QUOTE_COLUMNS).or(filter).order('created_at', { ascending: false });
-  if (!res.error) return (res.data ?? []) as unknown as Quote[];
-  console.warn('[devis] Dossiers indisponibles (migration lot E à appliquer ?) :', res.error.message);
-  const legacy = await supabase.from('quotes').select(QUOTE_COLUMNS_LEGACY).or(filter).order('created_at', { ascending: false });
-  return (legacy.data ?? []) as unknown as Quote[];
+async function loadQuotes(): Promise<Quote[]> {
+  return listQuotesLight<Quote>();
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -906,10 +888,8 @@ export default function DevisPage() {
     if (!user) return;
     const supabase = createClient();
     Promise.all([
-      loadQuotes(supabase, user.id, ids),
-      supabase.from('devis_templates')
-        .select('id, name, template, created_at, services, remarks, vat_rate, hide_price')
-        .order('created_at', { ascending: false }),
+      loadQuotes(),
+      listQuoteTemplatesLight<{ id: string; name: string; template: string; created_at: string; services: any[]; remarks: string | null; vat_rate: number; hide_price: boolean }>(),
       supabase.from('quote_folders')
         .select('id, name, parent_id, color, icon, created_at')
         .in('owner_user_id', ids)
@@ -917,7 +897,7 @@ export default function DevisPage() {
     ]).then(async ([quoteRows, tplRes, foldersRes]) => {
       try {
         setQuotes(quoteRows);
-        setTemplates(tplRes.data ?? []);
+        setTemplates(tplRes);
         // Table absente (migration lot E non appliquée) → liste vide, la page reste utilisable
         setFolders((foldersRes.data ?? []) as unknown as QuoteFolder[]);
 
@@ -940,6 +920,10 @@ export default function DevisPage() {
       } finally {
         setLoading(false);
       }
+    }).catch((e) => {
+      // Liste lue par une action serveur (server/quoteList.ts) : une erreur ne doit pas laisser la page en chargement.
+      console.error('[devis] chargement de la liste', e);
+      setLoading(false);
     });
   }, [user, ids]);
 
@@ -1552,7 +1536,7 @@ export default function DevisPage() {
         onCreated={() => {
           // Reload quotes
           if (!user) return;
-          loadQuotes(createClient(), user.id, ids).then(setQuotes);
+          loadQuotes().then(setQuotes);
         }}
       />
 
