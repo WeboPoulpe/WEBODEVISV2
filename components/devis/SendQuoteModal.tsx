@@ -38,6 +38,9 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
   const [suggestions, setSuggestions] = useState<RecipientSuggestion[]>([]);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [copyToMe, setCopyToMe] = useState(false);
+  // Devis sur fond noir : l'email propose aussi sa version claire, à imprimer (cochée d'office).
+  const [dark, setDark] = useState(false);
+  const [printLink, setPrintLink] = useState(true);
   // Copie visible (Cc) : champ affiché à la demande, adresses séparées par des virgules.
   const [ccOpen, setCcOpen] = useState(false);
   const [cc, setCc] = useState('');
@@ -70,7 +73,7 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
   useEffect(() => {
     let cancelled = false;
     quoteRecipientSuggestions(quote.id)
-      .then((res) => { if (!cancelled) { setSuggestions(res.suggestions); setAccountEmail(res.accountEmail); } })
+      .then((res) => { if (!cancelled) { setSuggestions(res.suggestions); setAccountEmail(res.accountEmail); setDark(!!res.dark); } })
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, [quote.id]);
@@ -132,7 +135,7 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
     const ccList = splitEmails(cc);
     const badCc = ccList.filter((e) => !isValidEmail(e));
     if (badCc.length) { setError(badCc.length === 1 ? `L’adresse en copie « ${badCc[0]} » n’est pas valide.` : `Ces adresses en copie ne sont pas valides : ${badCc.join(', ')}.`); return; }
-    const res = await sendQuoteToClient({ quoteId: quote.id, to: list, message, copyToMe, cc: ccList })
+    const res = await sendQuoteToClient({ quoteId: quote.id, to: list, message, copyToMe, cc: ccList, printLink: dark && printLink })
       .catch((): SendQuoteResult => ({ error: 'L’envoi a échoué. Réessayez dans un instant.' }));
     setSending(false);
     if (res.error) { setError(res.error); return; }
@@ -267,6 +270,13 @@ export default function SendQuoteModal({ quote, companyName, onClose, onSent }: 
             <label htmlFor="send-message" className={labelCls}>Message</label>
             <textarea id="send-message" rows={7} value={message} onChange={(e) => setMessage(e.target.value)} className={cn(inputCls, 'h-auto py-3 resize-none')} />
           </div>
+
+          {dark && (
+            <label onMouseDown={(e) => e.preventDefault()} className="flex items-start gap-3 min-h-10 cursor-pointer text-[15px] text-gray-700">
+              <input type="checkbox" checked={printLink} onChange={(e) => setPrintLink(e.target.checked)} className="w-5 h-5 mt-0.5 rounded accent-[rgb(var(--p-600))]" />
+              <span>Ajouter la version claire, à imprimer <span className="block text-sm text-gray-500">Le même devis sur fond blanc : le client l’imprime sans vider sa cartouche.</span></span>
+            </label>
+          )}
 
           {accountEmail && (
             <label onMouseDown={(e) => e.preventDefault()} className="flex items-center gap-3 min-h-10 cursor-pointer text-[15px] text-gray-700">

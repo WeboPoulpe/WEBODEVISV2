@@ -12,6 +12,7 @@ import { documentHasCgv } from '@/lib/cgvDetect';
 import { appResetCss, documentFonts, googleFontsHref, outputSettings, quoteOutputCss, wrapQuoteDoc } from '@/lib/quoteOutput';
 import { documentForFormula, parseFormulas, quoteLines } from '@/lib/quoteFormulas';
 import { generateQuoteHtml, type QuoteHtmlOptions } from '@/lib/generateQuoteHtml';
+import { lightQuoteHtml } from '@/lib/quoteLight';
 
 /** Accord signé en ligne par le client, imprimé à la fin du document. */
 export interface QuoteRenderAcceptance {
@@ -66,8 +67,12 @@ function generatedDocument(q: any, profile: QuoteRenderProfile | null): string {
  * Le document d'un devis, tel qu'il est imprimé et tel que le client le consulte en ligne.
  * Une seule version du rendu : la page d'impression et la page publique l'utilisent toutes les deux.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function QuoteRender({ quote: source, profile, acceptance = null }: { quote: any; profile: QuoteRenderProfile | null; acceptance?: QuoteRenderAcceptance | null }) {
+export default function QuoteRender({ quote: source, profile, acceptance = null, light = false }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  quote: any; profile: QuoteRenderProfile | null; acceptance?: QuoteRenderAcceptance | null;
+  /** Document sur fond noir rendu sur papier blanc (version à imprimer, lib/quoteLight). */
+  light?: boolean;
+}) {
   // Devis à formules sans document mis en forme (document effacé puis jamais réenregistré) : l'ancien rendu ne
   // présenterait qu'une formule ; le document généré les présente toutes, comme le client doit les comparer.
   const quote = !source.content_html && parseFormulas(source.formulas).length > 0
@@ -78,10 +83,11 @@ export default function QuoteRender({ quote: source, profile, acceptance = null 
     const settings = outputSettings(quote);
     // Le numéro attribué par la base est posé sous la date de l'en-tête. Devis à formules : une fois la formule
     // retenue, le document ne présente plus qu'elle.
-    const content = documentForFormula(
+    const formulaDoc = documentForFormula(
       withQuoteNumber(quote.content_html as string, quote.quote_number, quote.language === 'en' ? 'en' : 'fr'),
       parseFormulas(quote.formulas), quote.chosen_formula_id,
     );
+    const content = light ? lightQuoteHtml(formulaDoc) : formulaDoc;
 
     const coverHtml = buildCoverPageHtml((quote.cover_page_config as CoverPageConfig) ?? DEFAULT_COVER_CONFIG);
     const photosHtml = buildPhotosPageHtml((quote.photos_page_config as PhotosPageConfig) ?? DEFAULT_PHOTOS_CONFIG);

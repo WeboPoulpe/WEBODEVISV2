@@ -32,6 +32,12 @@ export interface SendQuoteResult {
   cc?: string[];
 }
 
+/**
+ * Document sur fond noir (repère webo-dark, lib/quoteLight) : il a une version claire à imprimer.
+ * Lu en base, pour ne pas transférer le document entier.
+ */
+const darkDocument = sql<boolean>`coalesce(${quotes.content_html} ~ 'class="[^"]*webo-dark', false)`;
+
 /** Nombre d'adresses en copie au plus. */
 const MAX_CC = 5;
 
@@ -43,7 +49,7 @@ const MAX_CC = 5;
  * propre email, avec le même lien. Personne ne voit ainsi les adresses des autres, et un envoi refusé
  * pour une adresse n'empêche pas les autres de partir.
  */
-export async function sendQuoteToClient(input: { quoteId: string; to: string | string[]; message: string; copyToMe?: boolean; cc?: string | string[] }): Promise<SendQuoteResult> {
+export async function sendQuoteToClient(input: { quoteId: string; to: string | string[]; message: string; copyToMe?: boolean; cc?: string | string[]; printLink?: boolean }): Promise<SendQuoteResult> {
   const user = await requireWriter();
   if (isDemoUser(user.id)) return { error: DEMO_BLOCKED };
   const recipients = uniqueEmails(Array.isArray(input.to) ? input.to.flatMap(splitEmails) : splitEmails(input.to));
@@ -63,6 +69,7 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
     .select({
       id: quotes.id, quote_number: quotes.quote_number, status: quotes.status, share_token: quotes.share_token, valid_until: quotes.valid_until, client_name: quotes.client_name, client_email: quotes.client_email,
       client_first_name: quotes.client_first_name, event_type: quotes.event_type, event_date: quotes.event_date, guest_count: quotes.guest_count,
+      dark: darkDocument,
     })
     .from(quotes)
     .where(and(eq(quotes.id, input.quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id} or ${quotes.owner_user_id} in ${companyIdsOf(user.id)})`))
@@ -90,6 +97,8 @@ export async function sendQuoteToClient(input: { quoteId: string; to: string | s
       guestCount: quote.guest_count,
       message: input.message.trim(),
       link: `${await appOrigin()}/d/${token}`,
+      // Devis sur fond noir : lien vers sa version claire, à imprimer.
+      printLink: input.printLink && quote.dark ? `${await appOrigin()}/d/${token}?version=claire` : null,
     }),
   };
 
@@ -177,12 +186,13 @@ export interface RecipientSuggestion {
  * Adresses connues pour le client du devis, proposées en un clic dans la fenêtre d'envoi :
  * l'email du devis, celui de la fiche client, le contact choisi pour le devis et les contacts de l'entreprise.
  */
-export async function quoteRecipientSuggestions(quoteId: string): Promise<{ suggestions: RecipientSuggestion[]; accountEmail: string | null }> {
+export async function quoteRecipientSuggestions(quoteId: string): Promise<{ suggestions: RecipientSuggestion[]; accountEmail: string | null; dark?: boolean }> {
   const user = await requireUser();
   const [quote] = await db
     .select({
       customer_id: quotes.customer_id, client_email: quotes.client_email, contact_person_name: quotes.contact_person_name,
       recipient_contact_email: quotes.recipient_contact_email, recipient_contact_role: quotes.recipient_contact_role,
+      dark: darkDocument,
     })
     .from(quotes)
     .where(and(eq(quotes.id, quoteId), sql`(${quotes.user_id} = ${user.id} or ${quotes.owner_user_id} = ${user.id} or ${quotes.owner_user_id} in ${companyIdsOf(user.id)})`))
@@ -217,5 +227,5 @@ export async function quoteRecipientSuggestions(quoteId: string): Promise<{ sugg
       add(customer.contact_person_email, contactLabel(customer.contact_person_name, null));
     }
   }
-  return { suggestions: found, accountEmail };
+  return { suggestions: found, accountEmail, dark: quote.dark };
 }

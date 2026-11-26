@@ -214,7 +214,7 @@ export function brochureEmail({ companyName, brochureName, message, link, langua
 }
 
 // ── Devis envoyé au client ────────────────────────────────────────────────────
-export function quoteProposalEmail({ companyName, quoteNumber, clientName, eventType, eventDate, guestCount, message, link }: {
+export function quoteProposalEmail({ companyName, quoteNumber, clientName, eventType, eventDate, guestCount, message, link, printLink }: {
   companyName: string;
   quoteNumber?: string | null;
   clientName: string;
@@ -223,6 +223,8 @@ export function quoteProposalEmail({ companyName, quoteNumber, clientName, event
   guestCount: number | null;
   message: string;
   link: string;
+  /** Version claire du devis, à imprimer (devis sur fond noir). */
+  printLink?: string | null;
 }): Email {
   return {
     subject: `Votre devis ${companyName}${quoteNumber ? ` n° ${quoteNumber}` : ''}${eventType ? `, ${eventType.toLowerCase()}` : ''}`,
@@ -238,7 +240,10 @@ export function quoteProposalEmail({ companyName, quoteNumber, clientName, event
         ['Couverts', guestCount ? String(guestCount) : ''],
       ],
       button: { label: 'Consulter le devis', url: link },
-      note: 'Le devis s’ouvre dans votre navigateur ; vous pouvez l’enregistrer en PDF ou l’imprimer. Pour toute question, répondez à cet email.',
+      ...(printLink ? { secondaryLink: { label: 'Version claire, pour l’imprimer', url: printLink } } : {}),
+      note: printLink
+        ? 'Le devis s’ouvre dans votre navigateur ; vous pouvez l’enregistrer en PDF ou l’imprimer. Pour l’imprimer chez vous, la version claire, sur fond blanc, économise l’encre. Pour toute question, répondez à cet email.'
+        : 'Le devis s’ouvre dans votre navigateur ; vous pouvez l’enregistrer en PDF ou l’imprimer. Pour toute question, répondez à cet email.',
       footer: `Envoyé par ${companyName} avec WeboDevis.`,
     }),
   };

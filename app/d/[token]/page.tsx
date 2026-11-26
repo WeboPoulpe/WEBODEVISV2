@@ -1,12 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { notFound } from 'next/navigation';
-import { CheckCircle2, Clock, CreditCard } from 'lucide-react';
+import { CheckCircle2, Clock, CreditCard, Moon, Sun } from 'lucide-react';
 import { adminSupabase } from '@/lib/supabase/admin';
 import QuoteRender from '@/components/devis/QuoteRender';
 import { LEGAL_PROFILE_COLUMNS } from '@/components/devis/weboword/printHelpers';
 import { cleanPaymentUrl } from '@/lib/paymentLink';
 import { acceptanceState, recordQuoteView } from '@/server/acceptance';
+import { isDarkQuote } from '@/lib/quoteLight';
 import PrintButton from './PrintButton';
 import AcceptQuote from './AcceptQuote';
 
@@ -23,8 +24,9 @@ async function companyProfile(userId: string) {
     .eq('id', (me as { parent_user_id?: string | null } | null)?.parent_user_id ?? userId).maybeSingle();
 }
 
-export default async function DevisPublicPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function DevisPublicPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ version?: string }> }) {
   const { token } = await params;
+  const { version } = await searchParams;
   if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) notFound();
 
   const { data: quote } = await adminSupabase.from('quotes').select('*').eq('share_token', token).maybeSingle();
@@ -39,13 +41,26 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
   ]);
   const companyName = profile?.company_name || 'Votre traiteur';
   // Lien de paiement du traiteur : proposé une fois le devis accepté. Le paiement se fait chez lui, pas ici.
+  // Devis sur fond noir : une version claire est proposée pour l'imprimer (lien « ?version=claire », aussi envoyé par email).
+  const dark = isDarkQuote(quote.content_html);
+  const light = dark && version === 'claire';
   const paymentUrl = cleanPaymentUrl((profile as { company_payment_url?: string | null } | null)?.company_payment_url);
 
   return (
     <div className="min-h-[100dvh] bg-page print:bg-white">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 sm:px-6 h-16 bg-page/90 backdrop-blur border-b border-gray-200 print:hidden">
         <p className="font-display text-lg font-semibold text-gray-900 truncate">{profile?.company_name || 'Votre devis'}</p>
-        <PrintButton />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {dark && (
+            <a href={light ? `/d/${token}` : `/d/${token}?version=claire`}
+              className="inline-flex items-center gap-2 h-10 px-3 sm:px-4 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:border-gray-400 transition-colors">
+              {light ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              <span className="hidden sm:inline">{light ? 'Version noire' : 'Version claire à imprimer'}</span>
+              <span className="sm:hidden">{light ? 'Noire' : 'Claire'}</span>
+            </a>
+          )}
+          <PrintButton />
+        </div>
       </header>
       <main className="px-0 sm:px-6 py-0 sm:py-6 print:p-0">
         {state?.acceptance && (
@@ -85,7 +100,7 @@ export default async function DevisPublicPage({ params }: { params: Promise<{ to
         {/* Le document garde sa largeur A4 ; sur téléphone il défile horizontalement plutôt que de se déformer. */}
         <div className="overflow-x-auto">
           <div className="mx-auto bg-white sm:rounded-2xl sm:border sm:border-gray-200 print:border-0 print:rounded-none" style={{ width: '210mm', maxWidth: 'none' }}>
-            <QuoteRender quote={quote} profile={profile} acceptance={state?.acceptance ?? null} />
+            <QuoteRender quote={quote} profile={profile} acceptance={state?.acceptance ?? null} light={light} />
           </div>
         </div>
       </main>

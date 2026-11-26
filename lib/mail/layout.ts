@@ -30,6 +30,8 @@ export interface EmailLayout {
   /** Tableau de faits, par exemple le détail d'une demande. */
   facts?: [label: string, value: string][];
   button?: { label: string; url: string };
+  /** Second lien, plus discret, sous le bouton. */
+  secondaryLink?: { label: string; url: string };
   /** Petit texte sous le bouton (HTML déjà échappé). */
   note?: string;
   /** Mention en pied de page. */
@@ -69,6 +71,7 @@ export function renderEmail(layout: EmailLayout): string {
           <a href="${esc(layout.button.url)}" style="display:inline-block;padding:14px 24px;font-family:${FONT};font-size:16px;font-weight:600;color:#FFFFFF;text-decoration:none;">${esc(layout.button.label)}</a>
         </td>
       </tr></table>` : ''}
+      ${layout.secondaryLink ? `<p style="margin:12px 0 0;font-size:15px;"><a href="${esc(layout.secondaryLink.url)}" style="color:${COLORS.primary};font-weight:600;text-decoration:underline;">${esc(layout.secondaryLink.label)}</a></p>` : ''}
       ${layout.note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:${COLORS.muted};">${layout.note}</p>` : ''}
     </td></tr>
     <tr><td style="padding:18px 32px 0;font-size:12px;line-height:1.5;color:${COLORS.muted};text-align:center;">
